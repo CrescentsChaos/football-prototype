@@ -350,20 +350,19 @@ const App = (() => {
     for (let i = 0; i < 5; i++) {
       const ht = homeTakers[i % homeTakers.length];
       const at = awayTakers[i % awayTakers.length];
-      const homeScore = Math.random() < (0.7 + (ht.att||70)/500);
-      const awayScore = Math.random() < (0.7 + (at.att||70)/500);
-      if (homeScore) {
+      const homeOut = pickPenOutcome();
+      const awayOut = pickPenOutcome();
+      if (homeOut.scored) {
         homePens++;
-        addEvent(m.minute, 'pen', `✓ ${ht.name} scores for ${m.home.team.short} (${homePens}-${awayPens})`, 'home');
+        addEvent(m.minute, 'pen', `⚽ ${ht.name} (${m.home.team.short}) ${homeOut.text} [${homePens}-${awayPens}]`, 'home');
       } else {
-        addEvent(m.minute, 'pen', `✗ ${ht.name} misses! Saved by ${awayGk ? awayGk.name : 'GK'} (${homePens}-${awayPens})`, 'home');
+        addEvent(m.minute, 'pen', `❌ ${ht.name} (${m.home.team.short}) — ${homeOut.text} [${homePens}-${awayPens}]`, 'home');
       }
-      // Early end check after both taken same number
-      if (awayScore) {
+      if (awayOut.scored) {
         awayPens++;
-        addEvent(m.minute, 'pen', `✓ ${at.name} scores for ${m.away.team.short} (${homePens}-${awayPens})`, 'away');
+        addEvent(m.minute, 'pen', `⚽ ${at.name} (${m.away.team.short}) ${awayOut.text} [${homePens}-${awayPens}]`, 'away');
       } else {
-        addEvent(m.minute, 'pen', `✗ ${at.name} misses! Saved by ${homeGk ? homeGk.name : 'GK'} (${homePens}-${awayPens})`, 'away');
+        addEvent(m.minute, 'pen', `❌ ${at.name} (${m.away.team.short}) — ${awayOut.text} [${homePens}-${awayPens}]`, 'away');
       }
       // Can we end early?
       const left = 4 - i;
@@ -374,12 +373,12 @@ const App = (() => {
     while (homePens === awayPens && sd < 5) {
       const ht = homeTakers[(5 + sd) % homeTakers.length];
       const at = awayTakers[(5 + sd) % awayTakers.length];
-      const hs = Math.random() < 0.72;
-      const as_ = Math.random() < 0.72;
-      if (hs) { homePens++; addEvent(m.minute, 'pen', `✓ ${ht.name} (SD) scores (${homePens}-${awayPens})`, 'home'); }
-      else addEvent(m.minute, 'pen', `✗ ${ht.name} (SD) misses (${homePens}-${awayPens})`, 'home');
-      if (as_) { awayPens++; addEvent(m.minute, 'pen', `✓ ${at.name} (SD) scores (${homePens}-${awayPens})`, 'away'); }
-      else addEvent(m.minute, 'pen', `✗ ${at.name} (SD) misses (${homePens}-${awayPens})`, 'away');
+      const homeOut = pickPenOutcome();
+      const awayOut = pickPenOutcome();
+      if (homeOut.scored) { homePens++; addEvent(m.minute, 'pen', `⚽ ${ht.name} (sudden death) ${homeOut.text} [${homePens}-${awayPens}]`, 'home'); }
+      else addEvent(m.minute, 'pen', `❌ ${ht.name} (sudden death) — ${homeOut.text} [${homePens}-${awayPens}]`, 'home');
+      if (awayOut.scored) { awayPens++; addEvent(m.minute, 'pen', `⚽ ${at.name} (sudden death) ${awayOut.text} [${homePens}-${awayPens}]`, 'away'); }
+      else addEvent(m.minute, 'pen', `❌ ${at.name} (sudden death) — ${awayOut.text} [${homePens}-${awayPens}]`, 'away');
       sd++;
     }
     m.home.penScore = homePens;
@@ -502,27 +501,121 @@ const App = (() => {
 
   function pickGoalMethod(shooter) {
     const methods = [
-      { desc: 'right-footed finish', xg: 0.35, puskas: false },
-      { desc: 'left-footed strike', xg: 0.32, puskas: false },
-      { desc: 'powerful header', xg: 0.28, puskas: false },
-      { desc: 'tap-in', xg: 0.55, puskas: false },
-      { desc: 'curled shot into the top corner', xg: 0.18, puskas: true },
-      { desc: 'long-range rocket', xg: 0.12, puskas: true },
-      { desc: 'chip over the keeper', xg: 0.22, puskas: true },
-      { desc: 'volley', xg: 0.20, puskas: true },
-      { desc: 'solo run and finish', xg: 0.25, puskas: true },
-      { desc: 'deflected shot', xg: 0.15, puskas: false },
-      { desc: 'close-range poke', xg: 0.45, puskas: false },
-      { desc: 'low driven shot', xg: 0.30, puskas: false }
+      { desc: 'low driven finish across the keeper', xg: 0.38, puskas: false },
+      { desc: 'side-footed placement into the far corner', xg: 0.36, puskas: false },
+      { desc: 'powerful right-footed strike', xg: 0.33, puskas: false },
+      { desc: 'left-footed drive', xg: 0.32, puskas: false },
+      { desc: 'towering header', xg: 0.30, puskas: false },
+      { desc: 'glancing near-post header', xg: 0.28, puskas: false },
+      { desc: 'tap-in from close range', xg: 0.58, puskas: false },
+      { desc: 'poacher\'s finish at the far post', xg: 0.48, puskas: false },
+      { desc: 'deflected effort that wrong-foots the keeper', xg: 0.22, puskas: false },
+      { desc: 'low screamer into the bottom corner', xg: 0.16, puskas: true },
+      { desc: 'dipping shot from outside the box', xg: 0.14, puskas: true },
+      { desc: 'rising drive that flies into the roof of the net', xg: 0.13, puskas: true },
+      { desc: 'knuckleball strike that swerves late', xg: 0.12, puskas: true },
+      { desc: 'blitz curler into the top corner', xg: 0.15, puskas: true },
+      { desc: 'inch-perfect curled finish around the wall', xg: 0.17, puskas: true },
+      { desc: 'chip over the advancing keeper', xg: 0.20, puskas: true },
+      { desc: 'first-time volley on the half-turn', xg: 0.18, puskas: true },
+      { desc: 'overhead kick', xg: 0.10, puskas: true },
+      { desc: 'bicycle kick', xg: 0.09, puskas: true },
+      { desc: 'rabona finish', xg: 0.08, puskas: true },
+      { desc: 'solo run from halfway, then cool finish', xg: 0.19, puskas: true },
+      { desc: 'cut inside and arrowed shot near post', xg: 0.24, puskas: false },
+      { desc: 'rebound smashed home', xg: 0.42, puskas: false },
+      { desc: 'toe-poke under the keeper', xg: 0.40, puskas: false }
     ];
-    // Higher tec players more likely spectacular
     const spectacular = methods.filter(m => m.puskas);
     const normal = methods.filter(m => !m.puskas);
-    if ((shooter.tec || 70) > 85 && Math.random() < 0.35) {
-      return spectacular[Math.floor(Math.random() * spectacular.length)];
-    }
-    return Math.random() < 0.2 ? spectacular[Math.floor(Math.random()*spectacular.length)] : normal[Math.floor(Math.random()*normal.length)];
+    const tec = shooter.tec || 70;
+    if (tec > 88 && Math.random() < 0.42) return spectacular[Math.floor(Math.random() * spectacular.length)];
+    if (tec > 82 && Math.random() < 0.28) return spectacular[Math.floor(Math.random() * spectacular.length)];
+    return Math.random() < 0.18 ? spectacular[Math.floor(Math.random()*spectacular.length)] : normal[Math.floor(Math.random()*normal.length)];
   }
+
+  function pickMissDesc(shooter) {
+    const list = [
+      'drags a low shot inches wide of the far post',
+      'blasts a rising shot over the crossbar',
+      'sees a dipping effort glance off the top of the bar',
+      'side-foots wide from a promising angle',
+      'scuffs a close-range chance wide of the near post',
+      'hits a first-time volley into the stands',
+      'curls a shot just beyond the far upright',
+      'fires a low screamer that skims past the post',
+      'leans back and sends a header over',
+      'is denied by the angle as the shot rolls across the face of goal'
+    ];
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function pickSaveDesc(gk, shooter) {
+    const list = [
+      `strong hands from <span class="player">${gk.name}</span> to push away a fierce drive`,
+      `<span class="player">${gk.name}</span> dives full length to tip a curler around the post`,
+      `reflex save — <span class="player">${gk.name}</span> blocks from point-blank range`,
+      `<span class="player">${gk.name}</span> gets down quickly to hold a low shot`,
+      `spectacular tip over from <span class="player">${gk.name}</span> as a rising shot threatens the top corner`,
+      `<span class="player">${gk.name}</span> parries a knuckleball, then gathers at the second attempt`,
+      `brave claim by <span class="player">${gk.name}</span> under pressure from the striker`
+    ];
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function pickSkillDesc(player) {
+    const list = [
+      `double touch to slip past the marker`,
+      `rabona cross that causes chaos in the box`,
+      `no-look lay-off that opens the defence`,
+      `visionary through ball between the centre-backs`,
+      `step-over and burst of pace down the flank`,
+      `elastico that leaves the full-back wrong-footed`,
+      `shoulder drop and cut inside from the wing`,
+      `quick one-two around the press`,
+      `disguised reverse pass into the channel`,
+      `roulette in midfield to escape two challenges`
+    ];
+    return `<span class="player">${player.name}</span> — ${list[Math.floor(Math.random() * list.length)]}`;
+  }
+
+  function pickPenOutcome() {
+    // precise outcomes for pens
+    const outcomes = [
+      { scored: true, text: 'sends the keeper the wrong way — bottom left' },
+      { scored: true, text: 'smashes high into the top-right corner' },
+      { scored: true, text: 'cool finish down the middle as the keeper dives early' },
+      { scored: true, text: 'low and hard to the keeper\'s right' },
+      { scored: true, text: 'panenka chip that floats under the bar' },
+      { scored: false, text: 'saved — the keeper guesses correctly and palms it away to his left' },
+      { scored: false, text: 'saved low to the right — strong hand from the goalkeeper' },
+      { scored: false, text: 'crashes against the crossbar and stays out' },
+      { scored: false, text: 'skewed wide of the left post' },
+      { scored: false, text: 'keeper tips it onto the upright — rebound cleared' }
+    ];
+    // ~72% score rate
+    const scoredOnes = outcomes.filter(o => o.scored);
+    const missedOnes = outcomes.filter(o => !o.scored);
+    if (Math.random() < 0.72) return scoredOnes[Math.floor(Math.random() * scoredOnes.length)];
+    return missedOnes[Math.floor(Math.random() * missedOnes.length)];
+  }
+
+  function pickFkOutcome() {
+    const outcomes = [
+      { scored: true, text: 'whipped curler over the wall into the top corner' },
+      { scored: true, text: 'knuckleball that dips late under the bar' },
+      { scored: true, text: 'low drive that skids under the jumping wall' },
+      { scored: true, text: 'rising shot into the far top corner' },
+      { scored: false, text: 'cleared off the line after the keeper was beaten' },
+      { scored: false, text: 'kept out — the keeper tips a curling effort over the bar' },
+      { scored: false, text: 'struck into the wall and spun away for a corner' },
+      { scored: false, text: 'inches over the crossbar' },
+      { scored: false, text: 'curls wide of the far post' }
+    ];
+    if (Math.random() < 0.22) return outcomes.filter(o=>o.scored)[Math.floor(Math.random()*3)];
+    return outcomes.filter(o=>!o.scored)[Math.floor(Math.random()*6)];
+  }
+
 
   function calcPlayerRating(ps) {
     let r = 6.0 + (Math.random() * 0.25 - 0.08);
@@ -719,9 +812,9 @@ const App = (() => {
             if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
             m.playerMatchStats[assister.id].assists++;
             m.playerMatchStats[assister.id].xa += 0.3 + Math.random() * 0.4;
-            addEvent(m.minute, 'goal', `<span class="player">${shooter.name}</span> (${shooter.num||''}) — ${method.desc}. Assist: <span class="player">${assister.name}</span>`, attackingSide, true);
+            addEvent(m.minute, 'goal', `⚽ <span class="player">${shooter.name}</span> (${shooter.num||''}) — ${method.desc}. Assist: <span class="player">${assister.name}</span>`, attackingSide, true);
           } else {
-            addEvent(m.minute, 'goal', `<span class="player">${shooter.name}</span> (${shooter.num||''}) finds the net — ${method.desc}`, attackingSide, true);
+            addEvent(m.minute, 'goal', `⚽ <span class="player">${shooter.name}</span> (${shooter.num||''}) — ${method.desc}`, attackingSide, true);
           }
         }
       } else {
@@ -729,7 +822,7 @@ const App = (() => {
         if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
         m.playerMatchStats[shooter.id].shots++;
         m.playerMatchStats[shooter.id].xg += 0.05 + Math.random()*0.1;
-        addEvent(m.minute, 'shot', `Shot by <span class="player">${shooter.name}</span> goes wide`, attackingSide);
+        addEvent(m.minute, 'miss', `<span class="player">${shooter.name}</span> ${pickMissDesc(shooter)}`, attackingSide);
       }
     } else if (r < 0.32) {
       attTeam.stats.corners++;
@@ -774,16 +867,24 @@ const App = (() => {
       }
     } else if (r < 0.55) {
       const taker = pickPlayer(attTeam, ['CAM','CM','ST','RW','LW']);
-      if (taker && Math.random() < 0.15) {
-        attTeam.stats.shots++; attTeam.stats.shotsOn++;
-        if (Math.random() < 0.3) {
+      if (taker && Math.random() < 0.18) {
+        attTeam.stats.shots++;
+        const fk = pickFkOutcome();
+        addEvent(m.minute, 'shot', `<span class="player">${taker.name}</span> stands over the free-kick...`, attackingSide);
+        if (fk.scored) {
+          attTeam.stats.shotsOn++;
           attTeam.score++;
           recordStat('goals', taker, attTeam.team);
-          pushGoal(attackingSide, taker, m.minute, 'free-kick');
-          addEvent(m.minute, 'goal', `Free-kick. <span class="player">${taker.name}</span> (${taker.num||''}) bends it past the wall`, attackingSide, true);
-          if (Math.random() < 0.5) recordStat('puskas', taker, attTeam.team);
+          pushGoal(attackingSide, taker, m.minute, fk.text);
+          addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide, true);
+          if (Math.random() < 0.55) recordStat('puskas', taker, attTeam.team);
         } else {
-          addEvent(m.minute, 'shot', `Free-kick by <span class="player">${taker.name}</span> saved/wide`, attackingSide);
+          if (fk.text.includes('keeper') || fk.text.includes('tips')) {
+            attTeam.stats.shotsOn++;
+            const gk = pickPlayer(defTeam, ['GK']);
+            if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
+          }
+          addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide);
         }
       }
     } else if (r < 0.65) {
@@ -812,22 +913,26 @@ const App = (() => {
       const p = pickPlayer(defTeam, ['CB','RB','LB','CDM','ST']);
       if (p) {
         defTeam.stats.fouls++;
-        addEvent(m.minute, 'handball', `Handball by <span class="player">${p.name}</span>`, defendingSide);
-        if (Math.random() < 0.25) {
-          // Penalty
+        addEvent(m.minute, 'handball', `Handball against <span class="player">${p.name}</span> — referee points to the spot`, defendingSide);
+        if (Math.random() < 0.28) {
           const taker = pickPlayer(attTeam, ['ST','CAM','CM']);
           if (taker) {
-            addEvent(m.minute, 'pen', `Penalty awarded! <span class="player">${taker.name}</span> steps up`, attackingSide);
-            attTeam.stats.shots++; attTeam.stats.shotsOn++;
-            if (Math.random() < 0.75) {
+            addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
+            attTeam.stats.shots++;
+            const po = pickPenOutcome();
+            if (po.scored) {
+              attTeam.stats.shotsOn++;
               attTeam.score++;
               recordStat('goals', taker, attTeam.team);
-              pushGoal(attackingSide, taker, m.minute, 'penalty');
-              addEvent(m.minute, 'goal', `Penalty scored by <span class="player">${taker.name}</span>`, attackingSide, true);
+              pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
+              addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
             } else {
               const gk = pickPlayer(defTeam, ['GK']);
-              if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
-              addEvent(m.minute, 'miss', `Penalty saved/missed! <span class="player">${taker.name}</span>`, attackingSide);
+              if (po.text.includes('saved') || po.text.includes('palms') || po.text.includes('hand')) {
+                attTeam.stats.shotsOn++;
+                if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
+              }
+              addEvent(m.minute, 'miss', `Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, attackingSide);
             }
           }
         }
@@ -855,21 +960,22 @@ const App = (() => {
           addEvent(m.minute, 'var', `VAR: Penalty awarded to ${varTeam.team.short}!`, varSide);
           const taker = pickPlayer(attTeam, ['ST','CAM','CM']) || fouled;
           if (taker) {
-            addEvent(m.minute, 'pen', `Penalty for ${varTeam.team.short} — <span class="player">${taker.name}</span> steps up`, varSide);
-            attTeam.stats.shots++; attTeam.stats.shotsOn++;
-            if (Math.random() < 0.75) {
+            addEvent(m.minute, 'pen', `Penalty to ${varTeam.team.short}. <span class="player">${taker.name}</span> places the ball on the spot.`, varSide);
+            attTeam.stats.shots++;
+            const po = pickPenOutcome();
+            if (po.scored) {
+              attTeam.stats.shotsOn++;
               attTeam.score++;
               recordStat('goals', taker, attTeam.team);
-              pushGoal(varSide, taker, m.minute, 'penalty');
-              addEvent(m.minute, 'goal', `Penalty scored — <span class="player">${taker.name}</span> (${varTeam.team.short})`, varSide, true);
+              pushGoal(varSide, taker, m.minute, 'penalty — ' + po.text);
+              addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, varSide, true);
             } else {
               const gk = pickPlayer(defTeam, ['GK']);
-              if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
-              if (Math.random() < 0.5) {
-                addEvent(m.minute, 'miss', `Penalty SAVED by <span class="player">${gk?gk.name:'GK'}</span>!`, defSide);
-              } else {
-                addEvent(m.minute, 'miss', `Penalty MISSED by <span class="player">${taker.name}</span> (over the bar)`, varSide);
+              if (po.text.includes('saved') || po.text.includes('palms') || po.text.includes('hand')) {
+                attTeam.stats.shotsOn++;
+                if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
               }
+              addEvent(m.minute, 'miss', `Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, varSide);
             }
           }
         } else {
@@ -901,7 +1007,7 @@ const App = (() => {
       } else if (rare < 0.48 && def) {
         addEvent(m.minute, 'foul', `<span class="player">${def.name}</span> times a sliding tackle to perfection on the edge of the box`, defendingSide);
       } else if (rare < 0.58 && att) {
-        addEvent(m.minute, 'skill', `<span class="player">${att.name}</span> nutmegs the full-back and drives toward the byline`, attackingSide);
+        addEvent(m.minute, 'skill', pickSkillDesc(att), attackingSide);
       } else if (rare < 0.68 && att) {
         addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> threads a defence-splitting ball into the channel`, attackingSide);
       } else if (rare < 0.78) {
@@ -1170,7 +1276,7 @@ const App = (() => {
     if (currentMatch.silentDeep) return;
     const feed = document.getElementById('events-feed');
     if (!feed) return;
-    const icons = { goal: '●', save: '▢', yellow: 'Y', red: 'R', sub: '↔', injury: '+', corner: '⌜', foul: '!', shot: '·', miss: '×', pass: '›', offside: 'off', whistle: '—', pressure: '»', motm: '★', var: 'VAR', pen: 'P', skill: '~', handball: 'HB', et: 'ET' };
+    const icons = { goal: '⚽', save: '🧤', yellow: '🟨', red: '🟥', sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: '📢', pressure: '🔥', motm: '⭐', var: '📺', pen: '⚽', skill: '✨', handball: '✋', et: '⏱️' };
     const div = document.createElement('div');
     div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
     div.innerHTML = `<span class="event-time">${minute}'</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
