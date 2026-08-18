@@ -2,63 +2,206 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>FIFA World Engine</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Football Simulator</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-<header>
-  <h1>⚽ Ultimate Football Engine</h1>
-  <div id="status-badge" style="color: var(--text-muted);">Ready for Kickoff</div>
-</header>
-
-<div class="controls-bar card">
-  <select id="comp-type" onchange="setupTeams()">
-    <option value="clubs">UEFA Champions League (Clubs)</option>
-    <option value="nationals">FIFA World Cup (Nationals)</option>
-  </select>
-  <select id="home-team" onchange="renderTacticalBoards()"></select>
-  <select id="away-team" onchange="renderTacticalBoards()"></select>
-  <button class="btn-sim" id="btn-start" onclick="startGradualSimulation()">Kickoff</button>
-  <button class="btn-reset" onclick="resetMatchData()">Reset</button>
-</div>
-
-<div class="main-layout">
-  <main class="card">
-    <!-- Scoreboard -->
-    <div class="scoreboard">
-      <div class="team-score" id="home-title">Home</div>
-      <div class="score-num" id="score-display">0 - 0</div>
-      <div class="team-score" id="away-title">Away</div>
-      <div class="match-clock" id="match-clock">00'</div>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">⚽</div>
+        <span>APEX SIM</span>
+      </div>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-view="home">Home</button>
+        <button class="nav-tab" data-view="match">Match</button>
+        <button class="nav-tab" data-view="tournament">Tournament</button>
+        <button class="nav-tab" data-view="leaderboard">Leaderboard</button>
+        <button class="nav-tab" data-view="teams">Teams</button>
+      </nav>
     </div>
+  </header>
 
-    <!-- Pre-Match Formations & Substitutes -->
-    <h3>Tactical Formations & Squads</h3>
-    <div class="pre-match-boards">
-      <div class="tactical-board" id="home-tactics"></div>
-      <div class="tactical-board" id="away-tactics"></div>
-    </div>
+  <main class="main-content">
+    <!-- HOME -->
+    <section id="view-home" class="view active">
+      <div class="hero">
+        <h1>Apex Football Simulator</h1>
+        <p>Premium match engine with formations, injuries, substitutions, and full tournament simulation. Experience World Cup & Champions League glory.</p>
+        <div class="mode-grid">
+          <div class="mode-card" onclick="App.goToMatch()">
+            <div class="icon">🏟️</div>
+            <h3>Friendly Match</h3>
+            <p>Pick two teams, choose formations, and simulate a full 90-minute match with live commentary, cards, goals and more.</p>
+          </div>
+          <div class="mode-card" onclick="App.goToTournament('worldcup')">
+            <div class="icon">🏆</div>
+            <h3>World Cup</h3>
+            <p>National teams battle through groups and knockouts. Track top scorers, assists, clean sheets across the tournament.</p>
+          </div>
+          <div class="mode-card" onclick="App.goToTournament('ucl')">
+            <div class="icon">⭐</div>
+            <h3>Champions League</h3>
+            <p>Club competition. Select teams, run the full knockout path, and crown the European champion.</p>
+          </div>
+          <div class="mode-card" onclick="App.switchView('leaderboard')">
+            <div class="icon">📊</div>
+            <h3>Leaderboards</h3>
+            <p>Global stats: goals, assists, saves, clean sheets. Updated after every simulated match.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <!-- Dynamic Match Feed -->
-    <h3>Live Commentary</h3>
-    <div class="feed-container" id="match-feed"></div>
+    <!-- MATCH -->
+    <section id="view-match" class="view">
+      <div id="match-setup">
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-title">Select Teams & Formations</div>
+          <div class="team-select-grid">
+            <div class="team-panel">
+              <h3>HOME</h3>
+              <select id="home-team" class="team-dropdown" onchange="App.updateTeamPreview('home')"></select>
+              <div id="home-preview" class="team-preview"></div>
+              <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
+              <select id="home-formation" class="formation-select"></select>
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="team-panel">
+              <h3>AWAY</h3>
+              <select id="away-team" class="team-dropdown" onchange="App.updateTeamPreview('away')"></select>
+              <div id="away-preview" class="team-preview"></div>
+              <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
+              <select id="away-formation" class="formation-select"></select>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;justify-content:center;margin-top:8px">
+            <button class="btn btn-primary" onclick="App.startMatch()">⚽ Kick Off</button>
+            <button class="btn btn-secondary" onclick="App.quickSimMatch()">⚡ Instant Result</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="match-live" style="display:none">
+        <div class="match-arena">
+          <div class="scoreboard">
+            <div class="score-team home">
+              <span class="flag" id="live-home-flag"></span>
+              <span class="name" id="live-home-name"></span>
+              <span class="formation" id="live-home-form"></span>
+            </div>
+            <div class="score-center">
+              <div class="score-numbers"><span id="live-home-score">0</span> - <span id="live-away-score">0</span></div>
+              <div class="score-time" id="live-minute">0'</div>
+              <div class="match-status" id="live-status">1st Half</div>
+            </div>
+            <div class="score-team away">
+              <span class="flag" id="live-away-flag"></span>
+              <span class="name" id="live-away-name"></span>
+              <span class="formation" id="live-away-form"></span>
+            </div>
+          </div>
+          <div class="events-container">
+            <div class="events-feed" id="events-feed"></div>
+            <div class="match-stats-panel">
+              <div class="stat-label">Match Stats</div>
+              <div id="live-stats"></div>
+            </div>
+          </div>
+          <div class="match-controls">
+            <button class="btn btn-primary btn-sm" id="btn-play" onclick="App.toggleSim()">▶ Play</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.simToEnd()">⏩ Finish Match</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.resetMatch()">↺ New Match</button>
+            <span style="margin-left:auto;color:var(--text-muted);font-size:0.85rem" id="sim-speed-label">Speed: Normal</span>
+            <select id="sim-speed" onchange="App.setSpeed(this.value)" style="padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)">
+              <option value="800">Slow</option>
+              <option value="400" selected>Normal</option>
+              <option value="150">Fast</option>
+              <option value="40">Turbo</option>
+            </select>
+          </div>
+        </div>
+        <div class="lineup-grid" id="lineup-display"></div>
+      </div>
+    </section>
+
+    <!-- TOURNAMENT -->
+    <section id="view-tournament" class="view">
+      <div id="tournament-setup" class="card">
+        <div class="card-title" id="tournament-title">World Cup Setup</div>
+        <p style="color:var(--text-secondary);margin-bottom:16px" id="tournament-desc">Select national teams to participate. Minimum 4, recommended 8 or 16.</p>
+        <div class="teams-checkbox-grid" id="tournament-teams"></div>
+        <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="App.selectAllTeams()">Select All</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.deselectAllTeams()">Clear</button>
+          <button class="btn btn-primary" onclick="App.startTournament()">🏆 Start Tournament</button>
+        </div>
+      </div>
+
+      <div id="tournament-live" style="display:none">
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title" id="tour-stage-title">Group Stage</div>
+          <div id="groups-container" class="groups-grid"></div>
+          <div style="display:flex;gap:12px;margin-top:16px">
+            <button class="btn btn-primary" id="btn-sim-round" onclick="App.simTournamentRound()">Simulate Round</button>
+            <button class="btn btn-secondary" onclick="App.simAllTournament()">⚡ Simulate All</button>
+            <button class="btn btn-secondary" onclick="App.resetTournament()">↺ Reset</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Knockout Bracket</div>
+          <div class="bracket-container">
+            <div class="bracket" id="bracket"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px" id="tour-leaderboard-mini">
+          <div class="card-title">Tournament Stats</div>
+          <div id="tour-stats-preview"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEADERBOARD -->
+    <section id="view-leaderboard" class="view">
+      <div class="card">
+        <div class="card-title">Global Leaderboards</div>
+        <div class="leaderboard-tabs">
+          <button class="lb-tab active" data-lb="goals" onclick="App.showLeaderboard('goals')">⚽ Goals</button>
+          <button class="lb-tab" data-lb="assists" onclick="App.showLeaderboard('assists')">🎯 Assists</button>
+          <button class="lb-tab" data-lb="saves" onclick="App.showLeaderboard('saves')">🧤 Saves</button>
+          <button class="lb-tab" data-lb="cleanSheets" onclick="App.showLeaderboard('cleanSheets')">🛡️ Clean Sheets</button>
+          <button class="lb-tab" data-lb="cards" onclick="App.showLeaderboard('cards')">🟨 Cards</button>
+          <button class="lb-tab" data-lb="motm" onclick="App.showLeaderboard('motm')">⭐ Man of the Match</button>
+        </div>
+        <div id="leaderboard-content">
+          <div class="empty-state">
+            <div class="icon">📊</div>
+            <p>Simulate matches to populate the leaderboards.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEAMS -->
+    <section id="view-teams" class="view">
+      <div class="card">
+        <div class="card-title">Team Database</div>
+        <p style="color:var(--text-secondary);margin-bottom:16px">All teams loaded from teams.json. Add more teams to the JSON file to make them appear here.</p>
+        <div style="display:flex;gap:12px;margin-bottom:16px">
+          <button class="btn btn-secondary btn-sm" onclick="App.filterTeams('all')">All</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.filterTeams('national')">National</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.filterTeams('club')">Club</button>
+        </div>
+        <div id="teams-list" class="teams-checkbox-grid" style="max-height:none"></div>
+      </div>
+    </section>
   </main>
 
-  <aside class="card">
-    <h3>Leaderboards</h3>
-    
-    <h4 style="margin-top:15px; color: var(--accent-gold);">Top Scorers</h4>
-    <table class="leaderboard-table"><tbody id="board-goals"></tbody></table>
+  <div class="modal-overlay" id="modal">
+    <div class="modal" id="modal-content"></div>
+  </div>
 
-    <h4 style="margin-top:15px; color: var(--accent-gold);">Top Assists</h4>
-    <table class="leaderboard-table"><tbody id="board-assists"></tbody></table>
-
-    <h4 style="margin-top:15px; color: var(--accent-gold);">Top Goalkeepers</h4>
-    <table class="leaderboard-table"><tbody id="board-saves"></tbody></table>
-  </aside>
-</div>
-
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
