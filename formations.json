@@ -1,0 +1,34 @@
+[
+  {
+    "name": "4-3-3",
+    "slots": [
+      {"role": "GK", "accepted": ["GK"]},
+      {"role": "RB", "accepted": ["RB", "RWB", "CB"]},
+      {"role": "CB1", "accepted": ["CB"]},
+      {"role": "CB2", "accepted": ["CB"]},
+      {"role": "LB", "accepted": ["LB", "LWB", "CB"]},
+      {"role": "CDM", "accepted": ["CDM", "CM"]},
+      {"role": "CM1", "accepted": ["CM", "CAM", "CDM"]},
+      {"role": "CM2", "accepted": ["CM", "CAM", "CDM"]},
+      {"role": "RW", "accepted": ["RW", "RM", "ST"]},
+      {"role": "ST", "accepted": ["ST", "CF"]},
+      {"role": "LW", "accepted": ["LW", "LM", "ST"]}
+    ]
+  },
+  {
+    "name": "4-4-2",
+    "slots": [
+      {"role": "GK", "accepted": ["GK"]},
+      {"role": "RB", "accepted": ["RB", "RWB"]},
+      {"role": "CB1", "accepted": ["CB"]},
+      {"role": "CB2", "accepted": ["CB"]},
+      {"role": "LB", "accepted": ["LB", "LWB"]},
+      {"role": "RM", "accepted": ["RM", "RW", "CM"]},
+      {"role": "CM1", "accepted": ["CM", "CDM"]},
+      {"role": "CM2", "accepted": ["CM", "CAM"]},
+      {"role": "LM", "accepted": ["LM", "LW", "CM"]},
+      {"role": "ST1", "accepted": ["ST", "CF"]},
+      {"role": "ST2", "accepted": ["ST", "CF", "CAM"]}
+    ]
+  }
+]

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FIFA Pro Simulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>⚽ Ultimate Football Engine</h1>
+  <div class="nav-tabs">
+    <button class="active">Single Match</button>
+  </div>
+</header>
+
+<div class="container">
+  <main class="card">
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+      <select id="comp-type" onchange="populateTeamSelects()">
+        <option value="clubs">UEFA Champions League (Clubs)</option>
+        <option value="nationals">FIFA World Cup (Nationals)</option>
+      </select>
+      <select id="home-team"></select>
+      <select id="away-team"></select>
+    </div>
+
+    <button class="btn-primary" onclick="simulateMatch()">Simulate Match</button>
+
+    <div class="scoreboard" id="score-display">
+      Home 0 - 0 Away
+    </div>
+
+    <h3>Match Feed</h3>
+    <div class="match-log" id="match-log"></div>
+  </main>
+
+  <aside class="card">
+    <h3>Leaderboards</h3>
+    <h4>Top Scorers</h4>
+    <table><tbody id="leaderboard-goals"></tbody></table>
+
+    <h4 style="margin-top: 15px;">Top Assists</h4>
+    <table><tbody id="leaderboard-assists"></tbody></table>
+
+    <h4 style="margin-top: 15px;">Top Goalkeepers</h4>
+    <table><tbody id="leaderboard-saves"></tbody></table>
+  </aside>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
