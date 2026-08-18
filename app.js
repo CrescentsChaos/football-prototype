@@ -1062,6 +1062,7 @@ const App = (() => {
   function addEvent(minute, type, text, side, isGoal) {
     if (!currentMatch) return;
     currentMatch.events.push({ minute, type, text, side });
+    if (currentMatch.silentDeep) return;
     const feed = document.getElementById('events-feed');
     if (!feed) return;
     const icons = { goal: '⚽', save: '🧤', yellow: '🟨', red: '🟥', sub: '🔄', injury: '🩹', corner: '🚩', foul: '💢', shot: '👟', miss: '😮', pass: '➡️', offside: '🚫', whistle: '📢', pressure: '🔥', motm: '⭐', var: '📺', pen: '⚽', skill: '✨', handball: '✋', et: '⏱️' };
@@ -1073,6 +1074,7 @@ const App = (() => {
 
   function updateScoreboard() {
     if (!currentMatch) return;
+    if (currentMatch.silentDeep) return;
     const m = currentMatch;
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     set('live-home-flag', m.home.team.flag || '');
@@ -1096,6 +1098,7 @@ const App = (() => {
 
   function updateStatsPanel() {
     if (!currentMatch) return;
+    if (currentMatch.silentDeep) return;
     const h = currentMatch.home.stats, a = currentMatch.away.stats;
     const ts = (h.shots + a.shots) || 1, ton = (h.shotsOn + a.shotsOn) || 1;
     const tc = (h.corners + a.corners) || 1, tf = (h.fouls + a.fouls) || 1, tsv = (h.saves + a.saves) || 1;
@@ -1218,12 +1221,24 @@ const App = (() => {
     if (!player || !team) return;
     if (!stats.ratings) stats.ratings = {};
     if (!stats.ratings[player.id]) {
-      stats.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0 };
+      const aff = findPlayerTeams(player.id);
+      stats.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
     }
     const e = stats.ratings[player.id];
     e.count++;
     e.sum += rating;
     e.avg = Math.round((e.sum / e.count) * 100) / 100;
+    if (tournament) {
+      if (!tournamentStats.ratings) tournamentStats.ratings = {};
+      if (!tournamentStats.ratings[player.id]) {
+        const aff = findPlayerTeams(player.id);
+        tournamentStats.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
+      }
+      const te = tournamentStats.ratings[player.id];
+      te.count++;
+      te.sum += rating;
+      te.avg = Math.round((te.sum / te.count) * 100) / 100;
+    }
   }
 
   function findPlayerTeams(playerId) {
@@ -1467,6 +1482,7 @@ const App = (() => {
       else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
     }
     renderGroups();
+    renderTournamentLeaderboard();
     const remaining = tournament.fixtures.filter(x => !x.played).length;
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = remaining ? `Group Stage — ${remaining} matches left` : 'Group Stage Complete';
@@ -1638,59 +1654,71 @@ const App = (() => {
     renderBracket();
   }
 
-  function simQuickMatch(homeTeam, awayTeam) {
-    // Random formations for variety
+  function simQuickMatch(homeTeam, awayTeam, opts) {
+    // Full deep simulation — same engine as live matches (goals, cards, MOTM, injuries, ratings)
+    opts = opts || {};
+    const prevMatch = currentMatch;
+    const prevFixture = window._tourFixtureIdx;
+    const prevKoR = window._koRoundIdx;
+    const prevKoM = window._koMatchIdx;
+    // Prevent live tournament hooks from double-writing during bulk sim
+    window._tourFixtureIdx = undefined;
+    window._koRoundIdx = undefined;
+    window._koMatchIdx = undefined;
+
     const forms = Object.keys(FORMATIONS);
-    const hf = forms[Math.floor(Math.random() * forms.length)];
-    const af = forms[Math.floor(Math.random() * forms.length)];
+    const hf = opts.homeForm || forms[Math.floor(Math.random() * forms.length)];
+    const af = opts.awayForm || forms[Math.floor(Math.random() * forms.length)];
     const homeSquad = buildSquad(homeTeam, hf);
     const awaySquad = buildSquad(awayTeam, af);
-    // Manager boost
-    const homeMgr = (homeTeam.manager && homeTeam.manager.ovr) || 75;
-    const awayMgr = (awayTeam.manager && awayTeam.manager.ovr) || 75;
-    const homeStr = homeSquad.starting.reduce((s, p) => s + (p.att || 70) + (p.ovr || 70), 0) / Math.max(1, homeSquad.starting.length) + (homeMgr - 75) * 0.15;
-    const awayStr = awaySquad.starting.reduce((s, p) => s + (p.att || 70) + (p.ovr || 70), 0) / Math.max(1, awaySquad.starting.length) + (awayMgr - 75) * 0.15;
-    // Slight home advantage + form randomness
-    const formSwing = (Math.random() - 0.5) * 0.6;
-    const homeExp = Math.max(0.3, (homeStr / (homeStr + awayStr)) * 2.5 + 0.15 + formSwing);
-    const awayExp = Math.max(0.3, (awayStr / (homeStr + awayStr)) * 2.5 + formSwing * -1);
-    let homeGoals = poisson(homeExp);
-    let awayGoals = poisson(awayExp);
-    // Rare: dramatic late equalizer bias if one side dominating 0
-    if (homeGoals === 0 && awayGoals >= 2 && Math.random() < 0.12) homeGoals = 1;
-    if (awayGoals === 0 && homeGoals >= 2 && Math.random() < 0.12) awayGoals = 1;
-    for (let i = 0; i < homeGoals; i++) {
-      const attackers = homeSquad.starting.filter(p => !(p.pos || []).includes('GK')).sort((a, b) => (b.att || 0) - (a.att || 0));
-      const scorer = attackers[Math.floor(Math.random() * Math.min(3, attackers.length))] || homeSquad.starting[10];
-      if (scorer) recordStat('goals', scorer, homeTeam);
-      if (Math.random() < 0.65) {
-        const ast = homeSquad.starting[Math.floor(Math.random() * 8) + 1];
-        if (ast && scorer && ast.id !== scorer.id) recordStat('assists', ast, homeTeam);
-      }
+
+    currentMatch = {
+      home: { team: homeTeam, squad: homeSquad, score: 0, stats: blankStats(), penScore: null },
+      away: { team: awayTeam, squad: awaySquad, score: 0, stats: blankStats(), penScore: null },
+      minute: 0,
+      status: '1st Half',
+      finished: false,
+      events: [],
+      homeOnPitch: homeSquad.starting.map(p => p.id),
+      awayOnPitch: awaySquad.starting.map(p => p.id),
+      homeSubsUsed: 0,
+      awaySubsUsed: 0,
+      maxSubs: 5,
+      injuries: [],
+      cards: { home: {}, away: {} },
+      playerMatchStats: {},
+      goalList: [],
+      allowET: !!opts.allowET,
+      allowPens: !!opts.allowPens,
+      silentDeep: true,
+      inET: false,
+      inPens: false
+    };
+
+    let safety = 0;
+    while (currentMatch && !currentMatch.finished && safety < 250) {
+      tick(true);
+      safety++;
     }
-    for (let i = 0; i < awayGoals; i++) {
-      const attackers = awaySquad.starting.filter(p => !(p.pos || []).includes('GK')).sort((a, b) => (b.att || 0) - (a.att || 0));
-      const scorer = attackers[Math.floor(Math.random() * Math.min(3, attackers.length))] || awaySquad.starting[10];
-      if (scorer) recordStat('goals', scorer, awayTeam);
-      if (Math.random() < 0.65) {
-        const ast = awaySquad.starting[Math.floor(Math.random() * 8) + 1];
-        if (ast && scorer && ast.id !== scorer.id) recordStat('assists', ast, awayTeam);
-      }
+    // Force finish if somehow stuck
+    if (currentMatch && !currentMatch.finished) {
+      endMatch();
     }
-    if (awayGoals === 0) {
-      const gk = homeSquad.starting.find(p => (p.pos || []).includes('GK'));
-      if (gk) recordStat('cleanSheets', gk, homeTeam);
-    }
-    if (homeGoals === 0) {
-      const gk = awaySquad.starting.find(p => (p.pos || []).includes('GK'));
-      if (gk) recordStat('cleanSheets', gk, awayTeam);
-    }
-    const homeGk = homeSquad.starting.find(p => (p.pos || []).includes('GK'));
-    const awayGk = awaySquad.starting.find(p => (p.pos || []).includes('GK'));
-    if (homeGk) for (let i = 0; i < Math.floor(Math.random() * 4) + awayGoals; i++) recordStat('saves', homeGk, homeTeam);
-    if (awayGk) for (let i = 0; i < Math.floor(Math.random() * 4) + homeGoals; i++) recordStat('saves', awayGk, awayTeam);
+
+    const result = {
+      home: currentMatch ? currentMatch.home.score : 0,
+      away: currentMatch ? currentMatch.away.score : 0,
+      pens: currentMatch && currentMatch.home.penScore != null
+        ? { home: currentMatch.home.penScore, away: currentMatch.away.penScore }
+        : null
+    };
+
+    currentMatch = prevMatch;
+    window._tourFixtureIdx = prevFixture;
+    window._koRoundIdx = prevKoR;
+    window._koMatchIdx = prevKoM;
     saveStats();
-    return { home: homeGoals, away: awayGoals };
+    return result;
   }
 
   function poisson(lambda) {
@@ -1703,23 +1731,26 @@ const App = (() => {
   function renderTournamentLeaderboard() {
     const el = document.getElementById('tour-stats-preview');
     if (!el) return;
-    const g = Object.values(tournamentStats.goals || {}).sort((a,b)=>b.count-a.count).slice(0,8);
-    const a = Object.values(tournamentStats.assists || {}).sort((a,b)=>b.count-a.count).slice(0,5);
-    const m = Object.values(tournamentStats.motm || {}).sort((a,b)=>b.count-a.count).slice(0,5);
-    if (!g.length && !a.length) {
-      el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Play tournament matches to fill the Golden Boot & assists charts.</p>';
+    const top = (key, n) => Object.values(tournamentStats[key] || {}).sort((a,b)=>b.count-a.count).slice(0, n);
+    const g = top('goals', 8), a = top('assists', 5), m = top('motm', 5);
+    const y = top('yellows', 5), r = top('reds', 5), s = top('saves', 5);
+    const hasAny = g.length || a.length || m.length || y.length || r.length;
+    if (!hasAny) {
+      el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Play tournament matches to fill stats (goals, cards, MOTM…).</p>';
       return;
     }
+    const col = (title, arr) => `<div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">${title}</div>
+      ${arr.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">${i+1}. ${p.name} <span style="color:var(--text-muted)">${p.team||''}</span> — <b>${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
     el.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
-        <div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">⚽ Golden Boot</div>
-          ${g.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0">${i+1}. ${p.name} <span style="color:var(--text-muted)">${p.team}</span> — <b>${p.count}</b></div>`).join('')||'—'}</div>
-        <div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">🎯 Assists</div>
-          ${a.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0">${i+1}. ${p.name} — <b>${p.count}</b></div>`).join('')||'—'}</div>
-        <div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">⭐ MOTM</div>
-          ${m.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0">${i+1}. ${p.name} — <b>${p.count}</b></div>`).join('')||'—'}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        ${col('⚽ Golden Boot', g)}
+        ${col('🎯 Assists', a)}
+        ${col('⭐ MOTM', m)}
+        ${col('🟨 Yellows', y)}
+        ${col('🟥 Reds', r)}
+        ${col('🧤 Saves', s)}
       </div>
-      <div style="margin-top:10px;font-size:0.75rem;color:var(--text-muted)">Matchday ${globalMatchDay} · Season injuries tracked</div>`;
+      <div style="margin-top:10px;font-size:0.75rem;color:var(--text-muted)">Matchday ${globalMatchDay} · Full match engine · Injuries tracked</div>`;
   }
 
   function renderBracket() {
@@ -1755,7 +1786,7 @@ const App = (() => {
     if (!tournament || !tournament.knockout[roundIdx]) return;
     const m = tournament.knockout[roundIdx].matches[matchIdx];
     if (!m || m.played) return;
-    const result = simQuickMatch(m.home, m.away);
+    const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
     m.homeScore = result.home;
     m.awayScore = result.away;
     m.played = true;
@@ -1864,6 +1895,7 @@ const App = (() => {
   
   function renderPostMatchRatings() {
     if (!currentMatch || !currentMatch.playerMatchStats) return;
+    if (currentMatch.silentDeep) return;
     const el = document.getElementById('post-match-ratings');
     if (!el) return;
     const m = currentMatch;

@@ -408,3 +408,16 @@ body {
 
 #post-match-ratings { max-height: 480px; overflow-y: auto; }
 .player-dot .dot-name { pointer-events: none; }
+
+#tour-stats-preview {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 12px;
+}
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table th { text-align: left; font-size: 0.75rem; color: var(--text-muted); padding: 8px 6px; border-bottom: 1px solid var(--border); }
+.lb-table td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.9rem; }
+.lb-table tr:hover td { background: rgba(255,255,255,0.03); }
+.btn-sm { padding: 6px 10px; font-size: 0.75rem; }
