@@ -421,3 +421,54 @@ body {
 .lb-table td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.9rem; }
 .lb-table tr:hover td { background: rgba(255,255,255,0.03); }
 .btn-sm { padding: 6px 10px; font-size: 0.75rem; }
+
+.pitch-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+@media (max-width: 700px) {
+  .pitch-pair { grid-template-columns: 1fr; }
+}
+.team-pitch {
+  min-height: 280px;
+  max-height: 420px;
+  aspect-ratio: 68/100;
+  margin: 0;
+}
+.event-item {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin-bottom: 6px;
+}
+.event-item.event-goal {
+  border-left-color: var(--accent-gold);
+  background: rgba(212,175,55,0.06);
+}
+.event-icon {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.7rem;
+  min-width: 28px;
+  color: var(--text-muted);
+}
+
+.goal-scorers {
+  margin-top: 8px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  font-weight: 600;
+  max-width: 140px;
+}
+.score-team.home .goal-scorers { text-align: left; }
+.score-team.away .goal-scorers, .away-scorers { text-align: right; margin-left: auto; }
+.scorer-line { margin-bottom: 2px; }
+.gt-min { color: var(--accent-gold); font-variant-numeric: tabular-nums; margin-right: 3px; }
+.gt-method { font-weight: 400; color: var(--text-muted); font-size: 0.65rem; }
+.report-event { font-size: 0.82rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.re-min { color: var(--accent-gold); font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.fixture-item.played:hover { background: rgba(212,175,55,0.08); border-color: var(--accent-gold); }

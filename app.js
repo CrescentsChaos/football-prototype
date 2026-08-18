@@ -320,6 +320,7 @@ const App = (() => {
     addEvent(0, 'whistle', 'Kick off!', null);
     currentMatch.playerMatchStats = {};
     currentMatch.goalList = [];
+    currentMatch.countForLeaderboard = !!(tournament || window._tourFixtureIdx != null || window._koRoundIdx != null);
     currentMatch.allowET = !!(document.getElementById('opt-et') && document.getElementById('opt-et').checked);
     currentMatch.allowPens = !!(document.getElementById('opt-pens') && document.getElementById('opt-pens').checked);
     const gt = document.getElementById('goal-timeline');
@@ -396,15 +397,104 @@ const App = (() => {
   }
 
   function renderGoalTimeline() {
-    const el = document.getElementById('goal-timeline');
-    if (!el || !currentMatch) return;
+    const homeEl = document.getElementById('home-goal-scorers');
+    const awayEl = document.getElementById('away-goal-scorers');
+    if (!currentMatch) {
+      if (homeEl) homeEl.innerHTML = '';
+      if (awayEl) awayEl.innerHTML = '';
+      return;
+    }
     const goals = currentMatch.goalList || [];
-    if (!goals.length) { el.innerHTML = ''; return; }
-    const homeG = goals.filter(g => g.side === 'home');
-    const awayG = goals.filter(g => g.side === 'away');
-    const fmt = (arr) => arr.map(g => `<span class="gt-min">${g.minute}'</span> ${g.player}${g.num ? ' ('+g.num+')' : ''}`).join('<br>');
-    el.innerHTML = `<div class="gt-row"><div class="gt-home">${fmt(homeG)}</div><div class="gt-away">${fmt(awayG)}</div></div>`;
+    const fmt = (arr) => arr.map(g =>
+      `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.num != null && g.num !== '' ? ' · '+g.num : ''}${g.method ? ' <span class="gt-method">('+g.method+')</span>' : ''}</div>`
+    ).join('');
+    if (homeEl) homeEl.innerHTML = fmt(goals.filter(g => g.side === 'home'));
+    if (awayEl) awayEl.innerHTML = fmt(goals.filter(g => g.side === 'away'));
   }
+
+  function buildMatchReport(m) {
+    if (!m) return null;
+    return {
+      home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation },
+      away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation },
+      events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
+      goals: JSON.parse(JSON.stringify(m.goalList || [])),
+      ratings: m.playerMatchStats ? JSON.parse(JSON.stringify(m.playerMatchStats)) : {},
+      finished: true
+    };
+  }
+
+  function showMatchReport(report) {
+    if (!report) { toast('No match details available'); return; }
+    const modal = document.getElementById('match-report-modal');
+    const content = document.getElementById('match-report-content');
+    if (!modal || !content) return;
+    const h = report.home, a = report.away;
+    const scoreLine = (h.penScore != null)
+      ? `${h.score} (${h.penScore}) - (${a.penScore}) ${a.score}`
+      : `${h.score} - ${a.score}`;
+    const goalsH = (report.goals || []).filter(g => g.side === 'home');
+    const goalsA = (report.goals || []).filter(g => g.side === 'away');
+    const fmtG = (arr) => arr.map(g => `${g.minute}' ${g.player}${g.method ? ' ('+g.method+')' : ''}`).join('<br>') || '—';
+    const ratings = Object.values(report.ratings || {}).sort((x,y) => (y.rating||0)-(x.rating||0));
+    const homeIds = new Set(); // approximate by team name match later
+    let eventsHtml = (report.events || []).filter(e => e.type !== 'pressure' || Math.random() < 0.3).slice(-80).map(e => {
+      const t = (e.text || '').replace(/<[^>]+>/g, '');
+      return `<div class="report-event"><span class="re-min">${e.minute}'</span> <span class="re-type">${e.type}</span> ${t}</div>`;
+    }).join('');
+    // show important events only for cleaner view
+    eventsHtml = (report.events || []).filter(e => ['goal','yellow','red','injury','sub','pen','var','motm','whistle','save','miss'].includes(e.type)).map(e => {
+      const t = (e.text || '').replace(/<[^>]+>/g, '');
+      return `<div class="report-event"><span class="re-min">${e.minute}'</span> ${t}</div>`;
+    }).join('');
+    content.innerHTML = `
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:0.85rem;color:var(--text-muted)">Match Report</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px">
+          <div style="flex:1;text-align:left"><div style="font-size:1.4rem">${h.flag||''}</div><strong>${h.name}</strong><div class="goal-scorers">${fmtG(goalsH)}</div></div>
+          <div style="font-size:1.6rem;font-weight:800;color:var(--accent-gold)">${scoreLine}</div>
+          <div style="flex:1;text-align:right"><div style="font-size:1.4rem">${a.flag||''}</div><strong>${a.name}</strong><div class="goal-scorers away-scorers">${fmtG(goalsA)}</div></div>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">${h.formation||''} vs ${a.formation||''}</div>
+      </div>
+      <div class="card-title">Key Events</div>
+      <div style="max-height:220px;overflow-y:auto;margin-bottom:12px">${eventsHtml || '<span style="color:var(--text-muted)">No events logged</span>'}</div>
+      <div class="card-title">Team Stats</div>
+      <table class="lb-table" style="margin-bottom:12px"><thead><tr><th></th><th>${h.short}</th><th>${a.short}</th></tr></thead>
+      <tbody>
+        <tr><td>Shots</td><td>${(h.stats&&h.stats.shots)||0}</td><td>${(a.stats&&a.stats.shots)||0}</td></tr>
+        <tr><td>On Target</td><td>${(h.stats&&h.stats.shotsOn)||0}</td><td>${(a.stats&&a.stats.shotsOn)||0}</td></tr>
+        <tr><td>Possession</td><td>${(h.stats&&h.stats.possession)||50}%</td><td>${(a.stats&&a.stats.possession)||50}%</td></tr>
+        <tr><td>Corners</td><td>${(h.stats&&h.stats.corners)||0}</td><td>${(a.stats&&a.stats.corners)||0}</td></tr>
+        <tr><td>Fouls</td><td>${(h.stats&&h.stats.fouls)||0}</td><td>${(a.stats&&a.stats.fouls)||0}</td></tr>
+        <tr><td>Saves</td><td>${(h.stats&&h.stats.saves)||0}</td><td>${(a.stats&&a.stats.saves)||0}</td></tr>
+        <tr><td>Yellow / Red</td><td>${(h.stats&&h.stats.yellows)||0} / ${(h.stats&&h.stats.reds)||0}</td><td>${(a.stats&&a.stats.yellows)||0} / ${(a.stats&&a.stats.reds)||0}</td></tr>
+      </tbody></table>
+      <div class="card-title">Player Ratings</div>
+      <div style="max-height:200px;overflow-y:auto">
+        ${ratings.slice(0,22).map(p => {
+          const rc = (p.rating||0) >= 7.5 ? 'rating-high' : (p.rating||0) >= 6.5 ? 'rating-mid' : 'rating-low';
+          return `<div class="pm-player"><span class="player-num">${p.num||''}</span><span style="flex:1">${p.name}</span><span class="rating-badge ${rc}">${(p.rating||0).toFixed(1)}</span></div>`;
+        }).join('') || '—'}
+      </div>
+      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
+    modal.classList.add('active');
+  }
+
+  function viewFixtureReport(idx) {
+    if (!tournament || !tournament.fixtures[idx] || !tournament.fixtures[idx].report) {
+      toast('No detailed report for this match');
+      return;
+    }
+    showMatchReport(tournament.fixtures[idx].report);
+  }
+
+  function viewKnockoutReport(ri, mi) {
+    const m = tournament && tournament.knockout[ri] && tournament.knockout[ri].matches[mi];
+    if (!m || !m.report) { toast('No detailed report for this match'); return; }
+    showMatchReport(m.report);
+  }
+
 
   function blankPlayerMatchStats(p) {
     return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
@@ -629,9 +719,9 @@ const App = (() => {
             if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
             m.playerMatchStats[assister.id].assists++;
             m.playerMatchStats[assister.id].xa += 0.3 + Math.random() * 0.4;
-            addEvent(m.minute, 'goal', `GOAL! <span class="player">${shooter.name}</span> (${shooter.num||''}) scores with a ${method.desc}! Assisted by <span class="player">${assister.name}</span> 🎯`, attackingSide, true);
+            addEvent(m.minute, 'goal', `<span class="player">${shooter.name}</span> (${shooter.num||''}) — ${method.desc}. Assist: <span class="player">${assister.name}</span>`, attackingSide, true);
           } else {
-            addEvent(m.minute, 'goal', `GOAL! <span class="player">${shooter.name}</span> (${shooter.num||''}) scores with a ${method.desc}!`, attackingSide, true);
+            addEvent(m.minute, 'goal', `<span class="player">${shooter.name}</span> (${shooter.num||''}) finds the net — ${method.desc}`, attackingSide, true);
           }
         }
       } else {
@@ -650,7 +740,7 @@ const App = (() => {
           attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
           pushGoal(attackingSide, scorer, m.minute, 'header from corner');
-          addEvent(m.minute, 'goal', `GOAL from the corner! <span class="player">${scorer.name}</span> (${scorer.num||''}) with a header!`, attackingSide, true);
+          addEvent(m.minute, 'goal', `Corner converted. <span class="player">${scorer.name}</span> (${scorer.num||''}) heads home`, attackingSide, true);
         }
       }
     } else if (r < 0.45) {
@@ -690,7 +780,7 @@ const App = (() => {
           attTeam.score++;
           recordStat('goals', taker, attTeam.team);
           pushGoal(attackingSide, taker, m.minute, 'free-kick');
-          addEvent(m.minute, 'goal', `Brilliant free-kick! <span class="player">${taker.name}</span> (${taker.num||''}) curls it home!`, attackingSide, true);
+          addEvent(m.minute, 'goal', `Free-kick. <span class="player">${taker.name}</span> (${taker.num||''}) bends it past the wall`, attackingSide, true);
           if (Math.random() < 0.5) recordStat('puskas', taker, attTeam.team);
         } else {
           addEvent(m.minute, 'shot', `Free-kick by <span class="player">${taker.name}</span> saved/wide`, attackingSide);
@@ -733,7 +823,7 @@ const App = (() => {
               attTeam.score++;
               recordStat('goals', taker, attTeam.team);
               pushGoal(attackingSide, taker, m.minute, 'penalty');
-              addEvent(m.minute, 'goal', `⚽ PENALTY GOAL! <span class="player">${taker.name}</span> scores!`, attackingSide, true);
+              addEvent(m.minute, 'goal', `Penalty scored by <span class="player">${taker.name}</span>`, attackingSide, true);
             } else {
               const gk = pickPlayer(defTeam, ['GK']);
               if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
@@ -771,7 +861,7 @@ const App = (() => {
               attTeam.score++;
               recordStat('goals', taker, attTeam.team);
               pushGoal(varSide, taker, m.minute, 'penalty');
-              addEvent(m.minute, 'goal', `⚽ PENALTY SCORED! <span class="player">${taker.name}</span> for ${varTeam.team.short}`, varSide, true);
+              addEvent(m.minute, 'goal', `Penalty scored — <span class="player">${taker.name}</span> (${varTeam.team.short})`, varSide, true);
             } else {
               const gk = pickPlayer(defTeam, ['GK']);
               if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
@@ -798,27 +888,40 @@ const App = (() => {
           addEvent(m.minute, 'var', `VAR: No red card — yellow only / play on`, null);
         }
       }
-    } else if (r < 0.97 && Math.random() < 0.15) {
-      // Rare unexpected events
+    } else if (r < 0.97 && Math.random() < 0.18) {
       const rare = Math.random();
-      if (rare < 0.2) {
-        addEvent(m.minute, 'whistle', `🌧 Sudden downpour — players struggling with the ball`, null);
-      } else if (rare < 0.35) {
-        const p = pickPlayer(attTeam, ['ST','CAM','RW']);
-        if (p) addEvent(m.minute, 'miss', `How did he miss that?! <span class="player">${p.name}</span> open goal blazed over`, attackingSide);
-      } else if (rare < 0.5) {
-        addEvent(m.minute, 'whistle', `⏱ Brief stoppage — medical staff on for a clash of heads`, null);
-      } else if (rare < 0.65) {
-        const p = pickPlayer(defTeam, ['CB','RB','LB']);
-        if (p) addEvent(m.minute, 'foul', `Outrageous challenge from <span class="player">${p.name}</span> — referee lets play continue`, defendingSide);
-      } else if (rare < 0.8) {
-        addEvent(m.minute, 'whistle', `📢 Crowd erupting after a sweeping counter-attack`, null);
+      const att = pickPlayer(attTeam, ['ST','CAM','RW','LW','CM']);
+      const def = pickPlayer(defTeam, ['CB','RB','LB','CDM']);
+      if (rare < 0.12) {
+        addEvent(m.minute, 'whistle', `Rain starts to lash the pitch — footing becomes tricky`, null);
+      } else if (rare < 0.24 && att) {
+        addEvent(m.minute, 'miss', `<span class="player">${att.name}</span> steals in at the far post but side-foots wide of the upright`, attackingSide);
+      } else if (rare < 0.36) {
+        addEvent(m.minute, 'whistle', `Stoppage as the referee speaks to both captains after a flare-up`, null);
+      } else if (rare < 0.48 && def) {
+        addEvent(m.minute, 'foul', `<span class="player">${def.name}</span> times a sliding tackle to perfection on the edge of the box`, defendingSide);
+      } else if (rare < 0.58 && att) {
+        addEvent(m.minute, 'skill', `<span class="player">${att.name}</span> nutmegs the full-back and drives toward the byline`, attackingSide);
+      } else if (rare < 0.68 && att) {
+        addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> threads a defence-splitting ball into the channel`, attackingSide);
+      } else if (rare < 0.78) {
+        const gk = pickPlayer(defTeam, ['GK']);
+        if (gk) addEvent(m.minute, 'save', `<span class="player">${gk.name}</span> rushes off the line to smother a through ball`, defendingSide);
+      } else if (rare < 0.88 && att) {
+        addEvent(m.minute, 'shot', `<span class="player">${att.name}</span> hits a first-time volley — always rising over the bar`, attackingSide);
+        attTeam.stats.shots++;
       } else {
-        const p = pickPlayer(attTeam, ['CM','CAM']);
-        if (p) addEvent(m.minute, 'pass', `World-class switch of play by <span class="player">${p.name}</span>`, attackingSide);
+        addEvent(m.minute, 'whistle', `The crowd sense a goal — noise levels rise as ${attTeam.team.short} advance`, null);
       }
     } else if (Math.random() < 0.35) {
-      addEvent(m.minute, 'pressure', `${attTeam.team.short} applying pressure`, attackingSide);
+      const lines = [
+        `${attTeam.team.short} recycle possession in the final third`,
+        `${attTeam.team.short} work an opening down the flank`,
+        `Patient build-up from ${attTeam.team.short}`,
+        `${defTeam.team.short} hold a high line under pressure`,
+        `Cross claimed comfortably — ${defTeam.team.short} clear`
+      ];
+      addEvent(m.minute, 'pressure', lines[Math.floor(Math.random()*lines.length)], attackingSide);
     }
   }
 
@@ -987,7 +1090,7 @@ const App = (() => {
       const team = (m.home.squad.all || []).find(p => p.id === best.id) ? m.home.team : m.away.team;
       const playerObj = [...(m.home.squad.all||[]), ...(m.away.squad.all||[])].find(p => p.id === best.id) || best;
       recordStat('motm', playerObj, team);
-      addEvent(90, 'motm', `Man of the Match: <span class="player">${best.name}</span> (${best.rating.toFixed(1)}) ⭐`, null);
+      addEvent(90, 'motm', `Player of the Match: <span class="player">${best.name}</span> (${best.rating.toFixed(1)})`, null);
     }
     renderPostMatchRatings();
     globalMatchDay++;
@@ -1011,6 +1114,7 @@ const App = (() => {
         km.played = true;
         km.homeScore = currentMatch.home.score;
         km.awayScore = currentMatch.away.score;
+        km.report = buildMatchReport(currentMatch);
         if (currentMatch.home.penScore != null) {
           km.penalties = true;
           // Winner by pens or score
@@ -1040,6 +1144,7 @@ const App = (() => {
         f.played = true;
         f.homeScore = currentMatch.home.score;
         f.awayScore = currentMatch.away.score;
+        f.report = buildMatchReport(currentMatch);
         const g = tournament.groups[f.group];
         if (g) {
           const ht = g.teams.find(t => t.team.id === f.home);
@@ -1065,7 +1170,7 @@ const App = (() => {
     if (currentMatch.silentDeep) return;
     const feed = document.getElementById('events-feed');
     if (!feed) return;
-    const icons = { goal: '⚽', save: '🧤', yellow: '🟨', red: '🟥', sub: '🔄', injury: '🩹', corner: '🚩', foul: '💢', shot: '👟', miss: '😮', pass: '➡️', offside: '🚫', whistle: '📢', pressure: '🔥', motm: '⭐', var: '📺', pen: '⚽', skill: '✨', handball: '✋', et: '⏱️' };
+    const icons = { goal: '●', save: '▢', yellow: 'Y', red: 'R', sub: '↔', injury: '+', corner: '⌜', foul: '!', shot: '·', miss: '×', pass: '›', offside: 'off', whistle: '—', pressure: '»', motm: '★', var: 'VAR', pen: 'P', skill: '~', handball: 'HB', et: 'ET' };
     const div = document.createElement('div');
     div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
     div.innerHTML = `<span class="event-time">${minute}'</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
@@ -1137,62 +1242,42 @@ const App = (() => {
       const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
       return (r*299 + g*587 + b*114) / 1000;
     };
-    const colorDist = (a, b) => Math.abs(luminance(a) - luminance(b));
-    // Pick kit colors that contrast between teams
-    let homeCol = m.home.team.color || '#ffffff';
-    let awayCol = m.away.team.color || '#0000aa';
-    let homeSec = m.home.team.secondary || '#000000';
-    let awaySec = m.away.team.secondary || '#ffffff';
-    if (colorDist(homeCol, awayCol) < 50) {
-      // Conflict: use away secondary or forced alternate
-      if (colorDist(homeCol, awaySec) >= 50) awayCol = awaySec;
-      else if (colorDist(homeSec, awayCol) >= 50) homeCol = homeSec;
-      else { awayCol = luminance(homeCol) > 140 ? '#1a237e' : '#ffeb3b'; }
-    }
-    // White vs grey etc.
-    if (colorDist(homeCol, awayCol) < 40) {
-      awayCol = luminance(homeCol) > 128 ? '#0d47a1' : '#fafafa';
-    }
 
-    const placeTeam = (side, isAway, primary, secondary) => {
+    const drawTeam = (side) => {
       const s = m[side];
       const form = FORMATIONS[s.squad.formation] || FORMATIONS['4-3-3'];
       const coords = form.coords || [];
       const onPitch = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      let primary = s.team.color || '#1a237e';
+      let secondary = s.team.secondary || '#ffffff';
       const textCol = luminance(primary) > 160 ? '#0a0e17' : '#ffffff';
-      let dots = '';
       const used = [];
-      (s.squad.starting || []).forEach((p, i) => {
+      let dots = '';
+      (s.squad.starting || []).forEach((p, idx) => {
         if (!onPitch.includes(p.id)) return;
-        let c = coords[i] || [50, 50];
-        let x = c[0];
-        let y = isAway ? (100 - c[1]) : c[1];
-        // Nudge if overlapping another dot
-        for (let t = 0; t < 8; t++) {
-          const clash = used.some(u => Math.hypot(u.x - x, u.y - y) < 7);
-          if (!clash) break;
-          x = Math.max(8, Math.min(92, x + (t % 2 === 0 ? 5 : -5)));
-          y = Math.max(6, Math.min(94, y + (t % 3 === 0 ? 4 : -3)));
+        let c = coords[idx] || [50, 50];
+        let x = c[0], y = c[1];
+        for (let t = 0; t < 6; t++) {
+          if (!used.some(u => Math.hypot(u.x - x, u.y - y) < 8)) break;
+          x = Math.max(10, Math.min(90, x + (t % 2 ? 6 : -6)));
+          y = Math.max(8, Math.min(92, y + (t % 3 ? 5 : -4)));
         }
         used.push({ x, y });
-        const shortName = (p.name || '').length > 12 ? (p.name || '').split(' ').pop() : (p.name || '');
+        const label = (p.name || '').split(' ').pop();
         dots += `<div class="player-dot" style="left:${x}%;top:${y}%;background:${primary};color:${textCol};border:2px solid ${secondary}">
           <span class="dot-num">${p.num || ''}</span>
-          <span class="dot-name">${shortName}</span>
+          <span class="dot-name">${label}</span>
         </div>`;
       });
-      return dots;
+      return `<div class="mini-pitch team-pitch">
+        <div class="pitch-label">${s.team.flag || ''} ${s.team.short} · ${form.name}</div>
+        ${dots}
+      </div>`;
     };
 
-    const homeForm = (FORMATIONS[m.home.squad.formation] || {}).name || '';
-    const awayForm = (FORMATIONS[m.away.squad.formation] || {}).name || '';
-    wrap.innerHTML = `<div class="mini-pitch single-pitch" style="max-height:560px;aspect-ratio:68/105;margin:0 auto">
-      <div class="pitch-label" style="top:4px">${m.away.team.short} · ${awayForm}</div>
-      <div class="pitch-label" style="top:auto;bottom:4px">${m.home.team.short} · ${homeForm}</div>
-      ${placeTeam('away', true, awayCol, awaySec)}
-      ${placeTeam('home', false, homeCol, homeSec)}
-    </div>`;
+    wrap.innerHTML = `<div class="pitch-pair">${drawTeam('home')}${drawTeam('away')}</div>`;
   }
+
 
   function renderLineups() {
     if (!currentMatch) return;
@@ -1219,6 +1304,8 @@ const App = (() => {
 
   function recordRating(player, team, rating) {
     if (!player || !team) return;
+    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
+    if (competitive) {
     if (!stats.ratings) stats.ratings = {};
     if (!stats.ratings[player.id]) {
       const aff = findPlayerTeams(player.id);
@@ -1228,6 +1315,7 @@ const App = (() => {
     e.count++;
     e.sum += rating;
     e.avg = Math.round((e.sum / e.count) * 100) / 100;
+    }
     if (tournament) {
       if (!tournamentStats.ratings) tournamentStats.ratings = {};
       if (!tournamentStats.ratings[player.id]) {
@@ -1270,16 +1358,19 @@ const App = (() => {
 
   function recordStat(type, player, team) {
     if (!player || !team) return;
-    if (!stats[type]) stats[type] = {};
-    if (!stats[type][player.id]) {
-      const aff = findPlayerTeams(player.id);
-      stats[type][player.id] = {
-        id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0,
-        national: aff.national, club: aff.club
-      };
+    // Friendlies do not feed global leaderboard — only competitive (tournament) matches
+    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
+    if (competitive) {
+      if (!stats[type]) stats[type] = {};
+      if (!stats[type][player.id]) {
+        const aff = findPlayerTeams(player.id);
+        stats[type][player.id] = {
+          id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0,
+          national: aff.national, club: aff.club
+        };
+      }
+      stats[type][player.id].count++;
     }
-    stats[type][player.id].count++;
-    // Tournament-specific leaderboard
     if (tournament) {
       if (!tournamentStats[type]) tournamentStats[type] = {};
       if (!tournamentStats[type][player.id]) {
@@ -1456,8 +1547,12 @@ const App = (() => {
         played.reverse().forEach(f => {
           const home = getTeam(f.home), away = getTeam(f.away);
           if (!home || !away) return;
-          h += `<div class="fixture-item played"><span class="fixture-teams">${home.flag} ${home.short} vs ${away.flag} ${away.short}</span>
-            <span class="fixture-score">${f.homeScore} - ${f.awayScore}</span></div>`;
+          const idx = tournament.fixtures.indexOf(f);
+          h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})" title="View full match report">
+            <span class="fixture-teams">${home.flag} ${home.short} vs ${away.flag} ${away.short}</span>
+            <span class="fixture-score">${f.homeScore} - ${f.awayScore}</span>
+            <span style="font-size:0.7rem;color:var(--accent-gold);margin-left:6px">Details</span>
+          </div>`;
         });
       }
       fixEl.innerHTML = h;
@@ -1469,7 +1564,7 @@ const App = (() => {
     const f = tournament.fixtures[idx];
     const home = getTeam(f.home), away = getTeam(f.away);
     const result = simQuickMatch(home, away);
-    f.played = true; f.homeScore = result.home; f.awayScore = result.away;
+    f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
     const g = tournament.groups[f.group];
     const ht = g.teams.find(t => t.team.id === f.home);
     const at = g.teams.find(t => t.team.id === f.away);
@@ -1519,7 +1614,7 @@ const App = (() => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
         const result = simQuickMatch(home, away);
-        f.played = true; f.homeScore = result.home; f.awayScore = result.away;
+        f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
         const g = tournament.groups[f.group];
         const ht = g.teams.find(t => t.team.id === f.home);
         const at = g.teams.find(t => t.team.id === f.away);
@@ -1543,16 +1638,30 @@ const App = (() => {
 
   function simAllTournament() {
     if (!tournament) return;
+    toast('Simulating full tournament…');
     let safety = 0;
-    while (tournament.stage === 'groups' && tournament.fixtures.some(f => !f.played) && safety < 50) {
+    // Finish all group fixtures
+    while (tournament.fixtures && tournament.fixtures.some(f => !f.played) && safety < 80) {
       simTournamentRound();
       safety++;
     }
-    if (tournament.stage === 'groups') advanceToKnockout();
+    if (!tournament.champion && tournament.stage !== 'knockout') {
+      advanceToKnockout();
+    }
+    // Play every knockout round through the final
     safety = 0;
-    while (tournament.stage === 'knockout' && !tournament.champion && safety < 20) {
-      simKnockoutRound();
+    while (!tournament.champion && tournament.knockout && tournament.knockout.length && safety < 30) {
+      const progressed = simKnockoutRound();
+      if (!progressed) break;
       safety++;
+    }
+    renderGroups();
+    renderBracket();
+    renderTournamentLeaderboard();
+    if (tournament.champion) {
+      const stageTitle = document.getElementById('tour-stage-title');
+      if (stageTitle) stageTitle.textContent = 'Champions: ' + (tournament.champion.flag || '') + ' ' + tournament.champion.name;
+      toast((tournament.champion.name) + ' win the tournament!');
     }
   }
 
@@ -1574,18 +1683,10 @@ const App = (() => {
         thirdPlaces.slice(0, need).forEach(t => qualifiers.push(t.team));
       }
     }
-    // Pad/trim to power of 2
+    // Always force power of 2 (2,4,8,16,32)
     while (qualifiers.length >= 2 && (qualifiers.length & (qualifiers.length - 1))) {
-      if (qualifiers.length > 16 && qualifiers.length < 32) {
-        // try not to drop if we can leave at 16
-        if (qualifiers.length > 24) qualifiers.pop();
-        else break;
-      } else {
-        qualifiers.pop();
-      }
+      qualifiers.pop();
     }
-    // Force power of 2
-    while (qualifiers.length >= 2 && (qualifiers.length & (qualifiers.length - 1))) qualifiers.pop();
     if (qualifiers.length < 2) { toast('Not enough qualifiers'); return; }
     tournament.stage = 'knockout';
     tournament.knockout = [{ name: getRoundName(qualifiers.length), matches: [] }];
@@ -1611,47 +1712,98 @@ const App = (() => {
   }
 
   function simKnockoutRound() {
-    if (!tournament || !tournament.knockout.length) return;
+    if (!tournament || !tournament.knockout.length) return false;
     const current = tournament.knockout[tournament.knockout.length - 1];
-    const unplayed = current.matches.filter(m => !m.played);
-    if (!unplayed.length) return;
+    if (!current || !current.matches.length) return false;
+
+    // If current round already complete, try to build next from winners
+    let unplayed = current.matches.filter(m => !m.played);
+    if (!unplayed.length) {
+      if (tournament.champion) return false;
+      const winners = current.matches.map(m => m.winner).filter(Boolean);
+      if (winners.length === 1) {
+        setChampion(winners[0]);
+        return false;
+      }
+      if (winners.length >= 2 && winners.length % 2 === 0) {
+        // next round may already exist
+        const nextExists = tournament.knockout.length > 1 && tournament.knockout[tournament.knockout.length - 1] !== current;
+        // if last round is complete and no further round, create it
+        const last = tournament.knockout[tournament.knockout.length - 1];
+        if (last === current || last.matches.every(m => m.played)) {
+          if (last === current) {
+            createNextKnockoutRound(winners);
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     unplayed.forEach(m => {
-      const result = simQuickMatch(m.home, m.away);
+      if (!m.home || !m.away) return;
+      const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
       m.homeScore = result.home;
       m.awayScore = result.away;
       m.played = true;
-      if (result.home === result.away) {
+      m.report = result.report;
+      if (result.pens) {
+        m.penalties = true;
+        m.winner = result.pens.home > result.pens.away ? m.home : m.away;
+      } else if (result.home === result.away) {
         m.winner = Math.random() < 0.5 ? m.home : m.away;
-        if (m.winner === m.home) m.homeScore++; else m.awayScore++;
         m.penalties = true;
       } else {
         m.winner = result.home > result.away ? m.home : m.away;
       }
     });
-    renderBracket();
+
     const winners = current.matches.map(m => m.winner).filter(Boolean);
     if (winners.length === 1) {
-      tournament.champion = winners[0];
-      const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
-      trophies.push({ name: tName, team: winners[0].name, type: 'Tournament', date: Date.now() });
-      try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch(e) {}
-      const stageTitle = document.getElementById('tour-stage-title');
-      if (stageTitle) stageTitle.textContent = `🏆 Champions: ${winners[0].flag || ''} ${winners[0].name}`;
-      toast(`${winners[0].name} win the ${tName}!`);
+      setChampion(winners[0]);
+      renderBracket();
+      renderTournamentLeaderboard();
+      return true;
+    }
+    if (winners.length >= 2) {
+      createNextKnockoutRound(winners);
+      renderBracket();
+      renderTournamentLeaderboard();
+      return true;
+    }
+    renderBracket();
+    return false;
+  }
+
+  function createNextKnockoutRound(winners) {
+    // Ensure even number of winners
+    let list = winners.filter(Boolean);
+    if (list.length % 2 === 1) list = list.slice(0, list.length - 1);
+    if (list.length < 2) {
+      if (winners[0]) setChampion(winners[0]);
       return;
     }
-    if (winners.length < 2) return;
     const nextMatches = [];
-    for (let i = 0; i < winners.length; i += 2) {
+    for (let i = 0; i < list.length; i += 2) {
       nextMatches.push({
-        home: winners[i], away: winners[i + 1],
-        homeScore: null, awayScore: null, winner: null, played: false
+        home: list[i], away: list[i + 1],
+        homeScore: null, awayScore: null, winner: null, played: false, penalties: false
       });
     }
-    tournament.knockout.push({ name: getRoundName(winners.length), matches: nextMatches });
+    tournament.knockout.push({ name: getRoundName(list.length), matches: nextMatches });
     const stageTitle = document.getElementById('tour-stage-title');
-    if (stageTitle) stageTitle.textContent = getRoundName(winners.length);
-    renderBracket();
+    if (stageTitle) stageTitle.textContent = getRoundName(list.length);
+  }
+
+  function setChampion(team) {
+    if (!team || tournament.champion) return;
+    tournament.champion = team;
+    tournament.stage = 'complete';
+    const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    trophies.push({ name: tName, team: team.name, type: 'Tournament', date: Date.now() });
+    try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch(e) {}
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = 'Champions: ' + (team.flag || '') + ' ' + team.name;
   }
 
   function simQuickMatch(homeTeam, awayTeam, opts) {
@@ -1691,6 +1843,7 @@ const App = (() => {
       allowET: !!opts.allowET,
       allowPens: !!opts.allowPens,
       silentDeep: true,
+      countForLeaderboard: tournament ? true : !!opts.countForLeaderboard,
       inET: false,
       inPens: false
     };
@@ -1705,12 +1858,14 @@ const App = (() => {
       endMatch();
     }
 
+    const report = currentMatch ? buildMatchReport(currentMatch) : null;
     const result = {
       home: currentMatch ? currentMatch.home.score : 0,
       away: currentMatch ? currentMatch.away.score : 0,
       pens: currentMatch && currentMatch.home.penScore != null
         ? { home: currentMatch.home.penScore, away: currentMatch.away.penScore }
-        : null
+        : null,
+      report
     };
 
     currentMatch = prevMatch;
@@ -1774,10 +1929,11 @@ const App = (() => {
             <span class="bracket-score">${m.played ? m.awayScore : '-'}</span>
           </div>
           ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">pens</div>' : ''}
-          ${(!m.played && ri === curIdx) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+          ${(!m.played && ri === curIdx && !tournament.champion) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Play Live</button>
             <button class="btn btn-secondary btn-sm" onclick="App.simKnockoutMatch(${ri},${mi})">⚡ Instant</button>
           </div>` : ''}
+          ${m.played ? `<button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%" onclick="App.viewKnockoutReport(${ri},${mi})">Match Report</button>` : ''}
         </div>`).join('')}
       </div>`).join('');
   }
@@ -1790,9 +1946,12 @@ const App = (() => {
     m.homeScore = result.home;
     m.awayScore = result.away;
     m.played = true;
-    if (result.home === result.away) {
+    m.report = result.report;
+    if (result.pens) {
+      m.penalties = true;
+      m.winner = result.pens.home > result.pens.away ? m.home : m.away;
+    } else if (result.home === result.away) {
       m.winner = Math.random() < 0.5 ? m.home : m.away;
-      if (m.winner === m.home) m.homeScore++; else m.awayScore++;
       m.penalties = true;
     } else {
       m.winner = result.home > result.away ? m.home : m.away;
@@ -2079,7 +2238,7 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, playKnockoutMatch, simKnockoutMatch
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport
   };
 })();
 
