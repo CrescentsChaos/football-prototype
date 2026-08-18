@@ -203,9 +203,9 @@ body {
 .player-dot.away { background: var(--accent-blue); color: white; }
 .player-dot .dot-num { font-size: 0.55rem; opacity: 0.85; }
 .player-dot .dot-name {
-  position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%);
-  font-size: 0.5rem; white-space: nowrap; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-  font-weight: 600; max-width: 48px; overflow: hidden; text-overflow: ellipsis;
+  position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
+  font-size: 0.55rem; white-space: nowrap; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.95);
+  font-weight: 700; max-width: 72px; overflow: hidden; text-overflow: ellipsis; text-align: center;
 }
 .lineup-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
 @media (min-width: 700px) { .lineup-grid { grid-template-columns: 1fr 1fr; } }
@@ -345,3 +345,10 @@ body {
   display: none; justify-content: center; padding: 8px;
 }
 .back-tour-btn.show { display: flex; }
+
+.pitch-wrap { display: block; }
+.mini-pitch.single-pitch { width: 100%; max-width: 360px; margin: 0 auto; }
+.player-dot {
+  width: 30px; height: 30px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}

@@ -50,9 +50,24 @@ const App = (() => {
     RW: ['RW','RM','ST','CAM'], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
   };
 
-  function init() {
+  async function init() {
     try {
-      teamsData = TEAMS_DATA;
+      // Prefer external teams.json (so GitHub / local edits apply). Fall back to embedded data.
+      let loaded = null;
+      try {
+        const res = await fetch('teams.json?t=' + Date.now());
+        if (res.ok) {
+          loaded = await res.json();
+          if (loaded && (loaded.national || loaded.club)) {
+            console.log('Loaded teams.json from server');
+          } else {
+            loaded = null;
+          }
+        }
+      } catch (fetchErr) {
+        console.log('fetch teams.json failed, using embedded data', fetchErr);
+      }
+      teamsData = loaded || TEAMS_DATA;
       allTeams = [...(teamsData.national || []), ...(teamsData.club || [])];
       if (!allTeams.length) throw new Error('No teams found');
       loadStats();
@@ -779,30 +794,50 @@ const App = (() => {
     const m = currentMatch;
     const wrap = document.getElementById('pitch-display');
     if (!wrap) return;
-    const makePitch = (side, isAway) => {
+
+    // Single pitch: home defends bottom (high Y%), away defends top (low Y%)
+    // Formation coords: y=92 is GK, y=16 is ST. Home uses as-is. Away flips Y.
+    const placeTeam = (side, isAway) => {
       const s = m[side];
       const form = FORMATIONS[s.squad.formation] || FORMATIONS['4-3-3'];
       const coords = form.coords || [];
       const onPitch = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const primary = s.team.color || (isAway ? '#2979ff' : '#d4af37');
+      const secondary = s.team.secondary || '#ffffff';
+      // Text color: light text on dark jersey, dark text on light jersey
+      const isLight = (c) => {
+        if (!c || c[0] !== '#') return false;
+        const hex = c.replace('#','');
+        const full = hex.length === 3 ? hex.split('').map(ch=>ch+ch).join('') : hex;
+        if (full.length < 6) return false;
+        const r = parseInt(full.slice(0,2),16), g = parseInt(full.slice(2,4),16), b = parseInt(full.slice(4,6),16);
+        return (r*299 + g*587 + b*114) / 1000 > 160;
+      };
+      const textCol = isLight(primary) ? '#0a0e17' : '#ffffff';
       let dots = '';
       (s.squad.starting || []).forEach((p, i) => {
         if (!onPitch.includes(p.id)) return;
         const c = coords[i] || [50, 50];
-        // For away, flip vertically so they attack the other way visually
-        const y = isAway ? (100 - c[1]) : c[1];
         const x = c[0];
-        const shortName = (p.name || '').split(' ').pop().slice(0, 7);
-        dots += `<div class="player-dot ${isAway ? 'away' : ''}" style="left:${x}%;top:${y}%">
+        // Home: keep coords (GK at bottom). Away: mirror so GK at top
+        const y = isAway ? (100 - c[1]) : c[1];
+        const fullName = p.name || '';
+        dots += `<div class="player-dot" style="left:${x}%;top:${y}%;background:${primary};color:${textCol};border:2px solid ${secondary}">
           <span class="dot-num">${p.num || ''}</span>
-          <span class="dot-name">${shortName}</span>
+          <span class="dot-name" style="color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.9)">${fullName}</span>
         </div>`;
       });
-      return `<div class="mini-pitch">
-        <div class="pitch-label">${s.team.short} · ${form.name}</div>
-        ${dots}
-      </div>`;
+      return dots;
     };
-    wrap.innerHTML = makePitch('home', false) + makePitch('away', true);
+
+    const homeForm = (FORMATIONS[m.home.squad.formation] || {}).name || '';
+    const awayForm = (FORMATIONS[m.away.squad.formation] || {}).name || '';
+    wrap.innerHTML = `<div class="mini-pitch single-pitch" style="max-height:520px;aspect-ratio:68/105;margin:0 auto">
+      <div class="pitch-label" style="top:4px">${m.away.team.short} · ${awayForm}</div>
+      <div class="pitch-label" style="top:auto;bottom:4px">${m.home.team.short} · ${homeForm}</div>
+      ${placeTeam('away', true)}
+      ${placeTeam('home', false)}
+    </div>`;
   }
 
   function renderLineups() {
