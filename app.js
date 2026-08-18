@@ -266,6 +266,11 @@ const App = (() => {
     if (feed) feed.innerHTML = '';
     addEvent(0, 'whistle', 'Kick off!', null);
     currentMatch.playerMatchStats = {};
+    currentMatch.goalList = [];
+    currentMatch.allowET = !!(document.getElementById('opt-et') && document.getElementById('opt-et').checked);
+    currentMatch.allowPens = !!(document.getElementById('opt-pens') && document.getElementById('opt-pens').checked);
+    const gt = document.getElementById('goal-timeline');
+    if (gt) gt.innerHTML = '';
     isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
@@ -273,6 +278,79 @@ const App = (() => {
 
   function blankStats() {
     return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, yellows: 0, reds: 0, xg: 0 };
+  }
+
+  
+  
+  function runPenaltyShootout() {
+    const m = currentMatch;
+    if (!m || m.inPens) return;
+    m.inPens = true;
+    m.status = 'Penalties';
+    addEvent(m.minute, 'pen', '⚽ Penalty shootout!', null);
+    let homePens = 0, awayPens = 0;
+    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>(b.att||0)-(a.att||0));
+    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>(b.att||0)-(a.att||0));
+    const homeGk = (m.home.squad.starting || []).find(p => (p.pos||[]).includes('GK'));
+    const awayGk = (m.away.squad.starting || []).find(p => (p.pos||[]).includes('GK'));
+    for (let i = 0; i < 5; i++) {
+      const ht = homeTakers[i % homeTakers.length];
+      const at = awayTakers[i % awayTakers.length];
+      const homeScore = Math.random() < (0.7 + (ht.att||70)/500);
+      const awayScore = Math.random() < (0.7 + (at.att||70)/500);
+      if (homeScore) {
+        homePens++;
+        addEvent(m.minute, 'pen', `✓ ${ht.name} scores for ${m.home.team.short} (${homePens}-${awayPens})`, 'home');
+      } else {
+        addEvent(m.minute, 'pen', `✗ ${ht.name} misses! Saved by ${awayGk ? awayGk.name : 'GK'} (${homePens}-${awayPens})`, 'home');
+      }
+      // Early end check after both taken same number
+      if (awayScore) {
+        awayPens++;
+        addEvent(m.minute, 'pen', `✓ ${at.name} scores for ${m.away.team.short} (${homePens}-${awayPens})`, 'away');
+      } else {
+        addEvent(m.minute, 'pen', `✗ ${at.name} misses! Saved by ${homeGk ? homeGk.name : 'GK'} (${homePens}-${awayPens})`, 'away');
+      }
+      // Can we end early?
+      const left = 4 - i;
+      if (homePens > awayPens + left || awayPens > homePens + left) break;
+    }
+    // Sudden death if level
+    let sd = 0;
+    while (homePens === awayPens && sd < 5) {
+      const ht = homeTakers[(5 + sd) % homeTakers.length];
+      const at = awayTakers[(5 + sd) % awayTakers.length];
+      const hs = Math.random() < 0.72;
+      const as_ = Math.random() < 0.72;
+      if (hs) { homePens++; addEvent(m.minute, 'pen', `✓ ${ht.name} (SD) scores (${homePens}-${awayPens})`, 'home'); }
+      else addEvent(m.minute, 'pen', `✗ ${ht.name} (SD) misses (${homePens}-${awayPens})`, 'home');
+      if (as_) { awayPens++; addEvent(m.minute, 'pen', `✓ ${at.name} (SD) scores (${homePens}-${awayPens})`, 'away'); }
+      else addEvent(m.minute, 'pen', `✗ ${at.name} (SD) misses (${homePens}-${awayPens})`, 'away');
+      sd++;
+    }
+    m.home.penScore = homePens;
+    m.away.penScore = awayPens;
+    // Assign winner for display - don't change regular score, show pens
+    addEvent(m.minute, 'whistle', `Penalties: ${m.home.team.short} ${homePens} - ${awayPens} ${m.away.team.short}`, null);
+    endMatch();
+  }
+
+  function pushGoal(side, player, minute, methodDesc) {
+    if (!currentMatch) return;
+    if (!currentMatch.goalList) currentMatch.goalList = [];
+    currentMatch.goalList.push({ side, player: player.name, num: player.num, minute, method: methodDesc || '' });
+    renderGoalTimeline();
+  }
+
+  function renderGoalTimeline() {
+    const el = document.getElementById('goal-timeline');
+    if (!el || !currentMatch) return;
+    const goals = currentMatch.goalList || [];
+    if (!goals.length) { el.innerHTML = ''; return; }
+    const homeG = goals.filter(g => g.side === 'home');
+    const awayG = goals.filter(g => g.side === 'away');
+    const fmt = (arr) => arr.map(g => `<span class="gt-min">${g.minute}'</span> ${g.player}${g.num ? ' ('+g.num+')' : ''}`).join('<br>');
+    el.innerHTML = `<div class="gt-row"><div class="gt-home">${fmt(homeG)}</div><div class="gt-away">${fmt(awayG)}</div></div>`;
   }
 
   function blankPlayerMatchStats(p) {
@@ -395,10 +473,44 @@ const App = (() => {
       m.status = '2nd Half';
       addEvent(46, 'whistle', 'Second half begins', null);
     }
-    if (m.minute >= 90) {
-      const stoppage = 1 + Math.floor(Math.random() * 5);
-      if (m.minute >= 90 + stoppage) { endMatch(); return; }
+    if (m.minute >= 90 && !m.inET && !m.inPens) {
+      if (!m._stoppage) m._stoppage = 1 + Math.floor(Math.random() * 5);
+      if (m.minute >= 90 + m._stoppage) {
+        // Check ET
+        if (m.allowET && m.home.score === m.away.score) {
+          m.inET = true;
+          m.status = 'Extra Time';
+          addEvent(m.minute, 'et', '⏱ Full time — scores level! Extra time begins', null);
+          m.etStart = m.minute;
+          updateScoreboard();
+          return;
+        }
+        if (m.allowPens && m.home.score === m.away.score) {
+          runPenaltyShootout();
+          return;
+        }
+        endMatch();
+        return;
+      }
       m.status = 'Stoppage Time';
+    }
+    // Extra time: 2x15 min (simplified as +30 minutes)
+    if (m.inET && !m.inPens) {
+      const etMin = m.minute - (m.etStart || 90);
+      if (etMin >= 30) {
+        if (m.allowPens && m.home.score === m.away.score) {
+          runPenaltyShootout();
+          return;
+        }
+        endMatch();
+        return;
+      }
+      if (etMin === 15) {
+        addEvent(m.minute, 'et', 'End of first half of extra time', null);
+      }
+      m.status = 'Extra Time ' + Math.min(etMin, 30) + "'";
+      // Higher chance of events in ET fatigue
+      if (Math.random() < 0.02) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     }
     generateEvents();
     if (m.minute >= 55 && m.minute <= 85 && Math.random() < 0.08) {
@@ -445,6 +557,7 @@ const App = (() => {
           const method = pickGoalMethod(shooter);
           recordStat('goals', shooter, attTeam.team);
           if (method.puskas) recordStat('puskas', shooter, attTeam.team);
+          pushGoal(attackingSide, shooter, m.minute, method.desc);
           // track xG
           if (!m.playerMatchStats) m.playerMatchStats = {};
           if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
@@ -471,6 +584,7 @@ const App = (() => {
         if (scorer) {
           attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
+          pushGoal(attackingSide, scorer, m.minute, 'header from corner');
           addEvent(m.minute, 'goal', `GOAL from the corner! <span class="player">${scorer.name}</span> (${scorer.num||''}) with a header!`, attackingSide, true);
         }
       }
@@ -507,6 +621,7 @@ const App = (() => {
         if (Math.random() < 0.3) {
           attTeam.score++;
           recordStat('goals', taker, attTeam.team);
+          pushGoal(attackingSide, taker, m.minute, 'free-kick');
           addEvent(m.minute, 'goal', `Brilliant free-kick! <span class="player">${taker.name}</span> (${taker.num||''}) curls it home!`, attackingSide, true);
           if (Math.random() < 0.5) recordStat('puskas', taker, attTeam.team);
         } else {
@@ -549,6 +664,7 @@ const App = (() => {
             if (Math.random() < 0.75) {
               attTeam.score++;
               recordStat('goals', taker, attTeam.team);
+              pushGoal(attackingSide, taker, m.minute, 'penalty');
               addEvent(m.minute, 'goal', `⚽ PENALTY GOAL! <span class="player">${taker.name}</span> scores!`, attackingSide, true);
             } else {
               const gk = pickPlayer(defTeam, ['GK']);
@@ -757,10 +873,13 @@ const App = (() => {
     const am = document.querySelector('.score-team.away .mgr');
     if (hm) hm.textContent = m.home.team.manager ? m.home.team.manager.name : '';
     if (am) am.textContent = m.away.team.manager ? m.away.team.manager.name : '';
-    set('live-home-score', m.home.score);
-    set('live-away-score', m.away.score);
-    set('live-minute', m.minute + "'");
+    const hs = m.home.penScore != null ? `${m.home.score} (${m.home.penScore})` : m.home.score;
+    const as_ = m.away.penScore != null ? `${m.away.score} (${m.away.penScore})` : m.away.score;
+    set('live-home-score', hs);
+    set('live-away-score', as_);
+    set('live-minute', m.inPens ? 'Pens' : (m.minute + "'"));
     set('live-status', m.status);
+    renderGoalTimeline();
   }
 
   function updateStatsPanel() {
@@ -849,12 +968,12 @@ const App = (() => {
       (s.squad.starting || []).forEach(p => {
         const on = (side === 'home' ? m.homeOnPitch : m.awayOnPitch).includes(p.id);
         const inj = m.injuries.includes(p.id);
-        h += `<li class="player-item ${inj ? 'injured' : ''}"><span class="player-num">${p.num || ''}</span><span class="player-pos">${p.slot || ''}</span> ${p.name} ${!on && !inj ? '(off)' : ''} ${inj ? '🩹' : ''}<span class="player-ovr">${p.ovr || ''}</span></li>`;
+        h += `<li class="player-item ${inj ? 'injured' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer"><span class="player-num">${p.num || ''}</span><span class="player-pos">${p.slot || ''}</span> ${p.name} ${!on && !inj ? '(off)' : ''} ${inj ? '🩹' : ''}<span class="player-ovr">${p.ovr || ''}</span></li>`;
       });
       h += `<li style="margin-top:8px;color:var(--text-muted);font-size:0.8rem">Substitutes</li>`;
       (s.squad.subs || []).forEach(p => {
         const on = (side === 'home' ? m.homeOnPitch : m.awayOnPitch).includes(p.id);
-        h += `<li class="player-item sub"><span class="player-num">${p.num || ''}</span><span class="player-pos">${(p.pos||[''])[0]}</span> ${p.name} ${on ? '(on)' : ''}<span class="player-ovr">${p.ovr || ''}</span></li>`;
+        h += `<li class="player-item sub" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer"><span class="player-num">${p.num || ''}</span><span class="player-pos">${(p.pos||[''])[0]}</span> ${p.name} ${on ? '(on)' : ''}<span class="player-ovr">${p.ovr || ''}</span></li>`;
       });
       return h + '</ul></div>';
     };
@@ -1174,14 +1293,26 @@ const App = (() => {
   }
 
   function simQuickMatch(homeTeam, awayTeam) {
-    const homeSquad = buildSquad(homeTeam, '4-3-3');
-    const awaySquad = buildSquad(awayTeam, '4-3-3');
-    const homeStr = homeSquad.starting.reduce((s, p) => s + (p.att || 70) + (p.ovr || 70), 0) / Math.max(1, homeSquad.starting.length);
-    const awayStr = awaySquad.starting.reduce((s, p) => s + (p.att || 70) + (p.ovr || 70), 0) / Math.max(1, awaySquad.starting.length);
-    const homeExp = (homeStr / (homeStr + awayStr)) * 2.4;
-    const awayExp = (awayStr / (homeStr + awayStr)) * 2.4;
-    const homeGoals = poisson(homeExp);
-    const awayGoals = poisson(awayExp);
+    // Random formations for variety
+    const forms = Object.keys(FORMATIONS);
+    const hf = forms[Math.floor(Math.random() * forms.length)];
+    const af = forms[Math.floor(Math.random() * forms.length)];
+    const homeSquad = buildSquad(homeTeam, hf);
+    const awaySquad = buildSquad(awayTeam, af);
+    // Manager boost
+    const homeMgr = (homeTeam.manager && homeTeam.manager.ovr) || 75;
+    const awayMgr = (awayTeam.manager && awayTeam.manager.ovr) || 75;
+    const homeStr = homeSquad.starting.reduce((s, p) => s + (p.att || 70) + (p.ovr || 70), 0) / Math.max(1, homeSquad.starting.length) + (homeMgr - 75) * 0.15;
+    const awayStr = awaySquad.starting.reduce((s, p) => s + (p.att || 70) + (p.ovr || 70), 0) / Math.max(1, awaySquad.starting.length) + (awayMgr - 75) * 0.15;
+    // Slight home advantage + form randomness
+    const formSwing = (Math.random() - 0.5) * 0.6;
+    const homeExp = Math.max(0.3, (homeStr / (homeStr + awayStr)) * 2.5 + 0.15 + formSwing);
+    const awayExp = Math.max(0.3, (awayStr / (homeStr + awayStr)) * 2.5 + formSwing * -1);
+    let homeGoals = poisson(homeExp);
+    let awayGoals = poisson(awayExp);
+    // Rare: dramatic late equalizer bias if one side dominating 0
+    if (homeGoals === 0 && awayGoals >= 2 && Math.random() < 0.12) homeGoals = 1;
+    if (awayGoals === 0 && homeGoals >= 2 && Math.random() < 0.12) awayGoals = 1;
     for (let i = 0; i < homeGoals; i++) {
       const attackers = homeSquad.starting.filter(p => !(p.pos || []).includes('GK')).sort((a, b) => (b.att || 0) - (a.att || 0));
       const scorer = attackers[Math.floor(Math.random() * Math.min(3, attackers.length))] || homeSquad.starting[10];
@@ -1267,9 +1398,10 @@ const App = (() => {
     const el = document.getElementById('teams-list');
     if (!el) return;
     el.innerHTML = list.map(t => `
-      <div class="team-check" style="cursor:default;flex-direction:column;align-items:flex-start;gap:4px">
+      <div class="team-check" style="cursor:pointer;flex-direction:column;align-items:flex-start;gap:4px" onclick="App.showTeamProfile('${t.id}')">
         <div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.5rem">${t.flag || ''}</span><strong>${t.name}</strong></div>
         <div style="font-size:0.8rem;color:var(--text-muted)">${(t.players || []).length} players · ${t.short}</div>
+        <div style="font-size:0.7rem;color:var(--accent-gold)">${(t.manager&&t.manager.name)||''}</div>
       </div>`).join('');
   }
 
@@ -1315,6 +1447,89 @@ const App = (() => {
       if (tournament.stage === 'knockout') renderBracket();
     }
     toast('Back to tournament — results updated');
+  }
+
+  
+  function showPlayerProfile(playerId) {
+    let player = null, team = null;
+    for (const t of allTeams) {
+      const p = (t.players || []).find(x => x.id === playerId);
+      if (p) { player = p; team = t; break; }
+    }
+    if (!player) { toast('Player not found'); return; }
+    const g = (stats.goals[playerId] || {}).count || 0;
+    const a = (stats.assists[playerId] || {}).count || 0;
+    const s = (stats.saves[playerId] || {}).count || 0;
+    const motm = (stats.motm[playerId] || {}).count || 0;
+    const y = (stats.yellows[playerId] || {}).count || 0;
+    const r = (stats.reds[playerId] || {}).count || 0;
+    const primary = team.color || '#d4af37';
+    const secondary = team.secondary || '#fff';
+    const modal = document.getElementById('player-modal');
+    const content = document.getElementById('player-modal-content');
+    if (!modal || !content) return;
+    content.innerHTML = `
+      <div class="profile-header">
+        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${player.num || '?'}</div>
+        <div>
+          <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
+          <div style="color:var(--text-secondary);font-size:0.85rem">${team.flag || ''} ${team.name} · ${(player.pos||[]).join('/')}</div>
+          <div style="color:var(--accent-gold);font-weight:700;margin-top:4px">OVR ${player.ovr}</div>
+        </div>
+      </div>
+      <div class="profile-stats-grid">
+        <div class="profile-stat"><div class="val">${g}</div><div class="lbl">Goals</div></div>
+        <div class="profile-stat"><div class="val">${a}</div><div class="lbl">Assists</div></div>
+        <div class="profile-stat"><div class="val">${motm}</div><div class="lbl">MOTM</div></div>
+        <div class="profile-stat"><div class="val">${s}</div><div class="lbl">Saves</div></div>
+        <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
+        <div class="profile-stat"><div class="val">${r}</div><div class="lbl">Reds</div></div>
+      </div>
+      <div style="margin-top:8px">
+        ${[['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
+          <div class="attr-bar-row"><span class="attr-name">${n}</span>
+            <div class="attr-track"><div class="attr-fill" style="width:${v||50}%"></div></div>
+            <span class="attr-val">${v||'-'}</span></div>`).join('')}
+      </div>
+      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
+    modal.classList.add('active');
+  }
+
+  function showTeamProfile(teamId) {
+    const team = getTeam(teamId);
+    if (!team) { toast('Team not found'); return; }
+    const primary = team.color || '#d4af37';
+    const secondary = team.secondary || '#fff';
+    const mgr = team.manager || {};
+    const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
+    const modal = document.getElementById('team-modal');
+    const content = document.getElementById('team-modal-content');
+    if (!modal || !content) return;
+    content.innerHTML = `
+      <div class="team-profile-banner" style="background:linear-gradient(135deg,${primary}33,${secondary}22);border:1px solid ${primary}55">
+        <span style="font-size:2.5rem">${team.flag || ''}</span>
+        <div>
+          <h2 style="margin:0">${team.name}</h2>
+          <div style="font-size:0.85rem;color:var(--text-secondary)">${team.short} · ${(team.players||[]).length} players</div>
+          <div style="font-size:0.8rem;color:var(--accent-gold);margin-top:4px">Manager: ${mgr.name || '—'} (OVR ${mgr.ovr || '—'})</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <div style="width:28px;height:28px;border-radius:6px;background:${primary};border:2px solid ${secondary}"></div>
+        <span style="font-size:0.8rem;color:var(--text-muted)">Primary / Secondary kit colors</span>
+      </div>
+      <div class="card-title">Squad</div>
+      <div style="max-height:320px;overflow-y:auto">
+        ${players.map(p => `
+          <div class="team-roster-item" onclick="App.showPlayerProfile('${p.id}')">
+            <span class="player-num">${p.num||''}</span>
+            <span class="player-pos">${(p.pos||[])[0]||''}</span>
+            <span style="flex:1;font-weight:600">${p.name}</span>
+            <span class="player-ovr">${p.ovr}</span>
+          </div>`).join('')}
+      </div>
+      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
+    modal.classList.add('active');
   }
 
   function showAwards(type) {
@@ -1378,7 +1593,7 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile
   };
 })();
 

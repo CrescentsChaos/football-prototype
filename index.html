@@ -87,7 +87,15 @@
               <select id="away-formation" class="formation-select"></select>
             </div>
           </div>
-          <div style="display:flex;gap:12px;justify-content:center;margin-top:8px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-top:12px">
+            <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="opt-et" style="accent-color:var(--accent-gold);width:16px;height:16px"> Extra Time if draw
+            </label>
+            <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="opt-pens" style="accent-color:var(--accent-gold);width:16px;height:16px"> Penalties if still draw
+            </label>
+          </div>
+          <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" onclick="App.startMatch()">⚽ Kick Off</button>
             <button class="btn btn-secondary" onclick="App.quickSimMatch()">⚡ Instant Result</button>
           </div>
@@ -107,6 +115,7 @@
               <div class="score-numbers"><span id="live-home-score">0</span> - <span id="live-away-score">0</span></div>
               <div class="score-time" id="live-minute">0'</div>
               <div class="match-status" id="live-status">1st Half</div>
+              <div class="goal-timeline" id="goal-timeline"></div>
             </div>
             <div class="score-team away">
               <span class="flag" id="live-away-flag"></span>
@@ -232,10 +241,17 @@
           <button class="btn btn-secondary btn-sm" onclick="App.filterTeams('club')">Club</button>
         </div>
         <div id="teams-list" class="teams-checkbox-grid" style="max-height:none"></div>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">Tap a team to open its full profile (manager, squad, colors).</p>
       </div>
     </section>
   </main>
 
+  <div class="modal-overlay" id="player-modal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="modal" id="player-modal-content" style="max-width:420px"></div>
+  </div>
+  <div class="modal-overlay" id="team-modal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="modal" id="team-modal-content" style="max-width:520px"></div>
+  </div>
   <div class="modal-overlay" id="modal">
     <div class="modal" id="modal-content"></div>
   </div>
