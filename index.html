@@ -2,49 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>FIFA Pro Simulator</title>
+  <title>FIFA World Engine</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header>
   <h1>⚽ Ultimate Football Engine</h1>
-  <div class="nav-tabs">
-    <button class="active">Single Match</button>
-  </div>
+  <div id="status-badge" style="color: var(--text-muted);">Ready for Kickoff</div>
 </header>
 
-<div class="container">
+<div class="controls-bar card">
+  <select id="comp-type" onchange="setupTeams()">
+    <option value="clubs">UEFA Champions League (Clubs)</option>
+    <option value="nationals">FIFA World Cup (Nationals)</option>
+  </select>
+  <select id="home-team" onchange="renderTacticalBoards()"></select>
+  <select id="away-team" onchange="renderTacticalBoards()"></select>
+  <button class="btn-sim" id="btn-start" onclick="startGradualSimulation()">Kickoff</button>
+  <button class="btn-reset" onclick="resetMatchData()">Reset</button>
+</div>
+
+<div class="main-layout">
   <main class="card">
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-      <select id="comp-type" onchange="populateTeamSelects()">
-        <option value="clubs">UEFA Champions League (Clubs)</option>
-        <option value="nationals">FIFA World Cup (Nationals)</option>
-      </select>
-      <select id="home-team"></select>
-      <select id="away-team"></select>
+    <!-- Scoreboard -->
+    <div class="scoreboard">
+      <div class="team-score" id="home-title">Home</div>
+      <div class="score-num" id="score-display">0 - 0</div>
+      <div class="team-score" id="away-title">Away</div>
+      <div class="match-clock" id="match-clock">00'</div>
     </div>
 
-    <button class="btn-primary" onclick="simulateMatch()">Simulate Match</button>
-
-    <div class="scoreboard" id="score-display">
-      Home 0 - 0 Away
+    <!-- Pre-Match Formations & Substitutes -->
+    <h3>Tactical Formations & Squads</h3>
+    <div class="pre-match-boards">
+      <div class="tactical-board" id="home-tactics"></div>
+      <div class="tactical-board" id="away-tactics"></div>
     </div>
 
-    <h3>Match Feed</h3>
-    <div class="match-log" id="match-log"></div>
+    <!-- Dynamic Match Feed -->
+    <h3>Live Commentary</h3>
+    <div class="feed-container" id="match-feed"></div>
   </main>
 
   <aside class="card">
     <h3>Leaderboards</h3>
-    <h4>Top Scorers</h4>
-    <table><tbody id="leaderboard-goals"></tbody></table>
+    
+    <h4 style="margin-top:15px; color: var(--accent-gold);">Top Scorers</h4>
+    <table class="leaderboard-table"><tbody id="board-goals"></tbody></table>
 
-    <h4 style="margin-top: 15px;">Top Assists</h4>
-    <table><tbody id="leaderboard-assists"></tbody></table>
+    <h4 style="margin-top:15px; color: var(--accent-gold);">Top Assists</h4>
+    <table class="leaderboard-table"><tbody id="board-assists"></tbody></table>
 
-    <h4 style="margin-top: 15px;">Top Goalkeepers</h4>
-    <table><tbody id="leaderboard-saves"></tbody></table>
+    <h4 style="margin-top:15px; color: var(--accent-gold);">Top Goalkeepers</h4>
+    <table class="leaderboard-table"><tbody id="board-saves"></tbody></table>
   </aside>
 </div>
 
