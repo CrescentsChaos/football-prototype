@@ -205,7 +205,7 @@ body {
 .player-dot .dot-name {
   position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
   font-size: 0.55rem; white-space: nowrap; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.95);
-  font-weight: 700; max-width: 72px; overflow: hidden; text-overflow: ellipsis; text-align: center;
+  font-weight: 700; max-width: 64px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; text-align: center;
 }
 .lineup-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
 @media (min-width: 700px) { .lineup-grid { grid-template-columns: 1fr 1fr; } }
@@ -405,3 +405,6 @@ body {
   border: 1px solid transparent;
 }
 .team-roster-item:hover { background: rgba(255,255,255,0.05); border-color: var(--border); }
+
+#post-match-ratings { max-height: 480px; overflow-y: auto; }
+.player-dot .dot-name { pointer-events: none; }

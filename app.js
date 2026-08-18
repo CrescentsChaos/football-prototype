@@ -6,8 +6,11 @@ const App = (() => {
 
   let teamsData = { national: [], club: [] };
   let allTeams = [];
-  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {} };
-  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {} };
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
+  // playerId -> { type, matchesOut, returnDay, teamName }
+  let injuryBook = {};
+  let globalMatchDay = 1;
   let trophies = []; // {name, team, type, date}
   let currentMatch = null;
   let simInterval = null;
@@ -126,6 +129,29 @@ const App = (() => {
     if (view === 'teams') renderTeamsList();
   }
 
+  function randomMatch(category) {
+    // category: 'national' | 'club' | 'all'
+    let pool = allTeams;
+    if (category === 'national') pool = teamsData.national || [];
+    if (category === 'club') pool = teamsData.club || [];
+    if (pool.length < 2) { toast('Need at least 2 teams'); return; }
+    const shuffled = shuffleArray([...pool]);
+    const home = shuffled[0], away = shuffled[1];
+    goToMatch();
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = home.id;
+    if (awaySel) awaySel.value = away.id;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    // Random formations
+    const forms = Object.keys(FORMATIONS);
+    const hf = document.getElementById('home-formation');
+    const af = document.getElementById('away-formation');
+    if (hf) hf.value = forms[Math.floor(Math.random()*forms.length)];
+    if (af) af.value = forms[Math.floor(Math.random()*forms.length)];
+    toast(`${home.flag||''} ${home.name} vs ${away.flag||''} ${away.name}`);
+  }
+
   function goToMatch() {
     switchView('match');
     const setup = document.getElementById('match-setup');
@@ -205,7 +231,11 @@ const App = (() => {
 
   function buildSquad(team, formationKey) {
     const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
-    const players = shuffleArray([...(team.players || [])]);
+    const players = shuffleArray([...(team.players || [])].filter(p => !isPlayerInjured(p.id)));
+    if (players.length < 11) {
+      // Emergency: allow injured if roster too thin
+      players.push(...shuffleArray([...(team.players||[])].filter(p => isPlayerInjured(p.id))));
+    }
     const used = new Set();
     const starting = [];
     for (const slot of formation.slots) {
@@ -377,7 +407,7 @@ const App = (() => {
   }
 
   function blankPlayerMatchStats(p) {
-    return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
+    return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
   }
 
   function pickGoalMethod(shooter) {
@@ -405,17 +435,22 @@ const App = (() => {
   }
 
   function calcPlayerRating(ps) {
-    let r = 6.0;
-    r += ps.goals * 1.1;
-    r += ps.assists * 0.8;
-    r += Math.min(ps.shots * 0.1, 0.5);
-    r += Math.min(ps.saves * 0.25, 1.5);
-    r += Math.min(ps.tackles * 0.15, 0.6);
-    r += Math.min(ps.xg * 0.3, 0.5);
-    if (ps.yellow) r -= 0.3;
-    if (ps.red) r -= 1.5;
-    r += (Math.random() - 0.5) * 0.4;
-    return Math.max(4.0, Math.min(10.0, Math.round(r * 10) / 10));
+    let r = 6.0 + (Math.random() * 0.25 - 0.08);
+    r += (ps.goals || 0) * 1.15;
+    r += (ps.assists || 0) * 0.85;
+    r += Math.min((ps.shots || 0) * 0.12, 0.6);
+    r += Math.min((ps.saves || 0) * 0.28, 1.8);
+    r += Math.min((ps.tackles || 0) * 0.18, 0.7);
+    r += Math.min((ps.passes || 0) * 0.02, 0.4);
+    r += Math.min((ps.xg || 0) * 0.25, 0.5);
+    r += Math.min((ps.xa || 0) * 0.2, 0.4);
+    if ((ps.saves || 0) >= 5) r += 0.3;
+    if ((ps.goals || 0) >= 2) r += 0.25;
+    if ((ps.goals || 0) >= 3) r += 0.35;
+    if (ps.yellow) r -= 0.35;
+    if (ps.red) r -= 1.6;
+    r += ((ps.ovr || 75) - 75) * 0.008;
+    return Math.max(4.0, Math.min(9.9, Math.round(r * 10) / 10));
   }
 
 
@@ -533,13 +568,13 @@ const App = (() => {
       }
       m.status = 'Extra Time ' + Math.min(etMin, 30) + "'";
       // Higher chance of events in ET fatigue
-      if (Math.random() < 0.02) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
+      if (Math.random() < 0.006) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     }
     generateEvents();
     if (m.minute >= 55 && m.minute <= 85 && Math.random() < 0.08) {
       trySubstitution(Math.random() < 0.5 ? 'home' : 'away');
     }
-    if (Math.random() < 0.012) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
+    if (Math.random() < 0.0035) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     updateScoreboard();
     if (!silent) updateStatsPanel();
   }
@@ -567,6 +602,9 @@ const App = (() => {
       attTeam.stats.shots++;
       if (Math.random() < (0.35 + (shooter.att || 70) / 300)) {
         attTeam.stats.shotsOn++;
+        if (!m.playerMatchStats) m.playerMatchStats={};
+        if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
+        m.playerMatchStats[shooter.id].shots++;
         const gk = pickPlayer(defTeam, ['GK']);
         if (Math.random() < (gk ? 0.55 + (gk.def || 70) / 400 : 0.6)) {
           if (gk) {
@@ -597,6 +635,10 @@ const App = (() => {
           }
         }
       } else {
+        if (!m.playerMatchStats) m.playerMatchStats={};
+        if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
+        m.playerMatchStats[shooter.id].shots++;
+        m.playerMatchStats[shooter.id].xg += 0.05 + Math.random()*0.1;
         addEvent(m.minute, 'shot', `Shot by <span class="player">${shooter.name}</span> goes wide`, attackingSide);
       }
     } else if (r < 0.32) {
@@ -621,6 +663,9 @@ const App = (() => {
         defTeam.stats.yellows++;
         recordStat('cards', fouler, defTeam.team);
         recordStat('yellows', fouler, defTeam.team);
+        if (!m.playerMatchStats) m.playerMatchStats={};
+        if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id]=blankPlayerMatchStats(fouler);
+        m.playerMatchStats[fouler.id].yellow = true;
         if (m.cards[defendingSide][fouler.id] >= 2) {
           defTeam.stats.reds++;
           addEvent(m.minute, 'red', `RED CARD! <span class="player">${fouler.name}</span> sent off (2nd yellow)`, defendingSide);
@@ -698,16 +743,81 @@ const App = (() => {
         }
       }
     } else if (r < 0.94) {
-      // VAR check
-      addEvent(m.minute, 'var', `📺 VAR check in progress...`, null);
-      if (Math.random() < 0.4) {
-        addEvent(m.minute, 'var', `VAR: Decision stands`, null);
-      } else if (Math.random() < 0.5) {
-        addEvent(m.minute, 'var', `VAR: Goal disallowed (offside)`, null);
+      // VAR — coherent sequence for one side
+      const varSide = attackingSide;
+      const varTeam = attTeam;
+      const defSide = defendingSide;
+      const scenario = Math.random();
+      if (scenario < 0.35) {
+        // Potential goal review
+        addEvent(m.minute, 'var', `📺 VAR checking possible offside in the build-up (${varTeam.team.short})...`, varSide);
+        if (Math.random() < 0.55) {
+          addEvent(m.minute, 'var', `VAR: Goal stands for ${varTeam.team.short}`, varSide);
+        } else {
+          addEvent(m.minute, 'var', `VAR: Goal disallowed — offside against ${varTeam.team.short}`, varSide);
+        }
+      } else if (scenario < 0.7) {
+        // Penalty review for attacking team
+        const fouled = pickPlayer(attTeam, ['ST','RW','LW','CAM']);
+        const fouler = pickPlayer(defTeam, ['CB','RB','LB','CDM']);
+        addEvent(m.minute, 'var', `📺 VAR checking penalty claim — foul on ${fouled?fouled.name:'attacker'} by ${fouler?fouler.name:'defender'} (${varTeam.team.short})...`, varSide);
+        if (Math.random() < 0.5) {
+          addEvent(m.minute, 'var', `VAR: Penalty awarded to ${varTeam.team.short}!`, varSide);
+          const taker = pickPlayer(attTeam, ['ST','CAM','CM']) || fouled;
+          if (taker) {
+            addEvent(m.minute, 'pen', `Penalty for ${varTeam.team.short} — <span class="player">${taker.name}</span> steps up`, varSide);
+            attTeam.stats.shots++; attTeam.stats.shotsOn++;
+            if (Math.random() < 0.75) {
+              attTeam.score++;
+              recordStat('goals', taker, attTeam.team);
+              pushGoal(varSide, taker, m.minute, 'penalty');
+              addEvent(m.minute, 'goal', `⚽ PENALTY SCORED! <span class="player">${taker.name}</span> for ${varTeam.team.short}`, varSide, true);
+            } else {
+              const gk = pickPlayer(defTeam, ['GK']);
+              if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
+              if (Math.random() < 0.5) {
+                addEvent(m.minute, 'miss', `Penalty SAVED by <span class="player">${gk?gk.name:'GK'}</span>!`, defSide);
+              } else {
+                addEvent(m.minute, 'miss', `Penalty MISSED by <span class="player">${taker.name}</span> (over the bar)`, varSide);
+              }
+            }
+          }
+        } else {
+          addEvent(m.minute, 'var', `VAR: No penalty — play on`, null);
+        }
       } else {
-        addEvent(m.minute, 'var', `VAR: Penalty confirmed`, null);
+        // Red card review
+        const player = pickPlayer(defTeam, ['CB','ST','CDM','CM']);
+        addEvent(m.minute, 'var', `📺 VAR checking possible red card (${defTeam.team.short})...`, defSide);
+        if (player && Math.random() < 0.4) {
+          defTeam.stats.reds++;
+          recordStat('reds', player, defTeam.team);
+          addEvent(m.minute, 'red', `VAR: Red card! <span class="player">${player.name}</span> (${defTeam.team.short}) sent off`, defSide);
+          removeFromPitch(defSide, player.id);
+        } else {
+          addEvent(m.minute, 'var', `VAR: No red card — yellow only / play on`, null);
+        }
       }
-    } else if (Math.random() < 0.4) {
+    } else if (r < 0.97 && Math.random() < 0.15) {
+      // Rare unexpected events
+      const rare = Math.random();
+      if (rare < 0.2) {
+        addEvent(m.minute, 'whistle', `🌧 Sudden downpour — players struggling with the ball`, null);
+      } else if (rare < 0.35) {
+        const p = pickPlayer(attTeam, ['ST','CAM','RW']);
+        if (p) addEvent(m.minute, 'miss', `How did he miss that?! <span class="player">${p.name}</span> open goal blazed over`, attackingSide);
+      } else if (rare < 0.5) {
+        addEvent(m.minute, 'whistle', `⏱ Brief stoppage — medical staff on for a clash of heads`, null);
+      } else if (rare < 0.65) {
+        const p = pickPlayer(defTeam, ['CB','RB','LB']);
+        if (p) addEvent(m.minute, 'foul', `Outrageous challenge from <span class="player">${p.name}</span> — referee lets play continue`, defendingSide);
+      } else if (rare < 0.8) {
+        addEvent(m.minute, 'whistle', `📢 Crowd erupting after a sweeping counter-attack`, null);
+      } else {
+        const p = pickPlayer(attTeam, ['CM','CAM']);
+        if (p) addEvent(m.minute, 'pass', `World-class switch of play by <span class="player">${p.name}</span>`, attackingSide);
+      }
+    } else if (Math.random() < 0.35) {
       addEvent(m.minute, 'pressure', `${attTeam.team.short} applying pressure`, attackingSide);
     }
   }
@@ -759,19 +869,55 @@ const App = (() => {
     addEvent(m.minute, 'sub', `Substitution (${sideData.team.short}): <span class="player">${inPlayer.name}</span> replaces <span class="player">${outPlayer.name}</span>`, side);
   }
 
+  function isPlayerInjured(playerId) {
+    const rec = injuryBook[playerId];
+    if (!rec) return false;
+    return globalMatchDay < rec.returnDay;
+  }
+
   function tryInjury(side) {
     const m = currentMatch;
     if (!m) return;
     const sideData = m[side];
     const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
-    const pool = (sideData.squad.all || []).filter(p => onPitchIds.includes(p.id) && (p.pos || [])[0] !== 'GK');
+    const pool = (sideData.squad.all || []).filter(p => onPitchIds.includes(p.id) && (p.pos || [])[0] !== 'GK' && !isPlayerInjured(p.id));
     if (!pool.length) return;
     const injured = pool[Math.floor(Math.random() * pool.length)];
+    const injuryTypes = [
+      { type: 'Ankle sprain', min: 1, max: 3 },
+      { type: 'Hamstring strain', min: 2, max: 5 },
+      { type: 'Knee knock', min: 1, max: 2 },
+      { type: 'Calf strain', min: 2, max: 4 },
+      { type: 'Shoulder injury', min: 1, max: 3 },
+      { type: 'Concussion protocol', min: 1, max: 2 },
+      { type: 'Groin strain', min: 2, max: 4 },
+      { type: 'Fractured metatarsal', min: 4, max: 8 },
+      { type: 'ACL concern (precaution)', min: 3, max: 6 },
+      { type: 'Muscle fatigue / cramp', min: 1, max: 1 }
+    ];
+    // Weighted toward minor
+    const roll = Math.random();
+    let info;
+    if (roll < 0.55) info = injuryTypes[Math.floor(Math.random() * 3)];
+    else if (roll < 0.85) info = injuryTypes[3 + Math.floor(Math.random() * 4)];
+    else info = injuryTypes[7 + Math.floor(Math.random() * 3)];
+    const outMatches = info.min + Math.floor(Math.random() * (info.max - info.min + 1));
+    const returnDay = globalMatchDay + outMatches;
+    injuryBook[injured.id] = {
+      type: info.type,
+      matchesOut: outMatches,
+      returnDay,
+      teamName: sideData.team.name,
+      playerName: injured.name
+    };
     m.injuries.push(injured.id);
-    addEvent(m.minute, 'injury', `⚠ Injury! <span class="player">${injured.name}</span> is down`, side);
+    addEvent(m.minute, 'injury',
+      `🩹 <span class="player">${injured.name}</span> — ${info.type}. Out for ${outMatches} matchday${outMatches>1?'s':''} (back MD ${returnDay})`,
+      side);
+    try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     if (used < m.maxSubs) {
-      const availableSubs = (sideData.squad.subs || []).filter(p => !onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
+      const availableSubs = (sideData.squad.subs || []).filter(p => !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !isPlayerInjured(p.id));
       if (availableSubs.length) {
         let candidates = availableSubs.filter(p => canPlay(p, injured.slot || (injured.pos || ['CM'])[0]));
         if (!candidates.length) candidates = availableSubs;
@@ -780,7 +926,7 @@ const App = (() => {
         const idx = onPitchIds.indexOf(injured.id);
         if (idx >= 0) onPitchIds[idx] = inPlayer.id;
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
-        addEvent(m.minute, 'sub', `Forced sub: <span class="player">${inPlayer.name}</span> comes on for injured <span class="player">${injured.name}</span>`, side);
+        addEvent(m.minute, 'sub', `Forced sub: <span class="player">${inPlayer.name}</span> replaces injured <span class="player">${injured.name}</span>`, side);
       } else {
         removeFromPitch(side, injured.id);
       }
@@ -812,31 +958,43 @@ const App = (() => {
       const gk = (m.away.squad.starting || []).find(p => (p.pos || []).includes('GK'));
       if (gk) recordStat('cleanSheets', gk, m.away.team);
     }
-    const allPlayers = [...(m.home.squad.all || []), ...(m.away.squad.all || [])];
-    let best = null, bestScore = -1;
-    allPlayers.forEach(p => {
-      const g = (stats.goals[p.id] || {}).count || 0;
-      const a = (stats.assists[p.id] || {}).count || 0;
-      const s = (stats.saves[p.id] || {}).count || 0;
-      const score = g * 3 + a * 2 + s * 0.5 + (p.ovr || 70) / 20 + Math.random();
-      if (score > bestScore) { bestScore = score; best = p; }
+    // Compute ratings for everyone who played, then MOTM = highest rating
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    const allOnPitch = [...(m.home.squad.starting||[]), ...(m.away.squad.starting||[])];
+    // Include subs who came on
+    const onIds = new Set([...(m.homeOnPitch||[]), ...(m.awayOnPitch||[])]);
+    const allInvolved = [...(m.home.squad.all||[]), ...(m.away.squad.all||[])].filter(p =>
+      onIds.has(p.id) || allOnPitch.some(s => s.id === p.id) || (m.playerMatchStats[p.id] && (
+        m.playerMatchStats[p.id].goals || m.playerMatchStats[p.id].assists || m.playerMatchStats[p.id].shots || m.playerMatchStats[p.id].saves
+      ))
+    );
+    const pool = allInvolved.length ? allInvolved : allOnPitch;
+    pool.forEach(p => {
+      if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+      // Baseline involvement for starters without events
+      const ps = m.playerMatchStats[p.id];
+      if (!(ps.passes||0) && onIds.has(p.id)) ps.passes = 8 + Math.floor(Math.random()*20);
+      if (!(ps.tackles||0) && onIds.has(p.id) && Math.random() < 0.4) ps.tackles = 1 + Math.floor(Math.random()*3);
+      ps.rating = calcPlayerRating(ps);
+      // Track average rating for leaderboard
+      recordRating(p, (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team, ps.rating);
+    });
+    let best = null, bestR = -1;
+    Object.values(m.playerMatchStats).forEach(ps => {
+      if (ps.rating > bestR) { bestR = ps.rating; best = ps; }
     });
     if (best) {
       const team = (m.home.squad.all || []).find(p => p.id === best.id) ? m.home.team : m.away.team;
-      recordStat('motm', best, team);
-      addEvent(90, 'motm', `Man of the Match: <span class="player">${best.name}</span> ⭐`, null);
-    }
-    // Compute post-match ratings
-    if (!m.playerMatchStats) m.playerMatchStats = {};
-    const allOnPitch = [...(m.home.squad.starting||[]), ...(m.away.squad.starting||[])];
-    allOnPitch.forEach(p => {
-      if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
-      m.playerMatchStats[p.id].rating = calcPlayerRating(m.playerMatchStats[p.id]);
-    });
-    if (best && m.playerMatchStats[best.id]) {
-      m.playerMatchStats[best.id].rating = Math.min(10, +(m.playerMatchStats[best.id].rating + 0.5).toFixed(1));
+      const playerObj = [...(m.home.squad.all||[]), ...(m.away.squad.all||[])].find(p => p.id === best.id) || best;
+      recordStat('motm', playerObj, team);
+      addEvent(90, 'motm', `Man of the Match: <span class="player">${best.name}</span> (${best.rating.toFixed(1)}) ⭐`, null);
     }
     renderPostMatchRatings();
+    globalMatchDay++;
+    // Clear recovered injuries
+    Object.keys(injuryBook).forEach(id => {
+      if (injuryBook[id].returnDay <= globalMatchDay) delete injuryBook[id];
+    });
     saveStats();
     updateScoreboard();
     updateStatsPanel();
@@ -845,6 +1003,37 @@ const App = (() => {
       if (backBtn) { backBtn.style.display = 'flex'; backBtn.classList.add('show'); }
     }
     // If this was a tournament match, update fixture
+    
+    // Knockout live result
+    if (typeof window._koRoundIdx === 'number' && typeof window._koMatchIdx === 'number' && tournament) {
+      const km = tournament.knockout[window._koRoundIdx] && tournament.knockout[window._koRoundIdx].matches[window._koMatchIdx];
+      if (km && !km.played && currentMatch) {
+        km.played = true;
+        km.homeScore = currentMatch.home.score;
+        km.awayScore = currentMatch.away.score;
+        if (currentMatch.home.penScore != null) {
+          km.penalties = true;
+          // Winner by pens or score
+          if (currentMatch.home.score !== currentMatch.away.score) {
+            km.winner = currentMatch.home.score > currentMatch.away.score ? km.home : km.away;
+          } else {
+            km.winner = (currentMatch.home.penScore > currentMatch.away.penScore) ? km.home : km.away;
+            km.homeScore = currentMatch.home.score;
+            km.awayScore = currentMatch.away.score;
+          }
+        } else if (currentMatch.home.score === currentMatch.away.score) {
+          km.winner = Math.random() < 0.5 ? km.home : km.away;
+          km.penalties = true;
+        } else {
+          km.winner = currentMatch.home.score > currentMatch.away.score ? km.home : km.away;
+        }
+        const ri = window._koRoundIdx;
+        window._koRoundIdx = null;
+        window._koMatchIdx = null;
+        afterKnockoutMatchPlayed(ri);
+        toast('Knockout result saved!');
+      }
+    }
     if (typeof window._tourFixtureIdx === 'number' && tournament && tournament.fixtures[window._tourFixtureIdx]) {
       const f = tournament.fixtures[window._tourFixtureIdx];
       if (!f.played && currentMatch) {
@@ -937,36 +1126,56 @@ const App = (() => {
     const wrap = document.getElementById('pitch-display');
     if (!wrap) return;
 
-    // Single pitch: home defends bottom (high Y%), away defends top (low Y%)
-    // Formation coords: y=92 is GK, y=16 is ST. Home uses as-is. Away flips Y.
-    const placeTeam = (side, isAway) => {
+    const luminance = (c) => {
+      if (!c || c[0] !== '#') return 128;
+      let hex = c.replace('#','');
+      if (hex.length === 3) hex = hex.split('').map(ch => ch+ch).join('');
+      if (hex.length < 6) return 128;
+      const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+      return (r*299 + g*587 + b*114) / 1000;
+    };
+    const colorDist = (a, b) => Math.abs(luminance(a) - luminance(b));
+    // Pick kit colors that contrast between teams
+    let homeCol = m.home.team.color || '#ffffff';
+    let awayCol = m.away.team.color || '#0000aa';
+    let homeSec = m.home.team.secondary || '#000000';
+    let awaySec = m.away.team.secondary || '#ffffff';
+    if (colorDist(homeCol, awayCol) < 50) {
+      // Conflict: use away secondary or forced alternate
+      if (colorDist(homeCol, awaySec) >= 50) awayCol = awaySec;
+      else if (colorDist(homeSec, awayCol) >= 50) homeCol = homeSec;
+      else { awayCol = luminance(homeCol) > 140 ? '#1a237e' : '#ffeb3b'; }
+    }
+    // White vs grey etc.
+    if (colorDist(homeCol, awayCol) < 40) {
+      awayCol = luminance(homeCol) > 128 ? '#0d47a1' : '#fafafa';
+    }
+
+    const placeTeam = (side, isAway, primary, secondary) => {
       const s = m[side];
       const form = FORMATIONS[s.squad.formation] || FORMATIONS['4-3-3'];
       const coords = form.coords || [];
       const onPitch = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
-      const primary = s.team.color || (isAway ? '#2979ff' : '#d4af37');
-      const secondary = s.team.secondary || '#ffffff';
-      // Text color: light text on dark jersey, dark text on light jersey
-      const isLight = (c) => {
-        if (!c || c[0] !== '#') return false;
-        const hex = c.replace('#','');
-        const full = hex.length === 3 ? hex.split('').map(ch=>ch+ch).join('') : hex;
-        if (full.length < 6) return false;
-        const r = parseInt(full.slice(0,2),16), g = parseInt(full.slice(2,4),16), b = parseInt(full.slice(4,6),16);
-        return (r*299 + g*587 + b*114) / 1000 > 160;
-      };
-      const textCol = isLight(primary) ? '#0a0e17' : '#ffffff';
+      const textCol = luminance(primary) > 160 ? '#0a0e17' : '#ffffff';
       let dots = '';
+      const used = [];
       (s.squad.starting || []).forEach((p, i) => {
         if (!onPitch.includes(p.id)) return;
-        const c = coords[i] || [50, 50];
-        const x = c[0];
-        // Home: keep coords (GK at bottom). Away: mirror so GK at top
-        const y = isAway ? (100 - c[1]) : c[1];
-        const fullName = p.name || '';
+        let c = coords[i] || [50, 50];
+        let x = c[0];
+        let y = isAway ? (100 - c[1]) : c[1];
+        // Nudge if overlapping another dot
+        for (let t = 0; t < 8; t++) {
+          const clash = used.some(u => Math.hypot(u.x - x, u.y - y) < 7);
+          if (!clash) break;
+          x = Math.max(8, Math.min(92, x + (t % 2 === 0 ? 5 : -5)));
+          y = Math.max(6, Math.min(94, y + (t % 3 === 0 ? 4 : -3)));
+        }
+        used.push({ x, y });
+        const shortName = (p.name || '').length > 12 ? (p.name || '').split(' ').pop() : (p.name || '');
         dots += `<div class="player-dot" style="left:${x}%;top:${y}%;background:${primary};color:${textCol};border:2px solid ${secondary}">
           <span class="dot-num">${p.num || ''}</span>
-          <span class="dot-name" style="color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.9)">${fullName}</span>
+          <span class="dot-name">${shortName}</span>
         </div>`;
       });
       return dots;
@@ -974,11 +1183,11 @@ const App = (() => {
 
     const homeForm = (FORMATIONS[m.home.squad.formation] || {}).name || '';
     const awayForm = (FORMATIONS[m.away.squad.formation] || {}).name || '';
-    wrap.innerHTML = `<div class="mini-pitch single-pitch" style="max-height:520px;aspect-ratio:68/105;margin:0 auto">
+    wrap.innerHTML = `<div class="mini-pitch single-pitch" style="max-height:560px;aspect-ratio:68/105;margin:0 auto">
       <div class="pitch-label" style="top:4px">${m.away.team.short} · ${awayForm}</div>
       <div class="pitch-label" style="top:auto;bottom:4px">${m.home.team.short} · ${homeForm}</div>
-      ${placeTeam('away', true)}
-      ${placeTeam('home', false)}
+      ${placeTeam('away', true, awayCol, awaySec)}
+      ${placeTeam('home', false, homeCol, homeSec)}
     </div>`;
   }
 
@@ -1005,37 +1214,121 @@ const App = (() => {
     renderPitch();
   }
 
+  function recordRating(player, team, rating) {
+    if (!player || !team) return;
+    if (!stats.ratings) stats.ratings = {};
+    if (!stats.ratings[player.id]) {
+      stats.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0 };
+    }
+    const e = stats.ratings[player.id];
+    e.count++;
+    e.sum += rating;
+    e.avg = Math.round((e.sum / e.count) * 100) / 100;
+  }
+
+  function findPlayerTeams(playerId) {
+    let national = null, club = null;
+    (teamsData.national || []).forEach(t => {
+      if ((t.players || []).some(p => p.id === playerId)) national = t.name;
+    });
+    (teamsData.club || []).forEach(t => {
+      if ((t.players || []).some(p => p.id === playerId)) club = t.name;
+    });
+    // Same player may only exist on one team in our data; also check by name match across
+    if (!national || !club) {
+      let pname = null;
+      allTeams.forEach(t => {
+        const p = (t.players || []).find(x => x.id === playerId);
+        if (p) pname = p.name;
+      });
+      if (pname) {
+        (teamsData.national || []).forEach(t => {
+          if ((t.players || []).some(p => p.name === pname)) national = t.name;
+        });
+        (teamsData.club || []).forEach(t => {
+          if ((t.players || []).some(p => p.name === pname)) club = t.name;
+        });
+      }
+    }
+    return { national, club };
+  }
+
   function recordStat(type, player, team) {
     if (!player || !team) return;
     if (!stats[type]) stats[type] = {};
     if (!stats[type][player.id]) {
-      stats[type][player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0 };
+      const aff = findPlayerTeams(player.id);
+      stats[type][player.id] = {
+        id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0,
+        national: aff.national, club: aff.club
+      };
     }
     stats[type][player.id].count++;
+    // Tournament-specific leaderboard
+    if (tournament) {
+      if (!tournamentStats[type]) tournamentStats[type] = {};
+      if (!tournamentStats[type][player.id]) {
+        const aff = findPlayerTeams(player.id);
+        tournamentStats[type][player.id] = {
+          id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0,
+          national: aff.national, club: aff.club
+        };
+      }
+      tournamentStats[type][player.id].count++;
+    }
   }
 
   function saveStats() {
-    try { localStorage.setItem('apexSimStats', JSON.stringify(stats)); } catch(e) {}
+    try {
+      localStorage.setItem('apexSimStats', JSON.stringify(stats));
+      localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook));
+      localStorage.setItem('apexMatchDay', String(globalMatchDay));
+    } catch(e) {}
   }
   function loadStats() {
     try {
       const s = localStorage.getItem('apexSimStats');
       if (s) stats = JSON.parse(s);
+      if (!stats.ratings) stats.ratings = {};
+      const t = localStorage.getItem('apexTrophies');
+      if (t) trophies = JSON.parse(t);
+      const ib = localStorage.getItem('apexInjuryBook');
+      if (ib) injuryBook = JSON.parse(ib);
+      const md = localStorage.getItem('apexMatchDay');
+      if (md) globalMatchDay = parseInt(md, 10) || 1;
     } catch(e) {}
+  }
+
+  function resetLeaderboard() {
+    if (!confirm('Reset all leaderboard stats? This cannot be undone.')) return;
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
+    try { localStorage.removeItem('apexSimStats'); } catch(e) {}
+    saveStats();
+    showLeaderboard('goals');
+    toast('Leaderboard reset');
   }
 
   function showLeaderboard(type) {
     document.querySelectorAll('.lb-tab').forEach(t => t.classList.toggle('active', t.dataset.lb === type));
-    const data = Object.values(stats[type] || {}).sort((a, b) => b.count - a.count).slice(0, 20);
+    let data;
+    if (type === 'ratings') {
+      data = Object.values(stats.ratings || {}).filter(x => x.count > 0).sort((a, b) => b.avg - a.avg || b.count - a.count).slice(0, 20);
+    } else {
+      data = Object.values(stats[type] || {}).sort((a, b) => b.count - a.count).slice(0, 20);
+    }
     const el = document.getElementById('leaderboard-content');
     if (!el) return;
     if (!data.length) {
       el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No ${type} recorded yet. Simulate matches!</p></div>`;
       return;
     }
-    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees' };
+    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating' };
     el.innerHTML = `<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>${labels[type]||type}</th></tr></thead><tbody>
-      ${data.map((p,i) => `<tr><td class="lb-rank">${i+1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${p.team}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
+      ${data.map((p,i) => {
+        const aff = [p.national, p.club].filter(Boolean).join(' · ') || p.team;
+        return `<tr><td class="lb-rank">${i+1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${aff}</td><td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
+      }).join('')}
     </tbody></table>`;
   }
 
@@ -1075,8 +1368,15 @@ const App = (() => {
     const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
     if (selected.length < 4) { toast('Select at least 4 teams'); return; }
     let teams = shuffleArray([...selected]);
+    // FIFA 2026 style: prefer groups of 4 (up to 12 groups = 48 teams)
     const groupSize = 4;
-    const numGroups = Math.floor(teams.length / groupSize) || 1;
+    let numGroups = Math.floor(teams.length / groupSize);
+    if (numGroups < 1) numGroups = 1;
+    if (numGroups > 12) numGroups = 12; // max 48 teams in groups
+    // Use as many full groups as possible
+    const used = numGroups * groupSize;
+    teams = teams.slice(0, used);
+    if (teams.length < 4) { toast('Need at least 4 teams for groups'); return; }
     const groups = [];
     for (let i = 0; i < numGroups; i++) {
       groups.push({
@@ -1092,7 +1392,9 @@ const App = (() => {
     const live = document.getElementById('tournament-live');
     if (setup) setup.style.display = 'none';
     if (live) live.style.display = 'block';
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
     renderGroups();
+    renderTournamentLeaderboard();
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = 'Group Stage';
     const bracket = document.getElementById('bracket');
@@ -1241,11 +1543,32 @@ const App = (() => {
   function advanceToKnockout() {
     if (!tournament) return;
     const qualifiers = [];
+    const thirdPlaces = [];
     tournament.groups.forEach(g => {
       const sorted = [...g.teams].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
       if (sorted[0]) qualifiers.push(sorted[0].team);
       if (sorted[1]) qualifiers.push(sorted[1].team);
+      if (sorted[2]) thirdPlaces.push(sorted[2]);
     });
+    // FIFA-style: if we have 12 groups (24 auto + need 8 thirds → 32)
+    if (tournament.groups.length >= 8 && thirdPlaces.length) {
+      thirdPlaces.sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      const need = 32 - qualifiers.length;
+      if (need > 0) {
+        thirdPlaces.slice(0, need).forEach(t => qualifiers.push(t.team));
+      }
+    }
+    // Pad/trim to power of 2
+    while (qualifiers.length >= 2 && (qualifiers.length & (qualifiers.length - 1))) {
+      if (qualifiers.length > 16 && qualifiers.length < 32) {
+        // try not to drop if we can leave at 16
+        if (qualifiers.length > 24) qualifiers.pop();
+        else break;
+      } else {
+        qualifiers.pop();
+      }
+    }
+    // Force power of 2
     while (qualifiers.length >= 2 && (qualifiers.length & (qualifiers.length - 1))) qualifiers.pop();
     if (qualifiers.length < 2) { toast('Not enough qualifiers'); return; }
     tournament.stage = 'knockout';
@@ -1377,6 +1700,28 @@ const App = (() => {
     return k - 1;
   }
 
+  function renderTournamentLeaderboard() {
+    const el = document.getElementById('tour-stats-preview');
+    if (!el) return;
+    const g = Object.values(tournamentStats.goals || {}).sort((a,b)=>b.count-a.count).slice(0,8);
+    const a = Object.values(tournamentStats.assists || {}).sort((a,b)=>b.count-a.count).slice(0,5);
+    const m = Object.values(tournamentStats.motm || {}).sort((a,b)=>b.count-a.count).slice(0,5);
+    if (!g.length && !a.length) {
+      el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Play tournament matches to fill the Golden Boot & assists charts.</p>';
+      return;
+    }
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+        <div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">⚽ Golden Boot</div>
+          ${g.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0">${i+1}. ${p.name} <span style="color:var(--text-muted)">${p.team}</span> — <b>${p.count}</b></div>`).join('')||'—'}</div>
+        <div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">🎯 Assists</div>
+          ${a.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0">${i+1}. ${p.name} — <b>${p.count}</b></div>`).join('')||'—'}</div>
+        <div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">⭐ MOTM</div>
+          ${m.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0">${i+1}. ${p.name} — <b>${p.count}</b></div>`).join('')||'—'}</div>
+      </div>
+      <div style="margin-top:10px;font-size:0.75rem;color:var(--text-muted)">Matchday ${globalMatchDay} · Season injuries tracked</div>`;
+  }
+
   function renderBracket() {
     const el = document.getElementById('bracket');
     if (!el || !tournament) return;
@@ -1384,9 +1729,10 @@ const App = (() => {
       el.innerHTML = '<p style="color:var(--text-muted)">No knockout matches yet.</p>';
       return;
     }
-    el.innerHTML = tournament.knockout.map(round => `
+    const curIdx = tournament.knockout.length - 1;
+    el.innerHTML = tournament.knockout.map((round, ri) => `
       <div class="round"><div class="round-title">${round.name}</div>
-      ${round.matches.map(m => `
+      ${round.matches.map((m, mi) => `
         <div class="bracket-match ${m.played ? 'played' : ''}">
           <div class="bracket-team ${m.winner && m.winner.id === m.home.id ? 'winner' : ''}">
             <span>${m.home.flag || ''} ${m.home.short}</span>
@@ -1397,9 +1743,86 @@ const App = (() => {
             <span class="bracket-score">${m.played ? m.awayScore : '-'}</span>
           </div>
           ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">pens</div>' : ''}
+          ${(!m.played && ri === curIdx) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Play Live</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.simKnockoutMatch(${ri},${mi})">⚡ Instant</button>
+          </div>` : ''}
         </div>`).join('')}
       </div>`).join('');
   }
+
+  function simKnockoutMatch(roundIdx, matchIdx) {
+    if (!tournament || !tournament.knockout[roundIdx]) return;
+    const m = tournament.knockout[roundIdx].matches[matchIdx];
+    if (!m || m.played) return;
+    const result = simQuickMatch(m.home, m.away);
+    m.homeScore = result.home;
+    m.awayScore = result.away;
+    m.played = true;
+    if (result.home === result.away) {
+      m.winner = Math.random() < 0.5 ? m.home : m.away;
+      if (m.winner === m.home) m.homeScore++; else m.awayScore++;
+      m.penalties = true;
+    } else {
+      m.winner = result.home > result.away ? m.home : m.away;
+    }
+    afterKnockoutMatchPlayed(roundIdx);
+  }
+
+  function playKnockoutMatch(roundIdx, matchIdx) {
+    if (!tournament || !tournament.knockout[roundIdx]) return;
+    const m = tournament.knockout[roundIdx].matches[matchIdx];
+    if (!m || m.played) return;
+    window._koRoundIdx = roundIdx;
+    window._koMatchIdx = matchIdx;
+    window._tourFixtureIdx = null;
+    switchView('match');
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = m.home.id;
+    if (awaySel) awaySel.value = m.away.id;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    // Force ET + pens for knockout
+    const et = document.getElementById('opt-et');
+    const pens = document.getElementById('opt-pens');
+    if (et) et.checked = true;
+    if (pens) pens.checked = true;
+    startMatch();
+    toast('Knockout match — ET & pens enabled');
+  }
+
+  function afterKnockoutMatchPlayed(roundIdx) {
+    const current = tournament.knockout[roundIdx];
+    if (!current.matches.every(x => x.played)) {
+      renderBracket();
+      renderTournamentLeaderboard();
+      return;
+    }
+    const winners = current.matches.map(m => m.winner).filter(Boolean);
+    if (winners.length === 1) {
+      tournament.champion = winners[0];
+      const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+      trophies.push({ name: tName, team: winners[0].name, type: 'Tournament', date: Date.now() });
+      try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch(e) {}
+      const stageTitle = document.getElementById('tour-stage-title');
+      if (stageTitle) stageTitle.textContent = `🏆 Champions: ${winners[0].flag || ''} ${winners[0].name}`;
+      toast(`${winners[0].name} win the ${tName}!`);
+      renderBracket();
+      renderTournamentLeaderboard();
+      return;
+    }
+    if (winners.length < 2) { renderBracket(); return; }
+    const nextMatches = [];
+    for (let i = 0; i < winners.length; i += 2) {
+      nextMatches.push({ home: winners[i], away: winners[i+1], homeScore: null, awayScore: null, winner: null, played: false });
+    }
+    tournament.knockout.push({ name: getRoundName(winners.length), matches: nextMatches });
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = getRoundName(winners.length);
+    renderBracket();
+    renderTournamentLeaderboard();
+  }
+
 
   function resetTournament() {
     tournament = null;
@@ -1445,18 +1868,26 @@ const App = (() => {
     if (!el) return;
     const m = currentMatch;
     const entries = Object.values(m.playerMatchStats).sort((a,b) => b.rating - a.rating);
-    let h = '<div class="card-title">Post-Match Ratings</div>';
-    entries.slice(0, 16).forEach(p => {
+    let h = '<div class="card-title">Post-Match Ratings (' + entries.length + ' players)</div>';
+    // Group by team
+    const homeIds = new Set((m.home.squad.all||[]).map(p=>p.id));
+    const homeP = entries.filter(p => homeIds.has(p.id));
+    const awayP = entries.filter(p => !homeIds.has(p.id));
+    const row = (p) => {
       const rc = p.rating >= 7.5 ? 'rating-high' : p.rating >= 6.5 ? 'rating-mid' : 'rating-low';
       const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals,3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists,2)) : '');
-      h += `<div class="pm-player">
+      return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
         <span class="player-num">${p.num||''}</span>
         <span style="flex:1;font-weight:600">${p.name}</span>
         <span>${icons}</span>
         <span class="xg">xG ${(p.xg||0).toFixed(2)} · xA ${(p.xa||0).toFixed(2)}</span>
         <span class="rating-badge ${rc}">${p.rating.toFixed(1)}</span>
       </div>`;
-    });
+    };
+    h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${m.home.team.flag||''} ${m.home.team.name}</div>`;
+    h += homeP.map(row).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${m.away.team.flag||''} ${m.away.team.name}</div>`;
+    h += awayP.map(row).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
     el.innerHTML = h;
     el.style.display = 'block';
   }
@@ -1616,7 +2047,7 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, playKnockoutMatch, simKnockoutMatch
   };
 })();
 

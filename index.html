@@ -38,6 +38,11 @@
             <h3>Friendly Match</h3>
             <p>Pick two teams, choose formations, and simulate a full 90-minute match with live commentary, cards, goals and more.</p>
           </div>
+          <div class="mode-card" onclick="App.randomMatch('all')">
+            <div class="icon">🎲</div>
+            <h3>Random Match</h3>
+            <p>Random national or club pairing. Or choose National / Club only from Match screen.</p>
+          </div>
           <div class="mode-card" onclick="App.goToTournament('worldcup')">
             <div class="icon">🏆</div>
             <h3>World Cup</h3>
@@ -100,6 +105,8 @@
           <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" onclick="App.startMatch()">⚽ Kick Off</button>
             <button class="btn btn-secondary" onclick="App.quickSimMatch()">⚡ Instant Result</button>
+            <button class="btn btn-secondary" onclick="App.randomMatch('national')">🎲 Random National</button>
+            <button class="btn btn-secondary" onclick="App.randomMatch('club')">🎲 Random Club</button>
           </div>
         </div>
       </div>
@@ -205,6 +212,8 @@
           <button class="lb-tab" data-lb="reds" onclick="App.showLeaderboard('reds')">🟥 Reds</button>
           <button class="lb-tab" data-lb="motm" onclick="App.showLeaderboard('motm')">⭐ MOTM</button>
           <button class="lb-tab" data-lb="puskas" onclick="App.showLeaderboard('puskas')">🏆 Puskas</button>
+          <button class="lb-tab" data-lb="ratings" onclick="App.showLeaderboard('ratings')">📊 Avg Rating</button>
+          <button class="btn btn-danger btn-sm" onclick="App.resetLeaderboard()" style="margin-left:auto">Reset Stats</button>
         </div>
         <div id="leaderboard-content">
           <div class="empty-state">
