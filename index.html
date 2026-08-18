@@ -18,6 +18,7 @@
         <button class="nav-tab" data-view="match">Match</button>
         <button class="nav-tab" data-view="tournament">Tournament</button>
         <button class="nav-tab" data-view="leaderboard">Leaderboard</button>
+        <button class="nav-tab" data-view="awards">Awards</button>
         <button class="nav-tab" data-view="teams">Teams</button>
       </nav>
     </div>
@@ -45,10 +46,20 @@
             <h3>Champions League</h3>
             <p>Club competition. Select teams, run the full knockout path, and crown the European champion.</p>
           </div>
+          <div class="mode-card" onclick="App.goToSquadBuilder()">
+            <div class="icon">📋</div>
+            <h3>Squad Builder</h3>
+            <p>Manually pick formation and starting XI, then simulate the match your way.</p>
+          </div>
           <div class="mode-card" onclick="App.switchView('leaderboard')">
             <div class="icon">📊</div>
             <h3>Leaderboards</h3>
             <p>Global stats: goals, assists, saves, clean sheets. Updated after every simulated match.</p>
+          </div>
+          <div class="mode-card" onclick="App.switchView('awards')">
+            <div class="icon">🏆</div>
+            <h3>Awards</h3>
+            <p>Golden Boot, Ballon d'Or, trophies and player of the match awards.</p>
           </div>
         </div>
       </div>
@@ -90,6 +101,7 @@
               <span class="flag" id="live-home-flag"></span>
               <span class="name" id="live-home-name"></span>
               <span class="formation" id="live-home-form"></span>
+              <span class="mgr"></span>
             </div>
             <div class="score-center">
               <div class="score-numbers"><span id="live-home-score">0</span> - <span id="live-away-score">0</span></div>
@@ -100,6 +112,7 @@
               <span class="flag" id="live-away-flag"></span>
               <span class="name" id="live-away-name"></span>
               <span class="formation" id="live-away-form"></span>
+              <span class="mgr"></span>
             </div>
           </div>
           <div class="events-container">
@@ -122,6 +135,7 @@
             </select>
           </div>
         </div>
+        <div class="pitch-wrap" id="pitch-display"></div>
         <div class="lineup-grid" id="lineup-display"></div>
       </div>
     </section>
@@ -143,7 +157,8 @@
         <div class="card" style="margin-bottom:20px">
           <div class="card-title" id="tour-stage-title">Group Stage</div>
           <div id="groups-container" class="groups-grid"></div>
-          <div style="display:flex;gap:12px;margin-top:16px">
+          <div id="fixture-list" class="fixture-list"></div>
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
             <button class="btn btn-primary" id="btn-sim-round" onclick="App.simTournamentRound()">Simulate Round</button>
             <button class="btn btn-secondary" onclick="App.simAllTournament()">⚡ Simulate All</button>
             <button class="btn btn-secondary" onclick="App.resetTournament()">↺ Reset</button>
@@ -179,6 +194,22 @@
             <div class="icon">📊</div>
             <p>Simulate matches to populate the leaderboards.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AWARDS -->
+    <section id="view-awards" class="view">
+      <div class="card">
+        <div class="card-title">Trophies & Awards</div>
+        <div class="award-tabs">
+          <button class="award-tab active" data-award="overview" onclick="App.showAwards('overview')">Overview</button>
+          <button class="award-tab" data-award="goldenboot" onclick="App.showAwards('goldenboot')">Golden Boot</button>
+          <button class="award-tab" data-award="ballon" onclick="App.showAwards('ballon')">Ballon d'Or</button>
+          <button class="award-tab" data-award="trophies" onclick="App.showAwards('trophies')">Trophies</button>
+        </div>
+        <div id="awards-content">
+          <div class="empty-state"><div class="icon">🏆</div><p>Simulate matches and tournaments to unlock awards.</p></div>
         </div>
       </div>
     </section>
