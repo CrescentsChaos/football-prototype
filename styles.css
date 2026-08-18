@@ -171,9 +171,9 @@ body {
 .match-stats-panel { padding: 12px; background: var(--bg-elevated); }
 .stat-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.8rem; }
 .stat-val { width: 32px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
-.stat-bar-wrap { flex: 1; height: 5px; background: var(--bg-dark); border-radius: 3px; margin: 0 6px; overflow: hidden; display: flex; }
-.stat-bar-home { height: 100%; background: var(--accent-blue); border-radius: 3px 0 0 3px; }
-.stat-bar-away { height: 100%; background: var(--accent-red); border-radius: 0 3px 3px 0; margin-left: auto; }
+.stat-bar-wrap { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; margin: 0 8px; overflow: hidden; position: relative; }
+.stat-bar-home { position: absolute; left: 0; top: 0; height: 100%; background: linear-gradient(90deg, #2979ff, #5c9dff); border-radius: 4px 0 0 4px; }
+.stat-bar-away { position: absolute; right: 0; top: 0; height: 100%; background: linear-gradient(90deg, #ff6b6b, #ff1744); border-radius: 0 4px 4px 0; }
 .stat-label { text-align: center; color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
 .match-controls { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--bg-elevated); flex-wrap: wrap; align-items: center; }
 .pitch-wrap { margin: 12px 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
@@ -317,3 +317,31 @@ body {
   .player-dot { width: 24px; height: 24px; font-size: 0.5rem; }
   .player-dot .dot-name { font-size: 0.45rem; bottom: -12px; }
 }
+
+/* Post-match ratings */
+.rating-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 20px; border-radius: 4px; font-size: 0.7rem; font-weight: 800;
+  padding: 0 4px;
+}
+.rating-high { background: #00c853; color: #0a0e17; }
+.rating-mid { background: #ffab00; color: #0a0e17; }
+.rating-low { background: #ff5252; color: white; }
+.goal-icon { color: var(--accent-gold); margin-left: 2px; }
+.assist-icon { color: var(--accent-blue); margin-left: 2px; }
+.half-divider {
+  text-align: center; padding: 10px; margin: 8px -12px;
+  background: rgba(212,175,55,0.08); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  font-weight: 700; font-size: 0.8rem; color: var(--accent-gold); letter-spacing: 1px;
+}
+.post-match-panel { margin-top: 12px; }
+.pm-player {
+  display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 6px;
+  font-size: 0.85rem; margin-bottom: 2px; background: var(--bg-elevated);
+}
+.pm-player .xg { font-size: 0.7rem; color: var(--text-muted); margin-left: auto; }
+.back-tour-btn {
+  position: sticky; bottom: 12px; left: 0; right: 0; z-index: 50;
+  display: none; justify-content: center; padding: 8px;
+}
+.back-tour-btn.show { display: flex; }

@@ -6,7 +6,8 @@ const App = (() => {
 
   let teamsData = { national: [], club: [] };
   let allTeams = [];
-  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, cards: {}, motm: {} };
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {} };
   let trophies = []; // {name, team, type, date}
   let currentMatch = null;
   let simInterval = null;
@@ -240,19 +241,67 @@ const App = (() => {
     const live = document.getElementById('match-live');
     if (setup) setup.style.display = 'none';
     if (live) live.style.display = 'block';
+    const pm = document.getElementById('post-match-ratings');
+    if (pm) { pm.style.display = 'none'; pm.innerHTML = ''; }
+    const backBtn = document.getElementById('back-to-tournament');
+    if (backBtn) { backBtn.style.display = 'none'; backBtn.classList.remove('show'); }
     updateScoreboard();
     renderLineups();
     const feed = document.getElementById('events-feed');
     if (feed) feed.innerHTML = '';
     addEvent(0, 'whistle', 'Kick off!', null);
+    currentMatch.playerMatchStats = {};
     isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
   }
 
   function blankStats() {
-    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, yellows: 0, reds: 0 };
+    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, yellows: 0, reds: 0, xg: 0 };
   }
+
+  function blankPlayerMatchStats(p) {
+    return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
+  }
+
+  function pickGoalMethod(shooter) {
+    const methods = [
+      { desc: 'right-footed finish', xg: 0.35, puskas: false },
+      { desc: 'left-footed strike', xg: 0.32, puskas: false },
+      { desc: 'powerful header', xg: 0.28, puskas: false },
+      { desc: 'tap-in', xg: 0.55, puskas: false },
+      { desc: 'curled shot into the top corner', xg: 0.18, puskas: true },
+      { desc: 'long-range rocket', xg: 0.12, puskas: true },
+      { desc: 'chip over the keeper', xg: 0.22, puskas: true },
+      { desc: 'volley', xg: 0.20, puskas: true },
+      { desc: 'solo run and finish', xg: 0.25, puskas: true },
+      { desc: 'deflected shot', xg: 0.15, puskas: false },
+      { desc: 'close-range poke', xg: 0.45, puskas: false },
+      { desc: 'low driven shot', xg: 0.30, puskas: false }
+    ];
+    // Higher tec players more likely spectacular
+    const spectacular = methods.filter(m => m.puskas);
+    const normal = methods.filter(m => !m.puskas);
+    if ((shooter.tec || 70) > 85 && Math.random() < 0.35) {
+      return spectacular[Math.floor(Math.random() * spectacular.length)];
+    }
+    return Math.random() < 0.2 ? spectacular[Math.floor(Math.random()*spectacular.length)] : normal[Math.floor(Math.random()*normal.length)];
+  }
+
+  function calcPlayerRating(ps) {
+    let r = 6.0;
+    r += ps.goals * 1.1;
+    r += ps.assists * 0.8;
+    r += Math.min(ps.shots * 0.1, 0.5);
+    r += Math.min(ps.saves * 0.25, 1.5);
+    r += Math.min(ps.tackles * 0.15, 0.6);
+    r += Math.min(ps.xg * 0.3, 0.5);
+    if (ps.yellow) r -= 0.3;
+    if (ps.red) r -= 1.5;
+    r += (Math.random() - 0.5) * 0.4;
+    return Math.max(4.0, Math.min(10.0, Math.round(r * 10) / 10));
+  }
+
 
   function quickSimMatch() { startMatch(); if (currentMatch) simToEnd(); }
 
@@ -315,9 +364,17 @@ const App = (() => {
     m.minute++;
     if (m.minute === 45) {
       m.status = 'Half Time';
-      addEvent(45, 'whistle', 'Half time', null);
+      addEvent(45, 'whistle', '—— HALF TIME ——', null);
+      addEvent(45, 'whistle', 'Tap Play to start 2nd half', null);
       updateScoreboard();
-      if (!silent) return;
+      // Pause at half time (unless turbo finish)
+      if (!silent) {
+        clearInterval(simInterval);
+        isPlaying = false;
+        const btn = document.getElementById('btn-play');
+        if (btn) btn.textContent = '▶ 2nd Half';
+        return;
+      }
     }
     if (m.minute === 46) {
       m.status = '2nd Half';
@@ -370,12 +427,22 @@ const App = (() => {
         } else {
           const assister = pickPlayer(attTeam, ['CAM','CM','RW','LW','ST','RM','LM'], shooter.id);
           attTeam.score++;
+          const method = pickGoalMethod(shooter);
           recordStat('goals', shooter, attTeam.team);
+          if (method.puskas) recordStat('puskas', shooter, attTeam.team);
+          // track xG
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
+          m.playerMatchStats[shooter.id].goals++;
+          m.playerMatchStats[shooter.id].xg += method.xg;
           if (assister && Math.random() < 0.7) {
             recordStat('assists', assister, attTeam.team);
-            addEvent(m.minute, 'goal', `GOAL! <span class="player">${shooter.name}</span> scores! Assisted by <span class="player">${assister.name}</span>`, attackingSide, true);
+            if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
+            m.playerMatchStats[assister.id].assists++;
+            m.playerMatchStats[assister.id].xa += 0.3 + Math.random() * 0.4;
+            addEvent(m.minute, 'goal', `GOAL! <span class="player">${shooter.name}</span> (${shooter.num||''}) scores with a ${method.desc}! Assisted by <span class="player">${assister.name}</span> 🎯`, attackingSide, true);
           } else {
-            addEvent(m.minute, 'goal', `GOAL! <span class="player">${shooter.name}</span> finds the net!`, attackingSide, true);
+            addEvent(m.minute, 'goal', `GOAL! <span class="player">${shooter.name}</span> (${shooter.num||''}) scores with a ${method.desc}!`, attackingSide, true);
           }
         }
       } else {
@@ -389,7 +456,7 @@ const App = (() => {
         if (scorer) {
           attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
-          addEvent(m.minute, 'goal', `GOAL from the corner! <span class="player">${scorer.name}</span>!`, attackingSide, true);
+          addEvent(m.minute, 'goal', `GOAL from the corner! <span class="player">${scorer.name}</span> (${scorer.num||''}) with a header!`, attackingSide, true);
         }
       }
     } else if (r < 0.45) {
@@ -401,6 +468,7 @@ const App = (() => {
         m.cards[defendingSide][fouler.id] = (m.cards[defendingSide][fouler.id] || 0) + 1;
         defTeam.stats.yellows++;
         recordStat('cards', fouler, defTeam.team);
+        recordStat('yellows', fouler, defTeam.team);
         if (m.cards[defendingSide][fouler.id] >= 2) {
           defTeam.stats.reds++;
           addEvent(m.minute, 'red', `RED CARD! <span class="player">${fouler.name}</span> sent off (2nd yellow)`, defendingSide);
@@ -411,6 +479,7 @@ const App = (() => {
       } else if (cardRoll < 0.15) {
         defTeam.stats.reds++;
         recordStat('cards', fouler, defTeam.team);
+        recordStat('reds', fouler, defTeam.team);
         addEvent(m.minute, 'red', `RED CARD! <span class="player">${fouler.name}</span> is sent off!`, defendingSide);
         removeFromPitch(defendingSide, fouler.id);
       } else {
@@ -423,7 +492,8 @@ const App = (() => {
         if (Math.random() < 0.3) {
           attTeam.score++;
           recordStat('goals', taker, attTeam.team);
-          addEvent(m.minute, 'goal', `Brilliant free-kick! <span class="player">${taker.name}</span> scores!`, attackingSide, true);
+          addEvent(m.minute, 'goal', `Brilliant free-kick! <span class="player">${taker.name}</span> (${taker.num||''}) curls it home!`, attackingSide, true);
+          if (Math.random() < 0.5) recordStat('puskas', taker, attTeam.team);
         } else {
           addEvent(m.minute, 'shot', `Free-kick by <span class="player">${taker.name}</span> saved/wide`, attackingSide);
         }
@@ -600,11 +670,26 @@ const App = (() => {
     if (best) {
       const team = (m.home.squad.all || []).find(p => p.id === best.id) ? m.home.team : m.away.team;
       recordStat('motm', best, team);
-      addEvent(90, 'motm', `Man of the Match: <span class="player">${best.name}</span>`, null);
+      addEvent(90, 'motm', `Man of the Match: <span class="player">${best.name}</span> ⭐`, null);
     }
+    // Compute post-match ratings
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    const allOnPitch = [...(m.home.squad.starting||[]), ...(m.away.squad.starting||[])];
+    allOnPitch.forEach(p => {
+      if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+      m.playerMatchStats[p.id].rating = calcPlayerRating(m.playerMatchStats[p.id]);
+    });
+    if (best && m.playerMatchStats[best.id]) {
+      m.playerMatchStats[best.id].rating = Math.min(10, +(m.playerMatchStats[best.id].rating + 0.5).toFixed(1));
+    }
+    renderPostMatchRatings();
     saveStats();
     updateScoreboard();
     updateStatsPanel();
+    if (typeof window._tourFixtureIdx === 'number') {
+      const backBtn = document.getElementById('back-to-tournament');
+      if (backBtn) { backBtn.style.display = 'flex'; backBtn.classList.add('show'); }
+    }
     // If this was a tournament match, update fixture
     if (typeof window._tourFixtureIdx === 'number' && tournament && tournament.fixtures[window._tourFixtureIdx]) {
       const f = tournament.fixtures[window._tourFixtureIdx];
@@ -670,20 +755,21 @@ const App = (() => {
     const tc = (h.corners + a.corners) || 1, tf = (h.fouls + a.fouls) || 1, tsv = (h.saves + a.saves) || 1;
     const el = document.getElementById('live-stats');
     if (!el) return;
+    const hp = (v, t) => t ? Math.round((v/t)*100) : 50;
     el.innerHTML = `
-      <div class="stat-row"><span class="stat-val">${h.shots}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${(h.shots/ts)*50}%"></div><div class="stat-bar-away" style="width:${(a.shots/ts)*50}%"></div></div><span class="stat-val">${a.shots}</span></div>
+      <div class="stat-row"><span class="stat-val">${h.shots}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shots,ts)}%"></div><div class="stat-bar-away" style="width:${hp(a.shots,ts)}%"></div></div><span class="stat-val">${a.shots}</span></div>
       <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Shots</div>
-      <div class="stat-row"><span class="stat-val">${h.shotsOn}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${(h.shotsOn/ton)*50}%"></div><div class="stat-bar-away" style="width:${(a.shotsOn/ton)*50}%"></div></div><span class="stat-val">${a.shotsOn}</span></div>
+      <div class="stat-row"><span class="stat-val">${h.shotsOn}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shotsOn,ton)}%"></div><div class="stat-bar-away" style="width:${hp(a.shotsOn,ton)}%"></div></div><span class="stat-val">${a.shotsOn}</span></div>
       <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">On Target</div>
-      <div class="stat-row"><span class="stat-val">${h.possession}%</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${h.possession/2}%"></div><div class="stat-bar-away" style="width:${a.possession/2}%"></div></div><span class="stat-val">${a.possession}%</span></div>
+      <div class="stat-row"><span class="stat-val">${h.possession}%</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${h.possession}%"></div><div class="stat-bar-away" style="width:${a.possession}%"></div></div><span class="stat-val">${a.possession}%</span></div>
       <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Possession</div>
-      <div class="stat-row"><span class="stat-val">${h.corners}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${(h.corners/tc)*50}%"></div><div class="stat-bar-away" style="width:${(a.corners/tc)*50}%"></div></div><span class="stat-val">${a.corners}</span></div>
+      <div class="stat-row"><span class="stat-val">${h.corners}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.corners,tc)}%"></div><div class="stat-bar-away" style="width:${hp(a.corners,tc)}%"></div></div><span class="stat-val">${a.corners}</span></div>
       <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Corners</div>
-      <div class="stat-row"><span class="stat-val">${h.fouls}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${(h.fouls/tf)*50}%"></div><div class="stat-bar-away" style="width:${(a.fouls/tf)*50}%"></div></div><span class="stat-val">${a.fouls}</span></div>
+      <div class="stat-row"><span class="stat-val">${h.fouls}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.fouls,tf)}%"></div><div class="stat-bar-away" style="width:${hp(a.fouls,tf)}%"></div></div><span class="stat-val">${a.fouls}</span></div>
       <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Fouls</div>
-      <div class="stat-row"><span class="stat-val">${h.saves}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${(h.saves/tsv)*50}%"></div><div class="stat-bar-away" style="width:${(a.saves/tsv)*50}%"></div></div><span class="stat-val">${a.saves}</span></div>
+      <div class="stat-row"><span class="stat-val">${h.saves}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.saves,tsv)}%"></div><div class="stat-bar-away" style="width:${hp(a.saves,tsv)}%"></div></div><span class="stat-val">${a.saves}</span></div>
       <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Saves</div>
-      <div class="stat-row"><span class="stat-val">${h.yellows}</span><div class="stat-bar-wrap"></div><span class="stat-val">${a.yellows}</span></div>
+      <div class="stat-row"><span class="stat-val">${h.yellows}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.yellows,h.yellows+a.yellows||1)}%"></div><div class="stat-bar-away" style="width:${hp(a.yellows,h.yellows+a.yellows||1)}%"></div></div><span class="stat-val">${a.yellows}</span></div>
       <div style="text-align:center;font-size:0.75rem;color:var(--text-muted)">Yellow Cards</div>`;
   }
 
@@ -770,7 +856,7 @@ const App = (() => {
       el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No ${type} recorded yet. Simulate matches!</p></div>`;
       return;
     }
-    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', cards: 'Cards', motm: 'MOTM' };
+    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees' };
     el.innerHTML = `<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>${labels[type]||type}</th></tr></thead><tbody>
       ${data.map((p,i) => `<tr><td class="lb-rank">${i+1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${p.team}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
     </tbody></table>`;
@@ -1162,6 +1248,40 @@ const App = (() => {
     setTimeout(() => t.remove(), 3000);
   }
 
+  
+  function renderPostMatchRatings() {
+    if (!currentMatch || !currentMatch.playerMatchStats) return;
+    const el = document.getElementById('post-match-ratings');
+    if (!el) return;
+    const m = currentMatch;
+    const entries = Object.values(m.playerMatchStats).sort((a,b) => b.rating - a.rating);
+    let h = '<div class="card-title">Post-Match Ratings</div>';
+    entries.slice(0, 16).forEach(p => {
+      const rc = p.rating >= 7.5 ? 'rating-high' : p.rating >= 6.5 ? 'rating-mid' : 'rating-low';
+      const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals,3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists,2)) : '');
+      h += `<div class="pm-player">
+        <span class="player-num">${p.num||''}</span>
+        <span style="flex:1;font-weight:600">${p.name}</span>
+        <span>${icons}</span>
+        <span class="xg">xG ${(p.xg||0).toFixed(2)} · xA ${(p.xa||0).toFixed(2)}</span>
+        <span class="rating-badge ${rc}">${p.rating.toFixed(1)}</span>
+      </div>`;
+    });
+    el.innerHTML = h;
+    el.style.display = 'block';
+  }
+
+  function returnToTournament() {
+    const backBtn = document.getElementById('back-to-tournament');
+    if (backBtn) { backBtn.style.display = 'none'; backBtn.classList.remove('show'); }
+    switchView('tournament');
+    if (tournament) {
+      renderGroups();
+      if (tournament.stage === 'knockout') renderBracket();
+    }
+    toast('Back to tournament — results updated');
+  }
+
   function showAwards(type) {
     document.querySelectorAll('.award-tab').forEach(t => t.classList.toggle('active', t.dataset.award === type));
     const el = document.getElementById('awards-content');
@@ -1185,6 +1305,13 @@ const App = (() => {
       el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or Ranking</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + Math.round(data[0].pts) + ' pts</p></div></div>' +
         '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Points</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table>';
+    } else if (type === 'puskas') {
+      const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 10);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No Puskas-worthy goals yet. Score screamers!</p></div>'; return; }
+      el.innerHTML = '<div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Puskas Award</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' spectacular goals</p></div></div>' +
+        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
@@ -1216,7 +1343,7 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament
   };
 })();
 

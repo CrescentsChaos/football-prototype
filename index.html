@@ -137,6 +137,10 @@
         </div>
         <div class="pitch-wrap" id="pitch-display"></div>
         <div class="lineup-grid" id="lineup-display"></div>
+        <div class="card post-match-panel" id="post-match-ratings" style="display:none"></div>
+        <div class="back-tour-btn" id="back-to-tournament" style="display:none">
+          <button class="btn btn-primary" onclick="App.returnToTournament()">← Back to Tournament</button>
+        </div>
       </div>
     </section>
 
@@ -186,8 +190,10 @@
           <button class="lb-tab" data-lb="assists" onclick="App.showLeaderboard('assists')">🎯 Assists</button>
           <button class="lb-tab" data-lb="saves" onclick="App.showLeaderboard('saves')">🧤 Saves</button>
           <button class="lb-tab" data-lb="cleanSheets" onclick="App.showLeaderboard('cleanSheets')">🛡️ Clean Sheets</button>
-          <button class="lb-tab" data-lb="cards" onclick="App.showLeaderboard('cards')">🟨 Cards</button>
-          <button class="lb-tab" data-lb="motm" onclick="App.showLeaderboard('motm')">⭐ Man of the Match</button>
+          <button class="lb-tab" data-lb="yellows" onclick="App.showLeaderboard('yellows')">🟨 Yellows</button>
+          <button class="lb-tab" data-lb="reds" onclick="App.showLeaderboard('reds')">🟥 Reds</button>
+          <button class="lb-tab" data-lb="motm" onclick="App.showLeaderboard('motm')">⭐ MOTM</button>
+          <button class="lb-tab" data-lb="puskas" onclick="App.showLeaderboard('puskas')">🏆 Puskas</button>
         </div>
         <div id="leaderboard-content">
           <div class="empty-state">
@@ -206,6 +212,7 @@
           <button class="award-tab active" data-award="overview" onclick="App.showAwards('overview')">Overview</button>
           <button class="award-tab" data-award="goldenboot" onclick="App.showAwards('goldenboot')">Golden Boot</button>
           <button class="award-tab" data-award="ballon" onclick="App.showAwards('ballon')">Ballon d'Or</button>
+          <button class="award-tab" data-award="puskas" onclick="App.showAwards('puskas')">Puskas</button>
           <button class="award-tab" data-award="trophies" onclick="App.showAwards('trophies')">Trophies</button>
         </div>
         <div id="awards-content">
