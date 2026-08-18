@@ -52,22 +52,44 @@ const App = (() => {
 
   async function init() {
     try {
-      // Prefer external teams.json (so GitHub / local edits apply). Fall back to embedded data.
       let loaded = null;
-      try {
-        const res = await fetch('teams.json?t=' + Date.now());
-        if (res.ok) {
-          loaded = await res.json();
-          if (loaded && (loaded.national || loaded.club)) {
-            console.log('Loaded teams.json from server');
-          } else {
-            loaded = null;
+      let source = 'embedded';
+      const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
+      if (isHosted) {
+        const urls = [
+          'teams.json?v=' + Date.now() + '&r=' + Math.random().toString(36).slice(2),
+          './teams.json?v=' + Date.now(),
+          'teams.json'
+        ];
+        for (const url of urls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && ((data.national && data.national.length) || (data.club && data.club.length))) {
+              loaded = data;
+              source = 'teams.json';
+              console.log('Loaded teams from', url);
+              break;
+            }
+          } catch (err) {
+            console.warn('Fetch failed', url, err);
           }
         }
-      } catch (fetchErr) {
-        console.log('fetch teams.json failed, using embedded data', fetchErr);
+      } else {
+        try {
+          const res = await fetch('teams.json?v=' + Date.now(), { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && (data.national || data.club)) { loaded = data; source = 'teams.json'; }
+          }
+        } catch (e) {}
       }
       teamsData = loaded || TEAMS_DATA;
+      if (!loaded) {
+        source = 'embedded';
+        console.warn('Using EMBEDDED team data — teams.json was NOT loaded from server');
+      }
       allTeams = [...(teamsData.national || []), ...(teamsData.club || [])];
       if (!allTeams.length) throw new Error('No teams found');
       loadStats();
@@ -75,7 +97,8 @@ const App = (() => {
       populateFormations();
       bindNav();
       renderTeamsList();
-      console.log('Apex Sim ready:', allTeams.length, 'teams');
+      console.log('Apex Sim ready:', allTeams.length, 'teams | source:', source);
+      window.__APEX_DATA_SOURCE = source;
     } catch (e) {
       console.error(e);
       alert('Error loading game: ' + e.message);
