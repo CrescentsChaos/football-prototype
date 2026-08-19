@@ -263,7 +263,12 @@ const App = (() => {
     for (let i = 0; i < remaining.length && (starting.length + subs.length) < 25; i++) {
       subs.push({ ...remaining[i], slot: (remaining[i].pos || ['CM'])[0], isStarter: false });
     }
-    return { starting, subs, formation: formationKey, all: [...starting, ...subs] };
+    const _seen = new Set();
+    const _st = [];
+    for (const p of starting) { if (_seen.has(p.id)) continue; _seen.add(p.id); _st.push(p); }
+    const _su = [];
+    for (const p of subs) { if (_seen.has(p.id)) continue; _seen.add(p.id); _su.push(p); }
+    return { starting: _st, subs: _su, formation: formationKey, all: [..._st, ..._su] };
   }
 
   function canPlay(player, slot) {
@@ -280,6 +285,172 @@ const App = (() => {
     return a;
   }
 
+
+  let customLineups = { home: null, away: null };
+  let sbSide = null;
+  let sbDraft = null;
+
+  function onFormationChange(side) {
+    if (customLineups[side]) customLineups[side] = null;
+  }
+
+  function openSquadBuilder(side) {
+    sbSide = side;
+    const teamId = document.getElementById(side + '-team') && document.getElementById(side + '-team').value;
+    const formKey = (document.getElementById(side + '-formation') && document.getElementById(side + '-formation').value) || '4-3-3';
+    const team = getTeam(teamId);
+    if (!team) { toast('Select a team first'); return; }
+    const formation = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
+    const players = [];
+    const seenP = new Set();
+    (team.players || []).forEach(p => {
+      if (p && p.id && !seenP.has(p.id)) { seenP.add(p.id); players.push(p); }
+    });
+    let slots = {};
+    let bench = new Set();
+    if (customLineups[side] && customLineups[side].formation === formKey) {
+      customLineups[side].starting.forEach((p, i) => { slots[i] = p.id; });
+      (customLineups[side].subs || []).forEach(p => bench.add(p.id));
+    } else {
+      const auto = buildSquad(team, formKey);
+      auto.starting.forEach((p, i) => { slots[i] = p.id; });
+      (auto.subs || []).slice(0, 9).forEach(p => bench.add(p.id));
+    }
+    sbDraft = { team: team, formation: formKey, slots: slots, bench: bench, players: players };
+    document.getElementById('sb-title').textContent = (side === 'home' ? 'HOME' : 'AWAY') + ' · ' + team.name + ' · ' + formKey;
+    document.getElementById('squad-builder-panel').style.display = 'block';
+    renderSquadBuilderUI();
+  }
+
+  function getUsedInDraft() {
+    const used = new Set(Object.values(sbDraft.slots).filter(Boolean));
+    sbDraft.bench.forEach(function(id) { used.add(id); });
+    return used;
+  }
+
+  function renderSquadBuilderUI() {
+    if (!sbDraft) return;
+    const slotsEl = document.getElementById('sb-slots');
+    const benchEl = document.getElementById('sb-bench');
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const used = getUsedInDraft();
+    slotsEl.innerHTML = formation.slots.map(function(slot, i) {
+      const selected = sbDraft.slots[i] || '';
+      const options = sbDraft.players
+        .filter(function(p) { return !used.has(p.id) || p.id === selected; })
+        .sort(function(a, b) {
+          const aFit = (a.pos || []).includes(slot) ? 1 : 0;
+          const bFit = (b.pos || []).includes(slot) ? 1 : 0;
+          if (bFit !== aFit) return bFit - aFit;
+          return (b.ovr || 70) - (a.ovr || 70);
+        })
+        .map(function(p) {
+          return '<option value="' + p.id + '"' + (p.id === selected ? ' selected' : '') + '>' +
+            (p.num || '?') + ' · ' + p.name + ' (' + (p.pos || []).join('/') + ') · ' + p.ovr + '</option>';
+        }).join('');
+      return '<div class="sb-slot"><label>' + slot + '</label><select onchange="App.setSquadSlot(' + i + ', this.value)">' +
+        '<option value="">— Select —</option>' + options + '</select></div>';
+    }).join('');
+    const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
+    const benchPool = sbDraft.players.filter(function(p) { return !starterIds.has(p.id); });
+    benchEl.innerHTML = benchPool.map(function(p) {
+      const checked = sbDraft.bench.has(p.id);
+      return '<label class="sb-bench-item"><input type="checkbox"' + (checked ? ' checked' : '') +
+        ' onchange="App.toggleBench(\'' + p.id + '\', this.checked)"><span>' + (p.num || '?') + ' ' + p.name +
+        '</span><span style="margin-left:auto;color:var(--text-3);font-size:0.7rem">' +
+        ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span></label>';
+    }).join('') || '<p style="color:var(--text-3)">No remaining players</p>';
+  }
+
+  function setSquadSlot(index, playerId) {
+    if (!sbDraft) return;
+    if (!playerId) {
+      delete sbDraft.slots[index];
+    } else {
+      Object.keys(sbDraft.slots).forEach(function(k) {
+        if (+k !== index && sbDraft.slots[k] === playerId) delete sbDraft.slots[k];
+      });
+      sbDraft.bench.delete(playerId);
+      sbDraft.slots[index] = playerId;
+    }
+    renderSquadBuilderUI();
+  }
+
+  function toggleBench(playerId, on) {
+    if (!sbDraft) return;
+    if (on) {
+      if (Object.values(sbDraft.slots).indexOf(playerId) >= 0) return;
+      if (sbDraft.bench.size >= 14) { toast('Max 14 substitutes'); renderSquadBuilderUI(); return; }
+      sbDraft.bench.add(playerId);
+    } else {
+      sbDraft.bench.delete(playerId);
+    }
+    renderSquadBuilderUI();
+  }
+
+  function autoFillSquadBuilder() {
+    if (!sbDraft) return;
+    const auto = buildSquad(sbDraft.team, sbDraft.formation);
+    sbDraft.slots = {};
+    auto.starting.forEach(function(p, i) { sbDraft.slots[i] = p.id; });
+    sbDraft.bench = new Set(auto.subs.slice(0, 9).map(function(p) { return p.id; }));
+    renderSquadBuilderUI();
+    toast('Best XI auto-filled');
+  }
+
+  function saveSquadBuilder() {
+    if (!sbDraft || !sbSide) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const starting = [];
+    const used = new Set();
+    for (let i = 0; i < formation.slots.length; i++) {
+      const id = sbDraft.slots[i];
+      if (!id || used.has(id)) { toast('Fill every starting slot with unique players'); return; }
+      const p = sbDraft.players.find(function(x) { return x.id === id; });
+      if (!p) continue;
+      used.add(id);
+      starting.push(Object.assign({}, p, { slot: formation.slots[i], isStarter: true }));
+    }
+    if (starting.length < 11) { toast('Need 11 unique starters'); return; }
+    const subs = [];
+    sbDraft.bench.forEach(function(id) {
+      if (used.has(id)) return;
+      const p = sbDraft.players.find(function(x) { return x.id === id; });
+      if (p) {
+        used.add(id);
+        subs.push(Object.assign({}, p, { slot: (p.pos || ['CM'])[0], isStarter: false }));
+      }
+    });
+    customLineups[sbSide] = {
+      starting: starting, subs: subs, formation: sbDraft.formation,
+      all: starting.concat(subs), _teamId: sbDraft.team.id
+    };
+    toast((sbSide === 'home' ? 'Home' : 'Away') + ' lineup saved (' + starting.length + '+' + subs.length + ')');
+    closeSquadBuilder();
+    updateTeamPreview(sbSide);
+  }
+
+  function closeSquadBuilder() {
+    const panel = document.getElementById('squad-builder-panel');
+    if (panel) panel.style.display = 'none';
+    sbDraft = null;
+  }
+
+  function dedupeSquad(sq) {
+    const seen = new Set();
+    const starting = [];
+    (sq.starting || []).forEach(function(p) {
+      if (!p || !p.id || seen.has(p.id)) return;
+      seen.add(p.id); starting.push(p);
+    });
+    const subs = [];
+    (sq.subs || []).forEach(function(p) {
+      if (!p || !p.id || seen.has(p.id)) return;
+      seen.add(p.id); subs.push(p);
+    });
+    return Object.assign({}, sq, { starting: starting, subs: subs, all: starting.concat(subs) });
+  }
+
   function startMatch() {
     const homeSel = document.getElementById('home-team');
     const awaySel = document.getElementById('away-team');
@@ -292,8 +463,12 @@ const App = (() => {
     if (!homeTeam || !awayTeam) { toast('Team not found'); return; }
     const homeForm = (document.getElementById('home-formation') || {}).value || '4-3-3';
     const awayForm = (document.getElementById('away-formation') || {}).value || '4-3-3';
-    const homeSquad = buildSquad(homeTeam, homeForm);
-    const awaySquad = buildSquad(awayTeam, awayForm);
+    let homeSquad = (customLineups.home && customLineups.home.formation === homeForm && customLineups.home._teamId === homeTeam.id)
+      ? customLineups.home : buildSquad(homeTeam, homeForm);
+    let awaySquad = (customLineups.away && customLineups.away.formation === awayForm && customLineups.away._teamId === awayTeam.id)
+      ? customLineups.away : buildSquad(awayTeam, awayForm);
+    homeSquad = dedupeSquad(homeSquad);
+    awaySquad = dedupeSquad(awaySquad);
 
     currentMatch = {
       home: { team: homeTeam, squad: homeSquad, score: 0, stats: blankStats() },
@@ -302,7 +477,11 @@ const App = (() => {
       homeOnPitch: homeSquad.starting.map(p => p.id),
       awayOnPitch: awaySquad.starting.map(p => p.id),
       homeSubsUsed: 0, awaySubsUsed: 0, maxSubs: 5,
-      injuries: [], cards: { home: {}, away: {} }, possession: 50
+      injuries: [], cards: { home: {}, away: {} }, possession: 50,
+      subLog: { home: {}, away: {} }, // playerId -> { outMin, inMin, replaced, replacedBy }
+      tactics: { home: 'balanced', away: 'balanced' },
+      playerMatchStats: {},
+      goalList: []
     };
 
     const setup = document.getElementById('match-setup');
@@ -317,9 +496,21 @@ const App = (() => {
     renderLineups();
     const feed = document.getElementById('events-feed');
     if (feed) feed.innerHTML = '';
-    addEvent(0, 'whistle', 'Kick off!', null);
-    currentMatch.playerMatchStats = {};
-    currentMatch.goalList = [];
+    // Clear previous match stats UI
+    ['live-home-score','live-away-score'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = '0'; });
+    const minEl = document.getElementById('live-minute'); if (minEl) minEl.textContent = "0'";
+    const stEl = document.getElementById('live-status'); if (stEl) stEl.textContent = '1st Half';
+    const hg = document.getElementById('home-goal-scorers'); if (hg) hg.innerHTML = '';
+    const ag = document.getElementById('away-goal-scorers'); if (ag) ag.innerHTML = '';
+    const statsEl = document.getElementById('match-stats'); if (statsEl) statsEl.innerHTML = '';
+    const pm2 = document.getElementById('post-match-ratings'); if (pm2) { pm2.style.display = 'none'; pm2.innerHTML = ''; }
+    const kickMsgs = [
+      'Kick off! The referee starts the contest.',
+      'And we're underway!',
+      'The match is live — kick-off taken.',
+      'Here we go! First whistle blown.'
+    ];
+    addEvent(0, 'whistle', kickMsgs[Math.floor(Math.random()*kickMsgs.length)], null);
     currentMatch.countForLeaderboard = !!(tournament || window._tourFixtureIdx != null || window._koRoundIdx != null);
     currentMatch.allowET = !!(document.getElementById('opt-et') && document.getElementById('opt-et').checked);
     currentMatch.allowPens = !!(document.getElementById('opt-pens') && document.getElementById('opt-pens').checked);
@@ -580,7 +771,12 @@ const App = (() => {
       'curls a shot just beyond the far upright',
       'fires a low screamer that skims past the post',
       'leans back and sends a header over',
-      'is denied by the angle as the shot rolls across the face of goal'
+      'is denied by the angle as the shot rolls across the face of goal',
+      'snatches at the chance and ballooned it over',
+      'is closed down and the shot lacks conviction',
+      'sees a deflected effort loop harmlessly wide',
+      'cannot keep the half-volley down',
+      'is stretching and can only prod it past the post'
     ];
     return list[Math.floor(Math.random() * list.length)];
   }
@@ -655,21 +851,38 @@ const App = (() => {
 
 
   function calcPlayerRating(ps) {
-    let r = 6.0 + (Math.random() * 0.25 - 0.08);
-    r += (ps.goals || 0) * 1.15;
-    r += (ps.assists || 0) * 0.85;
-    r += Math.min((ps.shots || 0) * 0.12, 0.6);
-    r += Math.min((ps.saves || 0) * 0.28, 1.8);
-    r += Math.min((ps.tackles || 0) * 0.18, 0.7);
-    r += Math.min((ps.passes || 0) * 0.02, 0.4);
-    r += Math.min((ps.xg || 0) * 0.25, 0.5);
-    r += Math.min((ps.xa || 0) * 0.2, 0.4);
-    if ((ps.saves || 0) >= 5) r += 0.3;
-    if ((ps.goals || 0) >= 2) r += 0.25;
-    if ((ps.goals || 0) >= 3) r += 0.35;
-    if (ps.yellow) r -= 0.35;
-    if (ps.red) r -= 1.6;
-    r += ((ps.ovr || 75) - 75) * 0.008;
+    // Fully activity-based — no random noise
+    let r = 6.0;
+    const goals = ps.goals || 0;
+    const assists = ps.assists || 0;
+    const shots = ps.shots || 0;
+    const saves = ps.saves || 0;
+    const tackles = ps.tackles || 0;
+    const passes = ps.passes || 0;
+    const xg = ps.xg || 0;
+    const xa = ps.xa || 0;
+
+    r += goals * 1.2;
+    r += assists * 0.9;
+    r += Math.min(shots * 0.1, 0.5);
+    // Finishing efficiency
+    if (shots > 0 && goals > 0) r += Math.min(goals / shots, 1) * 0.4;
+    r += Math.min(saves * 0.3, 2.0);
+    if (saves >= 6) r += 0.4;
+    if (saves >= 8) r += 0.3;
+    r += Math.min(tackles * 0.2, 0.8);
+    r += Math.min(passes * 0.015, 0.45);
+    r += Math.min(xg * 0.2, 0.4);
+    r += Math.min(xa * 0.15, 0.35);
+    // Clean involvement floor for players who played
+    if (passes + shots + tackles + saves + goals + assists === 0) r = 6.0;
+    if (goals >= 2) r += 0.3;
+    if (goals >= 3) r += 0.4;
+    if (assists >= 2) r += 0.25;
+    if (ps.yellow) r -= 0.4;
+    if (ps.red) r -= 1.8;
+    // Tiny quality anchor so elite players with solid games edge higher (not random)
+    r += Math.max(-0.15, Math.min(0.2, ((ps.ovr || 75) - 75) * 0.01));
     return Math.max(4.0, Math.min(9.9, Math.round(r * 10) / 10));
   }
 
@@ -816,7 +1029,14 @@ const App = (() => {
       if (Math.random() < 0.08) {
         const side = Math.random() < 0.5 ? m.home : m.away;
         const p = pickPlayer(side, ['CM','CDM','CAM','CB']);
-        if (p) addEvent(m.minute, 'pass', `<span class="player">${p.name}</span> keeps things tidy in midfield`, side === m.home ? 'home' : 'away');
+        if (p) const quiet = [
+          `<span class="player">${p.name}</span> recycles possession calmly`,
+          `<span class="player">${p.name}</span> breaks up the play and resets`,
+          `<span class="player">${p.name}</span> switches the point of attack`,
+          `<span class="player">${p.name}</span> finds a teammate under no pressure`,
+          `Spell of possession — <span class="player">${p.name}</span> dictates the tempo`
+        ];
+        addEvent(m.minute, 'pass', quiet[Math.floor(Math.random()*quiet.length)], side === m.home ? 'home' : 'away');
       }
       return;
     }
@@ -1152,16 +1372,19 @@ const App = (() => {
     if (!m) return;
     const sideData = m[side];
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
-    if (used >= m.maxSubs) return;
+    if (used >= (m.maxSubs || 5)) return;
     const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
-    const onPitch = (sideData.squad.starting || []).filter(p => onPitchIds.includes(p.id));
+    // Anyone currently on pitch (starter or previous sub)
+    const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
+    // Prefer lower rated / tired-looking out
     const sorted = [...onPitch].sort((a, b) => (a.ovr || 70) - (b.ovr || 70));
-    const candidatesOut = sorted.slice(0, Math.max(2, Math.floor(sorted.length / 2)));
+    const candidatesOut = sorted.filter(p => (p.slot || (p.pos||[])[0]) !== 'GK').slice(0, Math.max(2, Math.floor(sorted.length / 2)));
     if (!candidatesOut.length) return;
     const outPlayer = candidatesOut[Math.floor(Math.random() * candidatesOut.length)];
     const availableSubs = (sideData.squad.subs || []).filter(p => !onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
     if (!availableSubs.length) return;
-    let candidatesIn = availableSubs.filter(p => canPlay(p, outPlayer.slot));
+    let candidatesIn = availableSubs.filter(p => canPlay(p, outPlayer.slot || (outPlayer.pos||[])[0]));
     if (!candidatesIn.length) candidatesIn = availableSubs;
     candidatesIn.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
     const top = candidatesIn.slice(0, Math.min(3, candidatesIn.length));
@@ -1169,8 +1392,57 @@ const App = (() => {
     const idx = onPitchIds.indexOf(outPlayer.id);
     if (idx >= 0) onPitchIds[idx] = inPlayer.id;
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
-    addEvent(m.minute, 'sub', `Substitution (${sideData.team.short}): <span class="player">${inPlayer.name}</span> replaces <span class="player">${outPlayer.name}</span>`, side);
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
+    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
+    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
+    // Carry slot for in player
+    inPlayer.slot = outPlayer.slot || (outPlayer.pos || ['CM'])[0];
+    const phrases = [
+      `🔄 <span class="player">${inPlayer.name}</span> comes on for <span class="player">${outPlayer.name}</span>`,
+      `🔄 Change for ${sideData.team.short}: <span class="player">${outPlayer.name}</span> off, <span class="player">${inPlayer.name}</span> on`,
+      `🔄 Tactical switch — <span class="player">${inPlayer.name}</span> replaces <span class="player">${outPlayer.name}</span>`,
+      `🔄 Fresh legs: <span class="player">${inPlayer.name}</span> replaces a tiring <span class="player">${outPlayer.name}</span>`
+    ];
+    addEvent(m.minute, 'sub', phrases[Math.floor(Math.random()*phrases.length)] + ` (${used+1}/${m.maxSubs})`, side);
+    if (!m.silentDeep) renderLineups();
   }
+
+  function changeFormationLive(side, formKey) {
+    const m = currentMatch;
+    if (!m || m.finished) return;
+    if (!FORMATIONS[formKey]) return;
+    const sideData = m[side];
+    sideData.squad.formation = formKey;
+    // Reassign slots for on-pitch players by best fit
+    const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const all = [...(sideData.squad.starting||[]), ...(sideData.squad.subs||[])];
+    const onPitch = onIds.map(id => all.find(p => p.id === id)).filter(Boolean);
+    const slots = FORMATIONS[formKey].slots.slice();
+    const used = new Set();
+    const assigned = [];
+    slots.forEach(slot => {
+      const cand = onPitch.filter(p => !used.has(p.id) && canPlay(p, slot))
+        .sort((a,b) => ((b.pos||[]).includes(slot)?1:0) - ((a.pos||[]).includes(slot)?1:0) || (b.ovr||0)-(a.ovr||0));
+      if (cand[0]) { used.add(cand[0].id); cand[0].slot = slot; assigned.push(cand[0]); }
+    });
+    onPitch.filter(p => !used.has(p.id)).forEach((p, i) => {
+      p.slot = slots[assigned.length + i] || (p.pos||['CM'])[0];
+    });
+    addEvent(m.minute, 'whistle', `📐 ${sideData.team.short} switch shape to ${formKey}`, side);
+    if (!m.silentDeep) { renderLineups(); updateScoreboard(); }
+    toast(sideData.team.short + ' → ' + formKey);
+  }
+
+  function setTacticsLive(side, tactic) {
+    const m = currentMatch;
+    if (!m || m.finished) return;
+    if (!m.tactics) m.tactics = { home: 'balanced', away: 'balanced' };
+    m.tactics[side] = tactic;
+    const labels = { attack: 'all-out attack', balanced: 'balanced approach', defend: 'defensive block', press: 'high press' };
+    addEvent(m.minute, 'whistle', `📋 ${m[side].team.short} go ${labels[tactic] || tactic}`, side);
+    toast(m[side].team.short + ': ' + (labels[tactic] || tactic));
+  }
+
 
   function isPlayerInjured(playerId) {
     const rec = injuryBook[playerId];
@@ -1388,6 +1660,9 @@ const App = (() => {
     div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
     div.innerHTML = `<span class="event-time">${minute}'</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
     feed.insertBefore(div, feed.firstChild);
+    if (['goal','sub','yellow','red','injury','pen'].includes(type)) {
+      try { renderLineups(); } catch (e) {}
+    }
   }
 
   function updateScoreboard() {
@@ -1396,10 +1671,10 @@ const App = (() => {
     const m = currentMatch;
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     set('live-home-flag', m.home.team.flag || '');
-    set('live-home-name', m.home.team.name);
+    set('live-home-name', m.home.team.short || m.home.team.name);
     set('live-home-form', (FORMATIONS[m.home.squad.formation] || {}).name || '');
     set('live-away-flag', m.away.team.flag || '');
-    set('live-away-name', m.away.team.name);
+    set('live-away-name', m.away.team.short || m.away.team.name);
     set('live-away-form', (FORMATIONS[m.away.squad.formation] || {}).name || '');
     const hm = document.querySelector('.score-team.home .mgr');
     const am = document.querySelector('.score-team.away .mgr');
@@ -1492,28 +1767,120 @@ const App = (() => {
   }
 
 
+  function playerLineIcons(ps, subInfo, onPitch, inj) {
+    let icons = '';
+    if (ps) {
+      for (let i = 0; i < (ps.goals || 0); i++) icons += '<span class="li-icon" title="Goal">⚽</span>';
+      for (let i = 0; i < (ps.assists || 0); i++) icons += '<span class="li-icon" title="Assist">🅰️</span>';
+      if (ps.yellow) icons += '<span class="li-icon" title="Yellow">🟨</span>';
+      if (ps.red) icons += '<span class="li-icon" title="Red">🟥</span>';
+    }
+    if (inj) icons += '<span class="li-icon" title="Injured">🩹</span>';
+    if (subInfo && subInfo.outMin != null) icons += `<span class="li-sub out" title="Subbed off">🔻${subInfo.outMin}'</span>`;
+    if (subInfo && subInfo.inMin != null) icons += `<span class="li-sub in" title="Subbed on">🔺${subInfo.inMin}'</span>`;
+    return icons;
+  }
+
+  function liveRatingBadge(ps) {
+    if (!ps) return '<span class="rating-badge rating-mid">6.0</span>';
+    const r = calcPlayerRating(ps);
+    ps.rating = r;
+    const cls = r >= 7.5 ? 'rating-high' : r >= 6.5 ? 'rating-mid' : 'rating-low';
+    return `<span class="rating-badge ${cls}">${r.toFixed(1)}</span>`;
+  }
+
   function renderLineups() {
     if (!currentMatch) return;
     const m = currentMatch;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
+
+    const row = (p, side, isSubList) => {
+      const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const on = onPitchIds.includes(p.id);
+      const inj = (m.injuries || []).includes(p.id);
+      if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+      const ps = m.playerMatchStats[p.id];
+      const subInfo = (m.subLog[side] || {})[p.id];
+      const icons = playerLineIcons(ps, subInfo, on, inj);
+      const rating = liveRatingBadge(ps);
+      const dim = (!on && !inj && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
+      const pos = p.slot || (p.pos || [''])[0] || '';
+      return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
+        <span class="player-num">${p.num || ''}</span>
+        <span class="player-pos">${pos}</span>
+        <span class="player-name">${p.name}</span>
+        <span class="player-icons">${icons}</span>
+        ${rating}
+      </li>`;
+    };
+
     const html = (side) => {
       const s = m[side];
-      let h = `<div class="lineup-team"><h4>${s.team.flag || ''} ${s.team.name} (${(FORMATIONS[s.squad.formation]||{}).name || ''})</h4><ul class="player-list">`;
-      (s.squad.starting || []).forEach(p => {
-        const on = (side === 'home' ? m.homeOnPitch : m.awayOnPitch).includes(p.id);
-        const inj = m.injuries.includes(p.id);
-        h += `<li class="player-item ${inj ? 'injured' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer"><span class="player-num">${p.num || ''}</span><span class="player-pos">${p.slot || ''}</span> ${p.name} ${!on && !inj ? '(off)' : ''} ${inj ? '🩹' : ''}<span class="player-ovr">${p.ovr || ''}</span></li>`;
-      });
-      h += `<li style="margin-top:8px;color:var(--text-muted);font-size:0.8rem">Substitutes</li>`;
-      (s.squad.subs || []).forEach(p => {
-        const on = (side === 'home' ? m.homeOnPitch : m.awayOnPitch).includes(p.id);
-        h += `<li class="player-item sub" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer"><span class="player-num">${p.num || ''}</span><span class="player-pos">${(p.pos||[''])[0]}</span> ${p.name} ${on ? '(on)' : ''}<span class="player-ovr">${p.ovr || ''}</span></li>`;
-      });
+      const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+      const form = (FORMATIONS[s.squad.formation] || {}).name || s.squad.formation || '';
+      const tac = (m.tactics && m.tactics[side]) || 'balanced';
+      let h = `<div class="lineup-team">
+        <h4>${s.team.flag || ''} ${s.team.short || s.team.name} · ${form}
+          <span class="subs-badge">${used}/${m.maxSubs || 5} subs</span>
+          <span class="tac-badge">${tac}</span>
+        </h4>
+        <ul class="player-list">`;
+      // Starting XI order, including those subbed off
+      (s.squad.starting || []).forEach(p => { h += row(p, side, false); });
+      // Subs: original bench + any who came on already listed? Show all bench pool
+      h += `<li class="bench-label">Substitutes</li>`;
+      (s.squad.subs || []).forEach(p => { h += row(p, side, true); });
       return h + '</ul></div>';
     };
+
     const el = document.getElementById('lineup-display');
     if (el) el.innerHTML = html('home') + html('away');
+    // Live tactics / formation controls during match
+    let ctrl = document.getElementById('live-tactics-bar');
+    if (!ctrl) {
+      const parent = document.getElementById('lineup-display');
+      if (parent && parent.parentNode) {
+        ctrl = document.createElement('div');
+        ctrl.id = 'live-tactics-bar';
+        parent.parentNode.insertBefore(ctrl, parent);
+      }
+    }
+    if (ctrl && !m.finished && !m.silentDeep) {
+      const forms = Object.keys(FORMATIONS).map(f => `<option value="${f}">${f}</option>`).join('');
+      ctrl.innerHTML = `
+        <div class="live-tac-row">
+          <span class="live-tac-label">Home</span>
+          <select id="live-form-home" onchange="App.changeFormationLive('home', this.value)">${forms}</select>
+          <select id="live-tac-home" onchange="App.setTacticsLive('home', this.value)">
+            <option value="balanced">Balanced</option>
+            <option value="attack">Attack</option>
+            <option value="defend">Defend</option>
+            <option value="press">Press</option>
+          </select>
+          <span class="live-tac-label">Away</span>
+          <select id="live-form-away" onchange="App.changeFormationLive('away', this.value)">${forms}</select>
+          <select id="live-tac-away" onchange="App.setTacticsLive('away', this.value)">
+            <option value="balanced">Balanced</option>
+            <option value="attack">Attack</option>
+            <option value="defend">Defend</option>
+            <option value="press">Press</option>
+          </select>
+        </div>`;
+      const fh = document.getElementById('live-form-home');
+      const fa = document.getElementById('live-form-away');
+      const th = document.getElementById('live-tac-home');
+      const ta = document.getElementById('live-tac-away');
+      if (fh) fh.value = m.home.squad.formation || '4-3-3';
+      if (fa) fa.value = m.away.squad.formation || '4-3-3';
+      if (th) th.value = (m.tactics && m.tactics.home) || 'balanced';
+      if (ta) ta.value = (m.tactics && m.tactics.away) || 'balanced';
+    } else if (ctrl && m.finished) {
+      ctrl.innerHTML = '';
+    }
     renderPitch();
   }
+
 
   function recordRating(player, team, rating) {
     if (!player || !team) return;
@@ -1852,7 +2219,7 @@ const App = (() => {
     const el = document.getElementById('groups-container');
     if (!el || !tournament || tournament.format !== 'league') return;
     const sorted = sortedLeague();
-    let h = '<div class="group-card" style="grid-column:1/-1"><h4>League Phase Table</h4>';
+    let h = '<div class="group-card league-table-wrap" style="grid-column:1/-1"><h4>League Phase Table — all ' + sorted.length + ' teams</h4>';
     h += '<table class="group-table"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
     sorted.forEach((r, i) => {
       const gd = r.gf - r.ga;
@@ -2544,16 +2911,69 @@ const App = (() => {
 
 
   function setChampion(team) {
-    if (!team || tournament.champion) return;
+    if (!team || !tournament || tournament.champion) return;
     tournament.champion = team;
     tournament.stage = 'complete';
+    // Runners-up: loser of final
+    const finalRound = (tournament.knockout || []).find(r => r.name === 'Final') || (tournament.knockout || [])[(tournament.knockout || []).length - 1];
+    if (finalRound && finalRound.matches && finalRound.matches[0]) {
+      const fm = finalRound.matches[0];
+      tournament.runnersUp = (fm.winner && fm.winner.id === fm.home.id) ? fm.away : fm.home;
+    }
+    // Third place: prefer SF losers if available
+    const sf = (tournament.knockout || []).find(r => r.name === 'Semi-finals');
+    if (sf && sf.matches && sf.matches.length >= 2) {
+      const losers = sf.matches.map(m => {
+        if (!m.winner) return null;
+        return m.winner.id === m.home.id ? m.away : m.home;
+      }).filter(Boolean);
+      tournament.thirdPlace = losers[0] || null;
+      tournament.fourthPlace = losers[1] || null;
+    }
     assignTournamentAwards();
     const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
     trophies.push({ name: tName, team: team.name, type: 'Tournament', date: Date.now() });
     try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch(e) {}
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = 'Champions: ' + (team.flag || '') + ' ' + team.name;
+    renderTournamentPodium();
   }
+
+  function renderTournamentPodium() {
+    let el = document.getElementById('tour-podium');
+    if (!el) {
+      const bracket = document.getElementById('bracket');
+      if (bracket) {
+        el = document.createElement('div');
+        el.id = 'tour-podium';
+        bracket.parentNode.insertBefore(el, bracket);
+      }
+    }
+    if (!el || !tournament || !tournament.champion) return;
+    const first = tournament.champion;
+    const second = tournament.runnersUp;
+    const third = tournament.thirdPlace;
+    el.innerHTML = `
+      <div class="card-title">Final Standings</div>
+      <div class="podium">
+        <div class="podium-place">
+          <div class="place-num">2</div>
+          <div class="place-team">${second ? (second.flag||'') + ' ' + second.name : '—'}</div>
+          <div class="place-label">Runners-up</div>
+        </div>
+        <div class="podium-place first">
+          <div class="place-num">1</div>
+          <div class="place-team">${first.flag||''} ${first.name}</div>
+          <div class="place-label">Champions</div>
+        </div>
+        <div class="podium-place">
+          <div class="place-num">3</div>
+          <div class="place-team">${third ? (third.flag||'') + ' ' + third.name : '—'}</div>
+          <div class="place-label">Third place</div>
+        </div>
+      </div>`;
+  }
+
 
   function simQuickMatch(homeTeam, awayTeam, opts) {
     // Full deep simulation — same engine as live matches (goals, cards, MOTM, injuries, ratings)
@@ -2905,7 +3325,7 @@ const App = (() => {
     }).join('');
   }
 
-  function searchTournamentTeams(q) {
+  function searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive(q) {
     tourTeamsSearch = (q || '').trim().toLowerCase();
     renderTournamentTeamSelect();
   }
@@ -2971,34 +3391,61 @@ const App = (() => {
       const p = (t.players || []).find(x => x.id === playerId);
       if (p) { player = p; team = t; break; }
     }
+    // Fallback from current match stats object
+    if (!player && currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) {
+      const ms = currentMatch.playerMatchStats[playerId];
+      player = { id: playerId, name: ms.name, num: ms.num, pos: [ms.pos], ovr: ms.ovr, att: 70, def: 70, phy: 70, pac: 70, tec: 70 };
+      team = (currentMatch.home.squad.all || []).find(p => p.id === playerId) ? currentMatch.home.team
+        : ((currentMatch.away.squad.all || []).find(p => p.id === playerId) ? currentMatch.away.team : { name: '—', flag: '', color: '#d4af37', secondary: '#fff' });
+    }
     if (!player) { toast('Player not found'); return; }
     const g = (stats.goals[playerId] || {}).count || 0;
     const a = (stats.assists[playerId] || {}).count || 0;
     const s = (stats.saves[playerId] || {}).count || 0;
     const motm = (stats.motm[playerId] || {}).count || 0;
     const y = (stats.yellows[playerId] || {}).count || 0;
-    const r = (stats.reds[playerId] || {}).count || 0;
-    const primary = team.color || '#d4af37';
-    const secondary = team.secondary || '#fff';
+    const rd = (stats.reds[playerId] || {}).count || 0;
+    const primary = (team && team.color) || '#d4af37';
+    const secondary = (team && team.secondary) || '#fff';
+    const ms = (currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) || null;
     const modal = document.getElementById('player-modal');
     const content = document.getElementById('player-modal-content');
     if (!modal || !content) return;
+    let matchBlock = '';
+    if (ms) {
+      const rc = (ms.rating || 0) >= 7.5 ? 'rating-high' : (ms.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+      matchBlock = `
+        <div class="card-title" style="margin-top:8px">This Match</div>
+        <div class="profile-stats-grid">
+          <div class="profile-stat"><div class="val">${ms.goals || 0}</div><div class="lbl">Goals</div></div>
+          <div class="profile-stat"><div class="val">${ms.assists || 0}</div><div class="lbl">Assists</div></div>
+          <div class="profile-stat"><div class="val">${ms.shots || 0}</div><div class="lbl">Shots</div></div>
+          <div class="profile-stat"><div class="val">${ms.saves || 0}</div><div class="lbl">Saves</div></div>
+          <div class="profile-stat"><div class="val">${ms.tackles || 0}</div><div class="lbl">Tackles</div></div>
+          <div class="profile-stat"><div class="val">${(ms.xg || 0).toFixed(2)}</div><div class="lbl">xG</div></div>
+          <div class="profile-stat"><div class="val">${(ms.xa || 0).toFixed(2)}</div><div class="lbl">xA</div></div>
+          <div class="profile-stat"><div class="val"><span class="rating-badge ${rc}">${(ms.rating || 0).toFixed(1)}</span></div><div class="lbl">Rating</div></div>
+          <div class="profile-stat"><div class="val">${ms.yellow ? 'Y' : '—'} ${ms.red ? 'R' : ''}</div><div class="lbl">Cards</div></div>
+        </div>`;
+    }
     content.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${player.num || '?'}</div>
         <div>
           <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
-          <div style="color:var(--text-secondary);font-size:0.85rem">${team.flag || ''} ${team.name} · ${(player.pos||[]).join('/')}</div>
-          <div style="color:var(--accent-gold);font-weight:700;margin-top:4px">OVR ${player.ovr}</div>
+          <div style="color:var(--text-2);font-size:0.85rem">${(team && team.flag) || ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
+          <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'}</div>
         </div>
       </div>
+      ${matchBlock}
+      <div class="card-title">Career (competitive)</div>
       <div class="profile-stats-grid">
         <div class="profile-stat"><div class="val">${g}</div><div class="lbl">Goals</div></div>
         <div class="profile-stat"><div class="val">${a}</div><div class="lbl">Assists</div></div>
         <div class="profile-stat"><div class="val">${motm}</div><div class="lbl">MOTM</div></div>
         <div class="profile-stat"><div class="val">${s}</div><div class="lbl">Saves</div></div>
         <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
-        <div class="profile-stat"><div class="val">${r}</div><div class="lbl">Reds</div></div>
+        <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
       </div>
       <div style="margin-top:8px">
         ${[['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
@@ -3009,6 +3456,7 @@ const App = (() => {
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
   }
+
 
   function showTeamProfile(teamId) {
     const team = getTeam(teamId);
@@ -3059,17 +3507,27 @@ const App = (() => {
         data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table>';
     } else if (type === 'ballon') {
-      // Ballon d'Or formula: goals*3 + assists*2 + motm*4 + ovr factor from stats
       const scores = {};
-      Object.values(stats.goals||{}).forEach(p => { scores[p.id] = scores[p.id] || {id:p.id,name:p.name,team:p.team,pts:0}; scores[p.id].pts += p.count * 3; });
-      Object.values(stats.assists||{}).forEach(p => { scores[p.id] = scores[p.id] || {id:p.id,name:p.name,team:p.team,pts:0}; scores[p.id].pts += p.count * 2; });
-      Object.values(stats.motm||{}).forEach(p => { scores[p.id] = scores[p.id] || {id:p.id,name:p.name,team:p.team,pts:0}; scores[p.id].pts += p.count * 4; });
-      Object.values(stats.saves||{}).forEach(p => { scores[p.id] = scores[p.id] || {id:p.id,name:p.name,team:p.team,pts:0}; scores[p.id].pts += p.count * 0.5; });
-      const data = Object.values(scores).sort((a,b) => b.pts - a.pts).slice(0, 15);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Not enough data for Ballon d\'Or.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or Ranking</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + Math.round(data[0].pts) + ' pts</p></div></div>' +
-        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Points</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+      const ensure = (p) => {
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0 };
+        return scores[p.id];
+      };
+      Object.values(stats.goals||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 4; e.goals = p.count; });
+      Object.values(stats.assists||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 2.5; e.assists = p.count; });
+      Object.values(stats.motm||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 5; e.motm = p.count; });
+      Object.values(stats.saves||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.4; });
+      Object.values(stats.cleanSheets||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
+      Object.values(stats.ratings||{}).forEach(p => {
+        const e = ensure(p); e.avg = p.avg || 0;
+        e.pts += (p.avg || 0) * Math.min(p.count, 12) * 0.85;
+      });
+      Object.values(stats.puskas||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
+      const data = Object.values(scores).filter(p => p.pts > 0).sort((a,b) => b.pts - a.pts).slice(0, 15);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Play competitive matches to fill the Ballon d\'Or race.</p></div>'; return; }
+      const leader = data[0];
+      el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p></div></div>' +
+        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>G</th><th>A</th><th>MOTM</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+p.motm+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table>';
     } else if (type === 'puskas') {
       const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 10);
@@ -3077,6 +3535,55 @@ const App = (() => {
       el.innerHTML = '<div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Puskas Award</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' spectacular goals</p></div></div>' +
         '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        '</tbody></table>';
+    } else if (type === 'muller') {
+      // Gerd Müller Award — best pure striker: goals heavily weighted, ST/CF preference
+      const scores = {};
+      Object.values(stats.goals || {}).forEach(p => {
+        scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: p.count, assists: 0, pts: p.count * 5 };
+      });
+      Object.values(stats.assists || {}).forEach(p => {
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: 0, assists: 0, pts: 0 };
+        scores[p.id].assists = p.count;
+        scores[p.id].pts += p.count * 0.8;
+      });
+      // Bonus if player is a striker on roster
+      Object.values(scores).forEach(s => {
+        let isST = false;
+        for (const t of allTeams) {
+          const pl = (t.players || []).find(x => x.id === s.id);
+          if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
+        }
+        if (isST) s.pts += 2;
+      });
+      const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 15);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card"><div class="award-icon">🎯</div><div class="award-info"><h4>Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
+        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table>';
+    } else if (type === 'yashin') {
+      // Yashin Award — best goalkeeper: saves + clean sheets
+      const scores = {};
+      Object.values(stats.saves || {}).forEach(p => {
+        scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: p.count, clean: 0, pts: p.count * 1.2 };
+      });
+      Object.values(stats.cleanSheets || {}).forEach(p => {
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: 0, clean: 0, pts: 0 };
+        scores[p.id].clean = p.count;
+        scores[p.id].pts += p.count * 4;
+      });
+      Object.values(stats.motm || {}).forEach(p => {
+        if (scores[p.id]) scores[p.id].pts += p.count * 3;
+      });
+      Object.values(stats.ratings || {}).forEach(p => {
+        if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.3;
+      });
+      const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 15);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card"><div class="award-icon">🧤</div><div class="award-info"><h4>Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
+        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
@@ -3108,7 +3615,7 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
   };
 })();
 
