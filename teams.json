@@ -1,4 +1,77 @@
 {"national": [{
+  "id": "cze1976",
+  "name": "Czechoslovakia 1976",
+  "short": "CZE76",
+  "flag": "🇨🇿",
+  "color": "#D21034",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"cze76_1","name":"Ivo Viktor","pos":["GK"],"ovr":92,"att":15,"def":94,"phy":84,"pac":54,"tec":75,"num":1},
+    {"id":"cze76_2","name":"Karol Dobiaš","pos":["RB","RM"],"ovr":88,"att":78,"def":86,"phy":84,"pac":84,"tec":85,"num":2},
+    {"id":"cze76_3","name":"Jozef Čapkovič","pos":["CB"],"ovr":83,"att":40,"def":85,"phy":83,"pac":70,"tec":72,"num":3},
+    {"id":"cze76_4","name":"Anton Ondruš","pos":["CB","SW"],"ovr":93,"att":65,"def":94,"phy":90,"pac":76,"tec":85,"num":4},
+    {"id":"cze76_5","name":"Ján Pivarník","pos":["RB","CB"],"ovr":86,"att":68,"def":87,"phy":85,"pac":82,"tec":78,"num":5},
+    {"id":"cze76_6","name":"Ladislav Jurkemik","pos":["CB","CDM"],"ovr":84,"att":55,"def":86,"phy":87,"pac":72,"tec":76,"num":6},
+    {"id":"cze76_7","name":"Antonín Panenka","pos":["CAM","CM"],"ovr":91,"att":89,"def":48,"phy":74,"pac":75,"tec":96,"num":7},
+    {"id":"cze76_8","name":"Jozef Móder","pos":["CM","RM"],"ovr":86,"att":82,"def":68,"phy":78,"pac":78,"tec":86,"num":8},
+    {"id":"cze76_9","name":"Jaroslav Pollák","pos":["CM","CDM"],"ovr":85,"att":72,"def":82,"phy":84,"pac":76,"tec":83,"num":9},
+    {"id":"cze76_10","name":"Marian Masný","pos":["RW"],"ovr":90,"att":89,"def":32,"phy":72,"pac":92,"tec":91,"num":10},
+    {"id":"cze76_11","name":"Zdeněk Nehoda","pos":["ST","LW"],"ovr":89,"att":90,"def":30,"phy":83,"pac":85,"tec":88,"num":11},
+    {"id":"cze76_12","name":"Koloman Gögh","pos":["LB"],"ovr":86,"att":70,"def":87,"phy":84,"pac":82,"tec":78,"num":12},
+    {"id":"cze76_13","name":"Pavol Biroš","pos":["CB","RB"],"ovr":78,"att":42,"def":80,"phy":80,"pac":72,"tec":70,"num":13},
+    {"id":"cze76_14","name":"Pavol Pavlis","pos":["CB"],"ovr":77,"att":35,"def":79,"phy":81,"pac":68,"tec":68,"num":14},
+    {"id":"cze76_15","name":"Dušan Herda","pos":["LM","LW"],"ovr":79,"att":78,"def":35,"phy":70,"pac":82,"tec":80,"num":15},
+    {"id":"cze76_16","name":"František Veselý","pos":["RW","ST"],"ovr":84,"att":85,"def":30,"phy":72,"pac":88,"tec":85,"num":16},
+    {"id":"cze76_17","name":"Ján Švehlík","pos":["ST"],"ovr":82,"att":83,"def":28,"phy":76,"pac":81,"tec":81,"num":17},
+    {"id":"cze76_18","name":"Dušan Galis","pos":["ST"],"ovr":80,"att":81,"def":25,"phy":78,"pac":76,"tec":78,"num":18},
+    {"id":"cze76_19","name":"Ladislav Petráš","pos":["ST"],"ovr":79,"att":80,"def":28,"phy":80,"pac":74,"tec":76,"num":19},
+    {"id":"cze76_20","name":"František Štambachr","pos":["CM","LM"],"ovr":81,"att":76,"def":65,"phy":76,"pac":78,"tec":82,"num":20},
+    {"id":"cze76_21","name":"Alexander Vencel","pos":["GK"],"ovr":81,"att":15,"def":83,"phy":78,"pac":50,"tec":66,"num":21},
+    {"id":"cze76_22","name":"Pavol Michalík","pos":["GK"],"ovr":76,"att":15,"def":78,"phy":74,"pac":48,"tec":62,"num":22}
+  ],
+  "manager": {
+    "name": "Václav Ježek",
+    "ovr": 94
+  }
+}
+,{
+  "id": "cze2004",
+  "name": "Czech Republic 2004",
+  "short": "CZE04",
+  "flag": "🇨🇿",
+  "color": "#D21034",
+  "secondary": "#11457E",
+  "players": [
+    {"id":"cze04_1","name":"Petr Cech","pos":["GK"],"ovr":91,"att":15,"def":93,"phy":86,"pac":52,"tec":74,"num":1},
+    {"id":"cze04_2","name":"Zdeněk Grygera","pos":["RB","CB"],"ovr":84,"att":68,"def":84,"phy":82,"pac":81,"tec":78,"num":2},
+    {"id":"cze04_3","name":"Pavel Mareš","pos":["LB"],"ovr":76,"att":65,"def":75,"phy":76,"pac":75,"tec":72,"num":3},
+    {"id":"cze04_4","name":"Tomáš Galásek","pos":["CDM","CM"],"ovr":86,"att":58,"def":87,"phy":84,"pac":68,"tec":80,"num":4},
+    {"id":"cze04_5","name":"René Bolf","pos":["CB"],"ovr":81,"att":35,"def":83,"phy":85,"pac":68,"tec":68,"num":5},
+    {"id":"cze04_6","name":"Marek Jankulovski","pos":["LB","LWB","LM"],"ovr":88,"att":80,"def":83,"phy":82,"pac":86,"tec":87,"num":6},
+    {"id":"cze04_7","name":"Vladimír Šmicer","pos":["CAM","RM","LM"],"ovr":84,"att":83,"def":45,"phy":70,"pac":80,"tec":88,"num":7},
+    {"id":"cze04_8","name":"Karel Poborský","pos":["RM","RW"],"ovr":89,"att":87,"def":42,"phy":72,"pac":91,"tec":91,"num":8},
+    {"id":"cze04_9","name":"Jan Koller","pos":["ST"],"ovr":88,"att":89,"def":28,"phy":95,"pac":65,"tec":80,"num":9},
+    {"id":"cze04_10","name":"Tomáš Rosický","pos":["CAM","CM"],"ovr":90,"att":88,"def":48,"phy":68,"pac":84,"tec":95,"num":10},
+    {"id":"cze04_11","name":"Pavel Nedvěd","pos":["LM","CAM","CM"],"ovr":95,"att":93,"def":65,"phy":88,"pac":86,"tec":96,"num":11},
+    {"id":"cze04_12","name":"Vratislav Lokvenc","pos":["ST"],"ovr":78,"att":79,"def":25,"phy":88,"pac":64,"tec":72,"num":12},
+    {"id":"cze04_13","name":"Martin Jiránek","pos":["CB","RB"],"ovr":80,"att":55,"def":81,"phy":82,"pac":78,"tec":72,"num":13},
+    {"id":"cze04_14","name":"Štěpán Vachoušek","pos":["CAM","LM"],"ovr":77,"att":76,"def":40,"phy":72,"pac":76,"tec":80,"num":14},
+    {"id":"cze04_15","name":"Milan Baroš","pos":["ST"],"ovr":91,"att":92,"def":28,"phy":82,"pac":92,"tec":87,"num":15},
+    {"id":"cze04_16","name":"Jaromír Blažek","pos":["GK"],"ovr":79,"att":15,"def":81,"phy":78,"pac":48,"tec":64,"num":16},
+    {"id":"cze04_17","name":"Marek Heinz","pos":["ST","CAM"],"ovr":82,"att":83,"def":32,"phy":72,"pac":82,"tec":85,"num":17},
+    {"id":"cze04_18","name":"Marek Týce","pos":["CDM","RB"],"ovr":76,"att":52,"def":77,"phy":78,"pac":72,"tec":72,"num":18},
+    {"id":"cze04_19","name":"Roman Týce","pos":["CDM","CM"],"ovr":78,"att":58,"def":79,"phy":80,"pac":70,"tec":75,"num":19},
+    {"id":"cze04_20","name":"Jaroslav Plašil","pos":["CM","LM"],"ovr":80,"att":76,"def":68,"phy":74,"pac":75,"tec":82,"num":20},
+    {"id":"cze04_21","name":"Tomáš Ujfaluši","pos":["CB","RB"],"ovr":88,"att":50,"def":90,"phy":88,"pac":76,"tec":76,"num":21},
+    {"id":"cze04_22","name":"David Rozehnal","pos":["CB"],"ovr":80,"att":35,"def":82,"phy":83,"pac":68,"tec":70,"num":22},
+    {"id":"cze04_23","name":"Antonín Kinský","pos":["GK"],"ovr":75,"att":15,"def":77,"phy":74,"pac":48,"tec":60,"num":23}
+  ],
+  "manager": {
+    "name": "Karel Brückner",
+    "ovr": 94
+  }
+}
+,  {
   "id": "ned1988",
   "name": "Netherlands 1988",
   "short": "NED88",
@@ -17416,13 +17489,13 @@
     {"id":"rma26_16","name":"Ibrahima Konaté","pos":["CB"],"ovr":87,"att":38,"def":88,"phy":89,"pac":80,"tec":72,"num":16},
     {"id":"rma26_17","name":"Marc Cucurella","pos":["LB","LWB"],"ovr":84,"att":74,"def":82,"phy":80,"pac":81,"tec":81,"num":17},
     {"id":"rma26_18","name":"Álvaro Carreras","pos":["LB","LWB"],"ovr":81,"att":74,"def":79,"phy":76,"pac":83,"tec":80,"num":18},
-    {"id":"rma26_19","name":"Cristian Espí","pos":["ST"],"ovr":73,"att":74,"def":25,"phy":72,"pac":78,"tec":72,"num":19},
+    {"id":"rma26_19","name":"Carlos Espí","pos":["ST"],"ovr":73,"att":74,"def":25,"phy":72,"pac":78,"tec":72,"num":19},
     {"id":"rma26_20","name":"Bernardo Silva","pos":["CAM","CM","RW"],"ovr":90,"att":86,"def":62,"phy":68,"pac":75,"tec":95,"num":20},
     {"id":"rma26_21","name":"Brahim Díaz","pos":["CAM","RW","LW"],"ovr":85,"att":84,"def":35,"phy":66,"pac":85,"tec":88,"num":21},
     {"id":"rma26_22","name":"Antonio Rüdiger","pos":["CB"],"ovr":89,"att":48,"def":90,"phy":91,"pac":82,"tec":75,"num":22},
     {"id":"rma26_23","name":"Ferland Mendy","pos":["LB"],"ovr":83,"att":64,"def":84,"phy":83,"pac":86,"tec":76,"num":23},
     {"id":"rma26_24","name":"Denzel Dumfries","pos":["RB","RWB"],"ovr":84,"att":76,"def":80,"phy":87,"pac":88,"tec":76,"num":24},
-    {"id":"rma26_25","name":"Youssef Diomande","pos":["LW","RW"],"ovr":72,"att":73,"def":28,"phy":68,"pac":82,"tec":73,"num":25},
+    {"id":"rma26_25","name":"Yan Diomande","pos":["LW","RW"],"ovr":72,"att":73,"def":28,"phy":68,"pac":82,"tec":73,"num":25},
     {"id":"rma26_27","name":"Thiago","pos":["CM","CAM"],"ovr":75,"att":74,"def":52,"phy":65,"pac":70,"tec":82,"num":27}
   ],
   "manager": {

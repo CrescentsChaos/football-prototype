@@ -665,49 +665,108 @@ var App = (() => {
     m.inPens = true;
     m.status = 'Penalties';
     addEvent(m.minute, 'pen', '⚽ Penalty shootout!', null);
-    let homePens = 0, awayPens = 0;
+    updateScoreboard();
+
     const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>(b.att||0)-(a.att||0));
     const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>(b.att||0)-(a.att||0));
-    const homeGk = (m.home.squad.starting || []).find(p => (p.pos||[]).includes('GK'));
-    const awayGk = (m.away.squad.starting || []).find(p => (p.pos||[]).includes('GK'));
-    for (let i = 0; i < 5; i++) {
-      const ht = homeTakers[i % homeTakers.length];
-      const at = awayTakers[i % awayTakers.length];
-      const homeOut = pickPenOutcome();
-      const awayOut = pickPenOutcome();
-      if (homeOut.scored) {
-        homePens++;
-        addEvent(m.minute, 'pen', `⚽ ${ht.name} (${m.home.team.short}) ${homeOut.text} [${homePens}-${awayPens}]`, 'home');
-      } else {
-        addEvent(m.minute, 'pen', `❌ ${ht.name} (${m.home.team.short}) — ${homeOut.text} [${homePens}-${awayPens}]`, 'home');
+
+    // Silent/bulk sims (quick-sim, tournament auto-play) still resolve instantly —
+    // only a real, on-screen live match animates the shootout kick by kick.
+    if (m.silentDeep) {
+      const st = { homePens: 0, awayPens: 0, round: 0, phase: 'regular', sudden: 0 };
+      for (let i = 0; i < 5; i++) {
+        st.round = i;
+        takePenaltyKick(m, 'home', homeTakers, i, st);
+        takePenaltyKick(m, 'away', awayTakers, i, st);
+        const left = 4 - i;
+        if (st.homePens > st.awayPens + left || st.awayPens > st.homePens + left) break;
       }
-      if (awayOut.scored) {
-        awayPens++;
-        addEvent(m.minute, 'pen', `⚽ ${at.name} (${m.away.team.short}) ${awayOut.text} [${homePens}-${awayPens}]`, 'away');
-      } else {
-        addEvent(m.minute, 'pen', `❌ ${at.name} (${m.away.team.short}) — ${awayOut.text} [${homePens}-${awayPens}]`, 'away');
+      let sd = 0;
+      while (st.homePens === st.awayPens && sd < 20) {
+        st.phase = 'sudden'; st.sudden = sd;
+        takePenaltyKick(m, 'home', homeTakers, 5 + sd, st);
+        takePenaltyKick(m, 'away', awayTakers, 5 + sd, st);
+        sd++;
       }
-      // Can we end early?
-      const left = 4 - i;
-      if (homePens > awayPens + left || awayPens > homePens + left) break;
+      m.home.penScore = st.homePens;
+      m.away.penScore = st.awayPens;
+      addEvent(m.minute, 'whistle', `Penalties: ${m.home.team.short} ${st.homePens} - ${st.awayPens} ${m.away.team.short}`, null);
+      endMatch();
+      return;
     }
-    // Sudden death if level
-    let sd = 0;
-    while (homePens === awayPens && sd < 5) {
-      const ht = homeTakers[(5 + sd) % homeTakers.length];
-      const at = awayTakers[(5 + sd) % awayTakers.length];
-      const homeOut = pickPenOutcome();
-      const awayOut = pickPenOutcome();
-      if (homeOut.scored) { homePens++; addEvent(m.minute, 'pen', `⚽ ${ht.name} (sudden death) ${homeOut.text} [${homePens}-${awayPens}]`, 'home'); }
-      else addEvent(m.minute, 'pen', `❌ ${ht.name} (sudden death) — ${homeOut.text} [${homePens}-${awayPens}]`, 'home');
-      if (awayOut.scored) { awayPens++; addEvent(m.minute, 'pen', `⚽ ${at.name} (sudden death) ${awayOut.text} [${homePens}-${awayPens}]`, 'away'); }
-      else addEvent(m.minute, 'pen', `❌ ${at.name} (sudden death) — ${awayOut.text} [${homePens}-${awayPens}]`, 'away');
-      sd++;
+
+    clearInterval(simInterval);
+    isPlaying = false;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '▶ Play';
+
+    m._pensState = { homePens: 0, awayPens: 0, round: 0, sudden: 0, turn: 'home', phase: 'regular' };
+    const stepDelay = Math.max(700, Math.min(1400, simSpeed * 2.5));
+    // First kick fires right away so it doesn't feel like a stall, then one kick per interval tick.
+    stepPenaltyShootout(homeTakers, awayTakers);
+    simInterval = setInterval(() => stepPenaltyShootout(homeTakers, awayTakers), stepDelay);
+  }
+
+  // Resolves a single penalty kick and updates score/events. Shared by the instant
+  // (silentDeep) and animated (live) shootout paths so outcomes are computed the same way.
+  function takePenaltyKick(m, side, takers, kickIndex, st) {
+    if (!takers.length) return;
+    const taker = takers[kickIndex % takers.length];
+    const out = pickPenOutcome();
+    const teamShort = m[side].team.short;
+    if (out.scored) {
+      st[side === 'home' ? 'homePens' : 'awayPens']++;
+      addEvent(m.minute, 'pen', `⚽ ${taker.name} (${teamShort}) ${out.text} [${st.homePens}-${st.awayPens}]`, side);
+    } else {
+      addEvent(m.minute, 'pen', `❌ ${taker.name} (${teamShort}) — ${out.text} [${st.homePens}-${st.awayPens}]`, side);
     }
-    m.home.penScore = homePens;
-    m.away.penScore = awayPens;
-    // Assign winner for display - don't change regular score, show pens
-    addEvent(m.minute, 'whistle', `Penalties: ${m.home.team.short} ${homePens} - ${awayPens} ${m.away.team.short}`, null);
+  }
+
+  // Advances the live penalty shootout by exactly one kick, alternating home/away,
+  // so the person watching sees each penalty land before the next one is taken.
+  function stepPenaltyShootout(homeTakers, awayTakers) {
+    const m = currentMatch;
+    if (!m || !m._pensState) { clearInterval(simInterval); return; }
+    const st = m._pensState;
+    const side = st.turn;
+    const takers = side === 'home' ? homeTakers : awayTakers;
+    const kickIndex = st.phase === 'regular' ? st.round : (5 + st.sudden);
+    takePenaltyKick(m, side, takers, kickIndex, st);
+    m.home.penScore = st.homePens;
+    m.away.penScore = st.awayPens;
+    updateScoreboard();
+
+    if (st.turn === 'home') {
+      st.turn = 'away';
+      return; // wait for the next tick to take away's kick in the same round
+    }
+    // Away just kicked — the round is complete, decide what happens next.
+    st.turn = 'home';
+    if (st.phase === 'regular') {
+      const left = 4 - st.round;
+      if (st.homePens > st.awayPens + left || st.awayPens > st.homePens + left) {
+        finishPenaltyShootout();
+        return;
+      }
+      st.round++;
+      if (st.round >= 5) {
+        if (st.homePens === st.awayPens) { st.phase = 'sudden'; st.sudden = 0; }
+        else { finishPenaltyShootout(); return; }
+      }
+    } else {
+      if (st.homePens !== st.awayPens) { finishPenaltyShootout(); return; }
+      st.sudden++;
+    }
+  }
+
+  function finishPenaltyShootout() {
+    const m = currentMatch;
+    if (!m) return;
+    clearInterval(simInterval);
+    const st = m._pensState || { homePens: m.home.penScore || 0, awayPens: m.away.penScore || 0 };
+    m.home.penScore = st.homePens;
+    m.away.penScore = st.awayPens;
+    addEvent(m.minute, 'whistle', `Penalties: ${m.home.team.short} ${st.homePens} - ${st.awayPens} ${m.away.team.short}`, null);
     endMatch();
   }
 
@@ -1632,6 +1691,9 @@ var App = (() => {
         if (player && Math.random() < 0.4) {
           defTeam.stats.reds++;
           recordStat('reds', player, defTeam.team);
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
+          m.playerMatchStats[player.id].red = true;
           addEvent(m.minute, 'red', `VAR: Red card! <span class="player">${player.name}</span> (${defTeam.team.short}) sent off`, defSide);
           removeFromPitch(defSide, player.id);
         } else {
@@ -2354,18 +2416,19 @@ var App = (() => {
       if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
       const ps = m.playerMatchStats[p.id];
       const subInfo = (m.subLog[side] || {})[p.id];
+      const sentOff = !!ps.red;
       const icons = playerLineIcons(ps, subInfo, on, inj);
       const rating = liveRatingBadge(ps);
-      const dim = (!on && !inj && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
+      const dim = (!on && !inj && !sentOff && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
       const pos = p.slot || (p.pos || [''])[0] || '';
       const passAcc = ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
       const passInfo = (ps.passes > 0)
         ? `<span class="player-passes" title="Passes completed / attempted">${ps.passesCompleted || 0}/${ps.passes} <em>(${passAcc}%)</em></span>`
         : '';
-      return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
+      return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
         <span class="player-num">${p.num || ''}</span>
         <span class="player-pos">${pos}</span>
-        <span class="player-name">${p.name}</span>
+        <span class="player-name">${p.name}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         ${passInfo}
         <span class="player-icons">${icons}</span>
         ${rating}

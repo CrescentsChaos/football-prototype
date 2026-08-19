@@ -419,6 +419,23 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .player-item:hover { background: rgba(240,193,75,0.08); border-color: var(--border); }
 .player-item.injured { opacity: 0.55; }
 .player-item.sub { opacity: 0.75; }
+.player-item.sent-off {
+  opacity: 0.7;
+  background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.35);
+}
+.sent-off-tag {
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: 4px;
+  padding: 1px 4px;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  margin-left: 4px;
+}
 .player-num {
   font-family: var(--display); font-size: 0.7rem; font-weight: 700;
   color: var(--gold); min-width: 22px;
