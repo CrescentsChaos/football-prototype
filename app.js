@@ -1078,6 +1078,15 @@ var App = (() => {
       if (ps.red) r -= 1.7;
     }
 
+    // Passing success rate matters, not just volume — reward crisp, reliable passers
+    // and dock players who give the ball away a lot, once they've had enough passes
+    // for the sample to mean something.
+    if (passes >= 8) {
+      const acc = passesC / passes;
+      const accDelta = (acc - 0.78) * (isGK ? 0.5 : isDef ? 0.9 : isMid ? 1.1 : 0.6);
+      r += Math.max(-0.4, Math.min(0.35, accDelta));
+    }
+
     // Shared involvement floor
     const actions = goals + assists + shots + saves + tackles + Math.floor(passes / 5);
     if (actions === 0) r = 6.0;
@@ -1233,6 +1242,62 @@ var App = (() => {
     if (!silent) updateStatsPanel();
   }
 
+  // Position-based share of a team's passing volume. Higher = touches the ball more often.
+  const PASS_POS_WEIGHT = {
+    GK: 0.55, CB: 1.75, RB: 1.3, LB: 1.3, RWB: 1.3, LWB: 1.3,
+    CDM: 1.95, CM: 1.85, CAM: 1.45, RM: 1.2, LM: 1.2, RW: 1.0, LW: 1.0, ST: 0.7
+  };
+
+  // Simulates one minute of team passing for both sides: builds up real per-match
+  // pass volume (300-1000+ per team), splits it across on-pitch players by role,
+  // and gives each player their own completion (success) rate based on ability.
+  function simulateMinutePassing() {
+    const m = currentMatch;
+    if (!m) return;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    let homeCompletedMin = 0, awayCompletedMin = 0;
+    ['home', 'away'].forEach(side => {
+      const team = m[side];
+      const ids = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const onPitch = (team.squad.all || []).filter(p => ids.includes(p.id));
+      if (!onPitch.length) return;
+      const tac = (m.tactics && m.tactics[side]) || 'balanced';
+      // Recent possession share feeds back into how much of the ball this team gets —
+      // clamped so it can't spiral away from realistic bounds.
+      const possShare = Math.max(0.75, Math.min(1.3, ((team.stats.possession || 50)) / 50));
+      let baseVol = 5.2 + Math.random() * 2.6; // ~5.2-7.8 team passes per minute baseline
+      if (tac === 'attack') baseVol *= 1.08;
+      if (tac === 'defend') baseVol *= 0.86;
+      if (tac === 'press') baseVol *= 0.78;
+      const vol = Math.max(1, baseVol * possShare);
+      const weighted = onPitch.map(p => {
+        const slot = p.slot || (p.pos || [])[0] || 'CM';
+        return { p, w: PASS_POS_WEIGHT[slot] != null ? PASS_POS_WEIGHT[slot] : 1.2 };
+      });
+      const totalW = weighted.reduce((s, x) => s + x.w, 0) || 1;
+      weighted.forEach(({ p, w }) => {
+        const raw = vol * (w / totalW);
+        const count = Math.floor(raw) + (Math.random() < (raw - Math.floor(raw)) ? 1 : 0);
+        if (count <= 0) return;
+        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+        const ps = m.playerMatchStats[p.id];
+        // Individual success rate: driven by technical ability + overall, nudged by tactic.
+        const skill = ((p.tec || 70) * 0.55 + (p.ovr || 75) * 0.35 + (p.phy || 70) * 0.1) / 100;
+        let succRate = Math.min(0.97, Math.max(0.52, 0.64 + skill * 0.34));
+        if (tac === 'press') succRate -= 0.03;
+        if (tac === 'attack') succRate -= 0.015;
+        let completed = 0;
+        for (let i = 0; i < count; i++) { if (Math.random() < succRate) completed++; }
+        ps.passes = (ps.passes || 0) + count;
+        ps.passesCompleted = (ps.passesCompleted || 0) + completed;
+        team.stats.passes = (team.stats.passes || 0) + count;
+        team.stats.passesCompleted = (team.stats.passesCompleted || 0) + completed;
+        if (side === 'home') homeCompletedMin += completed; else awayCompletedMin += completed;
+      });
+    });
+    return { homeCompletedMin, awayCompletedMin };
+  }
+
   function generateEvents() {
     const m = currentMatch;
     if (!m) return;
@@ -1240,7 +1305,17 @@ var App = (() => {
     const awayStr = calcTeamStrength(m.away);
     const total = homeStr.att + awayStr.att + 50;
     const homeChance = (homeStr.att + 10) / total;
-    m.possession = Math.max(30, Math.min(70, m.possession + (Math.random() - 0.5) * 4));
+    // Build up real passing volume for both teams this minute (feeds player stats + rating).
+    simulateMinutePassing();
+    // Possession is now derived from actual completed-pass share (like real match data
+    // providers compute it), smoothed minute to minute so it doesn't jump around wildly.
+    const hp = m.home.stats.passes || 0, ap = m.away.stats.passes || 0;
+    const passShareTarget = (hp + ap) > 0 ? 100 * hp / (hp + ap) : 50;
+    // Slight tug toward the technically stronger side so quality shows up immediately, not just late.
+    const techBias = Math.max(-6, Math.min(6, (homeStr.tec - awayStr.tec) * 0.5));
+    const target = Math.max(22, Math.min(78, passShareTarget * 0.8 + (50 + techBias) * 0.2));
+    m.possession = m.possession + (target - m.possession) * 0.12 + (Math.random() - 0.5) * 1.2;
+    m.possession = Math.max(20, Math.min(80, m.possession));
     m.home.stats.possession = Math.round(m.possession);
     m.away.stats.possession = 100 - m.home.stats.possession;
     // Stronger teams create more moments
@@ -1329,6 +1404,17 @@ var App = (() => {
         if (scorer) {
           attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+          m.playerMatchStats[scorer.id].goals++;
+          m.playerMatchStats[scorer.id].xg += 0.28 + Math.random() * 0.15;
+          const corTaker = pickPlayer(attTeam, ['CM','CAM','RW','LW','RB','LB'], scorer.id);
+          if (corTaker && Math.random() < 0.65) {
+            recordStat('assists', corTaker, attTeam.team);
+            if (!m.playerMatchStats[corTaker.id]) m.playerMatchStats[corTaker.id] = blankPlayerMatchStats(corTaker);
+            m.playerMatchStats[corTaker.id].assists++;
+            m.playerMatchStats[corTaker.id].xa += 0.2 + Math.random() * 0.3;
+          }
           pushGoal(attackingSide, scorer, m.minute, 'header from corner');
           addEvent(m.minute, 'goal', `Corner converted. <span class="player">${scorer.name}</span> (${scorer.num||''}) heads home`, attackingSide, true);
         }
@@ -1392,6 +1478,10 @@ var App = (() => {
           attTeam.stats.shotsOn++;
           attTeam.score++;
           recordStat('goals', taker, attTeam.team);
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+          m.playerMatchStats[taker.id].goals++;
+          m.playerMatchStats[taker.id].xg += 0.12 + Math.random() * 0.1;
           pushGoal(attackingSide, taker, m.minute, fk.text);
           addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide, true);
           if (Math.random() < 0.55) recordStat('puskas', taker, attTeam.team);
@@ -1405,21 +1495,17 @@ var App = (() => {
         }
       }
     } else if (r < 0.58) {
+      // Flavor text only — the actual pass volume/accuracy is already tracked
+      // every minute in simulateMinutePassing(), so we just narrate it here.
       const p = pickPlayer(attTeam, ['CM','CAM','CDM','RB','LB','CB','RW','LW']);
-      if (p) {
-        const batch = 2 + Math.floor(Math.random() * 5);
-        attTeam.stats.passes = (attTeam.stats.passes || 0) + batch;
-        const completed = Math.max(1, batch - (Math.random() < 0.18 ? 1 : 0));
-        attTeam.stats.passesCompleted = (attTeam.stats.passesCompleted || 0) + completed;
-        if (!m.playerMatchStats) m.playerMatchStats = {};
-        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
-        m.playerMatchStats[p.id].passes += batch;
-        m.playerMatchStats[p.id].passesCompleted = (m.playerMatchStats[p.id].passesCompleted || 0) + completed;
-        if (Math.random() < 0.3) {
-          addEvent(m.minute, 'pass',
-            `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) — ${completed}/${batch} completed in the sequence.`,
-            attackingSide);
-        }
+      if (p && Math.random() < 0.3) {
+        const ps = (m.playerMatchStats && m.playerMatchStats[p.id]) || null;
+        const pAcc = ps && ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
+        addEvent(m.minute, 'pass',
+          pAcc != null
+            ? `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) — ${pAcc}% passing accuracy so far.`
+            : `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) keeps the move going.`,
+          attackingSide);
       }
     } else if (r < 0.66) {
       const def = pickPlayer(defTeam, ['CB','CDM','CM','RB','LB']);
@@ -1467,11 +1553,16 @@ var App = (() => {
           if (taker) {
             addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
             attTeam.stats.shots++;
+            if (!m.playerMatchStats) m.playerMatchStats = {};
+            if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+            m.playerMatchStats[taker.id].shots++;
             const po = pickPenOutcome();
             if (po.scored) {
               attTeam.stats.shotsOn++;
               attTeam.score++;
               recordStat('goals', taker, attTeam.team);
+              m.playerMatchStats[taker.id].goals++;
+              m.playerMatchStats[taker.id].xg += 0.76 + Math.random() * 0.08;
               pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
               addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
             } else {
@@ -1510,11 +1601,16 @@ var App = (() => {
           if (taker) {
             addEvent(m.minute, 'pen', `Penalty to ${varTeam.team.short}. <span class="player">${taker.name}</span> places the ball on the spot.`, varSide);
             attTeam.stats.shots++;
+            if (!m.playerMatchStats) m.playerMatchStats = {};
+            if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+            m.playerMatchStats[taker.id].shots++;
             const po = pickPenOutcome();
             if (po.scored) {
               attTeam.stats.shotsOn++;
               attTeam.score++;
               recordStat('goals', taker, attTeam.team);
+              m.playerMatchStats[taker.id].goals++;
+              m.playerMatchStats[taker.id].xg += 0.76 + Math.random() * 0.08;
               pushGoal(varSide, taker, m.minute, 'penalty — ' + po.text);
               addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, varSide, true);
             } else {
@@ -1947,15 +2043,15 @@ var App = (() => {
         const isMid = ['CM','CDM','CAM','RM','LM'].some(x => pos.includes(x) || (ps.posArr||[]).includes(x));
         if (isGK) {
           if (!(ps.saves > 0)) ps.saves = Math.max(ps.saves || 0, 1);
-          if (!(ps.passes > 0)) ps.passes = 6;
+          if (!(ps.passes > 0)) { ps.passes = 6; ps.passesCompleted = 5; }
         } else if (isDef) {
           if (!(ps.tackles > 0)) ps.tackles = 2;
-          if (!(ps.passes > 0)) ps.passes = 12;
+          if (!(ps.passes > 0)) { ps.passes = 12; ps.passesCompleted = 10; }
         } else if (isMid) {
-          if (!(ps.passes > 0)) ps.passes = 18;
+          if (!(ps.passes > 0)) { ps.passes = 18; ps.passesCompleted = 15; }
           if (!(ps.tackles > 0)) ps.tackles = 1;
         } else {
-          if (!(ps.passes > 0)) ps.passes = 8;
+          if (!(ps.passes > 0)) { ps.passes = 8; ps.passesCompleted = 6; }
         }
       }
       // Clean sheet flag for GK rating
@@ -2262,10 +2358,15 @@ var App = (() => {
       const rating = liveRatingBadge(ps);
       const dim = (!on && !inj && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
       const pos = p.slot || (p.pos || [''])[0] || '';
+      const passAcc = ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
+      const passInfo = (ps.passes > 0)
+        ? `<span class="player-passes" title="Passes completed / attempted">${ps.passesCompleted || 0}/${ps.passes} <em>(${passAcc}%)</em></span>`
+        : '';
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
         <span class="player-num">${p.num || ''}</span>
         <span class="player-pos">${pos}</span>
         <span class="player-name">${p.name}</span>
+        ${passInfo}
         <span class="player-icons">${icons}</span>
         ${rating}
       </li>`;
@@ -4124,6 +4225,7 @@ var App = (() => {
           <div class="profile-stat"><div class="val">${ms.tackles || 0}</div><div class="lbl">Tackles</div></div>
           <div class="profile-stat"><div class="val">${ms.passes || 0}</div><div class="lbl">Passes</div></div>
           <div class="profile-stat"><div class="val">${ms.passesCompleted || 0}</div><div class="lbl">Completed</div></div>
+          <div class="profile-stat"><div class="val">${ms.passes ? Math.round(100 * (ms.passesCompleted || 0) / ms.passes) + '%' : '—'}</div><div class="lbl">Pass Acc.</div></div>
           <div class="profile-stat"><div class="val">${ms.interceptions || 0}</div><div class="lbl">Interceptions</div></div>
           <div class="profile-stat"><div class="val">${ms.blocks || 0}</div><div class="lbl">Blocks</div></div>
           <div class="profile-stat"><div class="val">${(ms.xg || 0).toFixed(2)}</div><div class="lbl">xG</div></div>

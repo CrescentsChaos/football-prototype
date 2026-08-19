@@ -899,6 +899,17 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   gap: 2px;
   flex-wrap: wrap;
 }
+.player-passes {
+  font-size: 0.62rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.player-passes em {
+  font-style: normal;
+  color: var(--cyan);
+}
 .li-icon { font-size: 0.72rem; line-height: 1; }
 .li-sub {
   font-size: 0.68rem;
