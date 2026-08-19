@@ -231,6 +231,17 @@ body::before {
 .btn-sm { padding: 7px 12px; font-size: 0.75rem; border-radius: 8px; }
 .btn:active { transform: scale(0.98); }
 
+/* Keyboard focus visibility (buttons, tabs, cards, links) */
+.btn:focus-visible,
+.nav-tab:focus-visible,
+.mode-card:focus-visible,
+.lb-tab:focus-visible,
+.award-tab:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
 /* Forms */
 select, input[type="text"], input[type="search"] {
   width: 100%; padding: 11px 14px;

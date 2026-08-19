@@ -120,15 +120,20 @@ var App = (() => {
         if (view) switchView(view);
       });
     });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+      }
+    });
   }
 
   function switchView(view) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => { t.classList.remove('active'); t.removeAttribute('aria-current'); });
     const viewEl = document.getElementById('view-' + view);
     if (viewEl) viewEl.classList.add('active');
     const tabEl = document.querySelector(`.nav-tab[data-view="${view}"]`);
-    if (tabEl) tabEl.classList.add('active');
+    if (tabEl) { tabEl.classList.add('active'); tabEl.setAttribute('aria-current', 'page'); }
     if (view === 'leaderboard') showLeaderboard('goals');
     if (view === 'awards') showAwards('overview');
     if (view === 'teams') renderTeamsList();
@@ -993,8 +998,10 @@ var App = (() => {
       { scored: false, text: 'inches over the crossbar' },
       { scored: false, text: 'curls wide of the far post' }
     ];
-    if (Math.random() < 0.22) return outcomes.filter(o=>o.scored)[Math.floor(Math.random()*3)];
-    return outcomes.filter(o=>!o.scored)[Math.floor(Math.random()*6)];
+    const scoredOnes = outcomes.filter(o => o.scored);
+    const missedOnes = outcomes.filter(o => !o.scored);
+    if (Math.random() < 0.22) return scoredOnes[Math.floor(Math.random() * scoredOnes.length)];
+    return missedOnes[Math.floor(Math.random() * missedOnes.length)];
   }
 
 
@@ -4322,7 +4329,16 @@ var App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker, playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive, continueToET, continueToPens, skipETAndEnd, renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI, openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker, playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
+    returnToTournament, showPlayerProfile, showTeamProfile, randomMatch,
+    resetLeaderboard, searchTeams, sortTeams, searchTournamentTeams,
+    openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker,
+    playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
+    saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
+    setTacticsLive, continueToET, continueToPens, skipETAndEnd,
+    renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
+    simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport,
+    simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
   };
 })();
 

@@ -6,6 +6,12 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>APEX SIM — Football Simulator</title>
+  <meta name="description" content="APEX SIM — a browser-based football simulator with a live match engine, formations, injuries, a 36-team Champions League format and a full World Cup. Build your night of football.">
+  <meta name="theme-color" content="#05080f">
+  <meta property="og:title" content="APEX SIM — Football Simulator">
+  <meta property="og:description" content="Live match engine · Formations · Injuries · UCL 36-team league · World Cup.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23111a2b' stroke='%23f0c14b' stroke-width='6'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="styles.css">
@@ -17,8 +23,8 @@
         <div class="logo-icon">⚽</div>
         <span>APEX SIM</span>
       </div>
-      <nav class="nav-tabs">
-        <button class="nav-tab active" data-view="home">Home</button>
+      <nav class="nav-tabs" aria-label="Main navigation">
+        <button class="nav-tab active" data-view="home" aria-current="page">Home</button>
         <button class="nav-tab" data-view="match">Match</button>
         <button class="nav-tab" data-view="tournament">Tournament</button>
         <button class="nav-tab" data-view="leaderboard">Leaderboard</button>
@@ -35,37 +41,37 @@
         <h1>APEX SIM</h1>
         <p>Live match engine · Formations · Injuries · UCL 36-team league · World Cup. Build your night of football.</p>
         <div class="mode-grid">
-          <div class="mode-card" onclick="App.goToMatch()">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.goToMatch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToMatch()}">
             <div class="icon">🏟️</div>
             <h3>Friendly Match</h3>
             <p>Pick two teams, choose formations, and simulate a full 90-minute match with live commentary, cards, goals and more.</p>
           </div>
-          <div class="mode-card" onclick="App.randomMatch('all')">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.randomMatch('all')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.randomMatch('all')}">
             <div class="icon">🎲</div>
             <h3>Random Match</h3>
             <p>Random national or club pairing. Or choose National / Club only from Match screen.</p>
           </div>
-          <div class="mode-card" onclick="App.goToTournament('worldcup')">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.goToTournament('worldcup')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToTournament('worldcup')}">
             <div class="icon">🏆</div>
             <h3>World Cup</h3>
             <p>National teams battle through groups and knockouts. Track top scorers, assists, clean sheets across the tournament.</p>
           </div>
-          <div class="mode-card" onclick="App.goToTournament('ucl')">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.goToTournament('ucl')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToTournament('ucl')}">
             <div class="icon">⭐</div>
             <h3>Champions League</h3>
             <p>Club competition. Select teams, run the full knockout path, and crown the European champion.</p>
           </div>
-          <div class="mode-card" onclick="App.goToSquadBuilder()">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.goToSquadBuilder()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToSquadBuilder()}">
             <div class="icon">📋</div>
             <h3>Squad Builder</h3>
             <p>Manually pick formation and starting XI, then simulate the match your way.</p>
           </div>
-          <div class="mode-card" onclick="App.switchView('leaderboard')">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('leaderboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('leaderboard')}">
             <div class="icon">📊</div>
             <h3>Leaderboards</h3>
             <p>Global stats: goals, assists, saves, clean sheets. Updated after every simulated match.</p>
           </div>
-          <div class="mode-card" onclick="App.switchView('awards')">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('awards')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('awards')}">
             <div class="icon">🏆</div>
             <h3>Awards</h3>
             <p>Golden Boot, Ballon d'Or, trophies and player of the match awards.</p>
@@ -82,19 +88,19 @@
           <div class="team-select-grid">
             <div class="team-panel">
               <h3>HOME</h3>
-              <select id="home-team" class="team-dropdown" onchange="App.updateTeamPreview('home')"></select>
+              <select id="home-team" class="team-dropdown" onchange="App.updateTeamPreview('home')" aria-label="Home team"></select>
               <div id="home-preview" class="team-preview"></div>
               <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
-              <select id="home-formation" class="formation-select" onchange="App.onFormationChange('home')"></select>
+              <select id="home-formation" class="formation-select" onchange="App.onFormationChange('home')" aria-label="Home formation"></select>
               <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('home')">⚙️ Squad Builder</button>
             </div>
             <div class="vs-badge">VS</div>
             <div class="team-panel">
               <h3>AWAY</h3>
-              <select id="away-team" class="team-dropdown" onchange="App.updateTeamPreview('away')"></select>
+              <select id="away-team" class="team-dropdown" onchange="App.updateTeamPreview('away')" aria-label="Away team"></select>
               <div id="away-preview" class="team-preview"></div>
               <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
-              <select id="away-formation" class="formation-select" onchange="App.onFormationChange('away')"></select>
+              <select id="away-formation" class="formation-select" onchange="App.onFormationChange('away')" aria-label="Away formation"></select>
               <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('away')">⚙️ Squad Builder</button>
             </div>
           </div>
@@ -183,7 +189,7 @@
         <div class="card-title" id="tournament-title">World Cup Setup</div>
         <p style="color:var(--text-secondary);margin-bottom:16px" id="tournament-desc">Select national teams to participate. Minimum 4, recommended 8 or 16.</p>
         <div class="teams-toolbar" style="margin-bottom:10px">
-          <input type="search" id="tour-teams-search" placeholder="Search teams to select..." oninput="App.searchTournamentTeams(this.value)" autocomplete="off">
+          <input type="search" id="tour-teams-search" placeholder="Search teams to select..." oninput="App.searchTournamentTeams(this.value)" autocomplete="off" aria-label="Search tournament teams">
         </div>
         <div class="teams-checkbox-grid" id="tournament-teams"></div>
         <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
@@ -267,13 +273,13 @@
         <div class="card-title">Team Database</div>
         <p style="color:var(--text-secondary);margin-bottom:12px">Browse squads, managers & ratings. Tap a team for full profile.</p>
         <div class="teams-toolbar">
-          <input type="search" id="teams-search" placeholder="Search teams..." oninput="App.searchTeams(this.value)" autocomplete="off">
-          <select id="teams-sort" onchange="App.sortTeams(this.value)">
+          <input type="search" id="teams-search" placeholder="Search teams..." oninput="App.searchTeams(this.value)" autocomplete="off" aria-label="Search teams">
+          <select id="teams-sort" onchange="App.sortTeams(this.value)" aria-label="Sort teams">
             <option value="name">Sort: Name</option>
             <option value="ovr">Sort: Strength</option>
             <option value="players">Sort: Squad size</option>
           </select>
-          <select id="teams-type" onchange="App.filterTeams(this.value)">
+          <select id="teams-type" onchange="App.filterTeams(this.value)" aria-label="Filter team type">
             <option value="all">All teams</option>
             <option value="national">National</option>
             <option value="club">Clubs</option>
@@ -285,16 +291,16 @@
     </section>
   </main>
 
-  <div class="modal-overlay" id="match-report-modal" onclick="if(event.target===this)this.classList.remove('active')">
+  <div class="modal-overlay" id="match-report-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Match report">
     <div class="modal" id="match-report-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
   </div>
-  <div class="modal-overlay" id="player-modal" onclick="if(event.target===this)this.classList.remove('active')">
+  <div class="modal-overlay" id="player-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player profile">
     <div class="modal" id="player-modal-content" style="max-width:420px"></div>
   </div>
-  <div class="modal-overlay" id="team-modal" onclick="if(event.target===this)this.classList.remove('active')">
+  <div class="modal-overlay" id="team-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team profile">
     <div class="modal" id="team-modal-content" style="max-width:520px"></div>
   </div>
-  <div class="modal-overlay" id="modal">
+  <div class="modal-overlay" id="modal" role="dialog" aria-modal="true">
     <div class="modal" id="modal-content"></div>
   </div>
 
