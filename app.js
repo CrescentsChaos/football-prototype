@@ -4476,7 +4476,7 @@ var App = (() => {
     const el = document.getElementById('awards-content');
     if (!el) return;
     if (type === 'goldenboot') {
-      const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 15);
+      const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">⚽</div><p>No goals yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">👟</div><div class="award-info"><h4>Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th></tr></thead><tbody>' +
@@ -4531,7 +4531,7 @@ var App = (() => {
       const data = Object.values(scores)
         .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
         .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
-        .slice(0, 15);
+        .slice(0, 50);
       if (!data.length) {
         el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Need players with at least ' + MIN_APPS + ' competitive appearances (or strong goal/assist tallies) for Ballon d\'Or.</p></div>';
         return;
@@ -4543,7 +4543,7 @@ var App = (() => {
         '</tbody></table></div>';
     } else if (type === 'puskas') {
       // Puskás Award — best/most spectacular individual goal, tallied by nominee count
-      const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 15);
+      const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🎬</div><div class="award-info"><h4>Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Nominated Goals</th></tr></thead><tbody>' +
@@ -4569,7 +4569,7 @@ var App = (() => {
         }
         if (isST) s.pts += 2;
       });
-      const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 15);
+      const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🎯</div><div class="award-info"><h4>Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
@@ -4592,7 +4592,7 @@ var App = (() => {
       Object.values(stats.ratings || {}).forEach(p => {
         if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.3;
       });
-      const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 15);
+      const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🧤</div><div class="award-info"><h4>Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
