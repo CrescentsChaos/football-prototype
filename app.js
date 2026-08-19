@@ -1443,7 +1443,7 @@ var App = (() => {
       // Attributes matter: att/tec/ovr vs defence
       const shotQuality = ((shooter.att || 70) * 0.45 + (shooter.tec || 70) * 0.35 + (shooter.ovr || 75) * 0.2) / 100;
       const defAvg = calcTeamStrength(defTeam).def / 100;
-      const onTargetChance = Math.min(0.72, Math.max(0.18, 0.22 + shotQuality * 0.4 - defAvg * 0.12));
+      const onTargetChance = Math.min(0.62, Math.max(0.14, 0.18 + shotQuality * 0.32 - defAvg * 0.14));
       if (Math.random() < onTargetChance) {
         attTeam.stats.shotsOn++;
         if (!m.playerMatchStats) m.playerMatchStats={};
@@ -1451,7 +1451,7 @@ var App = (() => {
         m.playerMatchStats[shooter.id].shots++;
         const gk = pickPlayer(defTeam, ['GK']);
         const gkSkill = gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7;
-        const saveChance = Math.min(0.82, Math.max(0.28, 0.38 + gkSkill * 0.35 - shotQuality * 0.25));
+        const saveChance = Math.min(0.88, Math.max(0.35, 0.46 + gkSkill * 0.38 - shotQuality * 0.22));
         if (Math.random() < saveChance) {
           if (gk) {
             defTeam.stats.saves++;
@@ -1491,7 +1491,7 @@ var App = (() => {
     } else if (r < 0.32) {
       attTeam.stats.corners++;
       addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short}`, attackingSide);
-      if (Math.random() < 0.12) {
+      if (Math.random() < 0.03) {
         const scorer = pickPlayer(attTeam, ['ST','CB','CM','CAM']);
         if (scorer) {
           attTeam.score++;
@@ -1640,7 +1640,7 @@ var App = (() => {
       if (p) {
         defTeam.stats.fouls++;
         addEvent(m.minute, 'handball', `Handball against <span class="player">${p.name}</span> — referee points to the spot`, defendingSide);
-        if (Math.random() < 0.28) {
+        if (Math.random() < 0.10) {
           const taker = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM'], PEN_TAKER_ROLE_WEIGHT);
           if (taker) {
             addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
@@ -1829,8 +1829,13 @@ var App = (() => {
   // Realistic role tendencies: strikers/wingers get on the scoresheet far more
   // than they create, while attacking mids/central mids are the primary creators.
   // Defenders/holding mids chip in occasionally (set pieces, late runs) but rarely lead scoring.
-  const GOAL_ROLE_WEIGHT = { ST: 2.7, CF: 2.7, RW: 2.15, LW: 2.15, CAM: 1.35, RM: 1.05, LM: 1.05, CM: 0.5, CDM: 0.25, RWB: 0.22, LWB: 0.22, RB: 0.18, LB: 0.18, CB: 0.13, GK: 0.01 };
-  const ASSIST_ROLE_WEIGHT = { CAM: 2.05, CM: 1.75, RW: 1.7, LW: 1.7, RM: 1.45, LM: 1.45, ST: 0.9, CF: 0.9, CDM: 0.85, RWB: 0.8, LWB: 0.8, RB: 0.8, LB: 0.8, CB: 0.25, GK: 0.02 };
+  // NOTE: these weights combine multiplicatively with each player's own attributes
+  // (att/ovr/tec) in pickPlayerWeighted, and strikers/wingers already carry higher
+  // 'att' ratings than midfielders. A wide spread here compounds with that and makes
+  // strikers score far more than real-world scoring share (~ST 35-40%, wide/CAM
+  // ~35-40%, CM/deep ~15-20%, defenders ~5-8%). Keep the spread modest.
+  const GOAL_ROLE_WEIGHT = { ST: 1.9, CF: 1.9, RW: 1.7, LW: 1.7, CAM: 1.4, RM: 1.25, LM: 1.25, CM: 0.85, CDM: 0.45, RWB: 0.35, LWB: 0.35, RB: 0.3, LB: 0.3, CB: 0.2, GK: 0.01 };
+  const ASSIST_ROLE_WEIGHT = { CAM: 2.0, CM: 1.75, RW: 1.65, LW: 1.65, RM: 1.4, LM: 1.4, ST: 1.0, CF: 1.0, CDM: 0.85, RWB: 0.8, LWB: 0.8, RB: 0.8, LB: 0.8, CB: 0.25, GK: 0.02 };
   // Penalty duty in real football overwhelmingly goes to strikers/wingers, with the
   // occasional attacking mid; deep midfielders almost never take them.
   const PEN_TAKER_ROLE_WEIGHT = { ST: 3.3, CF: 3.3, RW: 2.5, LW: 2.5, CAM: 1.0, RM: 0.7, LM: 0.7, CM: 0.3, CDM: 0.1, CB: 0.05 };
