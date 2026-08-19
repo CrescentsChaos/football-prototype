@@ -4000,8 +4000,8 @@ var App = (() => {
     const el = document.getElementById('tour-stats-preview');
     if (!el) return;
     const top = (key, n) => Object.values(tournamentStats[key] || {}).sort((a,b)=>b.count-a.count).slice(0, n);
-    const g = top('goals', 8), a = top('assists', 5), m = top('motm', 5);
-    const y = top('yellows', 5), r = top('reds', 5), s = top('saves', 5);
+    const g = top('goals', 10), a = top('assists', 10), m = top('motm', 10);
+    const y = top('yellows', 5), r = top('reds', 5), s = top('saves', 10);
     const hasAny = g.length || a.length || m.length || y.length || r.length;
     if (!hasAny) {
       el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Play tournament matches to fill stats (goals, cards, MOTM…).</p>';
