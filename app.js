@@ -7,7 +7,12 @@ var App = (() => {
   let teamsData = { national: [], club: [] };
   let allTeams = [];
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
-  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+    // Clear previous tournament UI
+    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
+    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const st = document.getElementById('tour-stage-title');
+    if (st) st.textContent = 'Starting…';
   // playerId -> { type, matchesOut, returnDay, teamName }
   let injuryBook = {};
   let globalMatchDay = 1;
@@ -343,35 +348,80 @@ var App = (() => {
     if (!sbDraft) return;
     const slotsEl = document.getElementById('sb-slots');
     const benchEl = document.getElementById('sb-bench');
+    if (!slotsEl || !benchEl) return;
     const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
     const used = getUsedInDraft();
+
     slotsEl.innerHTML = formation.slots.map(function(slot, i) {
-      const selected = sbDraft.slots[i] || '';
-      const options = sbDraft.players
-        .filter(function(p) { return !used.has(p.id) || p.id === selected; })
-        .sort(function(a, b) {
-          const aFit = (a.pos || []).includes(slot) ? 1 : 0;
-          const bFit = (b.pos || []).includes(slot) ? 1 : 0;
-          if (bFit !== aFit) return bFit - aFit;
-          return (b.ovr || 70) - (a.ovr || 70);
-        })
-        .map(function(p) {
-          return '<option value="' + p.id + '"' + (p.id === selected ? ' selected' : '') + '>' +
-            (p.num || '?') + ' · ' + p.name + ' (' + (p.pos || []).join('/') + ') · ' + p.ovr + '</option>';
-        }).join('');
-      return '<div class="sb-slot"><label>' + slot + '</label><select onchange="App.setSquadSlot(' + i + ', this.value)">' +
-        '<option value="">— Select —</option>' + options + '</select></div>';
+      const selectedId = sbDraft.slots[i] || '';
+      const selectedP = sbDraft.players.find(function(p) { return p.id === selectedId; });
+      const label = selectedP
+        ? (selectedP.num || '?') + ' · ' + selectedP.name + ' · ' + selectedP.ovr
+        : 'Tap to pick ' + slot;
+      return '<div class="sb-slot' + (selectedId ? ' filled' : '') + '">' +
+        '<label>' + slot + '</label>' +
+        '<button type="button" class="sb-pick-btn" onclick="App.openSlotPicker(' + i + ')">' + label + '</button>' +
+        (selectedId ? '<button type="button" class="sb-clear-btn" onclick="App.setSquadSlot(' + i + ',\'\')">✕</button>' : '') +
+        '</div>';
     }).join('');
+
+    // Picker panel
+    let picker = document.getElementById('sb-picker');
+    if (!picker) {
+      picker = document.createElement('div');
+      picker.id = 'sb-picker';
+      picker.className = 'sb-picker';
+      picker.style.display = 'none';
+      slotsEl.parentNode.insertBefore(picker, slotsEl.nextSibling);
+    }
+
     const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
     const benchPool = sbDraft.players.filter(function(p) { return !starterIds.has(p.id); });
     benchEl.innerHTML = benchPool.map(function(p) {
       const checked = sbDraft.bench.has(p.id);
-      return '<label class="sb-bench-item"><input type="checkbox"' + (checked ? ' checked' : '') +
-        ' onchange="App.toggleBench(\'' + p.id + '\', this.checked)"><span>' + (p.num || '?') + ' ' + p.name +
-        '</span><span style="margin-left:auto;color:var(--text-3);font-size:0.7rem">' +
-        ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span></label>';
+      return '<label class="sb-bench-item' + (checked ? ' on' : '') + '">' +
+        '<input type="checkbox"' + (checked ? ' checked' : '') +
+        ' onchange="App.toggleBench(\'' + p.id + '\', this.checked)">' +
+        '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
+        '<span class="sb-bench-name">' + p.name + '</span>' +
+        '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span></label>';
     }).join('') || '<p style="color:var(--text-3)">No remaining players</p>';
   }
+
+  function openSlotPicker(index) {
+    if (!sbDraft) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const slot = formation.slots[index];
+    const used = getUsedInDraft();
+    const selected = sbDraft.slots[index] || '';
+    const list = sbDraft.players
+      .filter(function(p) { return !used.has(p.id) || p.id === selected; })
+      .sort(function(a, b) {
+        const aFit = (a.pos || []).includes(slot) ? 1 : 0;
+        const bFit = (b.pos || []).includes(slot) ? 1 : 0;
+        if (bFit !== aFit) return bFit - aFit;
+        return (b.ovr || 70) - (a.ovr || 70);
+      });
+    let picker = document.getElementById('sb-picker');
+    if (!picker) return;
+    picker.style.display = 'block';
+    picker.innerHTML = '<div class="sb-picker-head"><strong>Select ' + slot + '</strong>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="App.closeSlotPicker()">Close</button></div>' +
+      '<div class="sb-picker-list">' + list.map(function(p) {
+        const fit = (p.pos || []).includes(slot);
+        return '<button type="button" class="sb-picker-item' + (p.id === selected ? ' selected' : '') + '" onclick="App.setSquadSlot(' + index + ',\'' + p.id + '\');App.closeSlotPicker()">' +
+          '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
+          '<span class="sb-bench-name">' + p.name + '</span>' +
+          '<span class="sb-bench-meta">' + (p.pos || []).join('/') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
+      }).join('') + '</div>';
+    picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function closeSlotPicker() {
+    const picker = document.getElementById('sb-picker');
+    if (picker) { picker.style.display = 'none'; picker.innerHTML = ''; }
+  }
+
 
   function setSquadSlot(index, playerId) {
     if (!sbDraft) return;
@@ -942,8 +992,8 @@ var App = (() => {
 
 
   function calcPlayerRating(ps) {
-    // Fully activity-based — no random noise
-    let r = 6.0;
+    // Position-aware, activity-based, no random noise
+    if (!ps) return 6.0;
     const goals = ps.goals || 0;
     const assists = ps.assists || 0;
     const shots = ps.shots || 0;
@@ -952,28 +1002,66 @@ var App = (() => {
     const passes = ps.passes || 0;
     const xg = ps.xg || 0;
     const xa = ps.xa || 0;
+    const pos = (ps.pos || ps.slot || '').toString().toUpperCase();
+    const isGK = pos === 'GK' || (ps.posArr || []).includes('GK');
+    const isDef = ['CB','RB','LB','RWB','LWB','DEF'].some(x => pos.includes(x)) || (ps.posArr || []).some(p => ['CB','RB','LB','RWB','LWB'].includes(p));
+    const isMid = ['CM','CDM','CAM','RM','LM','DM','AM'].some(x => pos.includes(x)) || (ps.posArr || []).some(p => ['CM','CDM','CAM','RM','LM'].includes(p));
 
-    r += goals * 1.2;
-    r += assists * 0.9;
-    r += Math.min(shots * 0.1, 0.5);
-    // Finishing efficiency
-    if (shots > 0 && goals > 0) r += Math.min(goals / shots, 1) * 0.4;
-    r += Math.min(saves * 0.3, 2.0);
-    if (saves >= 6) r += 0.4;
-    if (saves >= 8) r += 0.3;
-    r += Math.min(tackles * 0.2, 0.8);
-    r += Math.min(passes * 0.015, 0.45);
-    r += Math.min(xg * 0.2, 0.4);
-    r += Math.min(xa * 0.15, 0.35);
-    // Clean involvement floor for players who played
-    if (passes + shots + tackles + saves + goals + assists === 0) r = 6.0;
-    if (goals >= 2) r += 0.3;
-    if (goals >= 3) r += 0.4;
-    if (assists >= 2) r += 0.25;
-    if (ps.yellow) r -= 0.4;
-    if (ps.red) r -= 1.8;
-    // Tiny quality anchor so elite players with solid games edge higher (not random)
-    r += Math.max(-0.15, Math.min(0.2, ((ps.ovr || 75) - 75) * 0.01));
+    let r = 6.0;
+
+    if (isGK) {
+      r += Math.min(saves * 0.35, 2.4);
+      if (saves >= 4) r += 0.25;
+      if (saves >= 7) r += 0.35;
+      if (ps.cleanSheet) r += 0.6;
+      if (goals > 0) r += 1.5; // rare GK goal
+      r += Math.min(passes * 0.01, 0.25);
+      if (ps.yellow) r -= 0.35;
+      if (ps.red) r -= 2.0;
+    } else if (isDef) {
+      r += Math.min(tackles * 0.28, 1.6);
+      r += Math.min(passes * 0.02, 0.5);
+      r += assists * 0.7;
+      r += goals * 1.1;
+      r += Math.min(shots * 0.08, 0.3);
+      if (tackles >= 3) r += 0.2;
+      if (tackles >= 5) r += 0.25;
+      if (ps.yellow) r -= 0.4;
+      if (ps.red) r -= 1.8;
+    } else if (isMid) {
+      r += assists * 0.95;
+      r += goals * 1.15;
+      r += Math.min(passes * 0.025, 0.7);
+      r += Math.min(tackles * 0.2, 0.9);
+      r += Math.min(shots * 0.1, 0.45);
+      r += Math.min(xa * 0.2, 0.4);
+      r += Math.min(xg * 0.15, 0.3);
+      if (passes >= 20) r += 0.2;
+      if (assists >= 2) r += 0.3;
+      if (ps.yellow) r -= 0.35;
+      if (ps.red) r -= 1.8;
+    } else {
+      // Forward / attacker
+      r += goals * 1.25;
+      r += assists * 0.85;
+      r += Math.min(shots * 0.12, 0.6);
+      if (shots > 0 && goals > 0) r += Math.min(goals / shots, 1) * 0.35;
+      r += Math.min(xg * 0.25, 0.5);
+      r += Math.min(xa * 0.15, 0.35);
+      r += Math.min(passes * 0.012, 0.3);
+      r += Math.min(tackles * 0.1, 0.3);
+      if (goals >= 2) r += 0.35;
+      if (goals >= 3) r += 0.4;
+      if (ps.yellow) r -= 0.35;
+      if (ps.red) r -= 1.7;
+    }
+
+    // Shared involvement floor
+    const actions = goals + assists + shots + saves + tackles + Math.floor(passes / 5);
+    if (actions === 0) r = 6.0;
+    else if (actions === 1 && !isGK) r = Math.max(r, 6.2);
+
+    r += Math.max(-0.12, Math.min(0.18, ((ps.ovr || 75) - 75) * 0.008));
     return Math.max(4.0, Math.min(9.9, Math.round(r * 10) / 10));
   }
 
@@ -1640,18 +1728,35 @@ var App = (() => {
       const pts = [{x:0, y:0}];
       events.forEach((e, i) => {
         let d = 0;
-        if (e.type === 'goal') d = e.side === 'home' ? 3 : -3;
-        else if (e.type === 'shot' || e.type === 'miss') d = e.side === 'home' ? 1 : -1;
-        else if (e.type === 'save') d = e.side === 'home' ? -0.8 : 0.8;
-        else if (e.type === 'yellow' || e.type === 'red') d = e.side === 'home' ? -0.5 : 0.5;
+        if (e.type === 'goal') d = e.side === 'home' ? 3 : (e.side === 'away' ? -3 : 0);
+        else if (e.type === 'shot' || e.type === 'miss') d = e.side === 'home' ? 1 : (e.side === 'away' ? -1 : 0);
+        else if (e.type === 'save') d = e.side === 'home' ? -0.8 : (e.side === 'away' ? 0.8 : 0);
+        else if (e.type === 'yellow' || e.type === 'red') d = e.side === 'home' ? -0.5 : (e.side === 'away' ? 0.5 : 0);
         mom = Math.max(-12, Math.min(12, mom + d));
         pts.push({ x: (e.minute || i) / Math.max(m.minute, 90), y: mom });
       });
+      const homeCol = m.home.team.color || '#3d8bfd';
+      const awayCol = m.away.team.color || '#ef4444';
       ctx.clearRect(0, 0, w, 80);
       ctx.fillStyle = '#0a1210';
       ctx.fillRect(0, 0, w, 80);
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      // midline
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
       ctx.beginPath(); ctx.moveTo(0, 40); ctx.lineTo(w, 40); ctx.stroke();
+      // Fill home (above mid = home momentum) and away (below)
+      if (pts.length > 1) {
+        for (let i = 1; i < pts.length; i++) {
+          const x0 = pts[i-1].x * w, x1 = pts[i].x * w;
+          const y0 = 40 - (pts[i-1].y / 12) * 36;
+          const y1 = 40 - (pts[i].y / 12) * 36;
+          const midY = (y0 + y1) / 2;
+          ctx.beginPath();
+          ctx.moveTo(x0, 40); ctx.lineTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1, 40);
+          ctx.closePath();
+          ctx.fillStyle = midY < 40 ? homeCol + '55' : awayCol + '55';
+          ctx.fill();
+        }
+      }
       ctx.beginPath();
       pts.forEach((p, i) => {
         const x = p.x * w;
@@ -1661,14 +1766,16 @@ var App = (() => {
       ctx.strokeStyle = '#f0c14b';
       ctx.lineWidth = 2;
       ctx.stroke();
-      // fill under
-      if (pts.length > 1) {
-        ctx.lineTo(pts[pts.length-1].x * w, 40);
-        ctx.lineTo(0, 40);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(240,193,75,0.15)';
-        ctx.fill();
-      }
+      // Legend
+      ctx.fillStyle = homeCol;
+      ctx.fillRect(8, 6, 10, 10);
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(m.home.team.short || 'HOME', 22, 15);
+      ctx.fillStyle = awayCol;
+      ctx.fillRect(w - 70, 6, 10, 10);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(m.away.team.short || 'AWAY', w - 56, 15);
     }
     // Heatmap: 3x3 zones from event sides + random based on possession
     const hc = document.getElementById('heatmap-canvas');
@@ -1721,7 +1828,8 @@ var App = (() => {
     clearInterval(simInterval); isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
-    try { renderMomentumAndHeat(); } catch(e) {}
+    try { renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI(); } catch(e) {}
+    if (tournament) { try { refreshTournamentStatsUI(); } catch(e) {} }
     addEvent(m.minute || 90, 'whistle', `Full Time! ${m.home.team.short} ${m.home.score} - ${m.away.score} ${m.away.team.short}`, null);
     if (m.away.score === 0) {
       const gk = (m.home.squad.starting || []).find(p => (p.pos || []).includes('GK'));
@@ -1744,13 +1852,38 @@ var App = (() => {
     const pool = allInvolved.length ? allInvolved : allOnPitch;
     pool.forEach(p => {
       if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
-      // Baseline involvement for starters without events
       const ps = m.playerMatchStats[p.id];
-      if (!(ps.passes||0) && onIds.has(p.id)) ps.passes = 8 + Math.floor(Math.random()*20);
-      if (!(ps.tackles||0) && onIds.has(p.id) && Math.random() < 0.4) ps.tackles = 1 + Math.floor(Math.random()*3);
+      // Ensure pos info for rating formula
+      if (!ps.posArr || !ps.posArr.length) ps.posArr = p.pos || [];
+      if (!ps.pos) ps.pos = p.slot || (p.pos||[])[0] || '';
+      if (!ps.slot) ps.slot = p.slot || ps.pos;
+      // Deterministic baseline for players who saw the pitch (no random — fair awards)
+      if (onIds.has(p.id)) {
+        const pos = (ps.pos || '').toUpperCase();
+        const isGK = pos === 'GK' || (ps.posArr||[]).includes('GK');
+        const isDef = ['CB','RB','LB','RWB','LWB'].some(x => pos.includes(x) || (ps.posArr||[]).includes(x));
+        const isMid = ['CM','CDM','CAM','RM','LM'].some(x => pos.includes(x) || (ps.posArr||[]).includes(x));
+        if (isGK) {
+          if (!(ps.saves > 0)) ps.saves = Math.max(ps.saves || 0, 1);
+          if (!(ps.passes > 0)) ps.passes = 6;
+        } else if (isDef) {
+          if (!(ps.tackles > 0)) ps.tackles = 2;
+          if (!(ps.passes > 0)) ps.passes = 12;
+        } else if (isMid) {
+          if (!(ps.passes > 0)) ps.passes = 18;
+          if (!(ps.tackles > 0)) ps.tackles = 1;
+        } else {
+          if (!(ps.passes > 0)) ps.passes = 8;
+        }
+      }
+      // Clean sheet flag for GK rating
+      if ((ps.pos === 'GK' || (ps.posArr||[]).includes('GK'))) {
+        const side = (m.home.squad.all||[]).find(x => x.id === p.id) ? 'home' : 'away';
+        if ((side === 'home' && m.away.score === 0) || (side === 'away' && m.home.score === 0)) ps.cleanSheet = true;
+      }
       ps.rating = calcPlayerRating(ps);
-      // Track average rating for leaderboard
-      recordRating(p, (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team, ps.rating);
+      const teamObj = (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team;
+      recordRating(p, teamObj, ps.rating);
     });
     let best = null, bestR = -1;
     Object.values(m.playerMatchStats).forEach(ps => {
@@ -1762,7 +1895,7 @@ var App = (() => {
       recordStat('motm', playerObj, team);
       addEvent(90, 'motm', `Player of the Match: <span class="player">${best.name}</span> (${best.rating.toFixed(1)})`, null);
     }
-    renderPostMatchRatings();
+    /* ratings live in lineup */ renderLineups();
     globalMatchDay++;
     // Clear recovered injuries
     Object.keys(injuryBook).forEach(id => {
@@ -1788,6 +1921,7 @@ var App = (() => {
         applyLeagueResult(f.home, f.away, f.homeScore, f.awayScore);
         window._uclFixtureIdx = null;
         if (tournament.fixtures.every(x => x.played)) advanceUCLFromLeague();
+        refreshTournamentStatsUI();
       }
     }
     // Knockout live result
@@ -1818,7 +1952,12 @@ var App = (() => {
         window._koRoundIdx = null;
         window._koMatchIdx = null;
         afterKnockoutMatchPlayed(ri);
+        refreshTournamentStatsUI();
         toast('Knockout result saved!');
+        const backBtn = document.getElementById('back-to-tournament');
+        if (backBtn) { backBtn.style.display = 'flex'; backBtn.classList.add('show'); }
+        renderBracket();
+        renderTournamentLeaderboard();
       }
     }
     if (typeof window._tourFixtureIdx === 'number' && tournament && tournament.fixtures[window._tourFixtureIdx]) {
@@ -1842,6 +1981,7 @@ var App = (() => {
           }
         }
         window._tourFixtureIdx = null;
+        refreshTournamentStatsUI();
         toast('Tournament match result saved!');
       }
     }
@@ -2186,7 +2326,12 @@ var App = (() => {
   function resetLeaderboard() {
     if (!confirm('Reset all leaderboard stats? This cannot be undone.')) return;
     stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+    // Clear previous tournament UI
+    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
+    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const st = document.getElementById('tour-stage-title');
+    if (st) st.textContent = 'Starting…';
     try { localStorage.removeItem('apexSimStats'); } catch(e) {}
     saveStats();
     showLeaderboard('goals');
@@ -2247,11 +2392,35 @@ var App = (() => {
         }
         const cb = l.querySelector('input');
         l.classList.toggle('selected', cb && cb.checked);
+        updateTournamentSelectedCount();
       });
+      l.querySelector('input') && l.querySelector('input').addEventListener('change', updateTournamentSelectedCount);
     });
+    updateTournamentSelectedCount();
   }
 
+  function updateTournamentSelectedCount() {
+    const n = document.querySelectorAll('#tournament-teams input:checked').length;
+    let el = document.getElementById('tour-selected-count');
+    if (!el) {
+      const setup = document.getElementById('tournament-setup');
+      const grid = document.getElementById('tournament-teams');
+      if (grid && grid.parentNode) {
+        el = document.createElement('div');
+        el.id = 'tour-selected-count';
+        el.className = 'tour-selected-count';
+        grid.parentNode.insertBefore(el, grid);
+      }
+    }
+    if (el) {
+      const need = tournamentType === 'ucl' ? '36 ideal (min 8)' : '4+ (8/16/32/48 ideal)';
+      el.innerHTML = '<strong>' + n + '</strong> teams selected <span style="color:var(--text-3)">· ' + need + '</span>';
+    }
+  }
+
+
   function selectAllTeams() {
+    setTimeout(updateTournamentSelectedCount, 0);
     document.querySelectorAll('#tournament-teams input').forEach(cb => {
       cb.checked = true;
       const parent = cb.closest('.team-check');
@@ -2270,7 +2439,12 @@ var App = (() => {
     const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
     if (selected.length < 4) { toast('Select at least 4 teams'); return; }
 
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+    // Clear previous tournament UI
+    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
+    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const st = document.getElementById('tour-stage-title');
+    if (st) st.textContent = 'Starting…';
 
     if (tournamentType === 'ucl') {
       startUCLTournament(selected);
@@ -2595,6 +2769,14 @@ var App = (() => {
 
   function simTournamentRound() {
     if (!tournament) return;
+    withLoading('Simulating round…', function() {
+      _simTournamentRoundWork();
+      refreshTournamentStatsUI();
+    });
+  }
+
+  function _simTournamentRoundWork() {
+    if (!tournament) return;
     if (tournament.format === 'league' || tournament.stage === 'league') {
       const unplayed = (tournament.fixtures || []).filter(f => !f.played);
       if (!unplayed.length) { advanceUCLFromLeague(); return; }
@@ -2641,6 +2823,12 @@ var App = (() => {
 
   function simAllTournament() {
     if (!tournament) return;
+    withLoading('Simulating full tournament…', function() {
+      _simAllTournamentWork();
+    });
+  }
+
+  function _simAllTournamentWork() {
     toast('Simulating full tournament…');
 
     if (tournament.format === 'league' || tournament.type === 'ucl') {
@@ -2795,12 +2983,14 @@ var App = (() => {
       toast('League phase complete');
       advanceUCLFromLeague();
     }
+    refreshTournamentStatsUI();
   }
 
   function playUCLFixture(idx) {
     if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
     window._uclFixtureIdx = idx;
     window._tourFixtureIdx = null;
+        refreshTournamentStatsUI();
     window._koRoundIdx = null;
     const f = tournament.fixtures[idx];
     switchView('match');
@@ -2885,6 +3075,7 @@ var App = (() => {
     p.played = true;
     renderUCLFixtures();
     if (tournament.playoff.every(x => x.played)) finishUCLPlayoffs();
+    refreshTournamentStatsUI();
   }
 
   function finishUCLPlayoffs() {
@@ -3038,6 +3229,19 @@ var App = (() => {
   }
 
   function simKnockoutRound() {
+    if (!tournament || !tournament.knockout || !tournament.knockout.length) return false;
+    // If called from UI button, show loading
+    if (!currentMatch || !currentMatch.silentDeep) {
+      withLoading('Simulating knockout round…', function() {
+        _simKnockoutRoundWork();
+        refreshTournamentStatsUI();
+      });
+      return true;
+    }
+    return _simKnockoutRoundWork();
+  }
+
+  function _simKnockoutRoundWork() {
     if (!tournament || !tournament.knockout || !tournament.knockout.length) return false;
     if (tournament.champion) return false;
     const current = tournament.knockout[tournament.knockout.length - 1];
@@ -3258,10 +3462,15 @@ var App = (() => {
     const assists = top('assists');
     const saves = top('saves');
     const motm = top('motm');
-    const ratings = Object.values(tournamentStats.ratings || {}).filter(x => x.count > 0).sort((a,b) => b.avg - a.avg || b.count - a.count);
+    const ratings = Object.values(tournamentStats.ratings || {})
+      .filter(x => (x.count || 0) >= 3)
+      .sort((a,b) => b.avg - a.avg || b.count - a.count);
+    const ratingsAny = Object.values(tournamentStats.ratings || {})
+      .filter(x => (x.count || 0) > 0)
+      .sort((a,b) => b.avg - a.avg || b.count - a.count);
     tournament.awards = {
       goldenBoot: goals[0] || null,
-      goldenBall: ratings[0] || motm[0] || null,
+      goldenBall: ratings[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || ratingsAny[0] || null,
       goldenGlove: saves[0] || null,
       topAssists: assists[0] || null,
       mostMotm: motm[0] || null
@@ -3287,6 +3496,15 @@ var App = (() => {
         ${card('Golden Glove', '🧤', a.goldenGlove, (a.goldenGlove && a.goldenGlove.count) + ' saves')}
         ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
       </div>`;
+  }
+
+  function refreshTournamentStatsUI() {
+    if (!tournament) return;
+    try {
+      assignTournamentAwards();
+      renderTournamentAwards();
+      renderTournamentLeaderboard();
+    } catch (e) { console.warn(e); }
   }
 
   function renderTournamentLeaderboard() {
@@ -3344,6 +3562,7 @@ var App = (() => {
           ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">pens</div>' : ''}
           ${m.played && m.twoLeg !== false && m.aggHome != null ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + score + '</div>' : ''}
           ${(!m.played && ri === curIdx && !tournament.champion) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Live</button>
             <button class="btn btn-secondary btn-sm" onclick="App.simKnockoutMatch(${ri},${mi})">⚡ Instant</button>
           </div>` : ''}
           ${m.played ? `<button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%" onclick="App.viewKnockoutReport(${ri},${mi})">Match Report</button>` : ''}
@@ -3355,6 +3574,15 @@ var App = (() => {
 
   function simKnockoutMatch(roundIdx, matchIdx) {
     if (!tournament || !tournament.knockout[roundIdx]) return;
+    const m = tournament.knockout[roundIdx].matches[matchIdx];
+    if (!m || m.played) return;
+    showLoading('Simulating match…');
+    setTimeout(function() {
+      try { _simKnockoutMatchWork(roundIdx, matchIdx); }
+      finally { hideLoading(); refreshTournamentStatsUI(); }
+    }, 30);
+  }
+  function _simKnockoutMatchWork(roundIdx, matchIdx) {
     const m = tournament.knockout[roundIdx].matches[matchIdx];
     if (!m || m.played) return;
     const round = tournament.knockout[roundIdx];
@@ -3369,6 +3597,7 @@ var App = (() => {
       else m.winner = result.home > result.away ? m.home : m.away;
     }
     afterKnockoutMatchPlayed(roundIdx);
+    refreshTournamentStatsUI();
   }
 
   function playKnockoutMatch(roundIdx, matchIdx) {
@@ -3378,6 +3607,7 @@ var App = (() => {
     window._koRoundIdx = roundIdx;
     window._koMatchIdx = matchIdx;
     window._tourFixtureIdx = null;
+        refreshTournamentStatsUI();
     switchView('match');
     const homeSel = document.getElementById('home-team');
     const awaySel = document.getElementById('away-team');
@@ -3529,6 +3759,40 @@ var App = (() => {
   }
 
 
+  function showLoading(msg) {
+    let el = document.getElementById('loading-overlay');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'loading-overlay';
+      el.innerHTML = '<div class="loading-box"><div class="loading-spinner"></div><div class="loading-text" id="loading-text">Simulating…</div><div class="loading-sub" id="loading-sub">Please wait</div></div>';
+      document.body.appendChild(el);
+    }
+    const t = document.getElementById('loading-text');
+    const s = document.getElementById('loading-sub');
+    if (t) t.textContent = msg || 'Simulating…';
+    if (s) s.textContent = 'Please wait — do not close the page';
+    el.classList.add('show');
+  }
+
+  function hideLoading() {
+    const el = document.getElementById('loading-overlay');
+    if (el) el.classList.remove('show');
+  }
+
+  function withLoading(msg, fn) {
+    showLoading(msg);
+    // Allow browser to paint overlay before heavy work
+    return new Promise(function(resolve) {
+      setTimeout(function() {
+        let result;
+        try { result = fn(); }
+        catch (e) { console.error(e); toast('Error: ' + (e.message || e)); }
+        hideLoading();
+        resolve(result);
+      }, 40);
+    });
+  }
+
   function toast(msg) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -3663,35 +3927,33 @@ var App = (() => {
     const secondary = team.secondary || '#fff';
     const mgr = team.manager || {};
     const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
+    const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
     const modal = document.getElementById('team-modal');
     const content = document.getElementById('team-modal-content');
     if (!modal || !content) return;
     content.innerHTML = `
-      <div class="team-profile-banner" style="background:linear-gradient(135deg,${primary}33,${secondary}22);border:1px solid ${primary}55">
-        <span style="font-size:2.5rem">${team.flag || ''}</span>
-        <div>
-          <h2 style="margin:0">${team.name}</h2>
-          <div style="font-size:0.85rem;color:var(--text-secondary)">${team.short} · ${(team.players||[]).length} players</div>
-          <div style="font-size:0.8rem;color:var(--accent-gold);margin-top:4px">Manager: ${mgr.name || '—'} (OVR ${mgr.ovr || '—'})</div>
+      <div class="profile-header" style="border-bottom:2px solid ${primary};padding-bottom:14px">
+        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary};font-size:1.6rem">${team.flag || '⚽'}</div>
+        <div style="flex:1;min-width:0">
+          <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
+          <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
+          <div style="color:var(--gold);font-size:0.8rem;margin-top:4px">Manager: ${mgr.name || '—'} ${mgr.ovr ? '· ' + mgr.ovr + ' OVR' : ''}</div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <div style="width:28px;height:28px;border-radius:6px;background:${primary};border:2px solid ${secondary}"></div>
-        <span style="font-size:0.8rem;color:var(--text-muted)">Primary / Secondary kit colors</span>
-      </div>
-      <div class="card-title">Squad</div>
-      <div style="max-height:320px;overflow-y:auto">
+      <div class="card-title" style="margin-top:14px">Squad</div>
+      <div class="team-squad-list">
         ${players.map(p => `
-          <div class="team-roster-item" onclick="App.showPlayerProfile('${p.id}')">
-            <span class="player-num">${p.num||''}</span>
-            <span class="player-pos">${(p.pos||[])[0]||''}</span>
-            <span style="flex:1;font-weight:600">${p.name}</span>
-            <span class="player-ovr">${p.ovr}</span>
-          </div>`).join('')}
+          <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
+            <span class="player-num">${p.num || ''}</span>
+            <span class="tsr-name">${p.name}</span>
+            <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
+            <span class="player-ovr">${p.ovr || ''}</span>
+          </button>`).join('')}
       </div>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
   }
+
 
   function showAwards(type) {
     document.querySelectorAll('.award-tab').forEach(t => t.classList.toggle('active', t.dataset.award === type));
@@ -3705,34 +3967,46 @@ var App = (() => {
         data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table>';
     } else if (type === 'ballon') {
+      // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
+      const MIN_APPS = 3;
       const scores = {};
       const ensure = (p) => {
-        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0 };
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0 };
         return scores[p.id];
       };
-      Object.values(stats.goals||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 4; e.goals = p.count; });
-      Object.values(stats.assists||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 2.5; e.assists = p.count; });
-      Object.values(stats.motm||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 5; e.motm = p.count; });
-      Object.values(stats.saves||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.4; });
-      Object.values(stats.cleanSheets||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
-      Object.values(stats.ratings||{}).forEach(p => {
-        const e = ensure(p); e.avg = p.avg || 0;
-        e.pts += (p.avg || 0) * Math.min(p.count, 12) * 0.85;
+      Object.values(stats.ratings || {}).forEach(p => {
+        const e = ensure(p);
+        e.apps = p.count || 0;
+        e.avg = p.avg || 0;
       });
-      Object.values(stats.puskas||{}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
-      const data = Object.values(scores).filter(p => p.pts > 0).sort((a,b) => b.pts - a.pts).slice(0, 15);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Play competitive matches to fill the Ballon d\'Or race.</p></div>'; return; }
+      Object.values(stats.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 4; });
+      Object.values(stats.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.5; });
+      Object.values(stats.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 5; });
+      Object.values(stats.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.35; });
+      Object.values(stats.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
+      Object.values(stats.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
+      // Rating contribution only if enough appearances (prevents 1-game 9.9 winners)
+      Object.values(scores).forEach(e => {
+        if (e.apps >= MIN_APPS && e.avg > 0) {
+          // Scale rating points by log of apps so volume + quality both matter
+          e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
+        } else if (e.apps > 0 && e.apps < MIN_APPS) {
+          // Tiny contribution only — cannot win on rating alone
+          e.pts += e.avg * 0.15;
+        }
+      });
+      const data = Object.values(scores)
+        .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
+        .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
+        .slice(0, 15);
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Need players with at least ' + MIN_APPS + ' competitive appearances (or strong goal/assist tallies) for Ballon d\'Or.</p></div>';
+        return;
+      }
       const leader = data[0];
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p></div></div>' +
-        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>G</th><th>A</th><th>MOTM</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+p.motm+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table>';
-    } else if (type === 'puskas') {
-      const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 10);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No Puskas-worthy goals yet. Score screamers!</p></div>'; return; }
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Puskas Award</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' spectacular goals</p></div></div>' +
-        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+      el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
+        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table>';
     } else if (type === 'muller') {
       // Gerd Müller Award — best pure striker: goals heavily weighted, ST/CF preference
@@ -3813,7 +4087,7 @@ var App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive, continueToET, continueToPens, skipETAndEnd, renderMomentumAndHeat, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker, playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive, continueToET, continueToPens, skipETAndEnd, renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI, openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker, playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
   };
 })();
 
