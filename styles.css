@@ -1232,3 +1232,8 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   color: var(--text-3);
   margin-top: 8px;
 }
+
+.player-dot.sub-on {
+  box-shadow: 0 0 0 2px #22c55e, 0 2px 8px rgba(0,0,0,0.5);
+}
+.player-dot.sub-on .dot-name { color: #bbf7d0; }

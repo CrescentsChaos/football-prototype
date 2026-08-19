@@ -583,7 +583,7 @@ var App = (() => {
   }
 
   function blankStats() {
-    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, yellows: 0, reds: 0, xg: 0 };
+    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0 };
   }
 
   
@@ -757,9 +757,11 @@ var App = (() => {
       return;
     }
     const goals = currentMatch.goalList || [];
-    const fmt = (arr) => arr.map(g =>
-      `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.num != null && g.num !== '' ? ' · '+g.num : ''}${g.method ? ' <span class="gt-method">('+g.method+')</span>' : ''}</div>`
-    ).join('');
+    const fmt = (arr) => arr.map(g => {
+      const isPen = g.method && /penalt/i.test(g.method);
+      const methodBit = isPen ? ' <span class="gt-method">[Penalty]</span>' : '';
+      return `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.num != null && g.num !== '' ? ' · '+g.num : ''}${methodBit}</div>`;
+    }).join('');
     if (homeEl) homeEl.innerHTML = fmt(goals.filter(g => g.side === 'home'));
     if (awayEl) awayEl.innerHTML = fmt(goals.filter(g => g.side === 'away'));
   }
@@ -817,6 +819,11 @@ var App = (() => {
         <tr><td>Shots</td><td>${(h.stats&&h.stats.shots)||0}</td><td>${(a.stats&&a.stats.shots)||0}</td></tr>
         <tr><td>On Target</td><td>${(h.stats&&h.stats.shotsOn)||0}</td><td>${(a.stats&&a.stats.shotsOn)||0}</td></tr>
         <tr><td>Possession</td><td>${(h.stats&&h.stats.possession)||50}%</td><td>${(a.stats&&a.stats.possession)||50}%</td></tr>
+        <tr><td>Passes</td><td>${(h.stats&&h.stats.passes)||0}</td><td>${(a.stats&&a.stats.passes)||0}</td></tr>
+        <tr><td>Passes completed</td><td>${(h.stats&&h.stats.passesCompleted)||0}</td><td>${(a.stats&&a.stats.passesCompleted)||0}</td></tr>
+        <tr><td>Pass accuracy</td><td>${(h.stats&&h.stats.passes)?Math.round(100*(h.stats.passesCompleted||0)/h.stats.passes)+'%':'—'}</td><td>${(a.stats&&a.stats.passes)?Math.round(100*(a.stats.passesCompleted||0)/a.stats.passes)+'%':'—'}</td></tr>
+        <tr><td>Interceptions</td><td>${(h.stats&&h.stats.interceptions)||0}</td><td>${(a.stats&&a.stats.interceptions)||0}</td></tr>
+        <tr><td>Blocks</td><td>${(h.stats&&h.stats.blocks)||0}</td><td>${(a.stats&&a.stats.blocks)||0}</td></tr>
         <tr><td>Corners</td><td>${(h.stats&&h.stats.corners)||0}</td><td>${(a.stats&&a.stats.corners)||0}</td></tr>
         <tr><td>Fouls</td><td>${(h.stats&&h.stats.fouls)||0}</td><td>${(a.stats&&a.stats.fouls)||0}</td></tr>
         <tr><td>Saves</td><td>${(h.stats&&h.stats.saves)||0}</td><td>${(a.stats&&a.stats.saves)||0}</td></tr>
@@ -1009,46 +1016,54 @@ var App = (() => {
 
     let r = 6.0;
 
+    const passesC = ps.passesCompleted || 0;
+    const ints = ps.interceptions || 0;
+    const blocks = ps.blocks || 0;
     if (isGK) {
       r += Math.min(saves * 0.35, 2.4);
       if (saves >= 4) r += 0.25;
       if (saves >= 7) r += 0.35;
       if (ps.cleanSheet) r += 0.6;
-      if (goals > 0) r += 1.5; // rare GK goal
+      if (goals > 0) r += 1.5;
       r += Math.min(passes * 0.01, 0.25);
+      r += Math.min(passesC * 0.015, 0.2);
       if (ps.yellow) r -= 0.35;
       if (ps.red) r -= 2.0;
     } else if (isDef) {
       r += Math.min(tackles * 0.28, 1.6);
-      r += Math.min(passes * 0.02, 0.5);
+      r += Math.min(ints * 0.3, 1.2);
+      r += Math.min(blocks * 0.25, 0.9);
+      r += Math.min(passes * 0.015, 0.45);
+      r += Math.min(passesC * 0.02, 0.4);
       r += assists * 0.7;
       r += goals * 1.1;
       r += Math.min(shots * 0.08, 0.3);
-      if (tackles >= 3) r += 0.2;
-      if (tackles >= 5) r += 0.25;
+      if (tackles + ints >= 4) r += 0.25;
       if (ps.yellow) r -= 0.4;
       if (ps.red) r -= 1.8;
     } else if (isMid) {
       r += assists * 0.95;
       r += goals * 1.15;
-      r += Math.min(passes * 0.025, 0.7);
-      r += Math.min(tackles * 0.2, 0.9);
+      r += Math.min(passes * 0.02, 0.65);
+      r += Math.min(passesC * 0.025, 0.55);
+      r += Math.min(tackles * 0.18, 0.8);
+      r += Math.min(ints * 0.22, 0.7);
       r += Math.min(shots * 0.1, 0.45);
       r += Math.min(xa * 0.2, 0.4);
       r += Math.min(xg * 0.15, 0.3);
-      if (passes >= 20) r += 0.2;
+      if (passesC >= 25) r += 0.25;
       if (assists >= 2) r += 0.3;
       if (ps.yellow) r -= 0.35;
       if (ps.red) r -= 1.8;
     } else {
-      // Forward / attacker
       r += goals * 1.25;
       r += assists * 0.85;
       r += Math.min(shots * 0.12, 0.6);
       if (shots > 0 && goals > 0) r += Math.min(goals / shots, 1) * 0.35;
       r += Math.min(xg * 0.25, 0.5);
       r += Math.min(xa * 0.15, 0.35);
-      r += Math.min(passes * 0.012, 0.3);
+      r += Math.min(passes * 0.01, 0.25);
+      r += Math.min(passesC * 0.015, 0.2);
       r += Math.min(tackles * 0.1, 0.3);
       if (goals >= 2) r += 0.35;
       if (goals >= 3) r += 0.4;
@@ -1189,8 +1204,22 @@ var App = (() => {
       if (Math.random() < 0.006) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     }
     generateEvents();
-    if (m.minute >= 55 && m.minute <= 85 && Math.random() < 0.08) {
-      trySubstitution(Math.random() < 0.5 ? 'home' : 'away');
+    // Substitutions: aim for at least 3 per team (max 5)
+    if (m.minute >= 55 && m.minute <= 88 && !m.inET) {
+      const needHome = (m.homeSubsUsed || 0) < 3;
+      const needAway = (m.awaySubsUsed || 0) < 3;
+      const windowLeft = Math.max(1, 88 - m.minute);
+      // Higher urgency if still below 3
+      let pHome = needHome ? Math.min(0.55, 0.12 + (3 - m.homeSubsUsed) * 0.12 / windowLeft * 8) : 0.06;
+      let pAway = needAway ? Math.min(0.55, 0.12 + (3 - m.awaySubsUsed) * 0.12 / windowLeft * 8) : 0.06;
+      if (m.minute >= 70) { pHome *= 1.3; pAway *= 1.3; }
+      if (Math.random() < pHome) trySubstitution('home');
+      if (Math.random() < pAway) trySubstitution('away');
+    }
+    // Late forced catch-up so each side reaches 3 if possible
+    if (m.minute === 80 || m.minute === 84 || m.minute === 87) {
+      if ((m.homeSubsUsed || 0) < 3) trySubstitution('home');
+      if ((m.awaySubsUsed || 0) < 3) trySubstitution('away');
     }
     if (Math.random() < 0.0035) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     updateScoreboard();
@@ -1368,11 +1397,42 @@ var App = (() => {
           addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide);
         }
       }
-    } else if (r < 0.65) {
-      const p = pickPlayer(attTeam, ['CM','CAM','CDM','RB','LB']);
+    } else if (r < 0.58) {
+      const p = pickPlayer(attTeam, ['CM','CAM','CDM','RB','LB','CB','RW','LW']);
       if (p) {
-        attTeam.stats.passes++;
-        if (Math.random() < 0.3) addEvent(m.minute, 'pass', `Nice play involving <span class="player">${p.name}</span>`, attackingSide);
+        const batch = 2 + Math.floor(Math.random() * 5);
+        attTeam.stats.passes = (attTeam.stats.passes || 0) + batch;
+        const completed = Math.max(1, batch - (Math.random() < 0.18 ? 1 : 0));
+        attTeam.stats.passesCompleted = (attTeam.stats.passesCompleted || 0) + completed;
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+        m.playerMatchStats[p.id].passes += batch;
+        m.playerMatchStats[p.id].passesCompleted = (m.playerMatchStats[p.id].passesCompleted || 0) + completed;
+        if (Math.random() < 0.3) {
+          addEvent(m.minute, 'pass',
+            `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) — ${completed}/${batch} completed in the sequence.`,
+            attackingSide);
+        }
+      }
+    } else if (r < 0.66) {
+      const def = pickPlayer(defTeam, ['CB','CDM','CM','RB','LB']);
+      if (def) {
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[def.id]) m.playerMatchStats[def.id] = blankPlayerMatchStats(def);
+        if (Math.random() < 0.55) {
+          defTeam.stats.interceptions = (defTeam.stats.interceptions || 0) + 1;
+          m.playerMatchStats[def.id].interceptions = (m.playerMatchStats[def.id].interceptions || 0) + 1;
+          m.playerMatchStats[def.id].tackles = (m.playerMatchStats[def.id].tackles || 0) + 1;
+          if (Math.random() < 0.45) {
+            addEvent(m.minute, 'pass', `Interception by <span class="player">${def.name}</span> (${defTeam.team.short}).`, defendingSide);
+          }
+        } else {
+          defTeam.stats.blocks = (defTeam.stats.blocks || 0) + 1;
+          m.playerMatchStats[def.id].blocks = (m.playerMatchStats[def.id].blocks || 0) + 1;
+          if (Math.random() < 0.45) {
+            addEvent(m.minute, 'shot', `Attempt blocked. Blocked by <span class="player">${def.name}</span> (${defTeam.team.short}).`, defendingSide);
+          }
+        }
       }
     } else if (r < 0.72) {
       const p = pickPlayer(attTeam, ['ST','RW','LW']);
@@ -1472,7 +1532,22 @@ var App = (() => {
           addEvent(m.minute, 'red', `VAR: Red card! <span class="player">${player.name}</span> (${defTeam.team.short}) sent off`, defSide);
           removeFromPitch(defSide, player.id);
         } else {
-          addEvent(m.minute, 'var', `VAR: No red card — yellow only / play on`, null);
+          const noRedLines = [
+            `VAR: No red card — challenge by ${player ? player.name : 'the defender'} was mistimed but not violent conduct`,
+            `VAR: Yellow card only — ${player ? player.name : 'player'} caught the man, not excessive force`,
+            `VAR: On-field decision stands — no red card for ${player ? player.name : 'the defender'}`,
+            `VAR: Review complete — foul confirmed, yellow sufficient for ${player ? player.name : 'the challenge'}`
+          ];
+          addEvent(m.minute, 'var', noRedLines[Math.floor(Math.random() * noRedLines.length)], defSide);
+          if (player && Math.random() < 0.5 && (m.cards[defSide][player.id] || 0) < 1) {
+            m.cards[defSide][player.id] = (m.cards[defSide][player.id] || 0) + 1;
+            defTeam.stats.yellows++;
+            recordStat('yellows', player, defTeam.team);
+            if (!m.playerMatchStats) m.playerMatchStats = {};
+            if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
+            m.playerMatchStats[player.id].yellow = true;
+            addEvent(m.minute, 'yellow', `🟨 Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
+          }
         }
       }
     } else if (r < 0.97 && Math.random() < 0.18) {
@@ -1587,7 +1662,7 @@ var App = (() => {
     addEvent(m.minute, 'sub',
       `Substitution · ${sideData.team.short}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
       side);
-    if (!m.silentDeep) renderLineups();
+    if (!m.silentDeep) { renderLineups(); renderPitch(); }
   }
 
   function changeFormationLive(side, formKey) {
@@ -1904,9 +1979,12 @@ var App = (() => {
     saveStats();
     updateScoreboard();
     updateStatsPanel();
-    if (typeof window._tourFixtureIdx === 'number') {
+    if (tournament || window._fromTournament || typeof window._tourFixtureIdx === 'number' || typeof window._koRoundIdx === 'number' || typeof window._uclFixtureIdx === 'number') {
       const backBtn = document.getElementById('back-to-tournament');
-      if (backBtn) { backBtn.style.display = 'flex'; backBtn.classList.add('show'); }
+      if (backBtn) {
+        backBtn.style.display = 'flex';
+        backBtn.classList.add('show');
+      }
     }
     // If this was a tournament match, update fixture
     
@@ -1986,6 +2064,12 @@ var App = (() => {
       }
     }
   }
+
+    // Always offer return after any tournament-linked live match
+    if (tournament || window._fromTournament) {
+      const backBtn = document.getElementById('back-to-tournament');
+      if (backBtn) { backBtn.style.display = 'flex'; backBtn.classList.add('show'); }
+    }
 
   function addEvent(minute, type, text, side, isGoal) {
     if (!currentMatch) return;
@@ -2073,14 +2157,40 @@ var App = (() => {
       const s = m[side];
       const form = FORMATIONS[s.squad.formation] || FORMATIONS['4-3-3'];
       const coords = form.coords || [];
-      const onPitch = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const slots = form.slots || [];
+      const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const allPlayers = [...(s.squad.starting || []), ...(s.squad.subs || []), ...(s.squad.all || [])];
+      // Unique by id
+      const byId = {};
+      allPlayers.forEach(p => { if (p && p.id) byId[p.id] = p; });
+      // Map current on-pitch players into formation slots
+      const onPitchPlayers = onPitchIds.map(id => byId[id]).filter(Boolean);
+      const assigned = new Set();
+      const slotPlayers = [];
+      slots.forEach((slot, idx) => {
+        // Prefer player already marked with this slot
+        let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.slot === slot || (p.pos || []).includes(slot)));
+        if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id) && canPlay(p, slot));
+        if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id));
+        if (pick) {
+          assigned.add(pick.id);
+          slotPlayers[idx] = pick;
+        }
+      });
+      // Any remaining on-pitch players fill empty slots
+      onPitchPlayers.forEach(p => {
+        if (assigned.has(p.id)) return;
+        const empty = slots.findIndex((_, i) => !slotPlayers[i]);
+        if (empty >= 0) { slotPlayers[empty] = p; assigned.add(p.id); }
+      });
+
       let primary = s.team.color || '#1a237e';
       let secondary = s.team.secondary || '#ffffff';
       const textCol = luminance(primary) > 160 ? '#0a0e17' : '#ffffff';
       const used = [];
       let dots = '';
-      (s.squad.starting || []).forEach((p, idx) => {
-        if (!onPitch.includes(p.id)) return;
+      slotPlayers.forEach((p, idx) => {
+        if (!p) return;
         let c = coords[idx] || [50, 50];
         let x = c[0], y = c[1];
         for (let t = 0; t < 6; t++) {
@@ -2090,7 +2200,8 @@ var App = (() => {
         }
         used.push({ x, y });
         const label = (p.name || '').split(' ').pop();
-        dots += `<div class="player-dot" style="left:${x}%;top:${y}%;background:${primary};color:${textCol};border:2px solid ${secondary}">
+        const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};color:${textCol};border:2px solid ${secondary}">
           <span class="dot-num">${p.num || ''}</span>
           <span class="dot-name">${label}</span>
         </div>`;
@@ -2752,18 +2863,29 @@ var App = (() => {
     const f = tournament.fixtures[idx];
     const home = getTeam(f.home), away = getTeam(f.away);
     if (!home || !away) return;
-    // Store callback context
     window._tourFixtureIdx = idx;
-    // Setup match selects and start
+    window._uclFixtureIdx = null;
+    window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._fromTournament = true;
     switchView('match');
     const homeSel = document.getElementById('home-team');
     const awaySel = document.getElementById('away-team');
     if (homeSel) homeSel.value = home.id;
     if (awaySel) awaySel.value = away.id;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(Math.random() * formKeys.length)];
+    const af = formKeys[Math.floor(Math.random() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    // Clear custom lineups so random formation applies
+    customLineups.home = null;
+    customLineups.away = null;
     updateTeamPreview('home'); updateTeamPreview('away');
     startMatch();
-    toast('Tournament match: play live, then return to Tournament tab');
-    // After match ends, update fixture - hook via endMatch check
+    toast('Tournament match — live · formations randomized');
   }
 
 
@@ -2829,46 +2951,68 @@ var App = (() => {
   }
 
   function _simAllTournamentWork() {
-    toast('Simulating full tournament…');
+    if (!tournament) return;
+    const updateLoading = (msg) => {
+      const t = document.getElementById('loading-text');
+      if (t) t.textContent = msg;
+    };
 
+    // ========== UCL / League format ==========
     if (tournament.format === 'league' || tournament.type === 'ucl') {
-      // League fixtures
-      (tournament.fixtures || []).forEach((f, idx) => {
-        if (!f.played) {
-          const home = getTeam(f.home), away = getTeam(f.away);
-          if (!home || !away) return;
-          const result = simQuickMatch(home, away);
-          f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
-          applyLeagueResult(f.home, f.away, result.home, result.away);
-        }
+      updateLoading('Simulating league phase…');
+      (tournament.fixtures || []).forEach((f) => {
+        if (f.played) return;
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const result = simQuickMatch(home, away, { countForLeaderboard: true });
+        f.played = true;
+        f.homeScore = result.home;
+        f.awayScore = result.away;
+        f.report = result.report;
+        applyLeagueResult(f.home, f.away, result.home, result.away);
       });
-      if (tournament.stage === 'league') advanceUCLFromLeague();
-      // Playoffs
+
+      if (tournament.stage === 'league' || !tournament.playoff) {
+        try { advanceUCLFromLeague(); } catch (e) { console.warn(e); }
+      }
+
+      updateLoading('Simulating playoffs…');
       if (tournament.playoff && tournament.playoff.length) {
         tournament.playoff.forEach((p, i) => {
-          if (!p.played) simPlayoffTie(i);
+          if (!p.played) {
+            try { simPlayoffTie(i); } catch (e) { console.warn(e); }
+          }
         });
+        if (tournament.stage === 'playoff' || tournament.playoff.every(p => p.played)) {
+          try { finishUCLPlayoffs(); } catch (e) { console.warn(e); }
+        }
       }
-      if (tournament.stage === 'playoff' && tournament.playoff.every(p => p.played)) {
-        finishUCLPlayoffs();
-      }
-      // Knockout rounds
+
+      updateLoading('Simulating knockout rounds…');
       let guard = 0;
-      while (!tournament.champion && tournament.knockout && tournament.knockout.length && guard < 20) {
+      while (!tournament.champion && tournament.knockout && tournament.knockout.length && guard < 30) {
         guard++;
         const ri = tournament.knockout.length - 1;
         const round = tournament.knockout[ri];
+        if (!round || !round.matches) break;
         const isFinal = round.name === 'Final' || round.matches.length === 1;
-        round.matches.forEach(m => {
-          if (m.played) return;
+
+        round.matches.forEach((m) => {
+          if (m.played || !m.home || !m.away) return;
           if (isFinal || m.twoLeg === false) simSingleFinal(m);
           else simTwoLegTie(m);
         });
+
+        // If any still unplayed, stop this iteration
+        if (round.matches.some(m => !m.played && m.home && m.away)) break;
+
         const winners = round.matches.map(m => m.winner).filter(Boolean);
         if (winners.length <= 1) {
           if (winners[0]) setChampion(winners[0]);
           break;
         }
+
+        // Create next round only if we are still on the last round
         if (ri === tournament.knockout.length - 1) {
           let list = winners.slice();
           if (list.length % 2 === 1) list.pop();
@@ -2881,11 +3025,13 @@ var App = (() => {
           for (let i = 0; i < list.length; i += 2) {
             if (nextIsFinal) {
               nextMatches.push({
-                home: list[i], away: list[i+1], twoLeg: false, played: false,
+                home: list[i], away: list[i + 1], twoLeg: false, played: false,
                 homeScore: null, awayScore: null, winner: null, report: null
               });
             } else {
-              nextMatches.push(makeTwoLegTie(list[i], list[i+1]));
+              nextMatches.push(typeof makeTwoLegTie === 'function'
+                ? makeTwoLegTie(list[i], list[i + 1])
+                : { home: list[i], away: list[i + 1], twoLeg: true, played: false, homeScore: null, awayScore: null, winner: null });
             }
           }
           tournament.knockout.push({
@@ -2895,26 +3041,33 @@ var App = (() => {
           });
         }
       }
+
       assignTournamentAwards();
-      renderUCLLeague();
-      renderBracket();
-      renderTournamentLeaderboard();
+      try { renderUCLLeague(); } catch (e) {}
+      try { renderBracket(); } catch (e) {}
+      try { refreshTournamentStatsUI(); } catch (e) {}
       if (tournament.champion) {
         const stageTitle = document.getElementById('tour-stage-title');
         if (stageTitle) stageTitle.textContent = 'Champions: ' + (tournament.champion.flag || '') + ' ' + tournament.champion.name;
         toast(tournament.champion.name + ' win the Champions League!');
+      } else {
+        toast('Tournament simulation finished');
       }
       return;
     }
 
-    // —— World Cup path (existing) ——
-    (tournament.fixtures || []).forEach(f => {
+    // ========== World Cup path ==========
+    updateLoading('Simulating group stage…');
+    (tournament.fixtures || []).forEach((f) => {
       if (f.played) return;
       const home = getTeam(f.home), away = getTeam(f.away);
       if (!home || !away) return;
-      const result = simQuickMatch(home, away);
-      f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
-      const g = tournament.groups[f.group];
+      const result = simQuickMatch(home, away, { countForLeaderboard: true });
+      f.played = true;
+      f.homeScore = result.home;
+      f.awayScore = result.away;
+      f.report = result.report;
+      const g = tournament.groups && tournament.groups[f.group];
       if (!g) return;
       const ht = g.teams.find(t => t.team.id === f.home);
       const at = g.teams.find(t => t.team.id === f.away);
@@ -2926,51 +3079,92 @@ var App = (() => {
       else if (result.away > result.home) { at.won++; at.pts += 3; ht.lost++; }
       else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
     });
+
     if (!tournament.champion && tournament.stage !== 'knockout' && tournament.stage !== 'complete') {
-      advanceToKnockout();
+      updateLoading('Advancing to knockout…');
+      try { advanceToKnockout(); } catch (e) { console.warn(e); }
     }
+
+    updateLoading('Simulating knockout rounds…');
     let safety = 0;
-    while (!tournament.champion && safety < 20) {
+    while (!tournament.champion && safety < 30) {
       safety++;
       if (!tournament.knockout || !tournament.knockout.length) break;
       const ri = tournament.knockout.length - 1;
       const round = tournament.knockout[ri];
-      round.matches.forEach(m => {
-        if (m.played) return;
-        if (!m.home || !m.away) return;
-        const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
-        m.homeScore = result.home; m.awayScore = result.away; m.played = true; m.report = result.report;
-        if (result.pens) { m.penalties = true; m.winner = result.pens.home > result.pens.away ? m.home : m.away; }
-        else if (result.home > result.away) m.winner = m.home;
+      if (!round || !round.matches) break;
+
+      round.matches.forEach((m) => {
+        if (m.played || !m.home || !m.away) return;
+        const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true, countForLeaderboard: true });
+        m.homeScore = result.home;
+        m.awayScore = result.away;
+        m.played = true;
+        m.report = result.report;
+        if (result.pens) {
+          m.penalties = true;
+          m.winner = result.pens.home > result.pens.away ? m.home : m.away;
+        } else if (result.home > result.away) m.winner = m.home;
         else if (result.away > result.home) m.winner = m.away;
-        else { m.penalties = true; m.winner = Math.random() < 0.5 ? m.home : m.away; }
+        else {
+          m.penalties = true;
+          m.winner = Math.random() < 0.5 ? m.home : m.away;
+        }
       });
+
+      if (round.matches.some(m => m.home && m.away && !m.played)) break;
+
       const winners = round.matches.map(m => m.winner).filter(Boolean);
-      if (winners.length <= 1) { if (winners[0]) setChampion(winners[0]); break; }
+      if (winners.length <= 1) {
+        if (winners[0]) setChampion(winners[0]);
+        break;
+      }
+
       if (ri === tournament.knockout.length - 1) {
         let list = winners.slice();
         if (list.length % 2 === 1) list.pop();
-        if (list.length < 2) { setChampion(list[0] || winners[0]); break; }
+        if (list.length < 2) {
+          setChampion(list[0] || winners[0]);
+          break;
+        }
         const nextMatches = [];
         for (let i = 0; i < list.length; i += 2) {
-          nextMatches.push({ home: list[i], away: list[i+1], homeScore: null, awayScore: null, winner: null, played: false });
+          nextMatches.push({
+            home: list[i], away: list[i + 1],
+            homeScore: null, awayScore: null, winner: null, played: false, report: null
+          });
         }
-        tournament.knockout.push({ name: getRoundName(list.length), matches: nextMatches });
+        tournament.knockout.push({
+          name: getRoundName(list.length),
+          matches: nextMatches
+        });
       }
     }
+
+    tournament.stage = tournament.champion ? 'complete' : (tournament.knockout && tournament.knockout.length ? 'knockout' : tournament.stage);
     assignTournamentAwards();
-    renderGroups();
-    renderBracket();
-    renderTournamentLeaderboard();
+    try { renderGroups(); } catch (e) {}
+    try { renderBracket(); } catch (e) {}
+    try { refreshTournamentStatsUI(); } catch (e) {}
     if (tournament.champion) {
       const stageTitle = document.getElementById('tour-stage-title');
       if (stageTitle) stageTitle.textContent = 'Champions: ' + (tournament.champion.flag || '') + ' ' + tournament.champion.name;
       toast(tournament.champion.name + ' win the tournament!');
+    } else {
+      toast('Tournament simulation finished');
     }
   }
 
 
   function simUCLFixture(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    showLoading('Simulating match…');
+    setTimeout(function() {
+      try { _simUCLFixtureWork(idx); }
+      finally { hideLoading(); refreshTournamentStatsUI(); try { renderUCLLeague(); renderUCLFixtures(); } catch(e) {} }
+    }, 30);
+  }
+  function _simUCLFixtureWork(idx) {
     if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
     const f = tournament.fixtures[idx];
     const home = getTeam(f.home), away = getTeam(f.away);
@@ -2989,18 +3183,31 @@ var App = (() => {
   function playUCLFixture(idx) {
     if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
     window._uclFixtureIdx = idx;
-    window._tourFixtureIdx = null;
-        refreshTournamentStatsUI();
+    window._tourFixtureIdx = idx;
     window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._fromTournament = true;
     const f = tournament.fixtures[idx];
     switchView('match');
     const homeSel = document.getElementById('home-team');
     const awaySel = document.getElementById('away-team');
     if (homeSel) homeSel.value = f.home;
     if (awaySel) awaySel.value = f.away;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(Math.random() * formKeys.length)];
+    const af = formKeys[Math.floor(Math.random() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    // Clear custom lineups so random formation applies
+    customLineups.home = null;
+    customLineups.away = null;
     updateTeamPreview('home'); updateTeamPreview('away');
     startMatch();
+    toast('UCL match — live · formations randomized');
   }
+
 
   function advanceUCLFromLeague() {
     if (!tournament || tournament.format !== 'league') return;
@@ -3603,25 +3810,36 @@ var App = (() => {
   function playKnockoutMatch(roundIdx, matchIdx) {
     if (!tournament || !tournament.knockout[roundIdx]) return;
     const m = tournament.knockout[roundIdx].matches[matchIdx];
-    if (!m || m.played) return;
+    if (!m || m.played || !m.home || !m.away) return;
     window._koRoundIdx = roundIdx;
     window._koMatchIdx = matchIdx;
     window._tourFixtureIdx = null;
-        refreshTournamentStatsUI();
+    window._uclFixtureIdx = null;
+    window._fromTournament = true;
     switchView('match');
     const homeSel = document.getElementById('home-team');
     const awaySel = document.getElementById('away-team');
     if (homeSel) homeSel.value = m.home.id;
     if (awaySel) awaySel.value = m.away.id;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(Math.random() * formKeys.length)];
+    const af = formKeys[Math.floor(Math.random() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    // Clear custom lineups so random formation applies
+    customLineups.home = null;
+    customLineups.away = null;
     updateTeamPreview('home'); updateTeamPreview('away');
-    // Force ET + pens for knockout
     const et = document.getElementById('opt-et');
     const pens = document.getElementById('opt-pens');
     if (et) et.checked = true;
     if (pens) pens.checked = true;
     startMatch();
-    toast('Knockout match — ET & pens enabled');
+    toast('Knockout match — live · ET & pens on · formations randomized');
   }
+
 
   function afterKnockoutMatchPlayed(roundIdx) {
     const current = tournament.knockout[roundIdx];
@@ -3780,16 +3998,25 @@ var App = (() => {
   }
 
   function withLoading(msg, fn) {
-    showLoading(msg);
-    // Allow browser to paint overlay before heavy work
+    showLoading(msg || 'Simulating…');
+    // Double rAF so the overlay is painted before heavy sync work
     return new Promise(function(resolve) {
-      setTimeout(function() {
-        let result;
-        try { result = fn(); }
-        catch (e) { console.error(e); toast('Error: ' + (e.message || e)); }
-        hideLoading();
-        resolve(result);
-      }, 40);
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          setTimeout(function() {
+            let result;
+            try {
+              result = fn();
+            } catch (e) {
+              console.error(e);
+              toast('Error: ' + (e && e.message ? e.message : e));
+            } finally {
+              hideLoading();
+            }
+            resolve(result);
+          }, 50);
+        });
+      });
     });
   }
 
@@ -3838,15 +4065,19 @@ var App = (() => {
   function returnToTournament() {
     const backBtn = document.getElementById('back-to-tournament');
     if (backBtn) { backBtn.style.display = 'none'; backBtn.classList.remove('show'); }
+    window._fromTournament = false;
     switchView('tournament');
     if (tournament) {
-      renderGroups();
-      if (tournament.stage === 'knockout') renderBracket();
+      try { refreshTournamentStatsUI(); } catch (e) {}
+      try { renderGroups(); } catch (e) {}
+      try { renderBracket(); } catch (e) {}
+      try { if (typeof renderUCLTable === 'function') renderUCLTable(); } catch (e) {}
+      try { renderTournamentAwards(); } catch (e) {}
     }
     toast('Back to tournament — results updated');
   }
 
-  
+
   function showPlayerProfile(playerId) {
     let player = null, team = null;
     for (const t of allTeams) {
@@ -3884,6 +4115,10 @@ var App = (() => {
           <div class="profile-stat"><div class="val">${ms.shots || 0}</div><div class="lbl">Shots</div></div>
           <div class="profile-stat"><div class="val">${ms.saves || 0}</div><div class="lbl">Saves</div></div>
           <div class="profile-stat"><div class="val">${ms.tackles || 0}</div><div class="lbl">Tackles</div></div>
+          <div class="profile-stat"><div class="val">${ms.passes || 0}</div><div class="lbl">Passes</div></div>
+          <div class="profile-stat"><div class="val">${ms.passesCompleted || 0}</div><div class="lbl">Completed</div></div>
+          <div class="profile-stat"><div class="val">${ms.interceptions || 0}</div><div class="lbl">Interceptions</div></div>
+          <div class="profile-stat"><div class="val">${ms.blocks || 0}</div><div class="lbl">Blocks</div></div>
           <div class="profile-stat"><div class="val">${(ms.xg || 0).toFixed(2)}</div><div class="lbl">xG</div></div>
           <div class="profile-stat"><div class="val">${(ms.xa || 0).toFixed(2)}</div><div class="lbl">xA</div></div>
           <div class="profile-stat"><div class="val"><span class="rating-badge ${rc}">${(ms.rating || 0).toFixed(1)}</span></div><div class="lbl">Rating</div></div>
