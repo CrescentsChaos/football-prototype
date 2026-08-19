@@ -667,8 +667,11 @@ var App = (() => {
     addEvent(m.minute, 'pen', '⚽ Penalty shootout!', null);
     updateScoreboard();
 
-    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>(b.att||0)-(a.att||0));
-    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>(b.att||0)-(a.att||0));
+    // Order the takers list so recognised penalty takers (strikers/wingers, then
+    // attacking mids) step up before defenders/holding mids, same as real teams do.
+    const penOrderScore = (p) => (p.att || 0) + (PEN_TAKER_ROLE_WEIGHT[p.slot || (p.pos||[])[0]] || 0.4) * 12;
+    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
+    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
 
     // Silent/bulk sims (quick-sim, tournament auto-play) still resolve instantly —
     // only a real, on-screen live match animates the shootout kick by kick.
@@ -878,7 +881,7 @@ var App = (() => {
       <div class="card-title">Key Events</div>
       <div style="max-height:220px;overflow-y:auto;margin-bottom:12px">${eventsHtml || '<span style="color:var(--text-muted)">No events logged</span>'}</div>
       <div class="card-title">Team Stats</div>
-      <table class="lb-table" style="margin-bottom:12px"><thead><tr><th></th><th>${h.short}</th><th>${a.short}</th></tr></thead>
+      <div class="table-scroll"><table class="lb-table" style="margin-bottom:12px"><thead><tr><th></th><th>${h.short}</th><th>${a.short}</th></tr></thead>
       <tbody>
         <tr><td>Shots</td><td>${(h.stats&&h.stats.shots)||0}</td><td>${(a.stats&&a.stats.shots)||0}</td></tr>
         <tr><td>On Target</td><td>${(h.stats&&h.stats.shotsOn)||0}</td><td>${(a.stats&&a.stats.shotsOn)||0}</td></tr>
@@ -892,7 +895,7 @@ var App = (() => {
         <tr><td>Fouls</td><td>${(h.stats&&h.stats.fouls)||0}</td><td>${(a.stats&&a.stats.fouls)||0}</td></tr>
         <tr><td>Saves</td><td>${(h.stats&&h.stats.saves)||0}</td><td>${(a.stats&&a.stats.saves)||0}</td></tr>
         <tr><td>Yellow / Red</td><td>${(h.stats&&h.stats.yellows)||0} / ${(h.stats&&h.stats.reds)||0}</td><td>${(a.stats&&a.stats.yellows)||0} / ${(a.stats&&a.stats.reds)||0}</td></tr>
-      </tbody></table>
+      </tbody></table></div>
       <div class="card-title">Player Ratings</div>
       <div style="max-height:200px;overflow-y:auto">
         ${ratings.slice(0,22).map(p => {
@@ -1152,7 +1155,18 @@ var App = (() => {
     else if (actions === 1 && !isGK) r = Math.max(r, 6.2);
 
     r += Math.max(-0.12, Math.min(0.18, ((ps.ovr || 75) - 75) * 0.008));
-    return Math.max(4.0, Math.min(9.9, Math.round(r * 10) / 10));
+
+    // Keep ratings realistic: a good, solid game should land in the high 7s/8s.
+    // Only a genuine breakout performance — a hat-trick, a brace-plus-assist, a big
+    // multi-goal contribution, or a standout shutout for a GK/defender — should be
+    // able to push into the 9.9-10.0 territory. Everything else is capped below that.
+    const isBreakout = isGK
+      ? (saves >= 7 && (ps.cleanSheet || goals === 0) && !ps.red)
+      : isDef
+        ? ((goals >= 1 && ps.cleanSheet) || (goals + assists >= 3) || (goals >= 2 && assists >= 1)) && !ps.red
+        : (goals >= 3 || (goals >= 2 && assists >= 1) || assists >= 3 || goals + assists >= 4) && !ps.red;
+    const cap = isBreakout ? 10.0 : 9.2;
+    return Math.max(4.0, Math.min(cap, Math.round(r * 10) / 10));
   }
 
 
@@ -1238,6 +1252,20 @@ var App = (() => {
       if (m.minute >= 90 + m._stoppage) {
         const drawn = m.home.score === m.away.score;
         if (drawn && (m.allowET || m.allowPens)) {
+          // Instant/bulk sims have no one to click the prompt, so resolve immediately
+          // instead of stalling — this is what was causing 200+ minute "matches".
+          if (m.silentDeep) {
+            addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
+            if (m.allowET) {
+              m.inET = true;
+              m.etStart = m.minute;
+              m.status = 'Extra Time';
+              addEvent(m.minute, 'et', 'Extra time begins — two periods of 15 minutes', null);
+            } else {
+              runPenaltyShootout();
+            }
+            return;
+          }
           // Pause — user chooses to continue to ET / pens
           m._awaitingET = true;
           m.status = 'Full Time';
@@ -1259,6 +1287,11 @@ var App = (() => {
       const etMin = m.minute - (m.etStart || 90);
       if (etMin >= 30) {
         if (m.home.score === m.away.score && m.allowPens) {
+          if (m.silentDeep) {
+            addEvent(m.minute, 'et', 'Extra time finished — still level. Straight to penalties.', null);
+            runPenaltyShootout();
+            return;
+          }
           m._awaitingPens = true;
           m.status = 'ET Full Time';
           addEvent(m.minute, 'et', 'Extra time finished — still level. Penalty shootout?', null);
@@ -1404,7 +1437,7 @@ var App = (() => {
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
 
     if (r < 0.22) {
-      const shooter = pickPlayer(attTeam, ['ST','RW','LW','CAM','CM','RM','LM']);
+      const shooter = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM','RM','LM'], GOAL_ROLE_WEIGHT);
       if (!shooter) return;
       attTeam.stats.shots++;
       // Attributes matter: att/tec/ovr vs defence
@@ -1426,7 +1459,7 @@ var App = (() => {
             addEvent(m.minute, 'save', `Great save by <span class="player">${gk.name}</span>!`, attackingSide);
           }
         } else {
-          const assister = pickPlayer(attTeam, ['CAM','CM','RW','LW','ST','RM','LM'], shooter.id);
+          const assister = pickPlayerWeighted(attTeam, ['CAM','CM','RW','LW','ST','RM','LM'], ASSIST_ROLE_WEIGHT, shooter.id);
           attTeam.score++;
           const method = pickGoalMethod(shooter);
           recordStat('goals', shooter, attTeam.team);
@@ -1608,7 +1641,7 @@ var App = (() => {
         defTeam.stats.fouls++;
         addEvent(m.minute, 'handball', `Handball against <span class="player">${p.name}</span> — referee points to the spot`, defendingSide);
         if (Math.random() < 0.28) {
-          const taker = pickPlayer(attTeam, ['ST','CAM','CM']);
+          const taker = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM'], PEN_TAKER_ROLE_WEIGHT);
           if (taker) {
             addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
             attTeam.stats.shots++;
@@ -1656,7 +1689,7 @@ var App = (() => {
         addEvent(m.minute, 'var', `📺 VAR checking penalty claim — foul on ${fouled?fouled.name:'attacker'} by ${fouler?fouler.name:'defender'} (${varTeam.team.short})...`, varSide);
         if (Math.random() < 0.5) {
           addEvent(m.minute, 'var', `VAR: Penalty awarded to ${varTeam.team.short}!`, varSide);
-          const taker = pickPlayer(attTeam, ['ST','CAM','CM']) || fouled;
+          const taker = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM'], PEN_TAKER_ROLE_WEIGHT) || fouled;
           if (taker) {
             addEvent(m.minute, 'pen', `Penalty to ${varTeam.team.short}. <span class="player">${taker.name}</span> places the ball on the spot.`, varSide);
             attTeam.stats.shots++;
@@ -1783,6 +1816,42 @@ var App = (() => {
     const weights = pool.map(p => {
       let w = (p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2;
       return Math.max(5, w);
+    });
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }
+
+  // Realistic role tendencies: strikers/wingers get on the scoresheet far more
+  // than they create, while attacking mids/central mids are the primary creators.
+  // Defenders/holding mids chip in occasionally (set pieces, late runs) but rarely lead scoring.
+  const GOAL_ROLE_WEIGHT = { ST: 2.7, CF: 2.7, RW: 2.15, LW: 2.15, CAM: 1.35, RM: 1.05, LM: 1.05, CM: 0.5, CDM: 0.25, RWB: 0.22, LWB: 0.22, RB: 0.18, LB: 0.18, CB: 0.13, GK: 0.01 };
+  const ASSIST_ROLE_WEIGHT = { CAM: 2.05, CM: 1.75, RW: 1.7, LW: 1.7, RM: 1.45, LM: 1.45, ST: 0.9, CF: 0.9, CDM: 0.85, RWB: 0.8, LWB: 0.8, RB: 0.8, LB: 0.8, CB: 0.25, GK: 0.02 };
+  // Penalty duty in real football overwhelmingly goes to strikers/wingers, with the
+  // occasional attacking mid; deep midfielders almost never take them.
+  const PEN_TAKER_ROLE_WEIGHT = { ST: 3.3, CF: 3.3, RW: 2.5, LW: 2.5, CAM: 1.0, RM: 0.7, LM: 0.7, CM: 0.3, CDM: 0.1, CB: 0.05 };
+
+  // Like pickPlayer, but multiplies selection weight by a role-tendency table so
+  // (for example) strikers/wingers are picked as goalscorers far more often than
+  // central/defensive midfielders, matching real-world scoring distributions.
+  function pickPlayerWeighted(side, preferredPos, roleWeights, excludeId) {
+    if (!currentMatch || !side) return null;
+    const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    let pool = (side.squad.all || []).filter(p => ids.includes(p.id) && p.id !== excludeId);
+    if (preferredPos && preferredPos.length) {
+      const preferred = pool.filter(p => (p.pos || []).some(pos => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
+      if (preferred.length) pool = preferred;
+    }
+    if (!pool.length) return null;
+    const weights = pool.map(p => {
+      const slot = p.slot || (p.pos || [])[0] || 'CM';
+      const roleW = (roleWeights && roleWeights[slot] != null) ? roleWeights[slot] : 1;
+      const w = ((p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2) * roleW;
+      return Math.max(1, w);
     });
     const total = weights.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
@@ -2635,12 +2704,12 @@ var App = (() => {
       return;
     }
     const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating' };
-    el.innerHTML = `<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>${labels[type]||type}</th></tr></thead><tbody>
+    el.innerHTML = `<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>${labels[type]||type}</th></tr></thead><tbody>
       ${data.map((p,i) => {
         const aff = [p.national, p.club].filter(Boolean).join(' · ') || p.team;
         return `<tr><td class="lb-rank">${i+1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${aff}</td><td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
       }).join('')}
-    </tbody></table>`;
+    </tbody></table></div>`;
   }
 
   function renderTournamentTeamSelect() {
@@ -3840,15 +3909,53 @@ var App = (() => {
     const assists = top('assists');
     const saves = top('saves');
     const motm = top('motm');
-    const ratings = Object.values(tournamentStats.ratings || {})
-      .filter(x => (x.count || 0) >= 3)
-      .sort((a,b) => b.avg - a.avg || b.count - a.count);
+    const cleanSheets = top('cleanSheets');
+    const puskas = top('puskas');
     const ratingsAny = Object.values(tournamentStats.ratings || {})
       .filter(x => (x.count || 0) > 0)
       .sort((a,b) => b.avg - a.avg || b.count - a.count);
+
+    // Golden Ball: a composite of G+A, average rating, MOTM count and "award show"
+    // presence across the other individual categories — not rating alone — so a
+    // quiet-but-consistent passer can't out-rank a genuine standout performer.
+    const goldenScores = {};
+    const ensureG = (p) => {
+      if (!goldenScores[p.id]) goldenScores[p.id] = { id: p.id, name: p.name, team: p.team, count: 0, avg: 0, apps: 0, pts: 0, goals: 0, assists: 0, motm: 0 };
+      return goldenScores[p.id];
+    };
+    goals.forEach(p => { const e = ensureG(p); e.goals = p.count; e.pts += p.count * 4; });
+    assists.forEach(p => { const e = ensureG(p); e.assists = p.count; e.pts += p.count * 2.5; });
+    motm.forEach(p => { const e = ensureG(p); e.motm = p.count; e.pts += p.count * 5; });
+    cleanSheets.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
+    puskas.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
+    Object.values(tournamentStats.ratings || {}).forEach(p => {
+      const e = ensureG(p);
+      e.apps = p.count || 0;
+      e.avg = p.avg || 0;
+      if (e.apps >= 3 && e.avg > 0) e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
+      else if (e.apps > 0) e.pts += e.avg * 0.15;
+    });
+    // Award-show-appearance bonus: nominee across multiple individual tournament awards
+    const topSets = {
+      goldenboot: new Set(goals.slice(0,10).map(p=>p.id)),
+      assists: new Set(assists.slice(0,10).map(p=>p.id)),
+      motm: new Set(motm.slice(0,10).map(p=>p.id)),
+      glove: new Set(saves.slice(0,10).map(p=>p.id)),
+      puskas: new Set(puskas.slice(0,10).map(p=>p.id))
+    };
+    Object.values(goldenScores).forEach(e => {
+      let noms = 0;
+      Object.values(topSets).forEach(set => { if (set.has(e.id)) noms++; });
+      if (noms >= 2) e.pts += (noms - 1) * 1.4;
+      e.count = Math.round(e.pts);
+    });
+    const goldenBallData = Object.values(goldenScores)
+      .filter(e => e.pts > 0 && (e.apps >= 3 || e.goals + e.assists + e.motm >= 3))
+      .sort((a,b) => b.pts - a.pts || b.apps - a.apps);
+
     tournament.awards = {
       goldenBoot: goals[0] || null,
-      goldenBall: ratings[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || ratingsAny[0] || null,
+      goldenBall: goldenBallData[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
       goldenGlove: saves[0] || null,
       topAssists: assists[0] || null,
       mostMotm: motm[0] || null
@@ -3870,7 +3977,9 @@ var App = (() => {
       <div class="card-title">Tournament Awards</div>
       <div class="awards-row">
         ${card('Golden Boot', '👟', a.goldenBoot, (a.goldenBoot && a.goldenBoot.count) + ' goals')}
-        ${card('Golden Ball', '🏆', a.goldenBall, a.goldenBall && a.goldenBall.avg != null ? ('Avg ' + a.goldenBall.avg.toFixed(2)) : ((a.goldenBall && a.goldenBall.count) + ' MOTM'))}
+        ${card('Golden Ball', '🏆', a.goldenBall, a.goldenBall && (a.goldenBall.goals != null || a.goldenBall.assists != null)
+          ? ((a.goldenBall.goals||0) + 'G ' + (a.goldenBall.assists||0) + 'A' + (a.goldenBall.avg ? ' · Avg ' + a.goldenBall.avg.toFixed(2) : ''))
+          : (a.goldenBall && a.goldenBall.avg != null ? ('Avg ' + a.goldenBall.avg.toFixed(2)) : ((a.goldenBall && a.goldenBall.count) + ' MOTM')))}
         ${card('Golden Glove', '🧤', a.goldenGlove, (a.goldenGlove && a.goldenGlove.count) + ' saves')}
         ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
       </div>`;
@@ -4370,15 +4479,15 @@ var App = (() => {
       const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 15);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">⚽</div><p>No goals yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">👟</div><div class="award-info"><h4>Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
-        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th></tr></thead><tbody>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
-        '</tbody></table>';
+        '</tbody></table></div>';
     } else if (type === 'ballon') {
       // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
       const MIN_APPS = 3;
       const scores = {};
       const ensure = (p) => {
-        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0 };
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0 };
         return scores[p.id];
       };
       Object.values(stats.ratings || {}).forEach(p => {
@@ -4402,6 +4511,23 @@ var App = (() => {
           e.pts += e.avg * 0.15;
         }
       });
+      // "Award show appearance" bonus: being a nominee/contender on other individual
+      // award leaderboards (Golden Boot, Assists, MOTM, Yashin-type keeper form, Puskás)
+      // is itself worth something toward the overall Ballon d'Or case — being in the
+      // conversation across multiple award shows should count for something.
+      const awardLeaders = {
+        goldenboot: new Set(Object.values(stats.goals || {}).sort((a,b)=>b.count-a.count).slice(0,15).map(p=>p.id)),
+        assists: new Set(Object.values(stats.assists || {}).sort((a,b)=>b.count-a.count).slice(0,15).map(p=>p.id)),
+        motm: new Set(Object.values(stats.motm || {}).sort((a,b)=>b.count-a.count).slice(0,15).map(p=>p.id)),
+        yashin: new Set(Object.values(stats.saves || {}).sort((a,b)=>b.count-a.count).slice(0,15).map(p=>p.id)),
+        puskas: new Set(Object.values(stats.puskas || {}).sort((a,b)=>b.count-a.count).slice(0,15).map(p=>p.id))
+      };
+      Object.values(scores).forEach(e => {
+        let noms = 0;
+        Object.values(awardLeaders).forEach(set => { if (set.has(e.id)) noms++; });
+        e.noms = noms;
+        if (noms >= 2) e.pts += (noms - 1) * 1.4; // each extra award-show appearance nudges the case
+      });
       const data = Object.values(scores)
         .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
         .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
@@ -4411,10 +4537,18 @@ var App = (() => {
         return;
       }
       const leader = data[0];
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
-        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table>';
+      el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Noms</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td>'+(p.noms||0)+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table></div>';
+    } else if (type === 'puskas') {
+      // Puskás Award — best/most spectacular individual goal, tallied by nominee count
+      const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 15);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card"><div class="award-icon">🎬</div><div class="award-info"><h4>Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Nominated Goals</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        '</tbody></table></div>';
     } else if (type === 'muller') {
       // Gerd Müller Award — best pure striker: goals heavily weighted, ST/CF preference
       const scores = {};
@@ -4438,9 +4572,9 @@ var App = (() => {
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 15);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🎯</div><div class="award-info"><h4>Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
-        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table>';
+        '</tbody></table></div>';
     } else if (type === 'yashin') {
       // Yashin Award — best goalkeeper: saves + clean sheets
       const scores = {};
@@ -4461,9 +4595,9 @@ var App = (() => {
       const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 15);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🧤</div><div class="award-info"><h4>Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
-        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table>';
+        '</tbody></table></div>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
       el.innerHTML = trophies.map(t => '<div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+t.team+'</p><p>'+t.type+'</p></div></div>').join('');

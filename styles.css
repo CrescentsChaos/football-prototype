@@ -558,6 +558,13 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   color: var(--bg-0); border-color: transparent;
 }
 .lb-table { width: 100%; border-collapse: collapse; }
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+}
+.table-scroll .lb-table { min-width: 480px; }
 .lb-table th {
   text-align: left; font-size: 0.72rem; color: var(--text-3);
   padding: 10px 8px; border-bottom: 1px solid var(--border);
