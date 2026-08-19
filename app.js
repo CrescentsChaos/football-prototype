@@ -172,8 +172,8 @@ const App = (() => {
     const desc = document.getElementById('tournament-desc');
     if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
     if (desc) desc.textContent = isWC
-      ? 'Select national teams. Minimum 4 (8 or 16 recommended).'
-      : 'Select club teams. Minimum 4 for knockout tournament.';
+      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
+      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
     renderTournamentTeamSelect();
   }
 
@@ -388,6 +388,41 @@ const App = (() => {
     endMatch();
   }
 
+  function maybeOffsideDisallow(side, scorer, minute) {
+    const m = currentMatch;
+    if (!m || Math.random() > 0.16) return false; // ~16% of goals get a check
+    const team = m[side];
+    addEvent(minute, 'var', `📺 VAR checking possible offside in the build-up to ${team.team.short}'s goal...`, side);
+    // Pace of attacker vs defence line slightly affects
+    const defLine = calcTeamStrength(m[side === 'home' ? 'away' : 'home']);
+    const offsideLikely = 0.35 + Math.max(0, (defLine.pac || 70) - (scorer.pac || 70)) / 200;
+    if (Math.random() < offsideLikely) {
+      team.score = Math.max(0, team.score - 1);
+      // remove last goal from list for this side/scorer
+      if (m.goalList && m.goalList.length) {
+        for (let i = m.goalList.length - 1; i >= 0; i--) {
+          if (m.goalList[i].side === side && m.goalList[i].player === scorer.name) {
+            m.goalList.splice(i, 1);
+            break;
+          }
+        }
+      }
+      // undo goal stat (best effort)
+      if (stats.goals && stats.goals[scorer.id]) stats.goals[scorer.id].count = Math.max(0, stats.goals[scorer.id].count - 1);
+      if (tournament && tournamentStats.goals && tournamentStats.goals[scorer.id]) {
+        tournamentStats.goals[scorer.id].count = Math.max(0, tournamentStats.goals[scorer.id].count - 1);
+      }
+      if (m.playerMatchStats && m.playerMatchStats[scorer.id]) {
+        m.playerMatchStats[scorer.id].goals = Math.max(0, (m.playerMatchStats[scorer.id].goals || 1) - 1);
+      }
+      addEvent(minute, 'var', `VAR: Goal disallowed — <span class="player">${scorer.name}</span> was offside`, side);
+      renderGoalTimeline();
+      return true;
+    }
+    addEvent(minute, 'var', `VAR: Goal stands — onside`, side);
+    return false;
+  }
+
   function pushGoal(side, player, minute, methodDesc) {
     if (!currentMatch) return;
     if (!currentMatch.goalList) currentMatch.goalList = [];
@@ -563,20 +598,22 @@ const App = (() => {
     return list[Math.floor(Math.random() * list.length)];
   }
 
-  function pickSkillDesc(player) {
-    const list = [
-      `double touch to slip past the marker`,
-      `rabona cross that causes chaos in the box`,
-      `no-look lay-off that opens the defence`,
-      `visionary through ball between the centre-backs`,
-      `step-over and burst of pace down the flank`,
-      `elastico that leaves the full-back wrong-footed`,
-      `shoulder drop and cut inside from the wing`,
-      `quick one-two around the press`,
-      `disguised reverse pass into the channel`,
-      `roulette in midfield to escape two challenges`
+  function pickSkillDesc(player, opponent) {
+    const moves = [
+      'elastico', 'roulette', 'step-over', 'double touch', 'body feint',
+      'rabona', 'sombrero flick', 'rainbow flick', 'marseille turn',
+      'shoulder drop', 'scissors', 'stop-and-go', 'drag-back'
     ];
-    return `<span class="player">${player.name}</span> — ${list[Math.floor(Math.random() * list.length)]}`;
+    const move = moves[Math.floor(Math.random() * moves.length)];
+    const opp = opponent ? opponent.name : 'the defender';
+    const ends = [
+      `beats ${opp} with a ${move}`,
+      `uses a ${move} to leave ${opp} on the ground`,
+      `sells ${opp} with a sharp ${move}`,
+      `skins ${opp} using a ${move} and accelerates clear`,
+      `bamboozles ${opp} with a ${move} on the touchline`
+    ];
+    return `<span class="player">${player.name}</span> ${ends[Math.floor(Math.random() * ends.length)]}`;
   }
 
   function pickPenOutcome() {
@@ -772,7 +809,17 @@ const App = (() => {
     m.possession = Math.max(30, Math.min(70, m.possession + (Math.random() - 0.5) * 4));
     m.home.stats.possession = Math.round(m.possession);
     m.away.stats.possession = 100 - m.home.stats.possession;
-    if (Math.random() > 0.55) return;
+    // Stronger teams create more moments
+    const intensity = 0.42 + (homeStr.ovr + awayStr.ovr) / 500;
+    if (Math.random() > intensity) {
+      // Quiet spell with occasional texture
+      if (Math.random() < 0.08) {
+        const side = Math.random() < 0.5 ? m.home : m.away;
+        const p = pickPlayer(side, ['CM','CDM','CAM','CB']);
+        if (p) addEvent(m.minute, 'pass', `<span class="player">${p.name}</span> keeps things tidy in midfield`, side === m.home ? 'home' : 'away');
+      }
+      return;
+    }
 
     const r = Math.random();
     const attackingSide = Math.random() < homeChance ? 'home' : 'away';
@@ -783,13 +830,19 @@ const App = (() => {
       const shooter = pickPlayer(attTeam, ['ST','RW','LW','CAM','CM','RM','LM']);
       if (!shooter) return;
       attTeam.stats.shots++;
-      if (Math.random() < (0.35 + (shooter.att || 70) / 300)) {
+      // Attributes matter: att/tec/ovr vs defence
+      const shotQuality = ((shooter.att || 70) * 0.45 + (shooter.tec || 70) * 0.35 + (shooter.ovr || 75) * 0.2) / 100;
+      const defAvg = calcTeamStrength(defTeam).def / 100;
+      const onTargetChance = Math.min(0.72, Math.max(0.18, 0.22 + shotQuality * 0.4 - defAvg * 0.12));
+      if (Math.random() < onTargetChance) {
         attTeam.stats.shotsOn++;
         if (!m.playerMatchStats) m.playerMatchStats={};
         if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
         m.playerMatchStats[shooter.id].shots++;
         const gk = pickPlayer(defTeam, ['GK']);
-        if (Math.random() < (gk ? 0.55 + (gk.def || 70) / 400 : 0.6)) {
+        const gkSkill = gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7;
+        const saveChance = Math.min(0.82, Math.max(0.28, 0.38 + gkSkill * 0.35 - shotQuality * 0.25));
+        if (Math.random() < saveChance) {
           if (gk) {
             defTeam.stats.saves++;
             recordStat('saves', gk, defTeam.team);
@@ -816,6 +869,7 @@ const App = (() => {
           } else {
             addEvent(m.minute, 'goal', `⚽ <span class="player">${shooter.name}</span> (${shooter.num||''}) — ${method.desc}`, attackingSide, true);
           }
+          maybeOffsideDisallow(attackingSide, shooter, m.minute);
         }
       } else {
         if (!m.playerMatchStats) m.playerMatchStats={};
@@ -840,32 +894,52 @@ const App = (() => {
       const fouler = pickPlayer(defTeam, ['CB','CDM','CM','RB','LB','ST']);
       if (!fouler) return;
       defTeam.stats.fouls++;
-      const cardRoll = Math.random();
-      if (cardRoll < 0.12) {
+      if (!m.foulCounts) m.foulCounts = { home: {}, away: {} };
+      m.foulCounts[defendingSide][fouler.id] = (m.foulCounts[defendingSide][fouler.id] || 0) + 1;
+      const foulCount = m.foulCounts[defendingSide][fouler.id];
+      const alreadyYellow = (m.cards[defendingSide][fouler.id] || 0) >= 1;
+      const aggression = 1 + Math.max(0, (75 - (fouler.def || 70)) / 80) + Math.max(0, ((fouler.phy || 70) - 80) / 100);
+      let yellowChance = 0.08 * aggression + (foulCount - 1) * 0.14;
+      let straightRedChance = 0.012 * aggression;
+      if (alreadyYellow) yellowChance += 0.18;
+      if (foulCount >= 3) yellowChance += 0.2;
+      yellowChance = Math.min(0.72, yellowChance);
+      const roll = Math.random();
+      const victim = pickPlayer(attTeam, ['ST','RW','LW','CAM','CM']);
+      const foulText = victim
+        ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
+        : `Foul by <span class="player">${fouler.name}</span>`;
+      if (roll < straightRedChance && !alreadyYellow) {
+        defTeam.stats.reds++;
+        recordStat('cards', fouler, defTeam.team);
+        recordStat('reds', fouler, defTeam.team);
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
+        m.playerMatchStats[fouler.id].red = true;
+        addEvent(m.minute, 'red', `🟥 Straight red! ${foulText} — reckless challenge`, defendingSide);
+        removeFromPitch(defendingSide, fouler.id);
+      } else if (roll < straightRedChance + yellowChance) {
         m.cards[defendingSide][fouler.id] = (m.cards[defendingSide][fouler.id] || 0) + 1;
         defTeam.stats.yellows++;
         recordStat('cards', fouler, defTeam.team);
         recordStat('yellows', fouler, defTeam.team);
-        if (!m.playerMatchStats) m.playerMatchStats={};
-        if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id]=blankPlayerMatchStats(fouler);
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
         m.playerMatchStats[fouler.id].yellow = true;
         if (m.cards[defendingSide][fouler.id] >= 2) {
           defTeam.stats.reds++;
-          addEvent(m.minute, 'red', `RED CARD! <span class="player">${fouler.name}</span> sent off (2nd yellow)`, defendingSide);
+          recordStat('reds', fouler, defTeam.team);
+          m.playerMatchStats[fouler.id].red = true;
+          addEvent(m.minute, 'red', `🟥 Second yellow → red! ${foulText}`, defendingSide);
           removeFromPitch(defendingSide, fouler.id);
         } else {
-          addEvent(m.minute, 'yellow', `Yellow card for <span class="player">${fouler.name}</span>`, defendingSide);
+          addEvent(m.minute, 'yellow', `🟨 Yellow card — ${foulText}${foulCount > 1 ? ' (repeated fouls)' : ''}`, defendingSide);
         }
-      } else if (cardRoll < 0.15) {
-        defTeam.stats.reds++;
-        recordStat('cards', fouler, defTeam.team);
-        recordStat('reds', fouler, defTeam.team);
-        addEvent(m.minute, 'red', `RED CARD! <span class="player">${fouler.name}</span> is sent off!`, defendingSide);
-        removeFromPitch(defendingSide, fouler.id);
       } else {
-        addEvent(m.minute, 'foul', `Foul by <span class="player">${fouler.name}</span>`, defendingSide);
+        addEvent(m.minute, 'foul', foulText + (foulCount > 1 ? ' — referee has a word' : ''), defendingSide);
       }
-    } else if (r < 0.55) {
+    
+} else if (r < 0.55) {
       const taker = pickPlayer(attTeam, ['CAM','CM','ST','RW','LW']);
       if (taker && Math.random() < 0.18) {
         attTeam.stats.shots++;
@@ -1007,7 +1081,7 @@ const App = (() => {
       } else if (rare < 0.48 && def) {
         addEvent(m.minute, 'foul', `<span class="player">${def.name}</span> times a sliding tackle to perfection on the edge of the box`, defendingSide);
       } else if (rare < 0.58 && att) {
-        addEvent(m.minute, 'skill', pickSkillDesc(att), attackingSide);
+        addEvent(m.minute, 'skill', pickSkillDesc(att, pickPlayer(defTeam, ['CB','RB','LB','CDM','CM'])), attackingSide);
       } else if (rare < 0.68 && att) {
         addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> threads a defence-splitting ball into the channel`, attackingSide);
       } else if (rare < 0.78) {
@@ -1032,26 +1106,46 @@ const App = (() => {
   }
 
   function calcTeamStrength(side) {
-    if (!currentMatch) return { att: 50, def: 50 };
-    const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    if (!currentMatch || !side) return { att: 50, def: 50, tec: 50 };
+    const isHome = side === currentMatch.home;
+    const ids = isHome ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
     const onPitch = (side.squad.all || []).filter(p => ids.includes(p.id));
-    if (!onPitch.length) return { att: 50, def: 50 };
+    if (!onPitch.length) return { att: 50, def: 50, tec: 50 };
+    const mgr = (side.team.manager && side.team.manager.ovr) || 75;
+    const avg = (key, fallback) => onPitch.reduce((s, p) => s + (p[key] != null ? p[key] : fallback), 0) / onPitch.length;
     return {
-      att: onPitch.reduce((s, p) => s + (p.att || 70), 0) / onPitch.length,
-      def: onPitch.reduce((s, p) => s + (p.def || 70), 0) / onPitch.length
+      att: avg('att', 70) + (mgr - 75) * 0.12,
+      def: avg('def', 70) + (mgr - 75) * 0.1,
+      tec: avg('tec', 70),
+      ovr: avg('ovr', 75),
+      phy: avg('phy', 70),
+      pac: avg('pac', 70)
     };
   }
 
   function pickPlayer(side, preferredPos, excludeId) {
-    if (!currentMatch) return null;
+    if (!currentMatch || !side) return null;
     const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
     let pool = (side.squad.all || []).filter(p => ids.includes(p.id) && p.id !== excludeId);
-    const preferred = pool.filter(p => (p.pos || []).some(pos => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
-    if (preferred.length) pool = preferred;
+    if (preferredPos && preferredPos.length) {
+      const preferred = pool.filter(p => (p.pos || []).some(pos => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
+      if (preferred.length) pool = preferred;
+    }
     if (!pool.length) return null;
-    pool.sort((a, b) => ((b.ovr || 70) + Math.random() * 15) - ((a.ovr || 70) + Math.random() * 15));
-    return pool[0];
+    // Weight selection toward higher ovr / relevant attrs
+    const weights = pool.map(p => {
+      let w = (p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2;
+      return Math.max(5, w);
+    });
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
   }
+
 
   function trySubstitution(side) {
     const m = currentMatch;
@@ -1213,6 +1307,19 @@ const App = (() => {
     }
     // If this was a tournament match, update fixture
     
+    // UCL league live result
+    if (typeof window._uclFixtureIdx === 'number' && tournament && tournament.fixtures) {
+      const f = tournament.fixtures[window._uclFixtureIdx];
+      if (f && !f.played && currentMatch) {
+        f.played = true;
+        f.homeScore = currentMatch.home.score;
+        f.awayScore = currentMatch.away.score;
+        f.report = buildMatchReport(currentMatch);
+        applyLeagueResult(f.home, f.away, f.homeScore, f.awayScore);
+        window._uclFixtureIdx = null;
+        if (tournament.fixtures.every(x => x.played)) advanceUCLFromLeague();
+      }
+    }
     // Knockout live result
     if (typeof window._koRoundIdx === 'number' && typeof window._koMatchIdx === 'number' && tournament) {
       const km = tournament.knockout[window._koRoundIdx] && tournament.knockout[window._koRoundIdx].matches[window._koMatchIdx];
@@ -1579,15 +1686,29 @@ const App = (() => {
   function startTournament() {
     const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
     if (selected.length < 4) { toast('Select at least 4 teams'); return; }
+
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
+
+    if (tournamentType === 'ucl') {
+      startUCLTournament(selected);
+    } else {
+      startWorldCupTournament(selected);
+    }
+
+    const setup = document.getElementById('tournament-setup');
+    const live = document.getElementById('tournament-live');
+    if (setup) setup.style.display = 'none';
+    if (live) live.style.display = 'block';
+    renderTournamentLeaderboard();
+  }
+
+  function startWorldCupTournament(selected) {
     let teams = shuffleArray([...selected]);
-    // FIFA 2026 style: prefer groups of 4 (up to 12 groups = 48 teams)
     const groupSize = 4;
     let numGroups = Math.floor(teams.length / groupSize);
     if (numGroups < 1) numGroups = 1;
-    if (numGroups > 12) numGroups = 12; // max 48 teams in groups
-    // Use as many full groups as possible
-    const used = numGroups * groupSize;
-    teams = teams.slice(0, used);
+    if (numGroups > 12) numGroups = 12;
+    teams = teams.slice(0, numGroups * groupSize);
     if (teams.length < 4) { toast('Need at least 4 teams for groups'); return; }
     const groups = [];
     for (let i = 0; i < numGroups; i++) {
@@ -1598,15 +1719,9 @@ const App = (() => {
         }))
       });
     }
-    tournament = { type: tournamentType, groups, knockout: [], stage: 'groups', fixtures: [], champion: null };
+    tournament = { type: 'worldcup', format: 'groups', groups, knockout: [], stage: 'groups', fixtures: [], champion: null, playoff: [] };
     generateGroupFixtures();
-    const setup = document.getElementById('tournament-setup');
-    const live = document.getElementById('tournament-live');
-    if (setup) setup.style.display = 'none';
-    if (live) live.style.display = 'block';
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {} };
     renderGroups();
-    renderTournamentLeaderboard();
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = 'Group Stage';
     const bracket = document.getElementById('bracket');
@@ -1614,6 +1729,187 @@ const App = (() => {
     const btn = document.getElementById('btn-sim-round');
     if (btn) btn.textContent = 'Simulate Round';
   }
+
+  function startUCLTournament(selected) {
+    let teams = shuffleArray([...selected]);
+    // Prefer 36; if fewer, use largest even count >= 8 (scale format)
+    if (teams.length >= 36) teams = teams.slice(0, 36);
+    else if (teams.length % 2 === 1) teams = teams.slice(0, teams.length - 1);
+    if (teams.length < 8) { toast('Champions League needs at least 8 clubs (36 ideal)'); return; }
+
+    const league = teams.map(t => ({
+      team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
+    }));
+
+    const matchesPerTeam = teams.length >= 36 ? 8 : Math.min(8, teams.length - 1);
+    const fixtures = generateUCLLeagueFixtures(teams, matchesPerTeam);
+
+    tournament = {
+      type: 'ucl',
+      format: 'league',
+      stage: 'league',
+      league,
+      fixtures,
+      playoff: [],
+      knockout: [],
+      groups: [],
+      champion: null,
+      matchesPerTeam
+    };
+
+    renderUCLLeague();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = 'League Phase (' + matchesPerTeam + ' matches each)';
+    const bracket = document.getElementById('bracket');
+    if (bracket) bracket.innerHTML = '<p style="color:var(--text-muted)">Playoffs & knockout appear after the league phase.</p>';
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate League Round';
+    toast('UCL league phase: ' + teams.length + ' teams, ' + fixtures.length + ' matches');
+  }
+
+  function generateUCLLeagueFixtures(teams, matchesPerTeam) {
+    const fixtures = [];
+    const opp = {};
+    teams.forEach(t => { opp[t.id] = new Set(); });
+
+    for (let round = 1; round <= matchesPerTeam; round++) {
+      const order = shuffleArray([...teams]);
+      const used = new Set();
+      for (const t of order) {
+        if (used.has(t.id)) continue;
+        if (opp[t.id].size >= matchesPerTeam) continue;
+        const candidate = order.find(o =>
+          o.id !== t.id &&
+          !used.has(o.id) &&
+          !opp[t.id].has(o.id) &&
+          opp[o.id].size < matchesPerTeam
+        );
+        if (!candidate) continue;
+        used.add(t.id);
+        used.add(candidate.id);
+        opp[t.id].add(candidate.id);
+        opp[candidate.id].add(t.id);
+        // Alternate home roughly by round
+        const tHome = (round + t.id.length) % 2 === 0;
+        const home = tHome ? t : candidate;
+        const away = tHome ? candidate : t;
+        fixtures.push({
+          phase: 'league',
+          round,
+          home: home.id,
+          away: away.id,
+          played: false,
+          homeScore: null,
+          awayScore: null,
+          report: null
+        });
+      }
+    }
+    return shuffleArray(fixtures);
+  }
+
+  function blankLeagueRow(team) {
+    return { team, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 };
+  }
+
+  function applyLeagueResult(homeId, awayId, hg, ag) {
+    const ht = tournament.league.find(r => r.team.id === homeId);
+    const at = tournament.league.find(r => r.team.id === awayId);
+    if (!ht || !at) return;
+    ht.played++; at.played++;
+    ht.gf += hg; ht.ga += ag;
+    at.gf += ag; at.ga += hg;
+    if (hg > ag) { ht.won++; ht.pts += 3; at.lost++; }
+    else if (ag > hg) { at.won++; at.pts += 3; ht.lost++; }
+    else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+  }
+
+  function sortedLeague() {
+    return [...(tournament.league || [])].sort((a, b) =>
+      b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf
+    );
+  }
+
+  function renderUCLLeague() {
+    const el = document.getElementById('groups-container');
+    if (!el || !tournament || tournament.format !== 'league') return;
+    const sorted = sortedLeague();
+    let h = '<div class="group-card" style="grid-column:1/-1"><h4>League Phase Table</h4>';
+    h += '<table class="group-table"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
+    sorted.forEach((r, i) => {
+      const gd = r.gf - r.ga;
+      let mark = '';
+      if (i < 8) mark = ' style="background:rgba(0,200,83,0.12)"';
+      else if (i < 24) mark = ' style="background:rgba(255,171,0,0.1)"';
+      else mark = ' style="background:rgba(255,82,82,0.08)"';
+      h += `<tr${mark}><td>${i+1}</td><td>${r.team.flag||''} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
+    });
+    h += '</tbody></table>';
+    h += '<p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">Green: Top 8 → R16 direct · Amber: 9–24 playoff · Red: 25–36 eliminated</p></div>';
+    el.innerHTML = h;
+
+    // Fixtures panel
+    const fixEl = document.getElementById('fixtures-list') || el;
+    // Use existing fixtures area inside renderGroups path — append via fixtures in live view
+    const liveFix = document.querySelector('#tournament-live .fixtures-panel') || document.getElementById('fixture-list');
+    renderUCLFixtures();
+  }
+
+  function renderUCLFixtures() {
+    // Find fixtures container used by renderGroups
+    let fixEl = document.getElementById('fixture-list');
+    if (!fixEl) {
+      // inject after groups if missing
+      const gc = document.getElementById('groups-container');
+      if (gc && !document.getElementById('fixture-list')) {
+        const d = document.createElement('div');
+        d.id = 'fixture-list';
+        gc.parentNode.insertBefore(d, gc.nextSibling);
+        fixEl = d;
+      }
+    }
+    if (!fixEl || !tournament) return;
+    const unplayed = (tournament.fixtures || []).filter(f => !f.played).slice(0, 12);
+    const played = (tournament.fixtures || []).filter(f => f.played).slice(-8);
+    let h = '';
+    if (tournament.stage === 'league') {
+      h += '<div class="card-title" style="margin-top:12px">League Fixtures</div>';
+      unplayed.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const idx = tournament.fixtures.indexOf(f);
+        h += `<div class="fixture-item"><span class="fixture-teams">${home.flag||''} ${home.short} vs ${away.flag||''} ${away.short}</span>
+          <button class="btn btn-primary btn-sm" onclick="App.playUCLFixture(${idx})">▶ Live</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.simUCLFixture(${idx})">⚡ Instant</button></div>`;
+      });
+      if (played.length) {
+        h += '<div class="card-title" style="margin-top:12px">Recent Results</div>';
+        played.reverse().forEach(f => {
+          const home = getTeam(f.home), away = getTeam(f.away);
+          const idx = tournament.fixtures.indexOf(f);
+          h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})">
+            <span class="fixture-teams">${home.flag||''} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+            <span style="font-size:0.7rem;color:var(--accent-gold)">Details</span></div>`;
+        });
+      }
+    }
+    if (tournament.stage === 'playoff' || (tournament.playoff && tournament.playoff.length)) {
+      h += '<div class="card-title" style="margin-top:12px">Knockout Playoffs (two legs)</div>';
+      (tournament.playoff || []).forEach((p, i) => {
+        const status = p.played ? (`Agg ${p.aggHome}-${p.aggAway} → ${p.winner ? p.winner.short : ''}`) : (p.leg1 && p.leg1.played ? 'Leg 2' : 'Leg 1');
+        h += `<div class="fixture-item ${p.played?'played':''}">
+          <span class="fixture-teams">${p.home.flag||''} ${p.home.short} vs ${p.away.flag||''} ${p.away.short} <small>(${status})</small></span>`;
+        if (!p.played) {
+          h += `<button class="btn btn-secondary btn-sm" onclick="App.simPlayoffTie(${i})">⚡ Sim Tie</button>`;
+        } else if (p.report || (p.leg2 && p.leg2.report)) {
+          h += `<button class="btn btn-secondary btn-sm" onclick="App.viewPlayoffReport(${i})">Report</button>`;
+        }
+        h += '</div>';
+      });
+    }
+    fixEl.innerHTML = h;
+  }
+
 
   function generateGroupFixtures() {
     tournament.fixtures = [];
@@ -1627,6 +1923,10 @@ const App = (() => {
   }
 
   function renderGroups() {
+    if (tournament && tournament.format === 'league') {
+      renderUCLLeague();
+      return;
+    }
     const el = document.getElementById('groups-container');
     if (!el || !tournament) return;
     el.innerHTML = tournament.groups.map(g => {
@@ -1687,7 +1987,7 @@ const App = (() => {
     const remaining = tournament.fixtures.filter(x => !x.played).length;
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = remaining ? `Group Stage — ${remaining} matches left` : 'Group Stage Complete';
-    if (!remaining) setTimeout(() => advanceToKnockout(), 400);
+    if (!remaining && tournament.stage === 'groups') advanceToKnockout();
   }
 
   function playTournamentMatch(idx) {
@@ -1712,6 +2012,20 @@ const App = (() => {
 
   function simTournamentRound() {
     if (!tournament) return;
+    if (tournament.format === 'league' || tournament.stage === 'league') {
+      const unplayed = (tournament.fixtures || []).filter(f => !f.played);
+      if (!unplayed.length) { advanceUCLFromLeague(); return; }
+      const batch = unplayed.slice(0, Math.max(4, Math.ceil(unplayed.length / 4)));
+      batch.forEach(f => {
+        const idx = tournament.fixtures.indexOf(f);
+        if (idx >= 0) simUCLFixture(idx);
+      });
+      return;
+    }
+    if (tournament.stage === 'playoff') {
+      tournament.playoff.forEach((p, i) => { if (!p.played) simPlayoffTie(i); });
+      return;
+    }
     if (tournament.stage === 'groups') {
       const unplayed = tournament.fixtures.filter(f => !f.played);
       if (!unplayed.length) { advanceToKnockout(); return; }
@@ -1736,7 +2050,7 @@ const App = (() => {
       const remaining = tournament.fixtures.filter(f => !f.played).length;
       const stageTitle = document.getElementById('tour-stage-title');
       if (stageTitle) stageTitle.textContent = remaining ? `Group Stage — ${remaining} matches left` : 'Group Stage Complete';
-      if (!remaining) setTimeout(() => advanceToKnockout(), 400);
+      if (!remaining && tournament.stage === 'groups') advanceToKnockout();
     } else if (tournament.stage === 'knockout') {
       simKnockoutRound();
     }
@@ -1745,34 +2059,355 @@ const App = (() => {
   function simAllTournament() {
     if (!tournament) return;
     toast('Simulating full tournament…');
-    let safety = 0;
-    // Finish all group fixtures
-    while (tournament.fixtures && tournament.fixtures.some(f => !f.played) && safety < 80) {
-      simTournamentRound();
-      safety++;
+
+    if (tournament.format === 'league' || tournament.type === 'ucl') {
+      // League fixtures
+      (tournament.fixtures || []).forEach((f, idx) => {
+        if (!f.played) {
+          const home = getTeam(f.home), away = getTeam(f.away);
+          if (!home || !away) return;
+          const result = simQuickMatch(home, away);
+          f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
+          applyLeagueResult(f.home, f.away, result.home, result.away);
+        }
+      });
+      if (tournament.stage === 'league') advanceUCLFromLeague();
+      // Playoffs
+      if (tournament.playoff && tournament.playoff.length) {
+        tournament.playoff.forEach((p, i) => {
+          if (!p.played) simPlayoffTie(i);
+        });
+      }
+      if (tournament.stage === 'playoff' && tournament.playoff.every(p => p.played)) {
+        finishUCLPlayoffs();
+      }
+      // Knockout rounds
+      let guard = 0;
+      while (!tournament.champion && tournament.knockout && tournament.knockout.length && guard < 20) {
+        guard++;
+        const ri = tournament.knockout.length - 1;
+        const round = tournament.knockout[ri];
+        const isFinal = round.name === 'Final' || round.matches.length === 1;
+        round.matches.forEach(m => {
+          if (m.played) return;
+          if (isFinal || m.twoLeg === false) simSingleFinal(m);
+          else simTwoLegTie(m);
+        });
+        const winners = round.matches.map(m => m.winner).filter(Boolean);
+        if (winners.length <= 1) {
+          if (winners[0]) setChampion(winners[0]);
+          break;
+        }
+        if (ri === tournament.knockout.length - 1) {
+          let list = winners.slice();
+          if (list.length % 2 === 1) list.pop();
+          if (list.length < 2) {
+            setChampion(list[0] || winners[0]);
+            break;
+          }
+          const nextMatches = [];
+          const nextIsFinal = list.length === 2;
+          for (let i = 0; i < list.length; i += 2) {
+            if (nextIsFinal) {
+              nextMatches.push({
+                home: list[i], away: list[i+1], twoLeg: false, played: false,
+                homeScore: null, awayScore: null, winner: null, report: null
+              });
+            } else {
+              nextMatches.push(makeTwoLegTie(list[i], list[i+1]));
+            }
+          }
+          tournament.knockout.push({
+            name: getRoundName(list.length),
+            matches: nextMatches,
+            twoLeg: !nextIsFinal
+          });
+        }
+      }
+      assignTournamentAwards();
+      renderUCLLeague();
+      renderBracket();
+      renderTournamentLeaderboard();
+      if (tournament.champion) {
+        const stageTitle = document.getElementById('tour-stage-title');
+        if (stageTitle) stageTitle.textContent = 'Champions: ' + (tournament.champion.flag || '') + ' ' + tournament.champion.name;
+        toast(tournament.champion.name + ' win the Champions League!');
+      }
+      return;
     }
-    if (!tournament.champion && tournament.stage !== 'knockout') {
+
+    // —— World Cup path (existing) ——
+    (tournament.fixtures || []).forEach(f => {
+      if (f.played) return;
+      const home = getTeam(f.home), away = getTeam(f.away);
+      if (!home || !away) return;
+      const result = simQuickMatch(home, away);
+      f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
+      const g = tournament.groups[f.group];
+      if (!g) return;
+      const ht = g.teams.find(t => t.team.id === f.home);
+      const at = g.teams.find(t => t.team.id === f.away);
+      if (!ht || !at) return;
+      ht.played++; at.played++;
+      ht.gf += result.home; ht.ga += result.away;
+      at.gf += result.away; at.ga += result.home;
+      if (result.home > result.away) { ht.won++; ht.pts += 3; at.lost++; }
+      else if (result.away > result.home) { at.won++; at.pts += 3; ht.lost++; }
+      else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+    });
+    if (!tournament.champion && tournament.stage !== 'knockout' && tournament.stage !== 'complete') {
       advanceToKnockout();
     }
-    // Play every knockout round through the final
-    safety = 0;
-    while (!tournament.champion && tournament.knockout && tournament.knockout.length && safety < 30) {
-      const progressed = simKnockoutRound();
-      if (!progressed) break;
+    let safety = 0;
+    while (!tournament.champion && safety < 20) {
       safety++;
+      if (!tournament.knockout || !tournament.knockout.length) break;
+      const ri = tournament.knockout.length - 1;
+      const round = tournament.knockout[ri];
+      round.matches.forEach(m => {
+        if (m.played) return;
+        if (!m.home || !m.away) return;
+        const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+        m.homeScore = result.home; m.awayScore = result.away; m.played = true; m.report = result.report;
+        if (result.pens) { m.penalties = true; m.winner = result.pens.home > result.pens.away ? m.home : m.away; }
+        else if (result.home > result.away) m.winner = m.home;
+        else if (result.away > result.home) m.winner = m.away;
+        else { m.penalties = true; m.winner = Math.random() < 0.5 ? m.home : m.away; }
+      });
+      const winners = round.matches.map(m => m.winner).filter(Boolean);
+      if (winners.length <= 1) { if (winners[0]) setChampion(winners[0]); break; }
+      if (ri === tournament.knockout.length - 1) {
+        let list = winners.slice();
+        if (list.length % 2 === 1) list.pop();
+        if (list.length < 2) { setChampion(list[0] || winners[0]); break; }
+        const nextMatches = [];
+        for (let i = 0; i < list.length; i += 2) {
+          nextMatches.push({ home: list[i], away: list[i+1], homeScore: null, awayScore: null, winner: null, played: false });
+        }
+        tournament.knockout.push({ name: getRoundName(list.length), matches: nextMatches });
+      }
     }
+    assignTournamentAwards();
     renderGroups();
     renderBracket();
     renderTournamentLeaderboard();
     if (tournament.champion) {
       const stageTitle = document.getElementById('tour-stage-title');
       if (stageTitle) stageTitle.textContent = 'Champions: ' + (tournament.champion.flag || '') + ' ' + tournament.champion.name;
-      toast((tournament.champion.name) + ' win the tournament!');
+      toast(tournament.champion.name + ' win the tournament!');
     }
   }
 
+
+  function simUCLFixture(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    const f = tournament.fixtures[idx];
+    const home = getTeam(f.home), away = getTeam(f.away);
+    const result = simQuickMatch(home, away);
+    f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
+    applyLeagueResult(f.home, f.away, result.home, result.away);
+    renderUCLLeague();
+    renderTournamentLeaderboard();
+    if (tournament.fixtures.every(x => x.played)) {
+      toast('League phase complete');
+      advanceUCLFromLeague();
+    }
+  }
+
+  function playUCLFixture(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    window._uclFixtureIdx = idx;
+    window._tourFixtureIdx = null;
+    window._koRoundIdx = null;
+    const f = tournament.fixtures[idx];
+    switchView('match');
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = f.home;
+    if (awaySel) awaySel.value = f.away;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    startMatch();
+  }
+
+  function advanceUCLFromLeague() {
+    if (!tournament || tournament.format !== 'league') return;
+    const sorted = sortedLeague();
+    if (sorted.length < 8) {
+      // Small field: top half direct, rest playoff or direct KO
+      const half = Math.floor(sorted.length / 2);
+      const direct = sorted.slice(0, Math.min(8, half)).map(r => r.team);
+      buildUCLKnockoutFromTeams(direct.length >= 2 ? direct : sorted.slice(0, 4).map(r => r.team), true);
+      return;
+    }
+
+    const direct = sorted.slice(0, 8).map(r => r.team);
+    const playoffTeams = sorted.slice(8, Math.min(24, sorted.length));
+    const eliminated = sorted.slice(24);
+
+    tournament.stage = 'playoff';
+    tournament.playoff = [];
+
+    // Pair 9th vs 24th, 10th vs 23rd, ...
+    const n = playoffTeams.length;
+    for (let i = 0; i < Math.floor(n / 2); i++) {
+      const high = playoffTeams[i];
+      const low = playoffTeams[n - 1 - i];
+      if (!high || !low) continue;
+      tournament.playoff.push({
+        home: high.team, // higher rank hosts 2nd leg
+        away: low.team,
+        seedHigh: i + 9,
+        seedLow: 24 - i,
+        leg1: { played: false, homeScore: null, awayScore: null, report: null },
+        leg2: { played: false, homeScore: null, awayScore: null, report: null },
+        aggHome: 0,
+        aggAway: 0,
+        winner: null,
+        played: false
+      });
+    }
+
+    tournament._uclDirect = direct;
+    renderUCLLeague();
+    renderUCLFixtures();
+    renderBracket();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = 'Knockout Playoffs (9th–24th)';
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Playoffs';
+    toast('Top 8 seeded to R16. Playoffs underway.');
+  }
+
+  function simPlayoffTie(idx) {
+    if (!tournament || !tournament.playoff[idx] || tournament.playoff[idx].played) return;
+    const p = tournament.playoff[idx];
+    // Leg 1: away team (lower seed) at home vs higher seed
+    const leg1Home = p.away, leg1Away = p.home;
+    const r1 = simQuickMatch(leg1Home, leg1Away, { allowET: false, allowPens: false });
+    p.leg1 = { played: true, homeScore: r1.home, awayScore: r1.away, report: r1.report, homeId: leg1Home.id, awayId: leg1Away.id };
+    // Leg 2: higher seed at home
+    const r2 = simQuickMatch(p.home, p.away, { allowET: true, allowPens: true });
+    p.leg2 = { played: true, homeScore: r2.home, awayScore: r2.away, report: r2.report, homeId: p.home.id, awayId: p.away.id };
+    // Aggregate from higher seed perspective: leg1 away goals + leg2 home goals
+    p.aggHome = r1.away + r2.home; // higher seed total
+    p.aggAway = r1.home + r2.away; // lower seed total
+    if (p.aggHome > p.aggAway) p.winner = p.home;
+    else if (p.aggAway > p.aggHome) p.winner = p.away;
+    else {
+      // Pens already may have decided leg2 if scores level after 90 — if still level use pens flag or random
+      if (r2.pens) p.winner = r2.pens.home > r2.pens.away ? p.home : p.away;
+      else p.winner = Math.random() < 0.5 ? p.home : p.away;
+      p.penalties = true;
+    }
+    p.played = true;
+    renderUCLFixtures();
+    if (tournament.playoff.every(x => x.played)) finishUCLPlayoffs();
+  }
+
+  function finishUCLPlayoffs() {
+    const winners = tournament.playoff.map(p => p.winner).filter(Boolean);
+    const direct = tournament._uclDirect || sortedLeague().slice(0, 8).map(r => r.team);
+    // R16: typically top seeds vs playoff winners — interleave
+    const r16 = [];
+    for (let i = 0; i < 8; i++) {
+      if (direct[i]) r16.push(direct[i]);
+      if (winners[i]) r16.push(winners[i]);
+    }
+    // Ensure 16 teams
+    while (r16.length > 16) r16.pop();
+    while (r16.length < 16 && winners.length) { /* pad */ break; }
+    buildUCLKnockoutFromTeams(r16, false);
+  }
+
+  function buildUCLKnockoutFromTeams(teams, singleLegFinalOnly) {
+    let list = teams.filter(Boolean);
+    while (list.length >= 2 && (list.length & (list.length - 1))) list.pop();
+    if (list.length < 2) { toast('Not enough teams for knockout'); return; }
+    tournament.stage = 'knockout';
+    const matches = [];
+    for (let i = 0; i < list.length; i += 2) {
+      matches.push(makeTwoLegTie(list[i], list[i + 1]));
+    }
+    tournament.knockout = [{ name: getRoundName(list.length), matches, twoLeg: list.length > 2 }];
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = getRoundName(list.length);
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Knockout Round';
+    renderBracket();
+    renderUCLFixtures();
+  }
+
+  function makeTwoLegTie(teamA, teamB) {
+    return {
+      home: teamA,
+      away: teamB,
+      twoLeg: true,
+      leg1: { played: false, homeScore: null, awayScore: null, report: null },
+      leg2: { played: false, homeScore: null, awayScore: null, report: null },
+      homeScore: null,
+      awayScore: null,
+      aggHome: null,
+      aggAway: null,
+      winner: null,
+      played: false,
+      penalties: false,
+      report: null
+    };
+  }
+
+  function simTwoLegTie(m) {
+    // Leg 1 at away stadium (away hosts)
+    const r1 = simQuickMatch(m.away, m.home, { allowET: false, allowPens: false });
+    m.leg1 = { played: true, homeScore: r1.home, awayScore: r1.away, report: r1.report };
+    // Leg 2 at home stadium
+    const r2 = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+    m.leg2 = { played: true, homeScore: r2.home, awayScore: r2.away, report: r2.report };
+    m.aggHome = r1.away + r2.home;
+    m.aggAway = r1.home + r2.away;
+    m.homeScore = m.aggHome;
+    m.awayScore = m.aggAway;
+    if (m.aggHome > m.aggAway) m.winner = m.home;
+    else if (m.aggAway > m.aggHome) m.winner = m.away;
+    else {
+      if (r2.pens) m.winner = r2.pens.home > r2.pens.away ? m.home : m.away;
+      else m.winner = Math.random() < 0.5 ? m.home : m.away;
+      m.penalties = true;
+    }
+    m.played = true;
+    m.report = r2.report;
+  }
+
+  function simSingleFinal(m) {
+    const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+    m.homeScore = result.home;
+    m.awayScore = result.away;
+    m.played = true;
+    m.report = result.report;
+    m.twoLeg = false;
+    if (result.pens) {
+      m.penalties = true;
+      m.winner = result.pens.home > result.pens.away ? m.home : m.away;
+    } else if (result.home === result.away) {
+      m.penalties = true;
+      m.winner = Math.random() < 0.5 ? m.home : m.away;
+    } else {
+      m.winner = result.home > result.away ? m.home : m.away;
+    }
+  }
+
+  function viewPlayoffReport(idx) {
+    const p = tournament && tournament.playoff && tournament.playoff[idx];
+    if (!p) return;
+    const rep = (p.leg2 && p.leg2.report) || (p.leg1 && p.leg1.report);
+    if (rep) showMatchReport(rep);
+    else toast('Aggregate: ' + p.aggHome + '-' + p.aggAway);
+  }
+
+
   function advanceToKnockout() {
     if (!tournament) return;
+    if (tournament.stage === 'knockout' || tournament.stage === 'complete') return;
+    if (tournament.knockout && tournament.knockout.length) return;
     const qualifiers = [];
     const thirdPlaces = [];
     tournament.groups.forEach(g => {
@@ -1809,39 +2444,30 @@ const App = (() => {
     if (btn) btn.textContent = 'Simulate Knockout Round';
   }
 
-  function getRoundName(n) {
-    if (n >= 16) return 'Round of 16';
-    if (n === 8) return 'Quarter-finals';
-    if (n === 4) return 'Semi-finals';
-    if (n === 2) return 'Final';
+  function getRoundName(teamCount) {
+    // teamCount = number of teams still in the competition for this round
+    if (teamCount >= 32) return 'Round of 32';
+    if (teamCount >= 16) return 'Round of 16';
+    if (teamCount >= 8) return 'Quarter-finals';
+    if (teamCount >= 4) return 'Semi-finals';
+    if (teamCount >= 2) return 'Final';
     return 'Knockout';
   }
 
   function simKnockoutRound() {
-    if (!tournament || !tournament.knockout.length) return false;
+    if (!tournament || !tournament.knockout || !tournament.knockout.length) return false;
+    if (tournament.champion) return false;
     const current = tournament.knockout[tournament.knockout.length - 1];
     if (!current || !current.matches.length) return false;
 
-    // If current round already complete, try to build next from winners
     let unplayed = current.matches.filter(m => !m.played);
     if (!unplayed.length) {
-      if (tournament.champion) return false;
       const winners = current.matches.map(m => m.winner).filter(Boolean);
-      if (winners.length === 1) {
-        setChampion(winners[0]);
-        return false;
-      }
-      if (winners.length >= 2 && winners.length % 2 === 0) {
-        // next round may already exist
-        const nextExists = tournament.knockout.length > 1 && tournament.knockout[tournament.knockout.length - 1] !== current;
-        // if last round is complete and no further round, create it
-        const last = tournament.knockout[tournament.knockout.length - 1];
-        if (last === current || last.matches.every(m => m.played)) {
-          if (last === current) {
-            createNextKnockoutRound(winners);
-            return true;
-          }
-        }
+      if (winners.length === 1) { setChampion(winners[0]); renderBracket(); return false; }
+      if (winners.length >= 2) {
+        createNextKnockoutRound(winners);
+        renderBracket();
+        return true;
       }
       return false;
     }
@@ -1857,8 +2483,8 @@ const App = (() => {
         m.penalties = true;
         m.winner = result.pens.home > result.pens.away ? m.home : m.away;
       } else if (result.home === result.away) {
-        m.winner = Math.random() < 0.5 ? m.home : m.away;
         m.penalties = true;
+        m.winner = Math.random() < 0.5 ? m.home : m.away;
       } else {
         m.winner = result.home > result.away ? m.home : m.away;
       }
@@ -1867,28 +2493,25 @@ const App = (() => {
     const winners = current.matches.map(m => m.winner).filter(Boolean);
     if (winners.length === 1) {
       setChampion(winners[0]);
-      renderBracket();
-      renderTournamentLeaderboard();
-      return true;
-    }
-    if (winners.length >= 2) {
+    } else if (winners.length >= 2) {
       createNextKnockoutRound(winners);
-      renderBracket();
-      renderTournamentLeaderboard();
-      return true;
     }
     renderBracket();
-    return false;
+    renderTournamentLeaderboard();
+    return true;
   }
 
+
   function createNextKnockoutRound(winners) {
-    // Ensure even number of winners
-    let list = winners.filter(Boolean);
+    let list = (winners || []).filter(Boolean);
     if (list.length % 2 === 1) list = list.slice(0, list.length - 1);
     if (list.length < 2) {
-      if (winners[0]) setChampion(winners[0]);
+      if (winners && winners[0]) setChampion(winners[0]);
       return;
     }
+    const name = getRoundName(list.length);
+    const last = tournament.knockout[tournament.knockout.length - 1];
+    if (last && last.name === name && !last.matches.every(m => m.played)) return;
     const nextMatches = [];
     for (let i = 0; i < list.length; i += 2) {
       nextMatches.push({
@@ -1896,15 +2519,17 @@ const App = (() => {
         homeScore: null, awayScore: null, winner: null, played: false, penalties: false
       });
     }
-    tournament.knockout.push({ name: getRoundName(list.length), matches: nextMatches });
+    tournament.knockout.push({ name, matches: nextMatches });
     const stageTitle = document.getElementById('tour-stage-title');
-    if (stageTitle) stageTitle.textContent = getRoundName(list.length);
+    if (stageTitle) stageTitle.textContent = name;
   }
+
 
   function setChampion(team) {
     if (!team || tournament.champion) return;
     tournament.champion = team;
     tournament.stage = 'complete';
+    assignTournamentAwards();
     const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
     trophies.push({ name: tName, team: team.name, type: 'Tournament', date: Date.now() });
     try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch(e) {}
@@ -1989,7 +2614,48 @@ const App = (() => {
     return k - 1;
   }
 
+  
+  function assignTournamentAwards() {
+    if (!tournament) return;
+    const top = (key) => Object.values(tournamentStats[key] || {}).sort((a,b) => b.count - a.count);
+    const goals = top('goals');
+    const assists = top('assists');
+    const saves = top('saves');
+    const motm = top('motm');
+    const ratings = Object.values(tournamentStats.ratings || {}).filter(x => x.count > 0).sort((a,b) => b.avg - a.avg || b.count - a.count);
+    tournament.awards = {
+      goldenBoot: goals[0] || null,
+      goldenBall: ratings[0] || motm[0] || null,
+      goldenGlove: saves[0] || null,
+      topAssists: assists[0] || null,
+      mostMotm: motm[0] || null
+    };
+  }
+
+  function renderTournamentAwards() {
+    const el = document.getElementById('tour-awards');
+    if (!el || !tournament) return;
+    if (!tournament.awards) assignTournamentAwards();
+    const a = tournament.awards || {};
+    const card = (title, icon, p, extra) => {
+      if (!p) return `<div class="award-mini"><div class="am-title">${icon} ${title}</div><div class="am-empty">TBD</div></div>`;
+      return `<div class="award-mini"><div class="am-title">${icon} ${title}</div>
+        <div class="am-name">${p.name}</div>
+        <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
+    };
+    el.innerHTML = `
+      <div class="card-title">Tournament Awards</div>
+      <div class="awards-row">
+        ${card('Golden Boot', '👟', a.goldenBoot, (a.goldenBoot && a.goldenBoot.count) + ' goals')}
+        ${card('Golden Ball', '🏆', a.goldenBall, a.goldenBall && a.goldenBall.avg != null ? ('Avg ' + a.goldenBall.avg.toFixed(2)) : ((a.goldenBall && a.goldenBall.count) + ' MOTM'))}
+        ${card('Golden Glove', '🧤', a.goldenGlove, (a.goldenGlove && a.goldenGlove.count) + ' saves')}
+        ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
+      </div>`;
+  }
+
   function renderTournamentLeaderboard() {
+    assignTournamentAwards();
+    renderTournamentAwards();
     const el = document.getElementById('tour-stats-preview');
     if (!el) return;
     const top = (key, n) => Object.values(tournamentStats[key] || {}).sort((a,b)=>b.count-a.count).slice(0, n);
@@ -2017,50 +2683,54 @@ const App = (() => {
   function renderBracket() {
     const el = document.getElementById('bracket');
     if (!el || !tournament) return;
-    if (!tournament.knockout.length) {
+    if (!tournament.knockout || !tournament.knockout.length) {
       el.innerHTML = '<p style="color:var(--text-muted)">No knockout matches yet.</p>';
       return;
     }
     const curIdx = tournament.knockout.length - 1;
     el.innerHTML = tournament.knockout.map((round, ri) => `
-      <div class="round"><div class="round-title">${round.name}</div>
-      ${round.matches.map((m, mi) => `
-        <div class="bracket-match ${m.played ? 'played' : ''}">
+      <div class="round"><div class="round-title">${round.name}${round.twoLeg ? ' (two legs)' : ''}</div>
+      ${round.matches.map((m, mi) => {
+        const score = m.played
+          ? (m.twoLeg !== false && m.aggHome != null
+              ? `Agg ${m.aggHome}-${m.aggAway}`
+              : `${m.homeScore} - ${m.awayScore}`)
+          : '-';
+        return `<div class="bracket-match ${m.played ? 'played' : ''}">
           <div class="bracket-team ${m.winner && m.winner.id === m.home.id ? 'winner' : ''}">
             <span>${m.home.flag || ''} ${m.home.short}</span>
-            <span class="bracket-score">${m.played ? m.homeScore : '-'}</span>
+            <span class="bracket-score">${m.played ? (m.twoLeg !== false && m.aggHome != null ? m.aggHome : m.homeScore) : '-'}</span>
           </div>
           <div class="bracket-team ${m.winner && m.winner.id === m.away.id ? 'winner' : ''}">
             <span>${m.away.flag || ''} ${m.away.short}</span>
-            <span class="bracket-score">${m.played ? m.awayScore : '-'}</span>
+            <span class="bracket-score">${m.played ? (m.twoLeg !== false && m.aggAway != null ? m.aggAway : m.awayScore) : '-'}</span>
           </div>
           ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">pens</div>' : ''}
+          ${m.played && m.twoLeg !== false && m.aggHome != null ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + score + '</div>' : ''}
           ${(!m.played && ri === curIdx && !tournament.champion) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Play Live</button>
             <button class="btn btn-secondary btn-sm" onclick="App.simKnockoutMatch(${ri},${mi})">⚡ Instant</button>
           </div>` : ''}
           ${m.played ? `<button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%" onclick="App.viewKnockoutReport(${ri},${mi})">Match Report</button>` : ''}
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
       </div>`).join('');
   }
+
 
   function simKnockoutMatch(roundIdx, matchIdx) {
     if (!tournament || !tournament.knockout[roundIdx]) return;
     const m = tournament.knockout[roundIdx].matches[matchIdx];
     if (!m || m.played) return;
-    const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
-    m.homeScore = result.home;
-    m.awayScore = result.away;
-    m.played = true;
-    m.report = result.report;
-    if (result.pens) {
-      m.penalties = true;
-      m.winner = result.pens.home > result.pens.away ? m.home : m.away;
-    } else if (result.home === result.away) {
-      m.winner = Math.random() < 0.5 ? m.home : m.away;
-      m.penalties = true;
-    } else {
-      m.winner = result.home > result.away ? m.home : m.away;
+    const round = tournament.knockout[roundIdx];
+    const isFinal = round.name === 'Final' || round.matches.length === 1 || m.twoLeg === false;
+    if (tournament.type === 'ucl' && !isFinal) simTwoLegTie(m);
+    else if (isFinal) simSingleFinal(m);
+    else {
+      const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+      m.homeScore = result.home; m.awayScore = result.away; m.played = true; m.report = result.report;
+      if (result.pens) { m.penalties = true; m.winner = result.pens.home > result.pens.away ? m.home : m.away; }
+      else if (result.home === result.away) { m.penalties = true; m.winner = Math.random() < 0.5 ? m.home : m.away; }
+      else m.winner = result.home > result.away ? m.home : m.away;
     }
     afterKnockoutMatchPlayed(roundIdx);
   }
@@ -2096,25 +2766,43 @@ const App = (() => {
     }
     const winners = current.matches.map(m => m.winner).filter(Boolean);
     if (winners.length === 1) {
-      tournament.champion = winners[0];
-      const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
-      trophies.push({ name: tName, team: winners[0].name, type: 'Tournament', date: Date.now() });
-      try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch(e) {}
-      const stageTitle = document.getElementById('tour-stage-title');
-      if (stageTitle) stageTitle.textContent = `🏆 Champions: ${winners[0].flag || ''} ${winners[0].name}`;
-      toast(`${winners[0].name} win the ${tName}!`);
+      setChampion(winners[0]);
       renderBracket();
       renderTournamentLeaderboard();
       return;
     }
     if (winners.length < 2) { renderBracket(); return; }
-    const nextMatches = [];
-    for (let i = 0; i < winners.length; i += 2) {
-      nextMatches.push({ home: winners[i], away: winners[i+1], homeScore: null, awayScore: null, winner: null, played: false });
+    // Don't add next if already exists beyond this round
+    if (roundIdx < tournament.knockout.length - 1) {
+      renderBracket();
+      return;
     }
-    tournament.knockout.push({ name: getRoundName(winners.length), matches: nextMatches });
+    let list = winners.slice();
+    if (list.length % 2 === 1) list.pop();
+    const nextIsFinal = list.length === 2;
+    const nextMatches = [];
+    for (let i = 0; i < list.length; i += 2) {
+      if (tournament.type === 'ucl' && !nextIsFinal) {
+        nextMatches.push(makeTwoLegTie(list[i], list[i+1]));
+      } else if (tournament.type === 'ucl' && nextIsFinal) {
+        nextMatches.push({
+          home: list[i], away: list[i+1], twoLeg: false, played: false,
+          homeScore: null, awayScore: null, winner: null, report: null
+        });
+      } else {
+        nextMatches.push({
+          home: list[i], away: list[i+1], homeScore: null, awayScore: null,
+          winner: null, played: false
+        });
+      }
+    }
+    tournament.knockout.push({
+      name: getRoundName(list.length),
+      matches: nextMatches,
+      twoLeg: tournament.type === 'ucl' && !nextIsFinal
+    });
     const stageTitle = document.getElementById('tour-stage-title');
-    if (stageTitle) stageTitle.textContent = getRoundName(winners.length);
+    if (stageTitle) stageTitle.textContent = getRoundName(list.length);
     renderBracket();
     renderTournamentLeaderboard();
   }
@@ -2344,7 +3032,7 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
   };
 })();
 

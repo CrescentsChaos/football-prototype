@@ -472,3 +472,21 @@ body {
 .report-event { font-size: 0.82rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .re-min { color: var(--accent-gold); font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; }
 .fixture-item.played:hover { background: rgba(212,175,55,0.08); border-color: var(--accent-gold); }
+
+.awards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.award-mini {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.award-mini .am-title { font-size: 0.72rem; color: var(--accent-gold); font-weight: 700; margin-bottom: 6px; }
+.award-mini .am-name { font-weight: 800; font-size: 0.95rem; }
+.award-mini .am-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+.award-mini .am-empty { color: var(--text-muted); font-size: 0.85rem; }
