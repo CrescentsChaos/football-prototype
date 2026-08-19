@@ -22014,7 +22014,40 @@
     "name": "Brian Clough",
     "ovr": 96
   }
+},{
+  "id": "dortmund2002",
+  "name": "Borussia Dortmund 2001-02",
+  "short": "BVB",
+  "flag": "🇩🇪",
+  "color": "#FDE100",
+  "secondary": "#000000",
+  "players": [
+    {"id":"bvb02_1","name":"Jens Lehmann","pos":["GK"],"ovr":88,"att":15,"def":87,"phy":83,"pac":52,"tec":74,"num":1},
+    {"id":"bvb02_20","name":"Philipp Laux","pos":["GK"],"ovr":76,"att":12,"def":77,"phy":75,"pac":45,"tec":55,"num":20},
+    {"id":"bvb02_2","name":"Christian Wörns","pos":["CB"],"ovr":87,"att":52,"def":89,"phy":86,"pac":75,"tec":74,"num":2},
+    {"id":"bvb02_6","name":"Jürgen Kohler","pos":["CB"],"ovr":88,"att":48,"def":91,"phy":87,"pac":64,"tec":72,"num":6},
+    {"id":"bvb02_5","name":"Stefan Reuter","pos":["RB","RWB"],"ovr":85,"att":74,"def":83,"phy":81,"pac":80,"tec":80,"num":5},
+    {"id":"bvb02_17","name":"Dede","pos":["LB","LWB","LM"],"ovr":86,"att":80,"def":82,"phy":83,"pac":88,"tec":84,"num":17},
+    {"id":"bvb02_3","name":"Evanilson","pos":["RB","RWB"],"ovr":84,"att":78,"def":80,"phy":79,"pac":86,"tec":81,"num":3},
+    {"id":"bvb02_21","name":"Christoph Metzelder","pos":["CB"],"ovr":85,"att":50,"def":88,"phy":85,"pac":74,"tec":75,"num":21},
+    {"id":"bvb02_16","name":"Ahmed Madouhi","pos":["LB"],"ovr":73,"att":65,"def":74,"phy":72,"pac":76,"tec":68,"num":16},
+    {"id":"bvb02_18","name":"Lars Ricken","pos":["CAM","CM","RM"],"ovr":85,"att":84,"def":65,"phy":75,"pac":78,"tec":86,"num":18},
+    {"id":"bvb02_7","name":"Stefan Klos","pos":["CM","CDM"],"ovr":79,"att":65,"def":81,"phy":80,"pac":70,"tec":76,"num":7},
+    {"id":"bvb02_10","name":"Tomáš Rosický","pos":["CAM","CM","LW"],"ovr":89,"att":87,"def":58,"phy":74,"pac":86,"tec":93,"num":10},
+    {"id":"bvb02_12","name":"Ewerthon","pos":["ST","RW"],"ovr":84,"att":85,"def":38,"phy":72,"pac":91,"tec":84,"num":12},
+    {"id":"bvb02_8","name":"Márcio Amoroso","pos":["ST","CF"],"ovr":88,"att":90,"def":38,"phy":76,"pac":87,"tec":91,"num":8},
+    {"id":"bvb02_22","name":"Sead Ramović","pos":["GK"],"ovr":74,"att":10,"def":75,"phy":72,"pac":44,"tec":50,"num":22},
+    {"id":"bvb02_19","name":"Otto Addo","pos":["RW","RM","CAM"],"ovr":81,"att":80,"def":55,"phy":78,"pac":85,"tec":83,"num":19},
+    {"id":"bvb02_23","name":"Jan Koller","pos":["ST"],"ovr":88,"att":89,"def":42,"phy":94,"pac":71,"tec":81,"num":9},
+    {"id":"bvb02_15","name":"Sunday Oliseh","pos":["CDM","CM"],"ovr":85,"att":74,"def":86,"phy":88,"pac":72,"tec":82,"num":15},
+    {"id":"bvb02_4","name":"Miroslav Stević","pos":["CM","CDM"],"ovr":81,"att":75,"def":81,"phy":80,"pac":72,"tec":80,"num":4}
+  ],
+  "manager": {
+    "name": "Matthias Sammer",
+    "ovr": 90
+  }
 }
+
 
 
 
