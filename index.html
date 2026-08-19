@@ -5,7 +5,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Apex Football Simulator</title>
+  <title>APEX SIM — Football Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -30,8 +32,8 @@
     <!-- HOME -->
     <section id="view-home" class="view active">
       <div class="hero">
-        <h1>Apex Football Simulator</h1>
-        <p>Premium match engine with formations, injuries, substitutions, and full tournament simulation. Experience World Cup & Champions League glory.</p>
+        <h1>APEX SIM</h1>
+        <p>Live match engine · Formations · Injuries · UCL 36-team league · World Cup. Build your night of football.</p>
         <div class="mode-grid">
           <div class="mode-card" onclick="App.goToMatch()">
             <div class="icon">🏟️</div>
@@ -166,6 +168,9 @@
       <div id="tournament-setup" class="card">
         <div class="card-title" id="tournament-title">World Cup Setup</div>
         <p style="color:var(--text-secondary);margin-bottom:16px" id="tournament-desc">Select national teams to participate. Minimum 4, recommended 8 or 16.</p>
+        <div class="teams-toolbar" style="margin-bottom:10px">
+          <input type="search" id="tour-teams-search" placeholder="Search teams to select..." oninput="App.searchTournamentTeams(this.value)" autocomplete="off">
+        </div>
         <div class="teams-checkbox-grid" id="tournament-teams"></div>
         <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="App.selectAllTeams()">Select All</button>
@@ -244,11 +249,19 @@
     <section id="view-teams" class="view">
       <div class="card">
         <div class="card-title">Team Database</div>
-        <p style="color:var(--text-secondary);margin-bottom:16px">All teams loaded from teams.json. Add more teams to the JSON file to make them appear here.</p>
-        <div style="display:flex;gap:12px;margin-bottom:16px">
-          <button class="btn btn-secondary btn-sm" onclick="App.filterTeams('all')">All</button>
-          <button class="btn btn-secondary btn-sm" onclick="App.filterTeams('national')">National</button>
-          <button class="btn btn-secondary btn-sm" onclick="App.filterTeams('club')">Club</button>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Browse squads, managers & ratings. Tap a team for full profile.</p>
+        <div class="teams-toolbar">
+          <input type="search" id="teams-search" placeholder="Search teams..." oninput="App.searchTeams(this.value)" autocomplete="off">
+          <select id="teams-sort" onchange="App.sortTeams(this.value)">
+            <option value="name">Sort: Name</option>
+            <option value="ovr">Sort: Strength</option>
+            <option value="players">Sort: Squad size</option>
+          </select>
+          <select id="teams-type" onchange="App.filterTeams(this.value)">
+            <option value="all">All teams</option>
+            <option value="national">National</option>
+            <option value="club">Clubs</option>
+          </select>
         </div>
         <div id="teams-list" class="teams-checkbox-grid" style="max-height:none"></div>
         <p style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">Tap a team to open its full profile (manager, squad, colors).</p>
@@ -270,5 +283,6 @@
   </div>
 
   <script src="app.js"></script>
+<div class="toast" id="toast"></div>
 </body>
 </html>

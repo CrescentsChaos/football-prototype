@@ -1652,10 +1652,28 @@ const App = (() => {
   }
 
   function renderTournamentTeamSelect() {
-    const pool = tournamentType === 'worldcup' ? (teamsData.national || []) : (teamsData.club || []);
+    let pool = tournamentType === 'worldcup' ? (teamsData.national || []) : (teamsData.club || []);
+    if (tourTeamsSearch) {
+      pool = pool.filter(t =>
+        (t.name || '').toLowerCase().includes(tourTeamsSearch) ||
+        (t.short || '').toLowerCase().includes(tourTeamsSearch)
+      );
+    }
     const el = document.getElementById('tournament-teams');
     if (!el) return;
-    el.innerHTML = pool.map(t => `<label class="team-check selected" data-id="${t.id}"><input type="checkbox" value="${t.id}" checked><span>${t.flag || ''} ${t.name}</span></label>`).join('');
+    // Preserve existing checks
+    const prevChecked = new Set(
+      [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => cb.value)
+    );
+    const firstRender = prevChecked.size === 0 && !tourTeamsSearch;
+    el.innerHTML = pool.map(t => {
+      const checked = firstRender || prevChecked.has(t.id);
+      return `<label class="team-check ${checked ? 'selected' : ''}" data-id="${t.id}">
+        <input type="checkbox" value="${t.id}" ${checked ? 'checked' : ''}>
+        <span>${t.flag || ''} ${t.name}</span>
+        <span class="player-ovr" style="margin-left:auto">${teamAvgOvr(t).toFixed(0)}</span>
+      </label>`;
+    }).join('') || '<div class="empty-state"><p>No teams found</p></div>';
     el.querySelectorAll('.team-check').forEach(l => {
       l.addEventListener('click', (e) => {
         if (e.target.tagName !== 'INPUT') {
@@ -2818,22 +2836,80 @@ const App = (() => {
     if (btn) btn.textContent = 'Simulate Round';
   }
 
-  function filterTeams(type) { renderTeamsList(type); }
+  let teamsFilter = 'all';
+  let teamsSearch = '';
+  let teamsSort = 'name';
+  let tourTeamsSearch = '';
 
-  function renderTeamsList(filter) {
-    filter = filter || 'all';
+  function teamAvgOvr(t) {
+    const ps = t.players || [];
+    if (!ps.length) return 0;
+    return ps.reduce((s, p) => s + (p.ovr || 70), 0) / ps.length;
+  }
+
+  function filterTeams(type) {
+    teamsFilter = type || 'all';
+    renderTeamsList();
+  }
+
+  function searchTeams(q) {
+    teamsSearch = (q || '').trim().toLowerCase();
+    renderTeamsList();
+  }
+
+  function sortTeams(mode) {
+    teamsSort = mode || 'name';
+    renderTeamsList();
+  }
+
+  function getFilteredTeamsList() {
     let list = allTeams;
-    if (filter === 'national') list = teamsData.national || [];
-    if (filter === 'club') list = teamsData.club || [];
+    if (teamsFilter === 'national') list = teamsData.national || [];
+    if (teamsFilter === 'club') list = teamsData.club || [];
+    if (teamsSearch) {
+      list = list.filter(t =>
+        (t.name || '').toLowerCase().includes(teamsSearch) ||
+        (t.short || '').toLowerCase().includes(teamsSearch) ||
+        ((t.manager && t.manager.name) || '').toLowerCase().includes(teamsSearch)
+      );
+    }
+    list = [...list];
+    if (teamsSort === 'name') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    else if (teamsSort === 'ovr') list.sort((a, b) => teamAvgOvr(b) - teamAvgOvr(a));
+    else if (teamsSort === 'players') list.sort((a, b) => (b.players || []).length - (a.players || []).length);
+    return list;
+  }
+
+  function renderTeamsList() {
+    const list = getFilteredTeamsList();
     const el = document.getElementById('teams-list');
     if (!el) return;
-    el.innerHTML = list.map(t => `
-      <div class="team-check" style="cursor:pointer;flex-direction:column;align-items:flex-start;gap:4px" onclick="App.showTeamProfile('${t.id}')">
-        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.5rem">${t.flag || ''}</span><strong>${t.name}</strong></div>
-        <div style="font-size:0.8rem;color:var(--text-muted)">${(t.players || []).length} players · ${t.short}</div>
-        <div style="font-size:0.7rem;color:var(--accent-gold)">${(t.manager&&t.manager.name)||''}</div>
-      </div>`).join('');
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>No teams match your search.</p></div>';
+      return;
+    }
+    el.innerHTML = list.map(t => {
+      const ovr = teamAvgOvr(t).toFixed(0);
+      const primary = t.color || '#d4af37';
+      return `<div class="team-check" style="cursor:pointer;border-left:3px solid ${primary}" onclick="App.showTeamProfile('${t.id}')">
+        <div style="display:flex;align-items:center;gap:8px;width:100%">
+          <span style="font-size:1.5rem">${t.flag || '⚽'}</span>
+          <div style="flex:1;min-width:0">
+            <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</strong>
+            <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''}</div>
+            <div style="font-size:0.7rem;color:var(--gold)">${(t.manager && t.manager.name) || ''}</div>
+          </div>
+          <span class="player-ovr">${ovr}</span>
+        </div>
+      </div>`;
+    }).join('');
   }
+
+  function searchTournamentTeams(q) {
+    tourTeamsSearch = (q || '').trim().toLowerCase();
+    renderTournamentTeamSelect();
+  }
+
 
   function toast(msg) {
     const existing = document.querySelector('.toast');
@@ -3032,7 +3108,7 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
   };
 })();
 
