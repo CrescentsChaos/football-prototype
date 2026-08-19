@@ -1,5 +1,5 @@
 /* Apex Football Simulator - Fixed (no external fetch) */
-const App = (() => {
+var App = (() => {
   // ========== EMBEDDED TEAMS DATA ==========
   const TEAMS_DATA = {"national": [{"id": "bra", "name": "Brazil", "short": "BRA", "flag": "🇧🇷", "color": "#009c3b", "secondary": "#ffdf00", "players": [{"id": "bra1", "name": "Alisson", "pos": ["GK"], "ovr": 89, "att": 20, "def": 88, "phy": 85, "pac": 60, "tec": 70, "num": 1}, {"id": "bra2", "name": "Ederson", "pos": ["GK"], "ovr": 88, "att": 25, "def": 86, "phy": 84, "pac": 65, "tec": 75, "num": 12}, {"id": "bra3", "name": "Marquinhos", "pos": ["CB"], "ovr": 87, "att": 50, "def": 90, "phy": 85, "pac": 78, "tec": 75, "num": 2}, {"id": "bra4", "name": "Thiago Silva", "pos": ["CB"], "ovr": 84, "att": 45, "def": 88, "phy": 80, "pac": 60, "tec": 78, "num": 3}, {"id": "bra5", "name": "Militão", "pos": ["CB", "RB"], "ovr": 86, "att": 55, "def": 87, "phy": 86, "pac": 85, "tec": 72, "num": 4}, {"id": "bra6", "name": "Bremer", "pos": ["CB"], "ovr": 85, "att": 48, "def": 86, "phy": 88, "pac": 78, "tec": 70, "num": 5}, {"id": "bra7", "name": "Danilo", "pos": ["RB", "CB"], "ovr": 82, "att": 60, "def": 82, "phy": 80, "pac": 75, "tec": 78, "num": 22}, {"id": "bra8", "name": "Alex Sandro", "pos": ["LB"], "ovr": 81, "att": 65, "def": 80, "phy": 78, "pac": 80, "tec": 80, "num": 6}, {"id": "bra9", "name": "Carlos Augusto", "pos": ["LB", "LM"], "ovr": 80, "att": 68, "def": 78, "phy": 76, "pac": 82, "tec": 78, "num": 7}, {"id": "bra10", "name": "Casemiro", "pos": ["CDM", "CM"], "ovr": 87, "att": 70, "def": 88, "phy": 88, "pac": 65, "tec": 80, "num": 8}, {"id": "bra11", "name": "Bruno Guimarães", "pos": ["CM", "CDM"], "ovr": 85, "att": 75, "def": 80, "phy": 82, "pac": 75, "tec": 85, "num": 10}, {"id": "bra12", "name": "André", "pos": ["CDM", "CM"], "ovr": 82, "att": 65, "def": 83, "phy": 80, "pac": 78, "tec": 80, "num": 14}, {"id": "bra13", "name": "Paquetá", "pos": ["CM", "CAM"], "ovr": 84, "att": 82, "def": 70, "phy": 78, "pac": 78, "tec": 88, "num": 16}, {"id": "bra14", "name": "Joelinton", "pos": ["CM", "LW", "ST"], "ovr": 83, "att": 80, "def": 75, "phy": 88, "pac": 80, "tec": 78, "num": 18}, {"id": "bra15", "name": "Rodrygo", "pos": ["RW", "ST", "LW"], "ovr": 86, "att": 88, "def": 40, "phy": 70, "pac": 90, "tec": 88, "num": 11}, {"id": "bra16", "name": "Vinícius Jr", "pos": ["LW", "ST"], "ovr": 90, "att": 92, "def": 35, "phy": 75, "pac": 95, "tec": 90, "num": 17}, {"id": "bra17", "name": "Raphinha", "pos": ["RW", "LW"], "ovr": 84, "att": 85, "def": 45, "phy": 72, "pac": 88, "tec": 85, "num": 19}, {"id": "bra18", "name": "Endrick", "pos": ["ST", "RW"], "ovr": 81, "att": 84, "def": 30, "phy": 78, "pac": 88, "tec": 80, "num": 9}, {"id": "bra19", "name": "Richarlison", "pos": ["ST", "LW"], "ovr": 82, "att": 85, "def": 40, "phy": 85, "pac": 82, "tec": 78, "num": 21}, {"id": "bra20", "name": "Gabriel Jesus", "pos": ["ST", "RW"], "ovr": 82, "att": 84, "def": 45, "phy": 78, "pac": 85, "tec": 84, "num": 13}, {"id": "bra21", "name": "Neymar", "pos": ["LW", "CAM", "ST"], "ovr": 87, "att": 90, "def": 35, "phy": 70, "pac": 85, "tec": 94, "num": 20}, {"id": "bra22", "name": "Martinelli", "pos": ["LW", "RW"], "ovr": 83, "att": 84, "def": 40, "phy": 72, "pac": 90, "tec": 82, "num": 15}, {"id": "bra23", "name": "Douglas Luiz", "pos": ["CM", "CDM"], "ovr": 81, "att": 72, "def": 78, "phy": 78, "pac": 75, "tec": 82, "num": 23}, {"id": "bra24", "name": "Savinho", "pos": ["RW", "LW"], "ovr": 80, "att": 82, "def": 35, "phy": 68, "pac": 90, "tec": 84, "num": 24}, {"id": "bra25", "name": "Andreas Pereira", "pos": ["CAM", "CM"], "ovr": 79, "att": 78, "def": 55, "phy": 70, "pac": 78, "tec": 82, "num": 25}, {"id": "bra26", "name": "Weverton", "pos": ["GK"], "ovr": 80, "att": 15, "def": 80, "phy": 78, "pac": 55, "tec": 65, "num": 26}, {"id": "bra27", "name": "Beraldo", "pos": ["CB"], "ovr": 78, "att": 40, "def": 80, "phy": 78, "pac": 75, "tec": 70, "num": 27}, {"id": "bra28", "name": "Yan Couto", "pos": ["RB", "RW"], "ovr": 79, "att": 70, "def": 72, "phy": 70, "pac": 88, "tec": 78, "num": 28}], "manager": {"name": "Dorival Júnior", "ovr": 82}}, {"id": "arg", "name": "Argentina", "short": "ARG", "flag": "🇦🇷", "color": "#75aadb", "secondary": "#ffffff", "players": [{"id": "arg1", "name": "Emiliano Martínez", "pos": ["GK"], "ovr": 88, "att": 20, "def": 87, "phy": 85, "pac": 55, "tec": 70, "num": 1}, {"id": "arg2", "name": "Armani", "pos": ["GK"], "ovr": 80, "att": 15, "def": 80, "phy": 78, "pac": 50, "tec": 65, "num": 12}, {"id": "arg3", "name": "Cuti Romero", "pos": ["CB"], "ovr": 86, "att": 50, "def": 88, "phy": 86, "pac": 80, "tec": 70, "num": 2}, {"id": "arg4", "name": "Lisandro Martínez", "pos": ["CB", "LB"], "ovr": 85, "att": 55, "def": 87, "phy": 82, "pac": 75, "tec": 78, "num": 3}, {"id": "arg5", "name": "Otamendi", "pos": ["CB"], "ovr": 82, "att": 45, "def": 85, "phy": 82, "pac": 60, "tec": 72, "num": 4}, {"id": "arg6", "name": "Molina", "pos": ["RB"], "ovr": 83, "att": 70, "def": 80, "phy": 78, "pac": 85, "tec": 78, "num": 22}, {"id": "arg7", "name": "Tagliafico", "pos": ["LB"], "ovr": 81, "att": 65, "def": 80, "phy": 78, "pac": 80, "tec": 75, "num": 5}, {"id": "arg8", "name": "Acuña", "pos": ["LB", "LM"], "ovr": 82, "att": 72, "def": 78, "phy": 80, "pac": 82, "tec": 80, "num": 6}, {"id": "arg9", "name": "De Paul", "pos": ["CM", "RM"], "ovr": 85, "att": 80, "def": 75, "phy": 82, "pac": 78, "tec": 85, "num": 8}, {"id": "arg10", "name": "Mac Allister", "pos": ["CM", "CAM"], "ovr": 84, "att": 80, "def": 72, "phy": 78, "pac": 75, "tec": 86, "num": 10}, {"id": "arg11", "name": "Enzo Fernández", "pos": ["CM", "CDM"], "ovr": 84, "att": 78, "def": 78, "phy": 80, "pac": 75, "tec": 85, "num": 14}, {"id": "arg12", "name": "Paredes", "pos": ["CDM", "CM"], "ovr": 81, "att": 70, "def": 82, "phy": 78, "pac": 65, "tec": 82, "num": 15}, {"id": "arg13", "name": "Lo Celso", "pos": ["CAM", "CM"], "ovr": 81, "att": 80, "def": 55, "phy": 70, "pac": 78, "tec": 85, "num": 7}, {"id": "arg14", "name": "Messi", "pos": ["RW", "CAM", "ST"], "ovr": 90, "att": 92, "def": 35, "phy": 68, "pac": 82, "tec": 95, "num": 11}, {"id": "arg15", "name": "Álvarez", "pos": ["ST", "LW"], "ovr": 85, "att": 88, "def": 40, "phy": 78, "pac": 88, "tec": 84, "num": 9}, {"id": "arg16", "name": "Lautaro", "pos": ["ST"], "ovr": 87, "att": 90, "def": 35, "phy": 82, "pac": 82, "tec": 85, "num": 19}, {"id": "arg17", "name": "Di María", "pos": ["RW", "LW", "CAM"], "ovr": 84, "att": 85, "def": 40, "phy": 70, "pac": 82, "tec": 88, "num": 17}, {"id": "arg18", "name": "Dybala", "pos": ["CAM", "ST", "RW"], "ovr": 85, "att": 88, "def": 35, "phy": 68, "pac": 80, "tec": 90, "num": 20}, {"id": "arg19", "name": "Garnacho", "pos": ["LW", "RW"], "ovr": 80, "att": 82, "def": 35, "phy": 70, "pac": 90, "tec": 80, "num": 13}, {"id": "arg20", "name": "Thiago Almada", "pos": ["CAM", "LW"], "ovr": 80, "att": 82, "def": 40, "phy": 68, "pac": 85, "tec": 84, "num": 16}, {"id": "arg21", "name": "Palacios", "pos": ["CM", "CDM"], "ovr": 80, "att": 72, "def": 78, "phy": 78, "pac": 78, "tec": 80, "num": 18}, {"id": "arg22", "name": "Montiel", "pos": ["RB"], "ovr": 79, "att": 65, "def": 78, "phy": 80, "pac": 82, "tec": 72, "num": 21}, {"id": "arg23", "name": "Pezzella", "pos": ["CB"], "ovr": 78, "att": 40, "def": 80, "phy": 80, "pac": 60, "tec": 68, "num": 23}, {"id": "arg24", "name": "Rulli", "pos": ["GK"], "ovr": 79, "att": 18, "def": 79, "phy": 78, "pac": 55, "tec": 68, "num": 24}, {"id": "arg25", "name": "Gonzalo Montiel", "pos": ["RB"], "ovr": 78, "att": 62, "def": 76, "phy": 78, "pac": 80, "tec": 72, "num": 25}], "manager": {"name": "Lionel Scaloni", "ovr": 88}}, {"id": "fra", "name": "France", "short": "FRA", "flag": "🇫🇷", "color": "#002654", "secondary": "#ed2939", "players": [{"id": "fra1", "name": "Lloris", "pos": ["GK"], "ovr": 84, "att": 15, "def": 84, "phy": 80, "pac": 50, "tec": 70, "num": 1}, {"id": "fra2", "name": "Maignan", "pos": ["GK"], "ovr": 87, "att": 25, "def": 86, "phy": 84, "pac": 60, "tec": 75, "num": 12}, {"id": "fra3", "name": "Upamecano", "pos": ["CB"], "ovr": 84, "att": 50, "def": 85, "phy": 88, "pac": 82, "tec": 70, "num": 2}, {"id": "fra4", "name": "Saliba", "pos": ["CB"], "ovr": 87, "att": 45, "def": 88, "phy": 85, "pac": 80, "tec": 75, "num": 3}, {"id": "fra5", "name": "Konaté", "pos": ["CB"], "ovr": 84, "att": 48, "def": 85, "phy": 88, "pac": 80, "tec": 70, "num": 4}, {"id": "fra6", "name": "Hernández", "pos": ["LB"], "ovr": 85, "att": 75, "def": 82, "phy": 80, "pac": 88, "tec": 80, "num": 5}, {"id": "fra7", "name": "Koundé", "pos": ["RB", "CB"], "ovr": 85, "att": 65, "def": 85, "phy": 82, "pac": 85, "tec": 78, "num": 22}, {"id": "fra8", "name": "Tchouaméni", "pos": ["CDM", "CM"], "ovr": 85, "att": 70, "def": 85, "phy": 86, "pac": 75, "tec": 80, "num": 6}, {"id": "fra9", "name": "Camavinga", "pos": ["CM", "LB", "CDM"], "ovr": 84, "att": 72, "def": 80, "phy": 82, "pac": 85, "tec": 82, "num": 8}, {"id": "fra10", "name": "Rabiot", "pos": ["CM", "LM"], "ovr": 83, "att": 78, "def": 78, "phy": 85, "pac": 75, "tec": 80, "num": 10}, {"id": "fra11", "name": "Griezmann", "pos": ["CAM", "ST", "RW"], "ovr": 87, "att": 88, "def": 55, "phy": 75, "pac": 80, "tec": 90, "num": 7}, {"id": "fra12", "name": "Mbappé", "pos": ["ST", "LW"], "ovr": 91, "att": 93, "def": 35, "phy": 80, "pac": 97, "tec": 88, "num": 9}, {"id": "fra13", "name": "Dembélé", "pos": ["RW", "LW"], "ovr": 85, "att": 86, "def": 35, "phy": 70, "pac": 92, "tec": 88, "num": 11}, {"id": "fra14", "name": "Coman", "pos": ["LW", "RW"], "ovr": 84, "att": 85, "def": 35, "phy": 72, "pac": 92, "tec": 85, "num": 17}, {"id": "fra15", "name": "Giroud", "pos": ["ST"], "ovr": 82, "att": 85, "def": 40, "phy": 82, "pac": 60, "tec": 80, "num": 19}, {"id": "fra16", "name": "Thuram", "pos": ["ST", "RW"], "ovr": 84, "att": 86, "def": 40, "phy": 85, "pac": 88, "tec": 80, "num": 21}, {"id": "fra17", "name": "Fofana", "pos": ["CM", "CDM"], "ovr": 81, "att": 70, "def": 80, "phy": 82, "pac": 80, "tec": 78, "num": 14}, {"id": "fra18", "name": "Zaire-Emery", "pos": ["CM", "CDM"], "ovr": 80, "att": 72, "def": 75, "phy": 75, "pac": 82, "tec": 82, "num": 16}, {"id": "fra19", "name": "Barcola", "pos": ["LW", "RW"], "ovr": 80, "att": 82, "def": 35, "phy": 70, "pac": 90, "tec": 82, "num": 20}, {"id": "fra20", "name": "Pavard", "pos": ["RB", "CB"], "ovr": 81, "att": 60, "def": 82, "phy": 80, "pac": 75, "tec": 75, "num": 13}, {"id": "fra21", "name": "Clauss", "pos": ["RB", "RM"], "ovr": 80, "att": 72, "def": 75, "phy": 75, "pac": 85, "tec": 78, "num": 15}, {"id": "fra22", "name": "Areola", "pos": ["GK"], "ovr": 81, "att": 18, "def": 81, "phy": 78, "pac": 55, "tec": 68, "num": 23}, {"id": "fra23", "name": "Disasi", "pos": ["CB"], "ovr": 79, "att": 45, "def": 80, "phy": 85, "pac": 72, "tec": 68, "num": 18}, {"id": "fra24", "name": "Guendouzi", "pos": ["CM", "CDM"], "ovr": 80, "att": 72, "def": 75, "phy": 80, "pac": 78, "tec": 80, "num": 24}, {"id": "fra25", "name": "Kolo Muani", "pos": ["ST", "RW"], "ovr": 81, "att": 83, "def": 35, "phy": 80, "pac": 88, "tec": 78, "num": 25}], "manager": {"name": "Didier Deschamps", "ovr": 86}}, {"id": "eng", "name": "England", "short": "ENG", "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "color": "#ffffff", "secondary": "#cf081f", "players": [{"id": "eng1", "name": "Pickford", "pos": ["GK"], "ovr": 83, "att": 20, "def": 83, "phy": 80, "pac": 55, "tec": 70, "num": 1}, {"id": "eng2", "name": "Ramsdale", "pos": ["GK"], "ovr": 81, "att": 18, "def": 81, "phy": 78, "pac": 55, "tec": 68, "num": 12}, {"id": "eng3", "name": "Stones", "pos": ["CB"], "ovr": 85, "att": 55, "def": 86, "phy": 82, "pac": 72, "tec": 80, "num": 2}, {"id": "eng4", "name": "Walker", "pos": ["RB", "CB"], "ovr": 84, "att": 60, "def": 82, "phy": 80, "pac": 90, "tec": 75, "num": 4}, {"id": "eng5", "name": "Guehi", "pos": ["CB"], "ovr": 82, "att": 45, "def": 84, "phy": 82, "pac": 75, "tec": 72, "num": 3}, {"id": "eng6", "name": "Dunk", "pos": ["CB"], "ovr": 80, "att": 40, "def": 82, "phy": 82, "pac": 55, "tec": 68, "num": 5}, {"id": "eng7", "name": "Shaw", "pos": ["LB"], "ovr": 82, "att": 70, "def": 80, "phy": 78, "pac": 80, "tec": 80, "num": 6}, {"id": "eng8", "name": "Trippier", "pos": ["RB", "RM"], "ovr": 83, "att": 75, "def": 80, "phy": 75, "pac": 75, "tec": 85, "num": 22}, {"id": "eng9", "name": "Rice", "pos": ["CDM", "CM"], "ovr": 87, "att": 70, "def": 88, "phy": 88, "pac": 75, "tec": 80, "num": 8}, {"id": "eng10", "name": "Bellingham", "pos": ["CM", "CAM"], "ovr": 88, "att": 85, "def": 75, "phy": 85, "pac": 82, "tec": 88, "num": 10}, {"id": "eng11", "name": "Foden", "pos": ["CAM", "RW", "LW"], "ovr": 87, "att": 88, "def": 50, "phy": 72, "pac": 85, "tec": 90, "num": 7}, {"id": "eng12", "name": "Saka", "pos": ["RW", "RM"], "ovr": 87, "att": 88, "def": 50, "phy": 75, "pac": 90, "tec": 88, "num": 11}, {"id": "eng13", "name": "Kane", "pos": ["ST"], "ovr": 89, "att": 92, "def": 45, "phy": 82, "pac": 70, "tec": 88, "num": 9}, {"id": "eng14", "name": "Rashford", "pos": ["LW", "ST"], "ovr": 84, "att": 86, "def": 35, "phy": 78, "pac": 90, "tec": 82, "num": 17}, {"id": "eng15", "name": "Grealish", "pos": ["LW", "CAM"], "ovr": 83, "att": 84, "def": 45, "phy": 72, "pac": 78, "tec": 88, "num": 20}, {"id": "eng16", "name": "Palmer", "pos": ["CAM", "RW"], "ovr": 84, "att": 86, "def": 40, "phy": 70, "pac": 82, "tec": 88, "num": 13}, {"id": "eng17", "name": "Gordon", "pos": ["LW", "RW"], "ovr": 82, "att": 84, "def": 40, "phy": 75, "pac": 88, "tec": 80, "num": 14}, {"id": "eng18", "name": "Gallagher", "pos": ["CM"], "ovr": 80, "att": 75, "def": 75, "phy": 82, "pac": 80, "tec": 78, "num": 16}, {"id": "eng19", "name": "Mainoo", "pos": ["CM", "CDM"], "ovr": 80, "att": 72, "def": 75, "phy": 78, "pac": 80, "tec": 82, "num": 18}, {"id": "eng20", "name": "Alexander-Arnold", "pos": ["RB", "CM"], "ovr": 86, "att": 80, "def": 78, "phy": 75, "pac": 80, "tec": 90, "num": 15}, {"id": "eng21", "name": "Maguire", "pos": ["CB"], "ovr": 80, "att": 50, "def": 82, "phy": 85, "pac": 50, "tec": 70, "num": 19}, {"id": "eng22", "name": "Pope", "pos": ["GK"], "ovr": 82, "att": 15, "def": 82, "phy": 80, "pac": 50, "tec": 68, "num": 23}, {"id": "eng23", "name": "Eze", "pos": ["CAM", "LW"], "ovr": 82, "att": 84, "def": 45, "phy": 72, "pac": 82, "tec": 86, "num": 21}, {"id": "eng24", "name": "Watkins", "pos": ["ST"], "ovr": 83, "att": 85, "def": 35, "phy": 82, "pac": 85, "tec": 78, "num": 24}, {"id": "eng25", "name": "Toney", "pos": ["ST"], "ovr": 81, "att": 84, "def": 40, "phy": 82, "pac": 75, "tec": 78, "num": 25}], "manager": {"name": "Thomas Tuchel", "ovr": 85}}, {"id": "ger", "name": "Germany", "short": "GER", "flag": "🇩🇪", "color": "#000000", "secondary": "#dd0000", "players": [{"id": "ger1", "name": "Neuer", "pos": ["GK"], "ovr": 86, "att": 30, "def": 85, "phy": 82, "pac": 55, "tec": 80, "num": 1}, {"id": "ger2", "name": "ter Stegen", "pos": ["GK"], "ovr": 88, "att": 25, "def": 87, "phy": 82, "pac": 55, "tec": 78, "num": 12}, {"id": "ger3", "name": "Rüdiger", "pos": ["CB"], "ovr": 86, "att": 50, "def": 87, "phy": 90, "pac": 80, "tec": 70, "num": 2}, {"id": "ger4", "name": "Tah", "pos": ["CB"], "ovr": 84, "att": 45, "def": 85, "phy": 88, "pac": 70, "tec": 72, "num": 3}, {"id": "ger5", "name": "Schlotterbeck", "pos": ["CB"], "ovr": 83, "att": 55, "def": 84, "phy": 85, "pac": 80, "tec": 75, "num": 4}, {"id": "ger6", "name": "Raum", "pos": ["LB"], "ovr": 82, "att": 75, "def": 78, "phy": 78, "pac": 88, "tec": 80, "num": 5}, {"id": "ger7", "name": "Kimmich", "pos": ["CDM", "RB", "CM"], "ovr": 87, "att": 78, "def": 85, "phy": 80, "pac": 75, "tec": 88, "num": 6}, {"id": "ger8", "name": "Goretzka", "pos": ["CM", "CDM"], "ovr": 85, "att": 80, "def": 80, "phy": 88, "pac": 78, "tec": 82, "num": 8}, {"id": "ger9", "name": "Musiala", "pos": ["CAM", "CM", "LW"], "ovr": 87, "att": 88, "def": 50, "phy": 72, "pac": 85, "tec": 92, "num": 10}, {"id": "ger10", "name": "Wirtz", "pos": ["CAM", "CM"], "ovr": 88, "att": 88, "def": 45, "phy": 70, "pac": 85, "tec": 92, "num": 7}, {"id": "ger11", "name": "Sané", "pos": ["RW", "LW"], "ovr": 84, "att": 85, "def": 35, "phy": 72, "pac": 92, "tec": 85, "num": 11}, {"id": "ger12", "name": "Gnabry", "pos": ["RW", "ST"], "ovr": 83, "att": 84, "def": 40, "phy": 75, "pac": 85, "tec": 84, "num": 17}, {"id": "ger13", "name": "Havertz", "pos": ["ST", "CAM", "CM"], "ovr": 84, "att": 85, "def": 55, "phy": 80, "pac": 80, "tec": 84, "num": 9}, {"id": "ger14", "name": "Füllkrug", "pos": ["ST"], "ovr": 82, "att": 84, "def": 40, "phy": 85, "pac": 65, "tec": 78, "num": 19}, {"id": "ger15", "name": "Müller", "pos": ["CAM", "ST", "RW"], "ovr": 83, "att": 85, "def": 50, "phy": 72, "pac": 70, "tec": 88, "num": 20}, {"id": "ger16", "name": "Gündoğan", "pos": ["CM", "CAM"], "ovr": 84, "att": 82, "def": 70, "phy": 75, "pac": 70, "tec": 88, "num": 14}, {"id": "ger17", "name": "Andrich", "pos": ["CDM", "CM"], "ovr": 81, "att": 70, "def": 82, "phy": 85, "pac": 70, "tec": 75, "num": 15}, {"id": "ger18", "name": "Mittelstädt", "pos": ["LB"], "ovr": 80, "att": 68, "def": 78, "phy": 78, "pac": 82, "tec": 75, "num": 13}, {"id": "ger19", "name": "Henrichs", "pos": ["RB", "RM"], "ovr": 80, "att": 70, "def": 78, "phy": 78, "pac": 82, "tec": 78, "num": 22}, {"id": "ger20", "name": "Beier", "pos": ["ST", "RW"], "ovr": 79, "att": 82, "def": 35, "phy": 75, "pac": 85, "tec": 78, "num": 21}, {"id": "ger21", "name": "Nübel", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 78, "pac": 55, "tec": 68, "num": 23}, {"id": "ger22", "name": "Koch", "pos": ["CB"], "ovr": 79, "att": 45, "def": 80, "phy": 82, "pac": 70, "tec": 70, "num": 16}, {"id": "ger23", "name": "Groß", "pos": ["CM", "CDM"], "ovr": 80, "att": 75, "def": 75, "phy": 75, "pac": 70, "tec": 82, "num": 18}, {"id": "ger24", "name": "Undav", "pos": ["ST"], "ovr": 80, "att": 82, "def": 35, "phy": 80, "pac": 78, "tec": 78, "num": 24}, {"id": "ger25", "name": "Adeyemi", "pos": ["LW", "RW"], "ovr": 81, "att": 82, "def": 35, "phy": 75, "pac": 95, "tec": 78, "num": 25}], "manager": {"name": "Julian Nagelsmann", "ovr": 84}}, {"id": "esp", "name": "Spain", "short": "ESP", "flag": "🇪🇸", "color": "#aa151b", "secondary": "#f1bf00", "players": [{"id": "esp1", "name": "Unai Simón", "pos": ["GK"], "ovr": 84, "att": 18, "def": 84, "phy": 80, "pac": 55, "tec": 70, "num": 1}, {"id": "esp2", "name": "Raya", "pos": ["GK"], "ovr": 83, "att": 20, "def": 83, "phy": 78, "pac": 55, "tec": 72, "num": 12}, {"id": "esp3", "name": "Carvajal", "pos": ["RB"], "ovr": 85, "att": 70, "def": 84, "phy": 80, "pac": 80, "tec": 82, "num": 2}, {"id": "esp4", "name": "Le Normand", "pos": ["CB"], "ovr": 82, "att": 40, "def": 84, "phy": 82, "pac": 70, "tec": 70, "num": 3}, {"id": "esp5", "name": "Laporte", "pos": ["CB"], "ovr": 84, "att": 50, "def": 85, "phy": 82, "pac": 70, "tec": 78, "num": 4}, {"id": "esp6", "name": "Cubarsí", "pos": ["CB"], "ovr": 80, "att": 45, "def": 82, "phy": 75, "pac": 75, "tec": 78, "num": 5}, {"id": "esp7", "name": "Balde", "pos": ["LB"], "ovr": 83, "att": 72, "def": 78, "phy": 75, "pac": 92, "tec": 80, "num": 6}, {"id": "esp8", "name": "Rodri", "pos": ["CDM", "CM"], "ovr": 90, "att": 75, "def": 90, "phy": 85, "pac": 70, "tec": 88, "num": 8}, {"id": "esp9", "name": "Pedri", "pos": ["CM", "CAM"], "ovr": 86, "att": 80, "def": 70, "phy": 70, "pac": 80, "tec": 92, "num": 10}, {"id": "esp10", "name": "Gavi", "pos": ["CM", "LW"], "ovr": 84, "att": 78, "def": 72, "phy": 75, "pac": 82, "tec": 88, "num": 14}, {"id": "esp11", "name": "Olmo", "pos": ["CAM", "LW"], "ovr": 84, "att": 85, "def": 50, "phy": 72, "pac": 82, "tec": 88, "num": 7}, {"id": "esp12", "name": "Fabián", "pos": ["CM", "CDM"], "ovr": 83, "att": 78, "def": 78, "phy": 80, "pac": 78, "tec": 84, "num": 16}, {"id": "esp13", "name": "Williams", "pos": ["RW", "LW"], "ovr": 84, "att": 86, "def": 35, "phy": 78, "pac": 92, "tec": 82, "num": 11}, {"id": "esp14", "name": "Yamal", "pos": ["RW"], "ovr": 85, "att": 86, "def": 35, "phy": 65, "pac": 88, "tec": 90, "num": 17}, {"id": "esp15", "name": "Morata", "pos": ["ST"], "ovr": 83, "att": 85, "def": 40, "phy": 80, "pac": 80, "tec": 80, "num": 9}, {"id": "esp16", "name": "Oyarzabal", "pos": ["ST", "LW"], "ovr": 84, "att": 86, "def": 40, "phy": 78, "pac": 80, "tec": 84, "num": 19}, {"id": "esp17", "name": "Joselu", "pos": ["ST"], "ovr": 80, "att": 82, "def": 35, "phy": 82, "pac": 60, "tec": 75, "num": 21}, {"id": "esp18", "name": "Merino", "pos": ["CM", "CAM"], "ovr": 82, "att": 78, "def": 75, "phy": 82, "pac": 75, "tec": 82, "num": 18}, {"id": "esp19", "name": "Zubimendi", "pos": ["CDM", "CM"], "ovr": 82, "att": 70, "def": 82, "phy": 78, "pac": 72, "tec": 84, "num": 15}, {"id": "esp20", "name": "Grimaldo", "pos": ["LB", "LM"], "ovr": 85, "att": 80, "def": 78, "phy": 75, "pac": 85, "tec": 88, "num": 13}, {"id": "esp21", "name": "Navas", "pos": ["RB"], "ovr": 80, "att": 65, "def": 80, "phy": 72, "pac": 75, "tec": 80, "num": 22}, {"id": "esp22", "name": "Remiro", "pos": ["GK"], "ovr": 80, "att": 15, "def": 80, "phy": 78, "pac": 50, "tec": 68, "num": 23}, {"id": "esp23", "name": "Vivian", "pos": ["CB"], "ovr": 79, "att": 40, "def": 80, "phy": 80, "pac": 70, "tec": 70, "num": 20}, {"id": "esp24", "name": "Baena", "pos": ["CAM", "LW"], "ovr": 80, "att": 82, "def": 45, "phy": 70, "pac": 82, "tec": 84, "num": 24}, {"id": "esp25", "name": "Ferran", "pos": ["ST", "LW"], "ovr": 81, "att": 83, "def": 35, "phy": 75, "pac": 85, "tec": 80, "num": 25}], "manager": {"name": "Luis de la Fuente", "ovr": 83}}, {"id": "por", "name": "Portugal", "short": "POR", "flag": "🇵🇹", "color": "#006600", "secondary": "#ff0000", "players": [{"id": "por1", "name": "Costa", "pos": ["GK"], "ovr": 85, "att": 18, "def": 85, "phy": 82, "pac": 55, "tec": 70, "num": 1}, {"id": "por2", "name": "Sá", "pos": ["GK"], "ovr": 82, "att": 18, "def": 82, "phy": 80, "pac": 55, "tec": 68, "num": 12}, {"id": "por3", "name": "Dias", "pos": ["CB"], "ovr": 88, "att": 50, "def": 90, "phy": 88, "pac": 75, "tec": 75, "num": 2}, {"id": "por4", "name": "Pepe", "pos": ["CB"], "ovr": 82, "att": 45, "def": 85, "phy": 85, "pac": 55, "tec": 70, "num": 3}, {"id": "por5", "name": "Inácio", "pos": ["CB"], "ovr": 81, "att": 50, "def": 82, "phy": 80, "pac": 78, "tec": 75, "num": 4}, {"id": "por6", "name": "Cancelo", "pos": ["RB", "LB"], "ovr": 84, "att": 78, "def": 78, "phy": 75, "pac": 85, "tec": 88, "num": 22}, {"id": "por7", "name": "Mendes", "pos": ["LB"], "ovr": 85, "att": 75, "def": 80, "phy": 78, "pac": 90, "tec": 82, "num": 5}, {"id": "por8", "name": "Palhinha", "pos": ["CDM"], "ovr": 85, "att": 60, "def": 88, "phy": 90, "pac": 70, "tec": 75, "num": 6}, {"id": "por9", "name": "Vitinha", "pos": ["CM"], "ovr": 85, "att": 78, "def": 75, "phy": 72, "pac": 78, "tec": 90, "num": 8}, {"id": "por10", "name": "Bruno Fernandes", "pos": ["CAM", "CM"], "ovr": 87, "att": 88, "def": 60, "phy": 78, "pac": 75, "tec": 90, "num": 10}, {"id": "por11", "name": "Bernardo", "pos": ["CAM", "RW", "LW"], "ovr": 87, "att": 86, "def": 50, "phy": 70, "pac": 80, "tec": 92, "num": 7}, {"id": "por12", "name": "Ronaldo", "pos": ["ST"], "ovr": 86, "att": 90, "def": 30, "phy": 80, "pac": 82, "tec": 88, "num": 9}, {"id": "por13", "name": "Leão", "pos": ["LW", "ST"], "ovr": 86, "att": 88, "def": 35, "phy": 80, "pac": 92, "tec": 85, "num": 11}, {"id": "por14", "name": "Félix", "pos": ["ST", "CAM", "LW"], "ovr": 83, "att": 85, "def": 40, "phy": 72, "pac": 85, "tec": 88, "num": 19}, {"id": "por15", "name": "Neto", "pos": ["RW", "LW"], "ovr": 82, "att": 84, "def": 35, "phy": 70, "pac": 90, "tec": 84, "num": 17}, {"id": "por16", "name": "Silva", "pos": ["CM", "CAM"], "ovr": 81, "att": 78, "def": 70, "phy": 72, "pac": 78, "tec": 85, "num": 14}, {"id": "por17", "name": "Neves", "pos": ["CM", "CDM"], "ovr": 82, "att": 75, "def": 78, "phy": 75, "pac": 72, "tec": 85, "num": 16}, {"id": "por18", "name": "Dalot", "pos": ["RB", "LB"], "ovr": 81, "att": 70, "def": 78, "phy": 80, "pac": 82, "tec": 78, "num": 13}, {"id": "por19", "name": "Rúben Neves", "pos": ["CDM", "CM"], "ovr": 81, "att": 72, "def": 80, "phy": 78, "pac": 70, "tec": 84, "num": 15}, {"id": "por20", "name": "Jota", "pos": ["ST", "LW"], "ovr": 84, "att": 86, "def": 40, "phy": 78, "pac": 88, "tec": 82, "num": 21}, {"id": "por21", "name": "Trubin", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 78, "pac": 55, "tec": 68, "num": 23}, {"id": "por22", "name": "António Silva", "pos": ["CB"], "ovr": 80, "att": 45, "def": 82, "phy": 80, "pac": 75, "tec": 72, "num": 18}, {"id": "por23", "name": "Nuno Mendes", "pos": ["LB"], "ovr": 84, "att": 72, "def": 80, "phy": 78, "pac": 90, "tec": 80, "num": 20}, {"id": "por24", "name": "Rafa", "pos": ["RW", "LW"], "ovr": 80, "att": 82, "def": 35, "phy": 70, "pac": 88, "tec": 82, "num": 24}, {"id": "por25", "name": "Gonçalo Ramos", "pos": ["ST"], "ovr": 82, "att": 84, "def": 35, "phy": 82, "pac": 82, "tec": 78, "num": 25}], "manager": {"name": "Roberto Martínez", "ovr": 81}}, {"id": "ned", "name": "Netherlands", "short": "NED", "flag": "🇳🇱", "color": "#ff6600", "secondary": "#ffffff", "players": [{"id": "ned1", "name": "Verbruggen", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 78, "pac": 55, "tec": 68, "num": 1}, {"id": "ned2", "name": "Flekken", "pos": ["GK"], "ovr": 81, "att": 18, "def": 81, "phy": 80, "pac": 55, "tec": 68, "num": 12}, {"id": "ned3", "name": "Van Dijk", "pos": ["CB"], "ovr": 89, "att": 55, "def": 90, "phy": 90, "pac": 75, "tec": 78, "num": 2}, {"id": "ned4", "name": "De Ligt", "pos": ["CB"], "ovr": 85, "att": 50, "def": 86, "phy": 88, "pac": 70, "tec": 75, "num": 3}, {"id": "ned5", "name": "Aké", "pos": ["CB", "LB"], "ovr": 82, "att": 50, "def": 84, "phy": 82, "pac": 75, "tec": 75, "num": 4}, {"id": "ned6", "name": "Dumfries", "pos": ["RB"], "ovr": 83, "att": 75, "def": 78, "phy": 88, "pac": 85, "tec": 75, "num": 22}, {"id": "ned7", "name": "Blind", "pos": ["LB", "CB", "CDM"], "ovr": 80, "att": 70, "def": 80, "phy": 72, "pac": 60, "tec": 85, "num": 5}, {"id": "ned8", "name": "Reijnders", "pos": ["CM", "CAM"], "ovr": 83, "att": 80, "def": 72, "phy": 78, "pac": 82, "tec": 84, "num": 8}, {"id": "ned9", "name": "Schouten", "pos": ["CDM", "CM"], "ovr": 81, "att": 70, "def": 82, "phy": 80, "pac": 75, "tec": 80, "num": 6}, {"id": "ned10", "name": "Koopmeiners", "pos": ["CM", "CAM"], "ovr": 83, "att": 80, "def": 75, "phy": 80, "pac": 75, "tec": 85, "num": 10}, {"id": "ned11", "name": "F. de Jong", "pos": ["CM"], "ovr": 86, "att": 78, "def": 78, "phy": 80, "pac": 78, "tec": 90, "num": 14}, {"id": "ned12", "name": "Gakpo", "pos": ["LW", "ST", "CAM"], "ovr": 84, "att": 86, "def": 40, "phy": 80, "pac": 85, "tec": 84, "num": 7}, {"id": "ned13", "name": "Xavi Simons", "pos": ["CAM", "LW", "RW"], "ovr": 83, "att": 84, "def": 40, "phy": 70, "pac": 88, "tec": 88, "num": 20}, {"id": "ned14", "name": "Depay", "pos": ["ST", "LW"], "ovr": 83, "att": 85, "def": 40, "phy": 80, "pac": 82, "tec": 86, "num": 9}, {"id": "ned15", "name": "Weghorst", "pos": ["ST"], "ovr": 80, "att": 82, "def": 40, "phy": 88, "pac": 60, "tec": 72, "num": 19}, {"id": "ned16", "name": "Frimpong", "pos": ["RB", "RW"], "ovr": 84, "att": 80, "def": 70, "phy": 75, "pac": 95, "tec": 80, "num": 11}, {"id": "ned17", "name": "Malen", "pos": ["RW", "ST"], "ovr": 81, "att": 84, "def": 35, "phy": 75, "pac": 92, "tec": 80, "num": 17}, {"id": "ned18", "name": "Bergwijn", "pos": ["LW", "ST"], "ovr": 80, "att": 82, "def": 35, "phy": 75, "pac": 85, "tec": 82, "num": 13}, {"id": "ned19", "name": "Timber", "pos": ["CB", "RB", "LB"], "ovr": 81, "att": 55, "def": 82, "phy": 80, "pac": 80, "tec": 78, "num": 15}, {"id": "ned20", "name": "Geertruida", "pos": ["RB", "CB"], "ovr": 80, "att": 60, "def": 80, "phy": 78, "pac": 80, "tec": 75, "num": 16}, {"id": "ned21", "name": "Bijlow", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 78, "pac": 55, "tec": 68, "num": 23}, {"id": "ned22", "name": "Veerman", "pos": ["CM"], "ovr": 80, "att": 78, "def": 70, "phy": 75, "pac": 70, "tec": 85, "num": 18}, {"id": "ned23", "name": "Brobbey", "pos": ["ST"], "ovr": 80, "att": 82, "def": 30, "phy": 88, "pac": 85, "tec": 72, "num": 21}, {"id": "ned24", "name": "Klaassen", "pos": ["CM", "CAM"], "ovr": 79, "att": 78, "def": 70, "phy": 78, "pac": 70, "tec": 80, "num": 24}, {"id": "ned25", "name": "Zirkzee", "pos": ["ST", "CAM"], "ovr": 80, "att": 82, "def": 40, "phy": 80, "pac": 78, "tec": 82, "num": 25}], "manager": {"name": "Ronald Koeman", "ovr": 82}}], "club": [{"id": "rma", "name": "Real Madrid", "short": "RMA", "flag": "⚪", "color": "#ffffff", "secondary": "#febe10", "players": [{"id": "rma1", "name": "Courtois", "pos": ["GK"], "ovr": 90, "att": 20, "def": 89, "phy": 86, "pac": 55, "tec": 75, "num": 1}, {"id": "rma2", "name": "Lunin", "pos": ["GK"], "ovr": 82, "att": 18, "def": 82, "phy": 80, "pac": 55, "tec": 70, "num": 12}, {"id": "rma3", "name": "Militão", "pos": ["CB"], "ovr": 86, "att": 55, "def": 87, "phy": 86, "pac": 85, "tec": 72, "num": 2}, {"id": "rma4", "name": "Alaba", "pos": ["CB", "LB"], "ovr": 84, "att": 70, "def": 84, "phy": 78, "pac": 78, "tec": 85, "num": 3}, {"id": "rma5", "name": "Rüdiger", "pos": ["CB"], "ovr": 86, "att": 50, "def": 87, "phy": 90, "pac": 80, "tec": 70, "num": 4}, {"id": "rma6", "name": "Carvajal", "pos": ["RB"], "ovr": 85, "att": 70, "def": 84, "phy": 80, "pac": 80, "tec": 82, "num": 22}, {"id": "rma7", "name": "Mendy", "pos": ["LB"], "ovr": 82, "att": 65, "def": 82, "phy": 85, "pac": 85, "tec": 75, "num": 5}, {"id": "rma8", "name": "Tchouaméni", "pos": ["CDM", "CM"], "ovr": 85, "att": 70, "def": 85, "phy": 86, "pac": 75, "tec": 80, "num": 6}, {"id": "rma9", "name": "Camavinga", "pos": ["CM", "LB", "CDM"], "ovr": 84, "att": 72, "def": 80, "phy": 82, "pac": 85, "tec": 82, "num": 8}, {"id": "rma10", "name": "Valverde", "pos": ["CM", "RM", "RB"], "ovr": 88, "att": 82, "def": 80, "phy": 88, "pac": 88, "tec": 85, "num": 10}, {"id": "rma11", "name": "Bellingham", "pos": ["CM", "CAM"], "ovr": 88, "att": 85, "def": 75, "phy": 85, "pac": 82, "tec": 88, "num": 14}, {"id": "rma12", "name": "Modrić", "pos": ["CM", "CAM"], "ovr": 85, "att": 80, "def": 70, "phy": 70, "pac": 70, "tec": 92, "num": 16}, {"id": "rma13", "name": "Kroos", "pos": ["CM", "CDM"], "ovr": 86, "att": 80, "def": 75, "phy": 70, "pac": 55, "tec": 92, "num": 18}, {"id": "rma14", "name": "Vinícius Jr", "pos": ["LW", "ST"], "ovr": 90, "att": 92, "def": 35, "phy": 75, "pac": 95, "tec": 90, "num": 7}, {"id": "rma15", "name": "Rodrygo", "pos": ["RW", "ST", "LW"], "ovr": 86, "att": 88, "def": 40, "phy": 70, "pac": 90, "tec": 88, "num": 11}, {"id": "rma16", "name": "Mbappé", "pos": ["ST", "LW"], "ovr": 91, "att": 93, "def": 35, "phy": 80, "pac": 97, "tec": 88, "num": 9}, {"id": "rma17", "name": "Joselu", "pos": ["ST"], "ovr": 80, "att": 82, "def": 35, "phy": 82, "pac": 60, "tec": 75, "num": 19}, {"id": "rma18", "name": "Brahim", "pos": ["CAM", "RW"], "ovr": 82, "att": 84, "def": 40, "phy": 68, "pac": 85, "tec": 86, "num": 20}, {"id": "rma19", "name": "Güler", "pos": ["CAM", "CM"], "ovr": 80, "att": 82, "def": 40, "phy": 65, "pac": 80, "tec": 88, "num": 13}, {"id": "rma20", "name": "Ceballos", "pos": ["CM", "CAM"], "ovr": 80, "att": 75, "def": 70, "phy": 70, "pac": 75, "tec": 85, "num": 15}, {"id": "rma21", "name": "Nacho", "pos": ["CB", "LB", "RB"], "ovr": 80, "att": 45, "def": 82, "phy": 78, "pac": 70, "tec": 75, "num": 17}, {"id": "rma22", "name": "Lucas Vázquez", "pos": ["RB", "RW"], "ovr": 80, "att": 75, "def": 75, "phy": 75, "pac": 80, "tec": 80, "num": 21}, {"id": "rma23", "name": "Fran García", "pos": ["LB"], "ovr": 79, "att": 70, "def": 75, "phy": 72, "pac": 90, "tec": 78, "num": 23}, {"id": "rma24", "name": "Endrick", "pos": ["ST", "RW"], "ovr": 81, "att": 84, "def": 30, "phy": 78, "pac": 88, "tec": 80, "num": 24}, {"id": "rma25", "name": "Arda Güler", "pos": ["CAM", "RW"], "ovr": 80, "att": 82, "def": 40, "phy": 65, "pac": 80, "tec": 88, "num": 25}], "manager": {"name": "Carlo Ancelotti", "ovr": 90}}, {"id": "mci", "name": "Manchester City", "short": "MCI", "flag": "🔵", "color": "#6cabdd", "secondary": "#1c2c5b", "players": [{"id": "mci1", "name": "Ederson", "pos": ["GK"], "ovr": 88, "att": 25, "def": 86, "phy": 84, "pac": 65, "tec": 75, "num": 1}, {"id": "mci2", "name": "Ortega", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 78, "pac": 55, "tec": 68, "num": 12}, {"id": "mci3", "name": "Dias", "pos": ["CB"], "ovr": 88, "att": 50, "def": 90, "phy": 88, "pac": 75, "tec": 75, "num": 2}, {"id": "mci4", "name": "Akanji", "pos": ["CB", "RB"], "ovr": 83, "att": 55, "def": 84, "phy": 82, "pac": 78, "tec": 75, "num": 3}, {"id": "mci5", "name": "Aké", "pos": ["CB", "LB"], "ovr": 82, "att": 50, "def": 84, "phy": 82, "pac": 75, "tec": 75, "num": 4}, {"id": "mci6", "name": "Walker", "pos": ["RB"], "ovr": 84, "att": 60, "def": 82, "phy": 80, "pac": 90, "tec": 75, "num": 22}, {"id": "mci7", "name": "Gvardiol", "pos": ["LB", "CB"], "ovr": 84, "att": 65, "def": 84, "phy": 85, "pac": 80, "tec": 78, "num": 5}, {"id": "mci8", "name": "Rodri", "pos": ["CDM", "CM"], "ovr": 90, "att": 75, "def": 90, "phy": 85, "pac": 70, "tec": 88, "num": 6}, {"id": "mci9", "name": "Kovacic", "pos": ["CM"], "ovr": 83, "att": 75, "def": 75, "phy": 75, "pac": 78, "tec": 88, "num": 8}, {"id": "mci10", "name": "De Bruyne", "pos": ["CAM", "CM"], "ovr": 90, "att": 90, "def": 60, "phy": 78, "pac": 75, "tec": 94, "num": 10}, {"id": "mci11", "name": "Bernardo", "pos": ["CAM", "RW", "LW"], "ovr": 87, "att": 86, "def": 50, "phy": 70, "pac": 80, "tec": 92, "num": 7}, {"id": "mci12", "name": "Foden", "pos": ["CAM", "RW", "LW"], "ovr": 87, "att": 88, "def": 50, "phy": 72, "pac": 85, "tec": 90, "num": 20}, {"id": "mci13", "name": "Grealish", "pos": ["LW", "CAM"], "ovr": 83, "att": 84, "def": 45, "phy": 72, "pac": 78, "tec": 88, "num": 11}, {"id": "mci14", "name": "Doku", "pos": ["LW", "RW"], "ovr": 83, "att": 84, "def": 35, "phy": 72, "pac": 95, "tec": 85, "num": 17}, {"id": "mci15", "name": "Haaland", "pos": ["ST"], "ovr": 91, "att": 94, "def": 40, "phy": 90, "pac": 90, "tec": 80, "num": 9}, {"id": "mci16", "name": "Álvarez", "pos": ["ST", "CAM"], "ovr": 85, "att": 88, "def": 40, "phy": 78, "pac": 88, "tec": 84, "num": 19}, {"id": "mci17", "name": "Nunes", "pos": ["CM", "RM"], "ovr": 81, "att": 75, "def": 75, "phy": 82, "pac": 85, "tec": 80, "num": 14}, {"id": "mci18", "name": "Lewis", "pos": ["RB", "CM"], "ovr": 78, "att": 65, "def": 75, "phy": 70, "pac": 80, "tec": 78, "num": 13}, {"id": "mci19", "name": "Stones", "pos": ["CB", "CDM"], "ovr": 85, "att": 55, "def": 86, "phy": 82, "pac": 72, "tec": 80, "num": 15}, {"id": "mci20", "name": "Ake", "pos": ["CB", "LB"], "ovr": 82, "att": 50, "def": 84, "phy": 82, "pac": 75, "tec": 75, "num": 16}, {"id": "mci21", "name": "Carson", "pos": ["GK"], "ovr": 75, "att": 15, "def": 75, "phy": 75, "pac": 45, "tec": 60, "num": 23}, {"id": "mci22", "name": "Gomez", "pos": ["CB", "RB"], "ovr": 78, "att": 45, "def": 80, "phy": 78, "pac": 75, "tec": 70, "num": 18}, {"id": "mci23", "name": "McAtee", "pos": ["CAM", "CM"], "ovr": 75, "att": 78, "def": 45, "phy": 65, "pac": 78, "tec": 80, "num": 21}, {"id": "mci24", "name": "Bobb", "pos": ["RW", "CAM"], "ovr": 76, "att": 78, "def": 35, "phy": 65, "pac": 85, "tec": 80, "num": 24}, {"id": "mci25", "name": "Savinho", "pos": ["RW", "LW"], "ovr": 80, "att": 82, "def": 35, "phy": 68, "pac": 90, "tec": 84, "num": 25}], "manager": {"name": "Pep Guardiola", "ovr": 92}}, {"id": "bay", "name": "Bayern Munich", "short": "BAY", "flag": "🔴", "color": "#dc052d", "secondary": "#ffffff", "players": [{"id": "bay1", "name": "Neuer", "pos": ["GK"], "ovr": 86, "att": 30, "def": 85, "phy": 82, "pac": 55, "tec": 80, "num": 1}, {"id": "bay2", "name": "Ulreich", "pos": ["GK"], "ovr": 78, "att": 15, "def": 78, "phy": 75, "pac": 50, "tec": 65, "num": 12}, {"id": "bay3", "name": "Upamecano", "pos": ["CB"], "ovr": 84, "att": 50, "def": 85, "phy": 88, "pac": 82, "tec": 70, "num": 2}, {"id": "bay4", "name": "Kim", "pos": ["CB"], "ovr": 85, "att": 50, "def": 86, "phy": 85, "pac": 80, "tec": 75, "num": 3}, {"id": "bay5", "name": "De Ligt", "pos": ["CB"], "ovr": 85, "att": 50, "def": 86, "phy": 88, "pac": 70, "tec": 75, "num": 4}, {"id": "bay6", "name": "Davies", "pos": ["LB"], "ovr": 85, "att": 75, "def": 80, "phy": 80, "pac": 96, "tec": 80, "num": 5}, {"id": "bay7", "name": "Mazraoui", "pos": ["RB", "LB"], "ovr": 82, "att": 70, "def": 80, "phy": 75, "pac": 85, "tec": 82, "num": 22}, {"id": "bay8", "name": "Kimmich", "pos": ["CDM", "RB", "CM"], "ovr": 87, "att": 78, "def": 85, "phy": 80, "pac": 75, "tec": 88, "num": 6}, {"id": "bay9", "name": "Goretzka", "pos": ["CM", "CDM"], "ovr": 85, "att": 80, "def": 80, "phy": 88, "pac": 78, "tec": 82, "num": 8}, {"id": "bay10", "name": "Musiala", "pos": ["CAM", "CM", "LW"], "ovr": 87, "att": 88, "def": 50, "phy": 72, "pac": 85, "tec": 92, "num": 10}, {"id": "bay11", "name": "Sané", "pos": ["RW", "LW"], "ovr": 84, "att": 85, "def": 35, "phy": 72, "pac": 92, "tec": 85, "num": 7}, {"id": "bay12", "name": "Coman", "pos": ["LW", "RW"], "ovr": 84, "att": 85, "def": 35, "phy": 72, "pac": 92, "tec": 85, "num": 11}, {"id": "bay13", "name": "Kane", "pos": ["ST"], "ovr": 89, "att": 92, "def": 45, "phy": 82, "pac": 70, "tec": 88, "num": 9}, {"id": "bay14", "name": "Müller", "pos": ["CAM", "ST", "RW"], "ovr": 83, "att": 85, "def": 50, "phy": 72, "pac": 70, "tec": 88, "num": 20}, {"id": "bay15", "name": "Gnabry", "pos": ["RW", "ST"], "ovr": 83, "att": 84, "def": 40, "phy": 75, "pac": 85, "tec": 84, "num": 17}, {"id": "bay16", "name": "Palhinha", "pos": ["CDM"], "ovr": 85, "att": 60, "def": 88, "phy": 90, "pac": 70, "tec": 75, "num": 14}, {"id": "bay17", "name": "Laimer", "pos": ["CM", "RB"], "ovr": 82, "att": 75, "def": 80, "phy": 85, "pac": 85, "tec": 78, "num": 16}, {"id": "bay18", "name": "Tel", "pos": ["ST", "LW"], "ovr": 78, "att": 80, "def": 30, "phy": 72, "pac": 88, "tec": 78, "num": 19}, {"id": "bay19", "name": "Guerreiro", "pos": ["LB"], "ovr": 80, "att": 75, "def": 75, "phy": 70, "pac": 80, "tec": 85, "num": 13}, {"id": "bay20", "name": "Dier", "pos": ["CB"], "ovr": 79, "att": 45, "def": 80, "phy": 82, "pac": 55, "tec": 70, "num": 15}, {"id": "bay21", "name": "Peretz", "pos": ["GK"], "ovr": 75, "att": 15, "def": 75, "phy": 75, "pac": 50, "tec": 65, "num": 23}, {"id": "bay22", "name": "Ito", "pos": ["LW", "RW"], "ovr": 80, "att": 82, "def": 35, "phy": 70, "pac": 88, "tec": 82, "num": 18}, {"id": "bay23", "name": "Goretzka", "pos": ["CM"], "ovr": 85, "att": 80, "def": 80, "phy": 88, "pac": 78, "tec": 82, "num": 21}, {"id": "bay24", "name": "Choupo-Moting", "pos": ["ST"], "ovr": 78, "att": 80, "def": 35, "phy": 80, "pac": 70, "tec": 78, "num": 24}, {"id": "bay25", "name": "Boey", "pos": ["RB"], "ovr": 79, "att": 65, "def": 78, "phy": 78, "pac": 88, "tec": 75, "num": 25}], "manager": {"name": "Vincent Kompany", "ovr": 83}}, {"id": "liv", "name": "Liverpool", "short": "LIV", "flag": "🔴", "color": "#c8102e", "secondary": "#00b2a9", "players": [{"id": "liv1", "name": "Alisson", "pos": ["GK"], "ovr": 89, "att": 20, "def": 88, "phy": 85, "pac": 60, "tec": 70, "num": 1}, {"id": "liv2", "name": "Kelleher", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 78, "pac": 55, "tec": 68, "num": 12}, {"id": "liv3", "name": "Van Dijk", "pos": ["CB"], "ovr": 89, "att": 55, "def": 90, "phy": 90, "pac": 75, "tec": 78, "num": 2}, {"id": "liv4", "name": "Konaté", "pos": ["CB"], "ovr": 84, "att": 48, "def": 85, "phy": 88, "pac": 80, "tec": 70, "num": 3}, {"id": "liv5", "name": "Gomez", "pos": ["CB", "RB"], "ovr": 80, "att": 50, "def": 82, "phy": 80, "pac": 78, "tec": 75, "num": 4}, {"id": "liv6", "name": "Alexander-Arnold", "pos": ["RB", "CM"], "ovr": 86, "att": 80, "def": 78, "phy": 75, "pac": 80, "tec": 90, "num": 22}, {"id": "liv7", "name": "Robertson", "pos": ["LB"], "ovr": 85, "att": 78, "def": 82, "phy": 80, "pac": 85, "tec": 85, "num": 5}, {"id": "liv8", "name": "Endo", "pos": ["CDM"], "ovr": 80, "att": 60, "def": 82, "phy": 82, "pac": 70, "tec": 75, "num": 6}, {"id": "liv9", "name": "Mac Allister", "pos": ["CM", "CAM"], "ovr": 84, "att": 80, "def": 72, "phy": 78, "pac": 75, "tec": 86, "num": 8}, {"id": "liv10", "name": "Szoboszlai", "pos": ["CM", "CAM", "RM"], "ovr": 83, "att": 82, "def": 70, "phy": 82, "pac": 82, "tec": 85, "num": 10}, {"id": "liv11", "name": "Gravenberch", "pos": ["CM", "CDM"], "ovr": 82, "att": 75, "def": 78, "phy": 82, "pac": 82, "tec": 82, "num": 14}, {"id": "liv12", "name": "Salah", "pos": ["RW", "ST"], "ovr": 89, "att": 90, "def": 40, "phy": 78, "pac": 90, "tec": 88, "num": 7}, {"id": "liv13", "name": "Díaz", "pos": ["LW"], "ovr": 85, "att": 86, "def": 40, "phy": 78, "pac": 90, "tec": 85, "num": 11}, {"id": "liv14", "name": "Núñez", "pos": ["ST"], "ovr": 84, "att": 86, "def": 35, "phy": 88, "pac": 90, "tec": 78, "num": 9}, {"id": "liv15", "name": "Jota", "pos": ["ST", "LW"], "ovr": 84, "att": 86, "def": 40, "phy": 78, "pac": 88, "tec": 82, "num": 19}, {"id": "liv16", "name": "Gakpo", "pos": ["LW", "ST", "CAM"], "ovr": 84, "att": 86, "def": 40, "phy": 80, "pac": 85, "tec": 84, "num": 17}, {"id": "liv17", "name": "Elliott", "pos": ["CAM", "RW"], "ovr": 80, "att": 80, "def": 50, "phy": 65, "pac": 80, "tec": 85, "num": 20}, {"id": "liv18", "name": "Jones", "pos": ["CM", "CAM"], "ovr": 79, "att": 75, "def": 70, "phy": 72, "pac": 80, "tec": 82, "num": 16}, {"id": "liv19", "name": "Tsimikas", "pos": ["LB"], "ovr": 79, "att": 70, "def": 78, "phy": 75, "pac": 82, "tec": 78, "num": 13}, {"id": "liv20", "name": "Quansah", "pos": ["CB"], "ovr": 78, "att": 40, "def": 80, "phy": 80, "pac": 75, "tec": 70, "num": 15}, {"id": "liv21", "name": "Adrian", "pos": ["GK"], "ovr": 75, "att": 15, "def": 75, "phy": 75, "pac": 45, "tec": 60, "num": 23}, {"id": "liv22", "name": "Bradley", "pos": ["RB"], "ovr": 77, "att": 65, "def": 75, "phy": 72, "pac": 85, "tec": 75, "num": 18}, {"id": "liv23", "name": "Chiesa", "pos": ["RW", "LW", "ST"], "ovr": 82, "att": 84, "def": 40, "phy": 75, "pac": 88, "tec": 82, "num": 21}, {"id": "liv24", "name": "Bajcetic", "pos": ["CDM", "CM"], "ovr": 75, "att": 60, "def": 75, "phy": 72, "pac": 75, "tec": 75, "num": 24}, {"id": "liv25", "name": "Danns", "pos": ["ST"], "ovr": 72, "att": 75, "def": 30, "phy": 70, "pac": 80, "tec": 72, "num": 25}], "manager": {"name": "Arne Slot", "ovr": 84}}, {"id": "bar", "name": "FC Barcelona", "short": "BAR", "flag": "🔵🔴", "color": "#a50044", "secondary": "#004d98", "players": [{"id": "bar1", "name": "ter Stegen", "pos": ["GK"], "ovr": 88, "att": 25, "def": 87, "phy": 82, "pac": 55, "tec": 78, "num": 1}, {"id": "bar2", "name": "Peña", "pos": ["GK"], "ovr": 78, "att": 18, "def": 78, "phy": 75, "pac": 55, "tec": 68, "num": 12}, {"id": "bar3", "name": "Araujo", "pos": ["CB", "RB"], "ovr": 85, "att": 50, "def": 86, "phy": 88, "pac": 85, "tec": 70, "num": 2}, {"id": "bar4", "name": "Cubarsí", "pos": ["CB"], "ovr": 80, "att": 45, "def": 82, "phy": 75, "pac": 75, "tec": 78, "num": 3}, {"id": "bar5", "name": "Christensen", "pos": ["CB"], "ovr": 83, "att": 45, "def": 85, "phy": 80, "pac": 70, "tec": 78, "num": 4}, {"id": "bar6", "name": "Koundé", "pos": ["RB", "CB"], "ovr": 85, "att": 65, "def": 85, "phy": 82, "pac": 85, "tec": 78, "num": 22}, {"id": "bar7", "name": "Balde", "pos": ["LB"], "ovr": 83, "att": 72, "def": 78, "phy": 75, "pac": 92, "tec": 80, "num": 5}, {"id": "bar8", "name": "Pedri", "pos": ["CM", "CAM"], "ovr": 86, "att": 80, "def": 70, "phy": 70, "pac": 80, "tec": 92, "num": 8}, {"id": "bar9", "name": "Gavi", "pos": ["CM", "LW"], "ovr": 84, "att": 78, "def": 72, "phy": 75, "pac": 82, "tec": 88, "num": 10}, {"id": "bar10", "name": "De Jong", "pos": ["CM"], "ovr": 86, "att": 78, "def": 78, "phy": 80, "pac": 78, "tec": 90, "num": 14}, {"id": "bar11", "name": "Gündoğan", "pos": ["CM", "CAM"], "ovr": 84, "att": 82, "def": 70, "phy": 75, "pac": 70, "tec": 88, "num": 16}, {"id": "bar12", "name": "Yamal", "pos": ["RW"], "ovr": 85, "att": 86, "def": 35, "phy": 65, "pac": 88, "tec": 90, "num": 7}, {"id": "bar13", "name": "Raphinha", "pos": ["RW", "LW"], "ovr": 84, "att": 85, "def": 45, "phy": 72, "pac": 88, "tec": 85, "num": 11}, {"id": "bar14", "name": "Lewandowski", "pos": ["ST"], "ovr": 88, "att": 90, "def": 40, "phy": 82, "pac": 70, "tec": 88, "num": 9}, {"id": "bar15", "name": "Fati", "pos": ["LW", "ST"], "ovr": 80, "att": 82, "def": 30, "phy": 68, "pac": 90, "tec": 84, "num": 17}, {"id": "bar16", "name": "Ferran", "pos": ["ST", "LW"], "ovr": 81, "att": 83, "def": 35, "phy": 75, "pac": 85, "tec": 80, "num": 19}, {"id": "bar17", "name": "Olmo", "pos": ["CAM", "LW"], "ovr": 84, "att": 85, "def": 50, "phy": 72, "pac": 82, "tec": 88, "num": 20}, {"id": "bar18", "name": "Casadó", "pos": ["CDM", "CM"], "ovr": 78, "att": 65, "def": 78, "phy": 75, "pac": 75, "tec": 80, "num": 6}, {"id": "bar19", "name": "Cancelo", "pos": ["RB", "LB"], "ovr": 84, "att": 78, "def": 78, "phy": 75, "pac": 85, "tec": 88, "num": 13}, {"id": "bar20", "name": "Iñigo", "pos": ["CB"], "ovr": 82, "att": 45, "def": 84, "phy": 80, "pac": 70, "tec": 75, "num": 15}, {"id": "bar21", "name": "Iñaki Peña", "pos": ["GK"], "ovr": 78, "att": 18, "def": 78, "phy": 75, "pac": 55, "tec": 68, "num": 23}, {"id": "bar22", "name": "Fort", "pos": ["RB", "LB"], "ovr": 75, "att": 60, "def": 72, "phy": 70, "pac": 85, "tec": 75, "num": 18}, {"id": "bar23", "name": "Torre", "pos": ["CM", "CAM"], "ovr": 76, "att": 75, "def": 60, "phy": 68, "pac": 78, "tec": 80, "num": 21}, {"id": "bar24", "name": "Pau Victor", "pos": ["ST"], "ovr": 75, "att": 78, "def": 30, "phy": 75, "pac": 80, "tec": 75, "num": 24}, {"id": "bar25", "name": "Bernardo", "pos": ["CAM"], "ovr": 78, "att": 80, "def": 40, "phy": 68, "pac": 78, "tec": 84, "num": 25}], "manager": {"name": "Hansi Flick", "ovr": 86}}, {"id": "psg", "name": "Paris Saint-Germain", "short": "PSG", "flag": "🔵🔴", "color": "#004170", "secondary": "#e2b013", "players": [{"id": "psg1", "name": "Donnarumma", "pos": ["GK"], "ovr": 88, "att": 20, "def": 87, "phy": 88, "pac": 60, "tec": 70, "num": 1}, {"id": "psg2", "name": "Safonov", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 80, "pac": 55, "tec": 68, "num": 12}, {"id": "psg3", "name": "Marquinhos", "pos": ["CB"], "ovr": 87, "att": 50, "def": 90, "phy": 85, "pac": 78, "tec": 75, "num": 2}, {"id": "psg4", "name": "Skriniar", "pos": ["CB"], "ovr": 82, "att": 40, "def": 84, "phy": 85, "pac": 65, "tec": 70, "num": 3}, {"id": "psg5", "name": "Pacho", "pos": ["CB"], "ovr": 81, "att": 45, "def": 82, "phy": 82, "pac": 78, "tec": 72, "num": 4}, {"id": "psg6", "name": "Hakimi", "pos": ["RB"], "ovr": 85, "att": 80, "def": 78, "phy": 80, "pac": 92, "tec": 82, "num": 22}, {"id": "psg7", "name": "Mendes", "pos": ["LB"], "ovr": 85, "att": 75, "def": 80, "phy": 78, "pac": 90, "tec": 82, "num": 5}, {"id": "psg8", "name": "Vitinha", "pos": ["CM"], "ovr": 85, "att": 78, "def": 75, "phy": 72, "pac": 78, "tec": 90, "num": 8}, {"id": "psg9", "name": "Ugarte", "pos": ["CDM"], "ovr": 82, "att": 60, "def": 84, "phy": 85, "pac": 75, "tec": 75, "num": 6}, {"id": "psg10", "name": "Zaire-Emery", "pos": ["CM", "CDM"], "ovr": 80, "att": 72, "def": 75, "phy": 75, "pac": 82, "tec": 82, "num": 10}, {"id": "psg11", "name": "Lee", "pos": ["CAM", "CM"], "ovr": 82, "att": 82, "def": 55, "phy": 70, "pac": 80, "tec": 88, "num": 7}, {"id": "psg12", "name": "Dembélé", "pos": ["RW", "LW"], "ovr": 85, "att": 86, "def": 35, "phy": 70, "pac": 92, "tec": 88, "num": 11}, {"id": "psg13", "name": "Barcola", "pos": ["LW", "RW"], "ovr": 80, "att": 82, "def": 35, "phy": 70, "pac": 90, "tec": 82, "num": 17}, {"id": "psg14", "name": "Kvaratskhelia", "pos": ["LW", "RW"], "ovr": 86, "att": 88, "def": 40, "phy": 75, "pac": 85, "tec": 90, "num": 20}, {"id": "psg15", "name": "Mbappé", "pos": ["ST", "LW"], "ovr": 91, "att": 93, "def": 35, "phy": 80, "pac": 97, "tec": 88, "num": 9}, {"id": "psg16", "name": "Ramos", "pos": ["ST"], "ovr": 82, "att": 84, "def": 35, "phy": 82, "pac": 82, "tec": 78, "num": 19}, {"id": "psg17", "name": "Asensio", "pos": ["CAM", "RW"], "ovr": 82, "att": 84, "def": 40, "phy": 68, "pac": 78, "tec": 88, "num": 13}, {"id": "psg18", "name": "Ruiz", "pos": ["CM"], "ovr": 81, "att": 78, "def": 72, "phy": 75, "pac": 75, "tec": 85, "num": 14}, {"id": "psg19", "name": "Hernández", "pos": ["LB"], "ovr": 85, "att": 75, "def": 82, "phy": 80, "pac": 88, "tec": 80, "num": 15}, {"id": "psg20", "name": "Beraldo", "pos": ["CB"], "ovr": 78, "att": 40, "def": 80, "phy": 78, "pac": 75, "tec": 70, "num": 16}, {"id": "psg21", "name": "Navas", "pos": ["GK"], "ovr": 82, "att": 15, "def": 82, "phy": 75, "pac": 55, "tec": 75, "num": 23}, {"id": "psg22", "name": "Zaïre-Emery", "pos": ["CM"], "ovr": 80, "att": 72, "def": 75, "phy": 75, "pac": 82, "tec": 82, "num": 18}, {"id": "psg23", "name": "Mayulu", "pos": ["ST", "CAM"], "ovr": 75, "att": 78, "def": 30, "phy": 70, "pac": 80, "tec": 78, "num": 21}, {"id": "psg24", "name": "Mukiele", "pos": ["RB", "CB"], "ovr": 78, "att": 55, "def": 80, "phy": 82, "pac": 85, "tec": 70, "num": 24}, {"id": "psg25", "name": "Soler", "pos": ["CM", "RM"], "ovr": 79, "att": 75, "def": 70, "phy": 75, "pac": 78, "tec": 82, "num": 25}], "manager": {"name": "Luis Enrique", "ovr": 85}}, {"id": "int", "name": "Inter Milan", "short": "INT", "flag": "🔵⚫", "color": "#010e80", "secondary": "#000000", "players": [{"id": "int1", "name": "Sommer", "pos": ["GK"], "ovr": 87, "att": 18, "def": 86, "phy": 80, "pac": 50, "tec": 72, "num": 1}, {"id": "int2", "name": "Di Gennaro", "pos": ["GK"], "ovr": 75, "att": 15, "def": 75, "phy": 75, "pac": 45, "tec": 60, "num": 12}, {"id": "int3", "name": "Bastoni", "pos": ["CB"], "ovr": 86, "att": 60, "def": 86, "phy": 82, "pac": 75, "tec": 82, "num": 2}, {"id": "int4", "name": "Acerbi", "pos": ["CB"], "ovr": 84, "att": 40, "def": 86, "phy": 82, "pac": 55, "tec": 72, "num": 3}, {"id": "int5", "name": "De Vrij", "pos": ["CB"], "ovr": 83, "att": 40, "def": 85, "phy": 80, "pac": 60, "tec": 75, "num": 4}, {"id": "int6", "name": "Dumfries", "pos": ["RB"], "ovr": 83, "att": 75, "def": 78, "phy": 88, "pac": 85, "tec": 75, "num": 22}, {"id": "int7", "name": "Dimarco", "pos": ["LB", "LM"], "ovr": 84, "att": 80, "def": 78, "phy": 78, "pac": 82, "tec": 85, "num": 5}, {"id": "int8", "name": "Barella", "pos": ["CM"], "ovr": 87, "att": 80, "def": 80, "phy": 82, "pac": 82, "tec": 88, "num": 8}, {"id": "int9", "name": "Çalhanoğlu", "pos": ["CDM", "CM"], "ovr": 86, "att": 82, "def": 80, "phy": 75, "pac": 70, "tec": 90, "num": 6}, {"id": "int10", "name": "Mkhitaryan", "pos": ["CM", "CAM"], "ovr": 83, "att": 80, "def": 70, "phy": 78, "pac": 75, "tec": 85, "num": 10}, {"id": "int11", "name": "Lautaro", "pos": ["ST"], "ovr": 87, "att": 90, "def": 35, "phy": 82, "pac": 82, "tec": 85, "num": 9}, {"id": "int12", "name": "Thuram", "pos": ["ST", "RW"], "ovr": 84, "att": 86, "def": 40, "phy": 85, "pac": 88, "tec": 80, "num": 19}, {"id": "int13", "name": "Frattesi", "pos": ["CM", "CAM"], "ovr": 82, "att": 80, "def": 70, "phy": 80, "pac": 82, "tec": 80, "num": 14}, {"id": "int14", "name": "Taremi", "pos": ["ST"], "ovr": 80, "att": 82, "def": 35, "phy": 78, "pac": 75, "tec": 82, "num": 21}, {"id": "int15", "name": "Asllani", "pos": ["CDM", "CM"], "ovr": 78, "att": 70, "def": 78, "phy": 72, "pac": 75, "tec": 80, "num": 15}, {"id": "int16", "name": "Darmian", "pos": ["RB", "CB", "LB"], "ovr": 80, "att": 60, "def": 82, "phy": 75, "pac": 70, "tec": 75, "num": 7}, {"id": "int17", "name": "Carlos Augusto", "pos": ["LB", "LM"], "ovr": 80, "att": 68, "def": 78, "phy": 76, "pac": 82, "tec": 78, "num": 11}, {"id": "int18", "name": "Bisseck", "pos": ["CB"], "ovr": 78, "att": 45, "def": 80, "phy": 85, "pac": 80, "tec": 68, "num": 16}, {"id": "int19", "name": "Arnautovic", "pos": ["ST"], "ovr": 79, "att": 82, "def": 35, "phy": 82, "pac": 70, "tec": 78, "num": 13}, {"id": "int20", "name": "Pavard", "pos": ["CB", "RB"], "ovr": 81, "att": 60, "def": 82, "phy": 80, "pac": 75, "tec": 75, "num": 17}, {"id": "int21", "name": "Audero", "pos": ["GK"], "ovr": 78, "att": 15, "def": 78, "phy": 78, "pac": 50, "tec": 65, "num": 23}, {"id": "int22", "name": "Zielinski", "pos": ["CM", "CAM"], "ovr": 81, "att": 80, "def": 65, "phy": 70, "pac": 78, "tec": 86, "num": 18}, {"id": "int23", "name": "Correa", "pos": ["ST", "RW"], "ovr": 78, "att": 80, "def": 35, "phy": 70, "pac": 85, "tec": 82, "num": 20}, {"id": "int24", "name": "Buchanan", "pos": ["RW", "RB"], "ovr": 77, "att": 78, "def": 55, "phy": 72, "pac": 90, "tec": 75, "num": 24}, {"id": "int25", "name": "Acerbi", "pos": ["CB"], "ovr": 84, "att": 40, "def": 86, "phy": 82, "pac": 55, "tec": 72, "num": 25}], "manager": {"name": "Simone Inzaghi", "ovr": 87}}, {"id": "ars", "name": "Arsenal", "short": "ARS", "flag": "🔴⚪", "color": "#ef0107", "secondary": "#ffffff", "players": [{"id": "ars1", "name": "Raya", "pos": ["GK"], "ovr": 83, "att": 20, "def": 83, "phy": 78, "pac": 55, "tec": 72, "num": 1}, {"id": "ars2", "name": "Ramsdale", "pos": ["GK"], "ovr": 81, "att": 18, "def": 81, "phy": 78, "pac": 55, "tec": 68, "num": 12}, {"id": "ars3", "name": "Saliba", "pos": ["CB"], "ovr": 87, "att": 45, "def": 88, "phy": 85, "pac": 80, "tec": 75, "num": 2}, {"id": "ars4", "name": "Gabriel", "pos": ["CB"], "ovr": 85, "att": 50, "def": 86, "phy": 88, "pac": 75, "tec": 72, "num": 3}, {"id": "ars5", "name": "White", "pos": ["RB", "CB"], "ovr": 83, "att": 60, "def": 84, "phy": 80, "pac": 75, "tec": 78, "num": 4}, {"id": "ars6", "name": "Timber", "pos": ["RB", "LB", "CB"], "ovr": 81, "att": 55, "def": 82, "phy": 80, "pac": 80, "tec": 78, "num": 22}, {"id": "ars7", "name": "Zinchenko", "pos": ["LB", "CM"], "ovr": 80, "att": 75, "def": 78, "phy": 72, "pac": 75, "tec": 85, "num": 5}, {"id": "ars8", "name": "Rice", "pos": ["CDM", "CM"], "ovr": 87, "att": 70, "def": 88, "phy": 88, "pac": 75, "tec": 80, "num": 6}, {"id": "ars9", "name": "Ødegaard", "pos": ["CAM", "CM"], "ovr": 87, "att": 86, "def": 55, "phy": 70, "pac": 78, "tec": 92, "num": 10}, {"id": "ars10", "name": "Partey", "pos": ["CDM", "CM"], "ovr": 82, "att": 70, "def": 82, "phy": 82, "pac": 70, "tec": 80, "num": 8}, {"id": "ars11", "name": "Saka", "pos": ["RW", "RM"], "ovr": 87, "att": 88, "def": 50, "phy": 75, "pac": 90, "tec": 88, "num": 7}, {"id": "ars12", "name": "Martinelli", "pos": ["LW", "RW"], "ovr": 83, "att": 84, "def": 40, "phy": 72, "pac": 90, "tec": 82, "num": 11}, {"id": "ars13", "name": "Trossard", "pos": ["LW", "ST", "CAM"], "ovr": 82, "att": 84, "def": 45, "phy": 72, "pac": 82, "tec": 85, "num": 17}, {"id": "ars14", "name": "Havertz", "pos": ["ST", "CAM", "CM"], "ovr": 84, "att": 85, "def": 55, "phy": 80, "pac": 80, "tec": 84, "num": 9}, {"id": "ars15", "name": "Jesus", "pos": ["ST", "RW"], "ovr": 82, "att": 84, "def": 45, "phy": 78, "pac": 85, "tec": 84, "num": 19}, {"id": "ars16", "name": "Nwaneri", "pos": ["CAM", "CM"], "ovr": 75, "att": 78, "def": 45, "phy": 65, "pac": 80, "tec": 80, "num": 20}, {"id": "ars17", "name": "Jorginho", "pos": ["CDM", "CM"], "ovr": 80, "att": 70, "def": 80, "phy": 70, "pac": 60, "tec": 88, "num": 14}, {"id": "ars18", "name": "Tomiyasu", "pos": ["RB", "LB", "CB"], "ovr": 80, "att": 55, "def": 82, "phy": 80, "pac": 75, "tec": 75, "num": 13}, {"id": "ars19", "name": "Kiwior", "pos": ["CB", "LB"], "ovr": 78, "att": 45, "def": 80, "phy": 80, "pac": 75, "tec": 70, "num": 15}, {"id": "ars20", "name": "Neto", "pos": ["GK"], "ovr": 80, "att": 18, "def": 80, "phy": 78, "pac": 55, "tec": 68, "num": 23}, {"id": "ars21", "name": "Calafiori", "pos": ["LB", "CB"], "ovr": 81, "att": 65, "def": 80, "phy": 80, "pac": 80, "tec": 80, "num": 16}, {"id": "ars22", "name": "Merino", "pos": ["CM", "CAM"], "ovr": 82, "att": 78, "def": 75, "phy": 82, "pac": 75, "tec": 82, "num": 18}, {"id": "ars23", "name": "Sterling", "pos": ["LW", "RW"], "ovr": 80, "att": 82, "def": 40, "phy": 70, "pac": 88, "tec": 82, "num": 21}, {"id": "ars24", "name": "Zinchenko", "pos": ["LB"], "ovr": 80, "att": 75, "def": 78, "phy": 72, "pac": 75, "tec": 85, "num": 24}, {"id": "ars25", "name": "Vieira", "pos": ["CM", "CAM"], "ovr": 76, "att": 75, "def": 60, "phy": 70, "pac": 80, "tec": 80, "num": 25}], "manager": {"name": "Mikel Arteta", "ovr": 88}}]};
 
@@ -295,11 +295,17 @@ const App = (() => {
   }
 
   function openSquadBuilder(side) {
+    try {
     sbSide = side;
-    const teamId = document.getElementById(side + '-team') && document.getElementById(side + '-team').value;
-    const formKey = (document.getElementById(side + '-formation') && document.getElementById(side + '-formation').value) || '4-3-3';
+    const teamSel = document.getElementById(side + '-team');
+    const formSel = document.getElementById(side + '-formation');
+    const teamId = teamSel && teamSel.value;
+    const formKey = (formSel && formSel.value) || '4-3-3';
     const team = getTeam(teamId);
     if (!team) { toast('Select a team first'); return; }
+    const panel = document.getElementById('squad-builder-panel');
+    if (!panel) { toast('Squad builder UI missing — re-upload index.html'); return; }
+
     const formation = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
     const players = [];
     const seenP = new Set();
@@ -318,8 +324,13 @@ const App = (() => {
     }
     sbDraft = { team: team, formation: formKey, slots: slots, bench: bench, players: players };
     document.getElementById('sb-title').textContent = (side === 'home' ? 'HOME' : 'AWAY') + ' · ' + team.name + ' · ' + formKey;
-    document.getElementById('squad-builder-panel').style.display = 'block';
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     renderSquadBuilderUI();
+    } catch (err) {
+      console.error(err);
+      toast('Squad builder error: ' + (err && err.message ? err.message : err));
+    }
   }
 
   function getUsedInDraft() {
@@ -506,7 +517,7 @@ const App = (() => {
     const pm2 = document.getElementById('post-match-ratings'); if (pm2) { pm2.style.display = 'none'; pm2.innerHTML = ''; }
     const kickMsgs = [
       'Kick off! The referee starts the contest.',
-      'And we're underway!',
+      "And we're underway!",
       'The match is live — kick-off taken.',
       'Here we go! First whistle blown.'
     ];
@@ -527,6 +538,72 @@ const App = (() => {
 
   
   
+  
+  function showETPrompt(drawn, pensOnly) {
+    let el = document.getElementById('et-prompt');
+    if (!el) {
+      const live = document.getElementById('match-live');
+      if (!live) return;
+      el = document.createElement('div');
+      el.id = 'et-prompt';
+      el.className = 'et-prompt';
+      live.insertBefore(el, live.firstChild.nextSibling);
+    }
+    if (pensOnly) {
+      el.innerHTML = `<p>Still level after extra time. Take the penalty shootout?</p>
+        <button class="btn btn-primary btn-sm" onclick="App.continueToPens()">⚽ Penalties</button>
+        <button class="btn btn-secondary btn-sm" onclick="App.skipETAndEnd()">End as draw</button>`;
+    } else {
+      el.innerHTML = `<p>Full time and the scores are level.</p>
+        ${currentMatch.allowET ? '<button class="btn btn-primary btn-sm" onclick="App.continueToET()">⏱ Extra Time</button>' : ''}
+        ${currentMatch.allowPens ? '<button class="btn btn-primary btn-sm" onclick="App.continueToPens()">⚽ Penalties</button>' : ''}
+        <button class="btn btn-secondary btn-sm" onclick="App.skipETAndEnd()">End as draw</button>`;
+    }
+    el.classList.add('show');
+  }
+
+  function hideETPrompt() {
+    const el = document.getElementById('et-prompt');
+    if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+  }
+
+  function continueToET() {
+    const m = currentMatch;
+    if (!m) return;
+    hideETPrompt();
+    m._awaitingET = false;
+    m.inET = true;
+    m.etStart = m.minute;
+    m.status = 'Extra Time';
+    addEvent(m.minute, 'et', 'Extra time begins — two periods of 15 minutes', null);
+    updateScoreboard();
+    isPlaying = true;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '⏸ Pause';
+    const speed = parseInt((document.getElementById('sim-speed') || {}).value || '400', 10);
+    clearInterval(simInterval);
+    simInterval = setInterval(() => tick(false), speed);
+  }
+
+  function continueToPens() {
+    const m = currentMatch;
+    if (!m) return;
+    hideETPrompt();
+    m._awaitingET = false;
+    m._awaitingPens = false;
+    runPenaltyShootout();
+  }
+
+  function skipETAndEnd() {
+    hideETPrompt();
+    if (currentMatch) {
+      currentMatch._awaitingET = false;
+      currentMatch._awaitingPens = false;
+    }
+    endMatch();
+  }
+
+
   function runPenaltyShootout() {
     const m = currentMatch;
     if (!m || m.inPens) return;
@@ -761,25 +838,39 @@ const App = (() => {
   }
 
   function pickMissDesc(shooter) {
-    const list = [
-      'drags a low shot inches wide of the far post',
-      'blasts a rising shot over the crossbar',
-      'sees a dipping effort glance off the top of the bar',
-      'side-foots wide from a promising angle',
-      'scuffs a close-range chance wide of the near post',
-      'hits a first-time volley into the stands',
-      'curls a shot just beyond the far upright',
-      'fires a low screamer that skims past the post',
-      'leans back and sends a header over',
-      'is denied by the angle as the shot rolls across the face of goal',
-      'snatches at the chance and ballooned it over',
-      'is closed down and the shot lacks conviction',
-      'sees a deflected effort loop harmlessly wide',
-      'cannot keep the half-volley down',
-      'is stretching and can only prod it past the post'
+    const foot = Math.random() < 0.55 ? 'right footed' : 'left footed';
+    const areas = [
+      foot + ' shot from outside the box misses to the left',
+      foot + ' shot from outside the box is too high',
+      foot + ' shot from the centre of the box misses to the right',
+      foot + ' shot from the right side of the box is close, but misses to the left',
+      foot + ' shot from the left side of the box misses to the right',
+      'header from the centre of the box misses to the left',
+      'header from the centre of the box is too high',
+      foot + ' shot from outside the box is blocked',
+      foot + ' shot from the centre of the box is blocked',
+      foot + ' shot from a difficult angle on the right misses to the left',
+      'first-time ' + foot + ' shot from outside the box is high and wide to the left',
+      foot + ' volley from the centre of the box is too high'
     ];
-    return list[Math.floor(Math.random() * list.length)];
+    return areas[Math.floor(Math.random() * areas.length)];
   }
+
+  function sofascoreMiss(shooter, team) {
+    return 'Attempt missed. <span class="player">' + shooter.name + '</span> (' + (team.short || team.name) + ') ' + pickMissDesc(shooter) + '.';
+  }
+
+  function sofascoreSave(gk, shooter, team, defTeam) {
+    const foot = Math.random() < 0.55 ? 'right footed' : 'left footed';
+    const lines = [
+      'Attempt saved. <span class="player">' + shooter.name + '</span> (' + (team.short||'') + ') ' + foot + ' shot from the centre of the box is saved in the centre of the goal by <span class="player">' + gk.name + '</span> (' + (defTeam.short||'') + ').',
+      'Attempt saved. <span class="player">' + shooter.name + '</span> (' + (team.short||'') + ') ' + foot + ' shot from outside the box is saved in the bottom left corner by <span class="player">' + gk.name + '</span>.',
+      'Attempt saved. <span class="player">' + shooter.name + '</span> (' + (team.short||'') + ') header from the centre of the box is saved in the top centre of the goal by <span class="player">' + gk.name + '</span>.',
+      '<span class="player">' + gk.name + '</span> (' + (defTeam.short||'') + ') saves a ' + foot + ' shot from <span class="player">' + shooter.name + '</span> at full stretch.'
+    ];
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
+
 
   function pickSaveDesc(gk, shooter) {
     const list = [
@@ -964,43 +1055,49 @@ const App = (() => {
       m.status = '2nd Half';
       addEvent(46, 'whistle', 'Second half begins', null);
     }
-    if (m.minute >= 90 && !m.inET && !m.inPens) {
+    if (m.minute >= 90 && !m.inET && !m.inPens && !m._awaitingET) {
       if (!m._stoppage) m._stoppage = 1 + Math.floor(Math.random() * 5);
       if (m.minute >= 90 + m._stoppage) {
-        // Check ET
-        if (m.allowET && m.home.score === m.away.score) {
-          m.inET = true;
-          m.status = 'Extra Time';
-          addEvent(m.minute, 'et', '⏱ Full time — scores level! Extra time begins', null);
-          m.etStart = m.minute;
+        const drawn = m.home.score === m.away.score;
+        if (drawn && (m.allowET || m.allowPens)) {
+          // Pause — user chooses to continue to ET / pens
+          m._awaitingET = true;
+          m.status = 'Full Time';
+          addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
+          clearInterval(simInterval); isPlaying = false;
+          const btn = document.getElementById('btn-play');
+          if (btn) btn.textContent = '▶ Play';
           updateScoreboard();
-          return;
-        }
-        if (m.allowPens && m.home.score === m.away.score) {
-          runPenaltyShootout();
+          showETPrompt(drawn);
           return;
         }
         endMatch();
         return;
       }
-      m.status = 'Stoppage Time';
+      m.status = 'Stoppage ' + (m.minute - 90) + "'";
     }
-    // Extra time: 2x15 min (simplified as +30 minutes)
+    // Extra time running
     if (m.inET && !m.inPens) {
       const etMin = m.minute - (m.etStart || 90);
       if (etMin >= 30) {
-        if (m.allowPens && m.home.score === m.away.score) {
-          runPenaltyShootout();
+        if (m.home.score === m.away.score && m.allowPens) {
+          m._awaitingPens = true;
+          m.status = 'ET Full Time';
+          addEvent(m.minute, 'et', 'Extra time finished — still level. Penalty shootout?', null);
+          clearInterval(simInterval); isPlaying = false;
+          const btn = document.getElementById('btn-play');
+          if (btn) btn.textContent = '▶ Play';
+          updateScoreboard();
+          showETPrompt(true, true);
           return;
         }
         endMatch();
         return;
       }
       if (etMin === 15) {
-        addEvent(m.minute, 'et', 'End of first half of extra time', null);
+        addEvent(m.minute, 'et', 'End of the first period of extra time', null);
       }
-      m.status = 'Extra Time ' + Math.min(etMin, 30) + "'";
-      // Higher chance of events in ET fatigue
+      m.status = 'ET ' + Math.min(etMin, 30) + "'";
       if (Math.random() < 0.006) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     }
     generateEvents();
@@ -1029,14 +1126,16 @@ const App = (() => {
       if (Math.random() < 0.08) {
         const side = Math.random() < 0.5 ? m.home : m.away;
         const p = pickPlayer(side, ['CM','CDM','CAM','CB']);
-        if (p) const quiet = [
-          `<span class="player">${p.name}</span> recycles possession calmly`,
-          `<span class="player">${p.name}</span> breaks up the play and resets`,
-          `<span class="player">${p.name}</span> switches the point of attack`,
-          `<span class="player">${p.name}</span> finds a teammate under no pressure`,
-          `Spell of possession — <span class="player">${p.name}</span> dictates the tempo`
-        ];
-        addEvent(m.minute, 'pass', quiet[Math.floor(Math.random()*quiet.length)], side === m.home ? 'home' : 'away');
+        if (p) {
+          const quiet = [
+            `<span class="player">${p.name}</span> recycles possession calmly`,
+            `<span class="player">${p.name}</span> breaks up the play and resets`,
+            `<span class="player">${p.name}</span> switches the point of attack`,
+            `<span class="player">${p.name}</span> finds a teammate under no pressure`,
+            `Spell of possession — <span class="player">${p.name}</span> dictates the tempo`
+          ];
+          addEvent(m.minute, 'pass', quiet[Math.floor(Math.random()*quiet.length)], side === m.home ? 'home' : 'away');
+        }
       }
       return;
     }
@@ -1085,9 +1184,9 @@ const App = (() => {
             if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
             m.playerMatchStats[assister.id].assists++;
             m.playerMatchStats[assister.id].xa += 0.3 + Math.random() * 0.4;
-            addEvent(m.minute, 'goal', `⚽ <span class="player">${shooter.name}</span> (${shooter.num||''}) — ${method.desc}. Assist: <span class="player">${assister.name}</span>`, attackingSide, true);
+            addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}. Assisted by <span class="player">${assister.name}</span>.`, attackingSide, true);
           } else {
-            addEvent(m.minute, 'goal', `⚽ <span class="player">${shooter.name}</span> (${shooter.num||''}) — ${method.desc}`, attackingSide, true);
+            addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}.`, attackingSide, true);
           }
           maybeOffsideDisallow(attackingSide, shooter, m.minute);
         }
@@ -1096,7 +1195,7 @@ const App = (() => {
         if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
         m.playerMatchStats[shooter.id].shots++;
         m.playerMatchStats[shooter.id].xg += 0.05 + Math.random()*0.1;
-        addEvent(m.minute, 'miss', `<span class="player">${shooter.name}</span> ${pickMissDesc(shooter)}`, attackingSide);
+        addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
       }
     } else if (r < 0.32) {
       attTeam.stats.corners++;
@@ -1397,13 +1496,9 @@ const App = (() => {
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
     // Carry slot for in player
     inPlayer.slot = outPlayer.slot || (outPlayer.pos || ['CM'])[0];
-    const phrases = [
-      `🔄 <span class="player">${inPlayer.name}</span> comes on for <span class="player">${outPlayer.name}</span>`,
-      `🔄 Change for ${sideData.team.short}: <span class="player">${outPlayer.name}</span> off, <span class="player">${inPlayer.name}</span> on`,
-      `🔄 Tactical switch — <span class="player">${inPlayer.name}</span> replaces <span class="player">${outPlayer.name}</span>`,
-      `🔄 Fresh legs: <span class="player">${inPlayer.name}</span> replaces a tiring <span class="player">${outPlayer.name}</span>`
-    ];
-    addEvent(m.minute, 'sub', phrases[Math.floor(Math.random()*phrases.length)] + ` (${used+1}/${m.maxSubs})`, side);
+    addEvent(m.minute, 'sub',
+      `Substitution · ${sideData.team.short}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
+      side);
     if (!m.silentDeep) renderLineups();
   }
 
@@ -1517,14 +1612,117 @@ const App = (() => {
     if (idx >= 0) arr.splice(idx, 1);
   }
 
+  
+  function renderMomentumAndHeat() {
+    const m = currentMatch;
+    if (!m || m.silentDeep) return;
+    let wrap = document.getElementById('momentum-heat');
+    if (!wrap) {
+      const live = document.getElementById('match-live');
+      const lineup = document.getElementById('lineup-display');
+      if (!live) return;
+      wrap = document.createElement('div');
+      wrap.id = 'momentum-heat';
+      if (lineup && lineup.parentNode) lineup.parentNode.insertBefore(wrap, lineup);
+      else live.appendChild(wrap);
+    }
+    wrap.innerHTML = `
+      <div class="momentum-wrap"><h4>Match Momentum</h4><canvas id="momentum-canvas" height="80"></canvas></div>
+      <div class="heatmap-wrap"><h4>Activity Heat (zones)</h4><canvas id="heatmap-canvas" height="140"></canvas></div>`;
+    // Momentum: walk events, +1 home goal/shot, -1 away
+    const canvas = document.getElementById('momentum-canvas');
+    if (canvas) {
+      const w = canvas.parentElement.clientWidth || 300;
+      canvas.width = w;
+      const ctx = canvas.getContext('2d');
+      const events = m.events || [];
+      let mom = 0;
+      const pts = [{x:0, y:0}];
+      events.forEach((e, i) => {
+        let d = 0;
+        if (e.type === 'goal') d = e.side === 'home' ? 3 : -3;
+        else if (e.type === 'shot' || e.type === 'miss') d = e.side === 'home' ? 1 : -1;
+        else if (e.type === 'save') d = e.side === 'home' ? -0.8 : 0.8;
+        else if (e.type === 'yellow' || e.type === 'red') d = e.side === 'home' ? -0.5 : 0.5;
+        mom = Math.max(-12, Math.min(12, mom + d));
+        pts.push({ x: (e.minute || i) / Math.max(m.minute, 90), y: mom });
+      });
+      ctx.clearRect(0, 0, w, 80);
+      ctx.fillStyle = '#0a1210';
+      ctx.fillRect(0, 0, w, 80);
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath(); ctx.moveTo(0, 40); ctx.lineTo(w, 40); ctx.stroke();
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const x = p.x * w;
+        const y = 40 - (p.y / 12) * 36;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = '#f0c14b';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // fill under
+      if (pts.length > 1) {
+        ctx.lineTo(pts[pts.length-1].x * w, 40);
+        ctx.lineTo(0, 40);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(240,193,75,0.15)';
+        ctx.fill();
+      }
+    }
+    // Heatmap: 3x3 zones from event sides + random based on possession
+    const hc = document.getElementById('heatmap-canvas');
+    if (hc) {
+      const w = hc.parentElement.clientWidth || 300;
+      hc.width = w;
+      const ctx = hc.getContext('2d');
+      const grid = Array.from({length: 3}, () => [0,0,0]);
+      (m.events || []).forEach(e => {
+        const row = e.side === 'home' ? 2 : (e.side === 'away' ? 0 : 1);
+        const col = Math.floor(Math.random() * 3);
+        let wgt = 1;
+        if (e.type === 'goal') wgt = 4;
+        else if (e.type === 'shot' || e.type === 'miss') wgt = 2;
+        else if (e.type === 'save') wgt = 2;
+        grid[row][col] += wgt;
+      });
+      // blend possession
+      const hp = (m.home.stats && m.home.stats.possession) || 50;
+      for (let c = 0; c < 3; c++) {
+        grid[2][c] += hp / 25;
+        grid[0][c] += (100 - hp) / 25;
+      }
+      let max = 1;
+      grid.forEach(r => r.forEach(v => { if (v > max) max = v; }));
+      const cellW = w / 3, cellH = 140 / 3;
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const t = grid[r][c] / max;
+          ctx.fillStyle = `rgba(34,197,94,${0.1 + t * 0.75})`;
+          ctx.fillRect(c * cellW + 1, r * cellH + 1, cellW - 2, cellH - 2);
+        }
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.strokeRect(0.5, 0.5, w - 1, 139);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(m.away.team.short || 'AWAY', 8, 14);
+      ctx.fillText(m.home.team.short || 'HOME', 8, 134);
+    }
+  }
+
   function endMatch() {
     const m = currentMatch;
     if (!m) return;
-    m.finished = true; m.status = 'Full Time'; m.minute = 90;
+    m.finished = true;
+    if (!m.inET && !m.inPens) { m.status = 'Full Time'; if (m.minute < 90) m.minute = 90; }
+    else if (m.inPens) m.status = 'FT (Pens)';
+    else m.status = 'Full Time (ET)';
     clearInterval(simInterval); isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
-    addEvent(90, 'whistle', `Full Time! ${m.home.team.short} ${m.home.score} - ${m.away.score} ${m.away.team.short}`, null);
+    try { renderMomentumAndHeat(); } catch(e) {}
+    addEvent(m.minute || 90, 'whistle', `Full Time! ${m.home.team.short} ${m.home.score} - ${m.away.score} ${m.away.team.short}`, null);
     if (m.away.score === 0) {
       const gk = (m.home.squad.starting || []).find(p => (p.pos || []).includes('GK'));
       if (gk) recordStat('cleanSheets', gk, m.home.team);
@@ -3325,7 +3523,7 @@ const App = (() => {
     }).join('');
   }
 
-  function searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive(q) {
+  function searchTournamentTeams(q) {
     tourTeamsSearch = (q || '').trim().toLowerCase();
     renderTournamentTeamSelect();
   }
@@ -3615,9 +3813,12 @@ const App = (() => {
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
-    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture, returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, resetLeaderboard, searchTeams, sortTeams, filterTeams, searchTournamentTeams, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive, setTacticsLive, continueToET, continueToPens, skipETAndEnd, renderMomentumAndHeat, openSquadBuilder, setSquadSlot, toggleBench, autoFillSquadBuilder, saveSquadBuilder, closeSquadBuilder, playKnockoutMatch, simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
   };
 })();
+
+// Expose for inline onclick handlers
+try { window.App = App; } catch (e) {}
 
 // Start the app
 if (document.readyState === 'loading') {
