@@ -147,7 +147,7 @@
 , {
   "id": "wal2016",
   "name": "Wales 2016",
-  "short": "WAL",
+  "short": "WAL16",
   "flag": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
   "color": "#D40000",
   "secondary": "#001489",
@@ -179,6 +179,142 @@
   "manager": {
     "name": "Chris Coleman",
     "ovr": 92
+  }
+}
+,{
+  "id": "asroma2000",
+  "name": "AS Roma 2000-01",
+  "short": "ASR",
+  "flag": "🇮🇹",
+  "color": "#8E1F2F",
+  "secondary": "#F0BC42",
+  "players": [
+    {"id":"asr00_1","name":"Francesco Antonioli","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":76,"pac":48,"tec":60,"num":1},
+    {"id":"asr00_12","name":"Cristiano Lupatelli","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":55,"num":12},
+    {"id":"asr00_15","name":"Jonathan Zebina","pos":["CB","RB"],"ovr":80,"att":58,"def":81,"phy":84,"pac":78,"tec":68,"num":15},
+    {"id":"asr00_19","name":"Walter Samuel","pos":["CB"],"ovr":88,"att":48,"def":90,"phy":88,"pac":75,"tec":70,"num":19},
+    {"id":"asr00_6","name":"Aldair","pos":["CB"],"ovr":85,"att":52,"def":87,"phy":80,"pac":65,"tec":78,"num":6},
+    {"id":"asr00_3","name":"Amedeo Mangone","pos":["CB"],"ovr":76,"att":42,"def":77,"phy":78,"pac":66,"tec":62,"num":3},
+    {"id":"asr00_2","name":"Cafu","pos":["RB","RWB"],"ovr":90,"att":85,"def":84,"phy":86,"pac":90,"tec":85,"num":2},
+    {"id":"asr00_32","name":"Vincent Candela","pos":["LB","LWB"],"ovr":87,"att":82,"def":84,"phy":81,"pac":84,"tec":86,"num":32},
+    {"id":"asr00_4","name":"Cristiano Zanetti","pos":["CDM","CM"],"ovr":82,"att":65,"def":83,"phy":84,"pac":72,"tec":76,"num":4},
+    {"id":"asr00_11","name":"Emerson","pos":["CDM","CM"],"ovr":87,"att":76,"def":86,"phy":85,"pac":76,"tec":84,"num":11},
+    {"id":"asr00_17","name":"Damiano Tommasi","pos":["CM","CDM"],"ovr":85,"att":74,"def":85,"phy":88,"pac":80,"tec":78,"num":17},
+    {"id":"asr00_8","name":"Marcos Assunção","pos":["CM","CAM"],"ovr":80,"att":78,"def":70,"phy":74,"pac":70,"tec":84,"num":8},
+    {"id":"asr00_7","name":"Hidetoshi Nakata","pos":["CAM","CM"],"ovr":84,"att":82,"def":58,"phy":76,"pac":78,"tec":87,"num":7},
+    {"id":"asr00_10","name":"Francesco Totti","pos":["CAM","CF","ST"],"ovr":92,"att":92,"def":45,"phy":82,"pac":82,"tec":95,"num":10},
+    {"id":"asr00_9","name":"Vincenzo Montella","pos":["ST"],"ovr":85,"att":87,"def":32,"phy":70,"pac":80,"tec":85,"num":9},
+    {"id":"asr00_18","name":"Gabriel Batistuta","pos":["ST"],"ovr":92,"att":93,"def":38,"phy":88,"pac":82,"tec":85,"num":18},
+    {"id":"asr00_24","name":"Marco Delvecchio","pos":["ST","LW"],"ovr":82,"att":83,"def":48,"phy":84,"pac":78,"tec":78,"num":24},
+    {"id":"asr00_16","name":"Gaetano D'Agostino","pos":["CM","CAM"],"ovr":72,"att":70,"def":55,"phy":65,"pac":70,"tec":76,"num":16},
+    {"id":"asr00_21","name":"Abel Balbo","pos":["ST"],"ovr":76,"att":78,"def":32,"phy":72,"pac":68,"tec":76,"num":21},
+    {"id":"asr00_28","name":"Gianni Guigou","pos":["LM","RM"],"ovr":76,"att":74,"def":68,"phy":74,"pac":78,"tec":75,"num":28}
+  ],
+  "manager": {
+    "name": "Fabio Capello",
+    "ovr": 92
+  }
+}
+,{
+  "id": "acfFiorentina1998",
+  "name": "ACF Fiorentina 1998-99",
+  "short": "FIO",
+  "flag": "🇮🇹",
+  "color": "#4B0082",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"fio98_1","name":"Francesco Toldo","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":84,"pac":50,"tec":62,"num":1},
+    {"id":"fio98_22","name":"Valerio Fiori","pos":["GK"],"ovr":74,"att":15,"def":75,"phy":72,"pac":42,"tec":55,"num":22},
+    {"id":"fio98_2","name":"Tomas Repka","pos":["CB","RB"],"ovr":82,"att":52,"def":83,"phy":86,"pac":74,"tec":65,"num":2},
+    {"id":"fio98_3","name":"Moreno Torricelli","pos":["RB","CB","LB"],"ovr":82,"att":70,"def":83,"phy":84,"pac":78,"tec":72,"num":3},
+    {"id":"fio98_19","name":"Giulio Falcone","pos":["CB"],"ovr":79,"att":42,"def":80,"phy":81,"pac":68,"tec":62,"num":19},
+    {"id":"fio98_5","name":"Pasquale Padalino","pos":["CB"],"ovr":80,"att":45,"def":81,"phy":82,"pac":70,"tec":64,"num":5},
+    {"id":"fio98_15","name":"Roberto Mirri","pos":["CB"],"ovr":73,"att":38,"def":74,"phy":76,"pac":65,"tec":58,"num":15},
+    {"id":"fio98_17","name":"Jörg Heinrich","pos":["LM","LB","RM"],"ovr":83,"att":78,"def":76,"phy":82,"pac":82,"tec":80,"num":17},
+    {"id":"fio98_24","name":"Christian Amoroso","pos":["CM","CDM"],"ovr":77,"att":70,"def":75,"phy":76,"pac":72,"tec":76,"num":24},
+    {"id":"fio98_14","name":"Sandro Cois","pos":["CDM","CM"],"ovr":80,"att":65,"def":81,"phy":83,"pac":72,"tec":74,"num":14},
+    {"id":"fio98_10","name":"Rui Costa","pos":["CAM"],"ovr":90,"att":88,"def":52,"phy":75,"pac":78,"tec":94,"num":10},
+    {"id":"fio98_11","name":"Fabio Rossitto","pos":["CDM","CM"],"ovr":76,"att":60,"def":77,"phy":78,"pac":70,"tec":72,"num":11},
+    {"id":"fio98_8","name":"Emiliano Bigica","pos":["CDM"],"ovr":75,"att":55,"def":76,"phy":78,"pac":66,"tec":70,"num":8},
+    {"id":"fio98_7","name":"Guillermo Amor","pos":["CM","CAM"],"ovr":78,"att":74,"def":70,"phy":72,"pac":68,"tec":81,"num":7},
+    {"id":"fio98_20","name":"Domenico Morfeo","pos":["CAM","CF"],"ovr":79,"att":80,"def":38,"phy":64,"pac":76,"tec":85,"num":20},
+    {"id":"fio98_9","name":"Gabriel Batistuta","pos":["ST"],"ovr":93,"att":94,"def":38,"phy":90,"pac":85,"tec":86,"num":9},
+    {"id":"fio98_25","name":"Luís Oliveira","pos":["ST","RW"],"ovr":81,"att":82,"def":40,"phy":75,"pac":82,"tec":81,"num":25},
+    {"id":"fio98_21","name":"Edmundo","pos":["ST","CF"],"ovr":86,"att":87,"def":35,"phy":78,"pac":86,"tec":91,"num":21},
+    {"id":"fio98_16","name":"Carmine Esposito","pos":["ST"],"ovr":74,"att":75,"def":32,"phy":72,"pac":75,"tec":73,"num":16},
+    {"id":"fio98_18","name":"Anselmo Robbiati","pos":["CF","CAM"],"ovr":76,"att":77,"def":35,"phy":66,"pac":78,"tec":80,"num":18}
+  ],
+  "manager": {
+    "name": "Giovanni Trapattoni",
+    "ovr": 90
+  }
+}
+,{
+  "id": "manchesterunited1993",
+  "name": "Manchester United 1993-94",
+  "short": "MUN93",
+  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "color": "#DA291C",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"mun93_1","name":"Peter Schmeichel","pos":["GK"],"ovr":90,"att":15,"def":91,"phy":88,"pac":50,"tec":62,"num":1},
+    {"id":"mun93_13","name":"Les Sealey","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":40,"tec":55,"num":13},
+    {"id":"mun93_2","name":"Paul Parker","pos":["RB"],"ovr":82,"att":68,"def":83,"phy":78,"pac":82,"tec":72,"num":2},
+    {"id":"mun93_6","name":"Gary Pallister","pos":["CB"],"ovr":87,"att":45,"def":88,"phy":86,"pac":74,"tec":68,"num":6},
+    {"id":"mun93_4","name":"Steve Bruce","pos":["CB"],"ovr":86,"att":60,"def":88,"phy":86,"pac":62,"tec":68,"num":4},
+    {"id":"mun93_3","name":"Denis Irwin","pos":["LB","RB"],"ovr":85,"att":76,"def":84,"phy":78,"pac":78,"tec":80,"num":3},
+    {"id":"mun93_12","name":"Bryan Robson","pos":["CM","CDM"],"ovr":82,"att":78,"def":78,"phy":80,"pac":68,"tec":81,"num":12},
+    {"id":"mun93_16","name":"Roy Keane","pos":["CM","CDM"],"ovr":87,"att":76,"def":86,"phy":90,"pac":78,"tec":80,"num":16},
+    {"id":"mun93_8","name":"Paul Ince","pos":["CM","CDM"],"ovr":86,"att":75,"def":85,"phy":88,"pac":76,"tec":78,"num":8},
+    {"id":"mun93_11","name":"Ryan Giggs","pos":["LM","LW"],"ovr":88,"att":86,"def":48,"phy":72,"pac":94,"tec":88,"num":11},
+    {"id":"mun93_14","name":"Andrei Kanchelskis","pos":["RM","RW"],"ovr":85,"att":84,"def":45,"phy":78,"pac":92,"tec":84,"num":14},
+    {"id":"mun93_15","name":"Lee Sharpe","pos":["LM","LW","LB"],"ovr":81,"att":80,"def":58,"phy":75,"pac":86,"tec":81,"num":15},
+    {"id":"mun93_7","name":"Eric Cantona","pos":["CF","ST","CAM"],"ovr":92,"att":91,"def":42,"phy":86,"pac":80,"tec":93,"num":7},
+    {"id":"mun93_10","name":"Mark Hughes","pos":["ST","CF"],"ovr":87,"att":88,"def":40,"phy":89,"pac":78,"tec":83,"num":10},
+    {"id":"mun93_9","name":"Brian McClair","pos":["CF","ST","CM"],"ovr":81,"att":82,"def":52,"phy":78,"pac":74,"tec":80,"num":9},
+    {"id":"mun93_21","name":"Lee Martin","pos":["LB"],"ovr":73,"att":65,"def":73,"phy":72,"pac":72,"tec":68,"num":21},
+    {"id":"mun93_23","name":"Clayton Blackmore","pos":["LB","RB","CM"],"ovr":74,"att":68,"def":74,"phy":75,"pac":70,"tec":72,"num":23},
+    {"id":"mun93_24","name":"Paul Scholes","pos":["CAM","ST"],"ovr":70,"att":72,"def":50,"phy":62,"pac":70,"tec":78,"num":24},
+    {"id":"mun93_27","name":"Gary Neville","pos":["RB","CB"],"ovr":71,"att":62,"def":72,"phy":70,"pac":72,"tec":68,"num":27},
+    {"id":"mun93_28","name":"David Beckham","pos":["RM","CM"],"ovr":69,"att":70,"def":50,"phy":60,"pac":70,"tec":76,"num":28},
+    {"id":"mun93_20","name":"Dion Dublin","pos":["ST"],"ovr":75,"att":76,"def":35,"phy":82,"pac":72,"tec":71,"num":20}
+  ],
+  "manager": {
+    "name": "Alex Ferguson",
+    "ovr": 93
+  }
+}
+,{
+  "id": "asroma2006",
+  "name": "AS Roma 2006-07",
+  "short": "ASR06",
+  "flag": "🇮🇹",
+  "color": "#8E1F2F",
+  "secondary": "#F0BC42",
+  "players": [
+    {"id":"asr06_32","name":"Doni","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":48,"tec":62,"num":32},
+    {"id":"asr06_1","name":"Gianluca Curci","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":55,"num":1},
+    {"id":"asr06_2","name":"Christian Panucci","pos":["RB","CB"],"ovr":83,"att":72,"def":84,"phy":81,"pac":75,"tec":76,"num":2},
+    {"id":"asr06_5","name":"Philippe Mexès","pos":["CB"],"ovr":85,"att":52,"def":86,"phy":84,"pac":72,"tec":70,"num":5},
+    {"id":"asr06_13","name":"Cristian Chivu","pos":["CB","LB"],"ovr":86,"att":68,"def":87,"phy":80,"pac":76,"tec":84,"num":13},
+    {"id":"asr06_22","name":"Max Tonetto","pos":["LB","LM"],"ovr":80,"att":75,"def":78,"phy":76,"pac":82,"tec":76,"num":22},
+    {"id":"asr06_77","name":"Marco Cassetti","pos":["RB","RWB"],"ovr":78,"att":72,"def":77,"phy":78,"pac":78,"tec":74,"num":77},
+    {"id":"asr06_21","name":"Ferrari","pos":["CB"],"ovr":78,"att":45,"def":80,"phy":80,"pac":68,"tec":64,"num":21},
+    {"id":"asr06_16","name":"Daniele De Rossi","pos":["CDM","CM"],"ovr":87,"att":78,"def":87,"phy":88,"pac":74,"tec":83,"num":16},
+    {"id":"asr06_8","name":"Alberto Aquilani","pos":["CM","CAM"],"ovr":81,"att":78,"def":72,"phy":74,"pac":72,"tec":85,"num":8},
+    {"id":"asr06_7","name":"David Pizarro","pos":["CM","CAM"],"ovr":84,"att":80,"def":70,"phy":68,"pac":70,"tec":88,"num":7},
+    {"id":"asr06_20","name":"Simone Perrotta","pos":["CAM","CM"],"ovr":84,"att":82,"def":75,"phy":83,"pac":78,"tec":80,"num":20},
+    {"id":"asr06_11","name":"Rodrigo Taddei","pos":["RM","RW","LM"],"ovr":82,"att":80,"def":68,"phy":76,"pac":82,"tec":84,"num":11},
+    {"id":"asr06_14","name":"Christian Wilhelmsson","pos":["RM","RW"],"ovr":77,"att":76,"def":45,"phy":68,"pac":85,"tec":80,"num":14},
+    {"id":"asr06_30","name":"Mancini","pos":["LW","RW","LM"],"ovr":85,"att":84,"def":48,"phy":72,"pac":88,"tec":88,"num":30},
+    {"id":"asr06_10","name":"Francesco Totti","pos":["CF","CAM","ST"],"ovr":92,"att":93,"def":42,"phy":80,"pac":78,"tec":95,"num":10},
+    {"id":"asr06_9","name":"Vincenzo Montella","pos":["ST"],"ovr":80,"att":82,"def":32,"phy":68,"pac":75,"tec":82,"num":9},
+    {"id":"asr06_18","name":"Mirko Vučinić","pos":["ST","LW"],"ovr":79,"att":80,"def":35,"phy":74,"pac":81,"tec":82,"num":18},
+    {"id":"asr06_23","name":"Francesco Tavano","pos":["ST","LW"],"ovr":76,"att":77,"def":32,"phy":68,"pac":83,"tec":76,"num":23}
+  ],
+  "manager": {
+    "name": "Luciano Spalletti",
+    "ovr": 88
   }
 }
 , {
@@ -18190,6 +18326,39 @@
   }
 }
 , {
+  "id": "bayernmunich1980",
+  "name": "FC Bayern München 1980-81",
+  "short": "BAY80",
+  "flag": "🇩🇪",
+  "color": "#DC052D",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"bay80_1","name":"Walter Junghans","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":45,"tec":58,"num":1},
+    {"id":"bay80_22","name":"Manfred Müller","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":42,"tec":55,"num":22},
+    {"id":"bay80_5","name":"Klaus Augenthaler","pos":["CB","SW"],"ovr":85,"att":55,"def":87,"phy":85,"pac":68,"tec":74,"num":5},
+    {"id":"bay80_4","name":"Udo Horsmann","pos":["LB","LWB"],"ovr":80,"att":72,"def":80,"phy":78,"pac":78,"tec":72,"num":4},
+    {"id":"bay80_2","name":"Einar Aas","pos":["CB"],"ovr":77,"att":42,"def":78,"phy":80,"pac":64,"tec":62,"num":2},
+    {"id":"bay80_3","name":"Hans Weiner","pos":["CB","RB"],"ovr":78,"att":45,"def":79,"phy":81,"pac":66,"tec":64,"num":3},
+    {"id":"bay80_12","name":"Bertram Beierlorzer","pos":["CB","RB"],"ovr":73,"att":40,"def":74,"phy":75,"pac":68,"tec":62,"num":12},
+    {"id":"bay80_6","name":"Wolfgang Dremmler","pos":["CDM","CM","RB"],"ovr":82,"att":70,"def":83,"phy":84,"pac":75,"tec":76,"num":6},
+    {"id":"bay80_8","name":"Paul Breitner","pos":["CM","CAM","LB"],"ovr":91,"att":88,"def":80,"phy":86,"pac":76,"tec":90,"num":8},
+    {"id":"bay80_10","name":"Wolfgang Kraus","pos":["CM","CAM"],"ovr":81,"att":78,"def":70,"phy":76,"pac":74,"tec":82,"num":10},
+    {"id":"bay80_7","name":"Bernd Dürnberger","pos":["LM","CM","LB"],"ovr":82,"att":76,"def":75,"phy":78,"pac":80,"tec":80,"num":7},
+    {"id":"bay80_14","name":"Kurt Niedermayer","pos":["CM","RB","RM"],"ovr":79,"att":75,"def":74,"phy":78,"pac":76,"tec":76,"num":14},
+    {"id":"bay80_13","name":"Pürkner","pos":["CM"],"ovr":70,"att":68,"def":68,"phy":70,"pac":70,"tec":71,"num":13},
+    {"id":"bay80_15","name":"Günther Güttler","pos":["CM","CDM"],"ovr":72,"att":66,"def":72,"phy":74,"pac":68,"tec":70,"num":15},
+    {"id":"bay80_11","name":"Karl-Heinz Rummenigge","pos":["ST","CF","RW"],"ovr":93,"att":94,"def":40,"phy":84,"pac":89,"tec":91,"num":11},
+    {"id":"bay80_9","name":"Dieter Hoeneß","pos":["ST"],"ovr":83,"att":85,"def":35,"phy":88,"pac":72,"tec":76,"num":9},
+    {"id":"bay80_16","name":"Norbert Janzon","pos":["ST","RW"],"ovr":76,"att":77,"def":32,"phy":72,"pac":78,"tec":74,"num":16},
+    {"id":"bay80_17","name":"Kalle Del'Haye","pos":["RW","RM"],"ovr":77,"att":76,"def":38,"phy":68,"pac":84,"tec":78,"num":17},
+    {"id":"bay80_18","name":"Reinhold Mathy","pos":["ST","LW"],"ovr":72,"att":73,"def":30,"phy":68,"pac":78,"tec":72,"num":18}
+  ],
+  "manager": {
+    "name": "Pál Csernai",
+    "ovr": 87
+  }
+}
+,{
   "id": "mci2026",
   "name": "Manchester City 2026-27",
   "short": "MCI",
@@ -18297,6 +18466,185 @@
   }
 }
 , {
+  "id": "liverpool2013",
+  "name": "Liverpool FC 2013-14",
+  "short": "LIV",
+  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "color": "#C8102E",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"liv13_22","name":"Simon Mignolet","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":22},
+    {"id":"liv13_1","name":"Brad Jones","pos":["GK"],"ovr":71,"att":15,"def":72,"phy":72,"pac":40,"tec":55,"num":1},
+    {"id":"liv13_37","name":"Martin Škrtel","pos":["CB"],"ovr":82,"att":45,"def":84,"phy":85,"pac":66,"tec":62,"num":37},
+    {"id":"liv13_17","name":"Mamadou Sakho","pos":["CB"],"ovr":80,"att":42,"def":82,"phy":84,"pac":64,"tec":65,"num":17},
+    {"id":"liv13_5","name":"Daniel Agger","pos":["CB"],"ovr":81,"att":52,"def":83,"phy":78,"pac":65,"tec":74,"num":5},
+    {"id":"liv13_4","name":"Kolo Touré","pos":["CB","RB"],"ovr":77,"att":40,"def":78,"phy":80,"pac":62,"tec":64,"num":4},
+    {"id":"liv13_2","name":"Glen Johnson","pos":["RB","RWB","LB"],"ovr":79,"att":76,"def":76,"phy":75,"pac":81,"tec":77,"num":2},
+    {"id":"liv13_38","name":"Jon Flanagan","pos":["RB","LB"],"ovr":75,"att":70,"def":76,"phy":76,"pac":74,"tec":70,"num":38},
+    {"id":"liv13_3","name":"José Enrique","pos":["LB","LWB"],"ovr":77,"att":74,"def":76,"phy":82,"pac":78,"tec":73,"num":3},
+    {"id":"liv13_20","name":"Aly Cissokho","pos":["LB"],"ovr":74,"att":68,"def":74,"phy":78,"pac":77,"tec":68,"num":20},
+    {"id":"liv13_16","name":"Sebastián Coates","pos":["CB"],"ovr":72,"att":38,"def":74,"phy":78,"pac":52,"tec":60,"num":16},
+    {"id":"liv13_8","name":"Steven Gerrard","pos":["CDM","CM"],"ovr":85,"att":82,"def":78,"phy":78,"pac":60,"tec":89,"num":8},
+    {"id":"liv13_14","name":"Jordan Henderson","pos":["CM","RM"],"ovr":80,"att":75,"def":76,"phy":82,"pac":78,"tec":78,"num":14},
+    {"id":"liv13_21","name":"Lucas Leiva","pos":["CDM","CM"],"ovr":80,"att":65,"def":82,"phy":78,"pac":62,"tec":76,"num":21},
+    {"id":"liv13_24","name":"Joe Allen","pos":["CM","CDM"],"ovr":77,"att":70,"def":74,"phy":68,"pac":68,"tec":79,"num":24},
+    {"id":"liv13_10","name":"Philippe Coutinho","pos":["CAM","LW","CM"],"ovr":82,"att":80,"def":50,"phy":62,"pac":82,"tec":87,"num":10},
+    {"id":"liv13_31","name":"Raheem Sterling","pos":["RW","LW","CAM"],"ovr":80,"att":78,"def":45,"phy":64,"pac":93,"tec":82,"num":31},
+    {"id":"liv13_12","name":"Victor Moses","pos":["LW","RW","LM"],"ovr":76,"att":75,"def":42,"phy":72,"pac":85,"tec":78,"num":12},
+    {"id":"liv13_6","name":"Luis Alberto","pos":["CAM","CM"],"ovr":73,"att":72,"def":45,"phy":60,"pac":65,"tec":78,"num":6},
+    {"id":"liv13_7","name":"Luis Suárez","pos":["ST","CF","LW"],"ovr":92,"att":93,"def":48,"phy":82,"pac":86,"tec":91,"num":7},
+    {"id":"liv13_15","name":"Daniel Sturridge","pos":["ST"],"ovr":84,"att":86,"def":35,"phy":74,"pac":89,"tec":83,"num":15},
+    {"id":"liv13_9","name":"Iago Aspas","pos":["ST","RW"],"ovr":76,"att":77,"def":35,"phy":66,"pac":78,"tec":78,"num":9},
+    {"id":"liv13_36","name":"Samed Yeşil","pos":["ST"],"ovr":64,"att":66,"def":25,"phy":60,"pac":72,"tec":65,"num":36}
+  ],
+  "manager": {
+    "name": "Brendan Rodgers",
+    "ovr": 83
+  }
+}
+,{
+  "id": "afcajax1994",
+  "name": "AFC Ajax 1994-95",
+  "short": "AJX94",
+  "flag": "🇳🇱",
+  "color": "#D2122E",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"ajx94_1","name":"Edwin van der Sar","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":78,"pac":48,"tec":70,"num":1},
+    {"id":"ajx94_12","name":"Fred Grim","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":72,"pac":40,"tec":55,"num":12},
+    {"id":"ajx94_3","name":"Danny Blind","pos":["CB","SW"],"ovr":87,"att":58,"def":89,"phy":81,"pac":68,"tec":80,"num":3},
+    {"id":"ajx94_4","name":"Frank de Boer","pos":["CB","LB"],"ovr":86,"att":68,"def":87,"phy":80,"pac":70,"tec":85,"num":4},
+    {"id":"ajx94_2","name":"Michael Reiziger","pos":["RB","RWB"],"ovr":82,"att":74,"def":83,"phy":80,"pac":87,"tec":74,"num":2},
+    {"id":"ajx94_5","name":"Winston Bogarde","pos":["CB","LB"],"ovr":78,"att":55,"def":79,"phy":85,"pac":74,"tec":68,"num":5},
+    {"id":"ajx94_13","name":"Sonny Silooy","pos":["CB","RB"],"ovr":77,"att":50,"def":78,"phy":78,"pac":68,"tec":66,"num":13},
+    {"id":"ajx94_14","name":"Frank Rijkaard","pos":["CDM","CB"],"ovr":90,"att":75,"def":91,"phy":88,"pac":72,"tec":86,"num":14},
+    {"id":"ajx94_8","name":"Edgar Davids","pos":["CM","CDM","LM"],"ovr":85,"att":76,"def":84,"phy":89,"pac":82,"tec":82,"num":8},
+    {"id":"ajx94_6","name":"Clarence Seedorf","pos":["CM","RM","CAM"],"ovr":84,"att":78,"def":74,"phy":82,"pac":78,"tec":85,"num":6},
+    {"id":"ajx94_10","name":"Jari Litmanen","pos":["CAM","CF"],"ovr":89,"att":89,"def":48,"phy":75,"pac":76,"tec":90,"num":10},
+    {"id":"ajx94_15","name":"Ronald de Boer","pos":["RM","RW","CAM","CF"],"ovr":84,"att":82,"def":65,"phy":79,"pac":76,"tec":85,"num":15},
+    {"id":"ajx94_16","name":"Kiki Musampa","pos":["LM","LW"],"ovr":72,"att":71,"def":45,"phy":68,"pac":78,"tec":74,"num":16},
+    {"id":"ajx94_17","name":"TarIK Oulida","pos":["CM","CAM"],"ovr":71,"att":70,"def":55,"phy":64,"pac":72,"tec":75,"num":17},
+    {"id":"ajx94_20","name":"Nordin Wooter","pos":["RW","RM"],"ovr":73,"att":72,"def":38,"phy":62,"pac":84,"tec":77,"num":20},
+    {"id":"ajx94_11","name":"Marc Overmars","pos":["LW","LM"],"ovr":88,"att":87,"def":40,"phy":68,"pac":95,"tec":88,"num":11},
+    {"id":"ajx94_7","name":"Finidi George","pos":["RW","RM"],"ovr":86,"att":85,"def":45,"phy":78,"pac":91,"tec":86,"num":7},
+    {"id":"ajx94_9","name":"Nwankwo Kanu","pos":["ST","CF"],"ovr":83,"att":84,"def":35,"phy":74,"pac":75,"tec":88,"num":9},
+    {"id":"ajx94_18","name":"Patrick Kluivert","pos":["ST"],"ovr":82,"att":84,"def":35,"phy":80,"pac":82,"tec":83,"num":18},
+    {"id":"ajx94_19","name":"Peter van Vossen","pos":["ST","LW"],"ovr":76,"att":77,"def":32,"phy":70,"pac":80,"tec":75,"num":19}
+  ],
+  "manager": {
+    "name": "Louis van Gaal",
+    "ovr": 92
+  }
+}
+,{
+  "id": "fcbarcelona1998",
+  "name": "FC Barcelona 1998-99",
+  "short": "BAR98",
+  "flag": "🇪🇸",
+  "color": "#004D98",
+  "secondary": "#A50044",
+  "players": [
+    {"id":"bar98_1","name":"Ruud Hesp","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":80,"pac":45,"tec":65,"num":1},
+    {"id":"bar98_13","name":"Vítor Baía","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":13},
+    {"id":"bar98_25","name":"Francesc Arnau","pos":["GK"],"ovr":71,"att":15,"def":72,"phy":70,"pac":40,"tec":55,"num":25},
+    {"id":"bar98_2","name":"Michael Reiziger","pos":["RB","CB"],"ovr":81,"att":68,"def":82,"phy":80,"pac":84,"tec":72,"num":2},
+    {"id":"bar98_3","name":"Pellegrino","pos":["CB"],"ovr":78,"att":40,"def":80,"phy":82,"pac":62,"tec":64,"num":3},
+    {"id":"bar98_5","name":"Abelardo","pos":["CB"],"ovr":83,"att":48,"def":85,"phy":83,"pac":68,"tec":68,"num":5},
+    {"id":"bar98_12","name":"Sergi Barjuán","pos":["LB","LWB"],"ovr":83,"att":78,"def":81,"phy":78,"pac":86,"tec":76,"num":12},
+    {"id":"bar98_17","name":"Winston Bogarde","pos":["CB","LB"],"ovr":77,"att":52,"def":78,"phy":84,"pac":72,"tec":66,"num":17},
+    {"id":"bar98_22","name":"Frank de Boer","pos":["CB","LB"],"ovr":86,"att":70,"def":87,"phy":82,"pac":68,"tec":84,"num":22},
+    {"id":"bar98_4","name":"Pep Guardiola","pos":["CDM","CM"],"ovr":86,"att":74,"def":81,"phy":72,"pac":62,"tec":91,"num":4},
+    {"id":"bar98_8","name":"Phillip Cocu","pos":["CM","CDM","LM"],"ovr":85,"att":80,"def":82,"phy":83,"pac":75,"tec":84,"num":8},
+    {"id":"bar98_21","name":"Luis Enrique","pos":["CM","CAM","RW","RM"],"ovr":87,"att":86,"def":74,"phy":85,"pac":81,"tec":85,"num":21},
+    {"id":"bar98_26","name":"Xavi","pos":["CM","CAM"],"ovr":74,"att":70,"def":68,"phy":64,"pac":65,"tec":83,"num":26},
+    {"id":"bar98_18","name":"Ronald de Boer","pos":["CAM","CM","RW"],"ovr":83,"att":81,"def":62,"phy":78,"pac":74,"tec":84,"num":18},
+    {"id":"bar98_6","name":"Oscar García","pos":["CAM","ST"],"ovr":76,"att":76,"def":45,"phy":70,"pac":74,"tec":78,"num":6},
+    {"id":"bar98_10","name":"Jari Litmanen","pos":["CAM","CF"],"ovr":84,"att":84,"def":45,"phy":72,"pac":73,"tec":87,"num":10},
+    {"id":"bar98_11","name":"Rivaldo","pos":["LW","CAM","CF"],"ovr":91,"att":92,"def":42,"phy":82,"pac":86,"tec":93,"num":11},
+    {"id":"bar98_7","name":"Luís Figo","pos":["RW","RM"],"ovr":90,"att":88,"def":45,"phy":75,"pac":87,"tec":92,"num":7},
+    {"id":"bar98_23","name":"Boudewijn Zenden","pos":["LM","LW","LB"],"ovr":81,"att":80,"def":60,"phy":76,"pac":86,"tec":82,"num":23},
+    {"id":"bar98_9","name":"Sonny Anderson","pos":["ST"],"ovr":82,"att":84,"def":32,"phy":76,"pac":82,"tec":80,"num":9},
+    {"id":"bar98_19","name":"Patrick Kluivert","pos":["ST","CF"],"ovr":87,"att":88,"def":38,"phy":84,"pac":83,"tec":86,"num":19},
+    {"id":"bar98_20","name":"Miguel Ángel Nadal","pos":["CB","CDM"],"ovr":80,"att":58,"def":81,"phy":85,"pac":64,"tec":70,"num":20}
+  ],
+  "manager": {
+    "name": "Louis van Gaal",
+    "ovr": 88
+  }
+}
+,{
+  "id": "chelsea1998",
+  "name": "Chelsea FC 1998-99",
+  "short": "CHE98",
+  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "color": "#034694",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"che98_1","name":"Ed de Goey","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":80,"pac":45,"tec":62,"num":1},
+    {"id":"che98_13","name":"Kevin Hitchcock","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":40,"tec":55,"num":13},
+    {"id":"che98_23","name":"Dmitri Kharine","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":70,"pac":42,"tec":58,"num":23},
+    {"id":"che98_5","name":"Frank Leboeuf","pos":["CB"],"ovr":85,"att":62,"def":86,"phy":80,"pac":65,"tec":78,"num":5},
+    {"id":"che98_6","name":"Marcel Desailly","pos":["CB","CDM"],"ovr":89,"att":50,"def":91,"phy":90,"pac":74,"tec":72,"num":6},
+    {"id":"che98_12","name":"Michael Duberry","pos":["CB"],"ovr":77,"att":40,"def":78,"phy":82,"pac":68,"tec":60,"num":12},
+    {"id":"che98_2","name":"Dan Petrescu","pos":["RB","RM","RWB"],"ovr":83,"att":80,"def":78,"phy":76,"pac":82,"tec":81,"num":2},
+    {"id":"che98_14","name":"Graeme Le Saux","pos":["LB","LWB","LM"],"ovr":84,"att":79,"def":81,"phy":78,"pac":83,"tec":80,"num":14},
+    {"id":"che98_17","name":"Albert Ferrer","pos":["RB"],"ovr":81,"att":72,"def":82,"phy":76,"pac":84,"tec":73,"num":17},
+    {"id":"che98_3","name":"Celestine Babayaro","pos":["LB","LWB"],"ovr":78,"att":75,"def":76,"phy":77,"pac":82,"tec":75,"num":3},
+    {"id":"che98_15","name":"Bernard Lambourde","pos":["CB","RB"],"ovr":74,"att":45,"def":75,"phy":76,"pac":66,"tec":64,"num":15},
+    {"id":"che98_11","name":"Dennis Wise","pos":["CM","CDM"],"ovr":83,"att":74,"def":81,"phy":84,"pac":72,"tec":78,"num":11},
+    {"id":"che98_8","name":"Gustavo Poyet","pos":["CM","CAM","RM"],"ovr":84,"att":83,"def":68,"phy":82,"pac":74,"tec":82,"num":8},
+    {"id":"che98_16","name":"Roberto Di Matteo","pos":["CM","CDM"],"ovr":83,"att":76,"def":78,"phy":77,"pac":70,"tec":84,"num":16},
+    {"id":"che98_24","name":"Eddie Newton","pos":["CM","CDM"],"ovr":75,"att":68,"def":75,"phy":76,"pac":68,"tec":72,"num":24},
+    {"id":"che98_20","name":"Jody Morris","pos":["CM"],"ovr":74,"att":70,"def":70,"phy":68,"pac":72,"tec":76,"num":20},
+    {"id":"che98_7","name":"Bjarne Goldbæk","pos":["RM","CM"],"ovr":75,"att":72,"def":65,"phy":72,"pac":76,"tec":75,"num":7},
+    {"id":"che98_25","name":"Gianfranco Zola","pos":["CF","CAM","ST"],"ovr":89,"att":88,"def":40,"phy":62,"pac":82,"tec":93,"num":25},
+    {"id":"che98_9","name":"Gianluca Vialli","pos":["ST"],"ovr":83,"att":85,"def":35,"phy":78,"pac":74,"tec":82,"num":9},
+    {"id":"che98_10","name":"Pierluigi Casiraghi","pos":["ST"],"ovr":81,"att":83,"def":38,"phy":82,"pac":76,"tec":77,"num":10},
+    {"id":"che98_19","name":"Tore André Flo","pos":["ST"],"ovr":82,"att":84,"def":32,"phy":83,"pac":75,"tec":78,"num":19},
+    {"id":"che98_22","name":"Mark Nicholls","pos":["ST","CF"],"ovr":70,"att":71,"def":28,"phy":68,"pac":74,"tec":70,"num":22},
+    {"id":"che98_21","name":"Mikael Forssell","pos":["ST"],"ovr":72,"att":74,"def":28,"phy":70,"pac":78,"tec":71,"num":21}
+  ],
+  "manager": {
+    "name": "Gianluca Vialli",
+    "ovr": 84
+  }
+}
+,{
+  "id": "realmadrid1959",
+  "name": "Real Madrid 1959-60",
+  "short": "RMA59",
+  "flag": "🇪🇸",
+  "color": "#FFFFFF",
+  "secondary": "#00529F",
+  "players": [
+    {"id":"rma59_1","name":"Rogelio Domínguez","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":52,"tec":62,"num":1},
+    {"id":"rma59_13","name":"Juan Alonso","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":76,"pac":48,"tec":58,"num":13},
+    {"id":"rma59_25","name":"Javier Berasaluce","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":70,"pac":45,"tec":52,"num":25},
+    {"id":"rma59_2","name":"Marquitos","pos":["CB","RB"],"ovr":85,"att":52,"def":86,"phy":84,"pac":72,"tec":68,"num":2},
+    {"id":"rma59_5","name":"José Santamaría","pos":["CB","SW"],"ovr":89,"att":48,"def":91,"phy":87,"pac":70,"tec":72,"num":5},
+    {"id":"rma59_3","name":"Pachín","pos":["LB","CB","RB"],"ovr":81,"att":62,"def":82,"phy":80,"pac":76,"tec":70,"num":3},
+    {"id":"rma59_12","name":"Rafael Lesmes","pos":["LB"],"ovr":79,"att":60,"def":80,"phy":76,"pac":74,"tec":66,"num":12},
+    {"id":"rma59_4","name":"Miche","pos":["RB","CB"],"ovr":76,"att":50,"def":77,"phy":78,"pac":70,"tec":64,"num":4},
+    {"id":"rma59_14","name":"José María Zárraga","pos":["CDM","CM"],"ovr":85,"att":70,"def":85,"phy":84,"pac":68,"tec":78,"num":14},
+    {"id":"rma59_6","name":"José María Vidal","pos":["CM","CDM"],"ovr":82,"att":72,"def":80,"phy":82,"pac":70,"tec":76,"num":6},
+    {"id":"rma59_15","name":"Antonio Ruiz","pos":["CM","CDM"],"ovr":78,"att":70,"def":77,"phy":76,"pac":68,"tec":74,"num":15},
+    {"id":"rma59_16","name":"Manuel Bueno","pos":["LM","LW"],"ovr":75,"att":74,"def":45,"phy":68,"pac":78,"tec":75,"num":16},
+    {"id":"rma59_10","name":"Ferenc Puskás","pos":["CF","ST"],"ovr":93,"att":95,"def":35,"phy":80,"pac":82,"tec":94,"num":10},
+    {"id":"rma59_9","name":"Alfredo Di Stéfano","pos":["CF","CAM","ST"],"ovr":94,"att":94,"def":68,"phy":85,"pac":86,"tec":93,"num":9},
+    {"id":"rma59_11","name":"Francisco Gento","pos":["LW","LM"],"ovr":91,"att":90,"def":42,"phy":78,"pac":96,"tec":89,"num":11},
+    {"id":"rma59_7","name":"Raymond Kopa","pos":["RW","CAM"],"ovr":88,"att":87,"def":40,"phy":65,"pac":84,"tec":91,"num":7},
+    {"id":"rma59_8","name":"Luis del Sol","pos":["CM","CAM","RW"],"ovr":85,"att":83,"def":60,"phy":82,"pac":80,"tec":86,"num":8},
+    {"id":"rma59_17","name":"Canário","pos":["RW","RM"],"ovr":82,"att":81,"def":45,"phy":72,"pac":86,"tec":83,"num":17},
+    {"id":"rma59_18","name":"Enrique Mateos","pos":["ST","CF"],"ovr":81,"att":82,"def":35,"phy":74,"pac":80,"tec":82,"num":18},
+    {"id":"rma59_19","name":"Pepillo","pos":["ST"],"ovr":78,"att":80,"def":30,"phy":75,"pac":76,"tec":75,"num":19},
+    {"id":"rma59_20","name":"Héctor Rial","pos":["CAM","LW"],"ovr":83,"att":82,"def":50,"phy":70,"pac":75,"tec":86,"num":20}
+  ],
+  "manager": {
+    "name": "Miguel Muñoz",
+    "ovr": 90
+  }
+}
+,{
   "id": "acm2007",
   "name": "AC Milan 2006-07",
   "short": "ACM07",
@@ -20274,6 +20622,181 @@
   }
 }
 ,{
+  "id": "acmilan2011",
+  "name": "AC Milan 2011-12",
+  "short": "ACM11",
+  "flag": "🇮🇹",
+  "color": "#AC121B",
+  "secondary": "#000000",
+  "players": [
+    {"id":"acm11_32","name":"Christian Abbiati","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":45,"tec":62,"num":32},
+    {"id":"acm11_1","name":"Marco Amelia","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":76,"pac":42,"tec":58,"num":1},
+    {"id":"acm11_20","name":"Ignazio Abate","pos":["RB","RWB"],"ovr":81,"att":74,"def":78,"phy":77,"pac":91,"tec":75,"num":20},
+    {"id":"acm11_33","name":"Thiago Silva","pos":["CB"],"ovr":89,"att":60,"def":91,"phy":84,"pac":79,"tec":78,"num":33},
+    {"id":"acm11_13","name":"Alessandro Nesta","pos":["CB"],"ovr":85,"att":40,"def":88,"phy":76,"pac":62,"tec":72,"num":13},
+    {"id":"acm11_5","name":"Philippe Mexès","pos":["CB"],"ovr":81,"att":52,"def":82,"phy":83,"pac":66,"tec":68,"num":5},
+    {"id":"acm11_77","name":"Luca Antonini","pos":["LB","LWB"],"ovr":76,"att":70,"def":75,"phy":74,"pac":80,"tec":72,"num":77},
+    {"id":"acm11_2","name":"Taye Taiwo","pos":["LB"],"ovr":77,"att":75,"def":72,"phy":86,"pac":83,"tec":74,"num":2},
+    {"id":"acm11_25","name":"Daniele Bonera","pos":["CB","RB"],"ovr":76,"att":48,"def":78,"phy":77,"pac":68,"tec":64,"num":25},
+    {"id":"acm11_76","name":"Mario Yepes","pos":["CB"],"ovr":78,"att":42,"def":80,"phy":82,"pac":58,"tec":60,"num":76},
+    {"id":"acm11_4","name":"Mark van Bommel","pos":["CDM","CM"],"ovr":82,"att":68,"def":83,"phy":86,"pac":58,"tec":77,"num":4},
+    {"id":"acm11_8","name":"Gennaro Gattuso","pos":["CDM","CM"],"ovr":81,"att":55,"def":84,"phy":88,"pac":65,"tec":68,"num":8},
+    {"id":"acm11_23","name":"Massimo Ambrosini","pos":["CDM","CM"],"ovr":79,"att":64,"def":81,"phy":82,"pac":60,"tec":72,"num":23},
+    {"id":"acm11_10","name":"Clarence Seedorf","pos":["CM","CAM"],"ovr":82,"att":79,"def":70,"phy":76,"pac":64,"tec":88,"num":10},
+    {"id":"acm11_27","name":"Kevin-Prince Boateng","pos":["CAM","CM","CF"],"ovr":83,"att":82,"def":68,"phy":84,"pac":82,"tec":83,"num":27},
+    {"id":"acm11_22","name":"Antonio Nocerino","pos":["CM","CDM"],"ovr":81,"att":78,"def":76,"phy":80,"pac":78,"tec":76,"num":22},
+    {"id":"acm11_18","name":"Alberto Aquilani","pos":["CM","CAM"],"ovr":79,"att":76,"def":68,"phy":70,"pac":68,"tec":83,"num":18},
+    {"id":"acm11_11","name":"Zlatan Ibrahimović","pos":["ST"],"ovr":89,"att":91,"def":35,"phy":88,"pac":78,"tec":91,"num":11},
+    {"id":"acm11_7","name":"Pato","pos":["ST","CF"],"ovr":83,"att":84,"def":32,"phy":72,"pac":90,"tec":85,"num":7},
+    {"id":"acm11_99","name":"Antonio Cassano","pos":["CF","CAM","ST"],"ovr":83,"att":83,"def":30,"phy":70,"pac":72,"tec":90,"num":99},
+    {"id":"acm11_70","name":"Robinho","pos":["LW","RW","CAM"],"ovr":82,"att":81,"def":32,"phy":64,"pac":86,"tec":89,"num":70},
+    {"id":"acm11_92","name":"Stephan El Shaarawy","pos":["LW","ST"],"ovr":76,"att":76,"def":38,"phy":62,"pac":85,"tec":81,"num":92}
+  ],
+  "manager": {
+    "name": "Massimiliano Allegri",
+    "ovr": 86
+  }
+}
+,{
+  "id": "tottenham2012",
+  "name": "Tottenham Hotspur 2012-13",
+  "short": "TOT12",
+  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "color": "#132257",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"tot12_25","name":"Hugo Lloris","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":78,"pac":58,"tec":68,"num":25},
+    {"id":"tot12_24","name":"Brad Friedel","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":38,"tec":60,"num":24},
+    {"id":"tot12_28","name":"Kyle Walker","pos":["RB","RWB"],"ovr":82,"att":76,"def":79,"phy":83,"pac":92,"tec":75,"num":28},
+    {"id":"tot12_20","name":"Michael Dawson","pos":["CB"],"ovr":80,"att":42,"def":82,"phy":84,"pac":58,"tec":62,"num":20},
+    {"id":"tot12_5","name":"Jan Vertonghen","pos":["CB","LB"],"ovr":85,"att":68,"def":86,"phy":82,"pac":74,"tec":80,"num":5},
+    {"id":"tot12_33","name":"Steven Caulker","pos":["CB"],"ovr":77,"att":40,"def":78,"phy":81,"pac":66,"tec":60,"num":33},
+    {"id":"tot12_13","name":"William Gallas","pos":["CB"],"ovr":78,"att":45,"def":80,"phy":76,"pac":62,"tec":64,"num":13},
+    {"id":"tot12_32","name":"Benoît Assou-Ekotto","pos":["LB"],"ovr":78,"att":72,"def":76,"phy":75,"pac":78,"tec":76,"num":32},
+    {"id":"tot12_16","name":"Kyle Naughton","pos":["RB","LB"],"ovr":75,"att":68,"def":74,"phy":72,"pac":78,"tec":72,"num":16},
+    {"id":"tot12_30","name":"Sandro","pos":["CDM","CM"],"ovr":81,"att":62,"def":83,"phy":86,"pac":70,"tec":72,"num":30},
+    {"id":"tot12_19","name":"Mousa Dembélé","pos":["CM","CDM"],"ovr":84,"att":78,"def":78,"phy":87,"pac":76,"tec":88,"num":19},
+    {"id":"tot12_6","name":"Tom Huddlestone","pos":["CM","CDM"],"ovr":77,"att":72,"def":72,"phy":78,"pac":50,"tec":82,"num":6},
+    {"id":"tot12_8","name":"Scott Parker","pos":["CDM","CM"],"ovr":80,"att":60,"def":82,"phy":82,"pac":65,"tec":74,"num":8},
+    {"id":"tot12_23","name":"Gylfi Sigurðsson","pos":["CAM","CM"],"ovr":79,"att":80,"def":52,"phy":74,"pac":70,"tec":82,"num":23},
+    {"id":"tot12_2","name":"Clint Dempsey","pos":["CAM","CF","ST"],"ovr":81,"att":82,"def":48,"phy":80,"pac":74,"tec":80,"num":2},
+    {"id":"tot12_11","name":"Gareth Bale","pos":["LB","RB","LW","RW","CAM"],"ovr":90,"att":90,"def":65,"phy":84,"pac":93,"tec":89,"num":11},
+    {"id":"tot12_7","name":"Aaron Lennon","pos":["RW","RM"],"ovr":82,"att":78,"def":42,"phy":62,"pac":92,"tec":82,"num":7},
+    {"id":"tot12_22","name":"Steven Pienaar","pos":["LM","LW"],"ovr":78,"att":76,"def":50,"phy":68,"pac":76,"tec":82,"num":22},
+    {"id":"tot12_18","name":"Jermain Defoe","pos":["ST"],"ovr":82,"att":84,"def":32,"phy":72,"pac":85,"tec":78,"num":18},
+    {"id":"tot12_10","name":"Emmanuel Adebayor","pos":["ST"],"ovr":81,"att":82,"def":35,"phy":82,"pac":78,"tec":79,"num":10}
+  ],
+  "manager": {
+    "name": "André Villas-Boas",
+    "ovr": 83
+  }
+}
+,{
+  "id": "sslazio1999",
+  "name": "SS Lazio 1999-00",
+  "short": "LAZ99",
+  "flag": "🇮🇹",
+  "color": "#87D8F7",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"laz99_1","name":"Luca Marchegiani","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":78,"pac":48,"tec":62,"num":1},
+    {"id":"laz99_22","name":"Marco Ballotta","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":74,"pac":42,"tec":58,"num":22},
+    {"id":"laz99_13","name":"Alessandro Nesta","pos":["CB"],"ovr":91,"att":48,"def":93,"phy":86,"pac":78,"tec":78,"num":13},
+    {"id":"laz99_2","name":"Paolo Negro","pos":["CB","RB"],"ovr":82,"att":58,"def":83,"phy":83,"pac":75,"tec":70,"num":2},
+    {"id":"laz99_24","name":"Fernando Couto","pos":["CB"],"ovr":82,"att":45,"def":83,"phy":86,"pac":68,"tec":66,"num":24},
+    {"id":"laz99_15","name":"Giuseppe Pancaro","pos":["LB","RB"],"ovr":81,"att":72,"def":81,"phy":80,"pac":76,"tec":74,"num":15},
+    {"id":"laz99_17","name":"Guerino Gottardi","pos":["RB","RM"],"ovr":75,"att":68,"def":74,"phy":74,"pac":78,"tec":72,"num":17},
+    {"id":"laz99_16","name":"Giuseppe Favalli","pos":["LB"],"ovr":81,"att":74,"def":81,"phy":78,"pac":78,"tec":75,"num":16},
+    {"id":"laz99_23","name":"Juan Sebastián Verón","pos":["CM","CAM"],"ovr":89,"att":86,"def":72,"phy":82,"pac":74,"tec":92,"num":23},
+    {"id":"laz99_25","name":"Matias Almeyda","pos":["CDM","CM"],"ovr":85,"att":62,"def":86,"phy":89,"pac":74,"tec":76,"num":25},
+    {"id":"laz99_14","name":"Diego Simeone","pos":["CM","CDM"],"ovr":86,"att":78,"def":84,"phy":88,"pac":74,"tec":78,"num":14},
+    {"id":"laz99_18","name":"Pavel Nedvěd","pos":["LM","LW","CAM"],"ovr":88,"att":86,"def":68,"phy":84,"pac":86,"tec":88,"num":18},
+    {"id":"laz99_7","name":"Sérgio Conceição","pos":["RM","RW"],"ovr":84,"att":83,"def":52,"phy":78,"pac":86,"tec":85,"num":7},
+    {"id":"laz99_20","name":"Dejan Stanković","pos":["CM","CAM","RM"],"ovr":81,"att":78,"def":70,"phy":80,"pac":76,"tec":82,"num":20},
+    {"id":"laz99_6","name":"Roberto Sensini","pos":["CB","CDM","LB"],"ovr":83,"att":55,"def":85,"phy":82,"pac":70,"tec":74,"num":6},
+    {"id":"laz99_4","name":"Dario Marcolin","pos":["CM","CDM"],"ovr":73,"att":68,"def":72,"phy":72,"pac":66,"tec":74,"num":4},
+    {"id":"laz99_10","name":"Roberto Mancini","pos":["CF","CAM","ST"],"ovr":86,"att":85,"def":38,"phy":72,"pac":72,"tec":91,"num":10},
+    {"id":"laz99_9","name":"Marcelo Salas","pos":["ST"],"ovr":88,"att":89,"def":35,"phy":82,"pac":84,"tec":86,"num":9},
+    {"id":"laz99_21","name":"Simone Inzaghi","pos":["ST"],"ovr":82,"att":84,"def":32,"phy":76,"pac":78,"tec":78,"num":21},
+    {"id":"laz99_11","name":"Siniša Mihajlović","pos":["CB","LB"],"ovr":86,"att":78,"def":85,"phy":84,"pac":70,"tec":88,"num":11},
+    {"id":"laz99_33","name":"Fabrizio Ravanelli","pos":["ST"],"ovr":80,"att":81,"def":40,"phy":82,"pac":76,"tec":76,"num":33},
+    {"id":"laz99_19","name":"Alen Bokšić","pos":["ST"],"ovr":82,"att":83,"def":32,"phy":84,"pac":82,"tec":82,"num":19}
+  ],
+  "manager": {
+    "name": "Sven-Göran Eriksson",
+    "ovr": 90
+  }
+}
+,{
+  "id": "manchesterunited1998",
+  "name": "Manchester United 1998-99",
+  "short": "MUN98",
+  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "color": "#DA291C",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"mun98_1","name":"Peter Schmeichel","pos":["GK"],"ovr":92,"att":15,"def":93,"phy":90,"pac":50,"tec":65,"num":1},
+    {"id":"mun98_17","name":"Raimond van der Gouw","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":75,"pac":42,"tec":58,"num":17},
+    {"id":"mun98_2","name":"Gary Neville","pos":["RB","RWB"],"ovr":86,"att":74,"def":86,"phy":81,"pac":80,"tec":76,"num":2},
+    {"id":"mun98_6","name":"Jaap Stam","pos":["CB"],"ovr":90,"att":48,"def":92,"phy":93,"pac":78,"tec":72,"num":6},
+    {"id":"mun98_5","name":"Ronny Johnsen","pos":["CB","CDM"],"ovr":83,"att":52,"def":84,"phy":83,"pac":74,"tec":70,"num":5},
+    {"id":"mun98_3","name":"Denis Irwin","pos":["LB","RB"],"ovr":86,"att":78,"def":85,"phy":78,"pac":78,"tec":82,"num":3},
+    {"id":"mun98_4","name":"David May","pos":["CB","RB"],"ovr":77,"att":45,"def":78,"phy":79,"pac":66,"tec":62,"num":4},
+    {"id":"mun98_12","name":"Phil Neville","pos":["LB","RB","CDM"],"ovr":79,"att":70,"def":79,"phy":77,"pac":76,"tec":72,"num":12},
+    {"id":"mun98_21","name":"Henning Berg","pos":["CB","RB"],"ovr":80,"att":48,"def":81,"phy":82,"pac":68,"tec":65,"num":21},
+    {"id":"mun98_30","name":"Wes Brown","pos":["CB","RB"],"ovr":74,"att":42,"def":75,"phy":76,"pac":72,"tec":60,"num":30},
+    {"id":"mun98_7","name":"David Beckham","pos":["RM","RW","CM"],"ovr":90,"att":88,"def":68,"phy":78,"pac":76,"tec":94,"num":7},
+    {"id":"mun98_16","name":"Roy Keane","pos":["CDM","CM"],"ovr":91,"att":78,"def":90,"phy":92,"pac":75,"tec":83,"num":16},
+    {"id":"mun98_18","name":"Paul Scholes","pos":["CM","CAM"],"ovr":89,"att":88,"def":68,"phy":76,"pac":72,"tec":92,"num":18},
+    {"id":"mun98_11","name":"Ryan Giggs","pos":["LM","LW"],"ovr":90,"att":88,"def":50,"phy":74,"pac":93,"tec":90,"num":11},
+    {"id":"mun98_8","name":"Nicky Butt","pos":["CM","CDM"],"ovr":82,"att":72,"def":82,"phy":84,"pac":72,"tec":76,"num":8},
+    {"id":"mun98_15","name":"Jesper Blomqvist","pos":["LM","LW"],"ovr":78,"att":76,"def":48,"phy":68,"pac":84,"tec":80,"num":15},
+    {"id":"mun98_19","name":"Dwight Yorke","pos":["ST","CF"],"ovr":89,"att":90,"def":40,"phy":82,"pac":85,"tec":88,"num":19},
+    {"id":"mun98_9","name":"Andy Cole","pos":["ST"],"ovr":87,"att":88,"def":35,"phy":80,"pac":86,"tec":82,"num":9},
+    {"id":"mun98_20","name":"Ole Gunnar Solskjær","pos":["ST","CF"],"ovr":84,"att":86,"def":32,"phy":72,"pac":81,"tec":80,"num":20},
+    {"id":"mun98_10","name":"Teddy Sheringham","pos":["CF","ST"],"ovr":83,"att":84,"def":38,"phy":76,"pac":65,"tec":86,"num":10}
+  ],
+  "manager": {
+    "name": "Alex Ferguson",
+    "ovr": 94
+  }
+}
+,{
+  "id": "chelsea2006",
+  "name": "Chelsea FC 2006-07",
+  "short": "CHE06",
+  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "color": "#034694",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"che06_1","name":"Petr Čech","pos":["GK"],"ovr":90,"att":15,"def":91,"phy":84,"pac":50,"tec":68,"num":1},
+    {"id":"che06_23","name":"Carlo Cudicini","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":23},
+    {"id":"che06_40","name":"Henrique Hilário","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":42,"tec":55,"num":40},
+    {"id":"che06_26","name":"John Terry","pos":["CB"],"ovr":90,"att":55,"def":92,"phy":88,"pac":65,"tec":70,"num":26},
+    {"id":"che06_6","name":"Ricardo Carvalho","pos":["CB"],"ovr":88,"att":48,"def":89,"phy":82,"pac":76,"tec":75,"num":6},
+    {"id":"che06_3","name":"Ashley Cole","pos":["LB","LWB"],"ovr":88,"att":81,"def":86,"phy":80,"pac":88,"tec":80,"num":3},
+    {"id":"che06_18","name":"Wayne Bridge","pos":["LB"],"ovr":78,"att":74,"def":76,"phy":75,"pac":78,"tec":74,"num":18},
+    {"id":"che06_20","name":"Paulo Ferreira","pos":["RB","LB"],"ovr":80,"att":70,"def":81,"phy":77,"pac":76,"tec":74,"num":20},
+    {"id":"che06_9","name":"Khalid Boulahrouz","pos":["CB","RB"],"ovr":78,"att":42,"def":80,"phy":84,"pac":72,"tec":62,"num":9},
+    {"id":"che06_4","name":"Claude Makélélé","pos":["CDM"],"ovr":88,"att":50,"def":90,"phy":84,"pac":68,"tec":78,"num":4},
+    {"id":"che06_5","name":"Michael Essien","pos":["CM","CDM","RB"],"ovr":88,"att":82,"def":85,"phy":91,"pac":84,"tec":82,"num":5},
+    {"id":"che06_8","name":"Frank Lampard","pos":["CM","CAM"],"ovr":89,"att":88,"def":72,"phy":83,"pac":76,"tec":86,"num":8},
+    {"id":"che06_13","name":"Michael Ballack","pos":["CM","CAM"],"ovr":88,"att":86,"def":76,"phy":86,"pac":72,"tec":86,"num":13},
+    {"id":"che06_12","name":"John Obi Mikel","pos":["CDM","CM"],"ovr":77,"att":68,"def":78,"phy":81,"pac":68,"tec":78,"num":12},
+    {"id":"che06_19","name":"Lassana Diarra","pos":["RB","CDM"],"ovr":76,"att":66,"def":77,"phy":78,"pac":80,"tec":74,"num":19},
+    {"id":"che06_10","name":"Joe Cole","pos":["RW","LW","CAM"],"ovr":85,"att":83,"def":42,"phy":68,"pac":83,"tec":90,"num":10},
+    {"id":"che06_16","name":"Arjen Robben","pos":["LW","RW"],"ovr":87,"att":86,"def":35,"phy":68,"pac":93,"tec":89,"num":16},
+    {"id":"che06_24","name":"Shaun Wright-Phillips","pos":["RW","RM"],"ovr":80,"att":78,"def":40,"phy":64,"pac":92,"tec":81,"num":24},
+    {"id":"che06_11","name":"Didier Drogba","pos":["ST"],"ovr":91,"att":91,"def":45,"phy":92,"pac":84,"tec":82,"num":11},
+    {"id":"che06_7","name":"Andriy Shevchenko","pos":["ST"],"ovr":86,"att":87,"def":38,"phy":78,"pac":81,"tec":85,"num":7},
+    {"id":"che06_21","name":"Salomon Kalou","pos":["ST","LW","RW"],"ovr":80,"att":81,"def":35,"phy":74,"pac":84,"tec":82,"num":21}
+  ],
+  "manager": {
+    "name": "José Mourinho",
+    "ovr": 92
+  }
+}
+,{
   "id": "juv1998",
   "name": "Juventus 1997-98",
   "short": "JUV97",
@@ -20306,6 +20829,39 @@
   "manager": {
     "name": "Marcello Lippi",
     "ovr": 93
+  }
+}
+,{
+  "id": "juventus1992",
+  "name": "Juventus FC 1992-93",
+  "short": "JUV92",
+  "flag": "🇮🇹",
+  "color": "#000000",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"juv92_1","name":"Angelo Peruzzi","pos":["GK"],"ovr":85,"att":15,"def":86,"phy":83,"pac":52,"tec":65,"num":1},
+    {"id":"juv92_12","name":"Michelangelo Rampulla","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":45,"tec":58,"num":12},
+    {"id":"juv92_2","name":"Moreno Torricelli","pos":["RB","CB"],"ovr":81,"att":68,"def":82,"phy":84,"pac":82,"tec":72,"num":2},
+    {"id":"juv92_3","name":"Massimo Carrera","pos":["CB","RB"],"ovr":80,"att":55,"def":82,"phy":81,"pac":74,"tec":68,"num":3},
+    {"id":"juv92_4","name":"Júlio César","pos":["CB","SW"],"ovr":86,"att":62,"def":88,"phy":85,"pac":74,"tec":78,"num":4},
+    {"id":"juv92_5","name":"Jürgen Kohler","pos":["CB"],"ovr":89,"att":45,"def":91,"phy":88,"pac":72,"tec":70,"num":5},
+    {"id":"juv92_6","name":"Luigi de Agostini","pos":["LB","LWB","LM"],"ovr":80,"att":74,"def":79,"phy":78,"pac":78,"tec":76,"num":6},
+    {"id":"juv92_13","name":"Marco De Marchi","pos":["CB"],"ovr":75,"att":42,"def":76,"phy":78,"pac":66,"tec":62,"num":13},
+    {"id":"juv92_8","name":"Antonio Conte","pos":["CM","CDM","RM"],"ovr":82,"att":74,"def":80,"phy":85,"pac":76,"tec":76,"num":8},
+    {"id":"juv92_14","name":"Giancarlo Marocchi","pos":["CM","LM"],"ovr":81,"att":75,"def":76,"phy":79,"pac":75,"tec":79,"num":14},
+    {"id":"juv92_7","name":"Angelo Di Livio","pos":["RM","RWB"],"ovr":79,"att":75,"def":72,"phy":78,"pac":82,"tec":78,"num":7},
+    {"id":"juv92_15","name":"Roberto Galia","pos":["CDM","CM","CB"],"ovr":78,"att":65,"def":80,"phy":82,"pac":70,"tec":72,"num":15},
+    {"id":"juv92_16","name":"Dino Baggio","pos":["CDM","CM"],"ovr":84,"att":76,"def":84,"phy":86,"pac":74,"tec":78,"num":16},
+    {"id":"juv92_17","name":"Andreas Möller","pos":["CAM","CF","RM"],"ovr":88,"att":87,"def":52,"phy":76,"pac":86,"tec":89,"num":17},
+    {"id":"juv92_10","name":"Roberto Baggio","pos":["CAM","CF","ST"],"ovr":94,"att":93,"def":40,"phy":74,"pac":86,"tec":96,"num":10},
+    {"id":"juv92_9","name":"Gianluca Vialli","pos":["ST"],"ovr":88,"att":89,"def":42,"phy":85,"pac":83,"tec":85,"num":9},
+    {"id":"juv92_11","name":"Fabrizio Ravanelli","pos":["ST"],"ovr":83,"att":84,"def":45,"phy":84,"pac":81,"tec":78,"num":11},
+    {"id":"juv92_18","name":"Paolo Di Canio","pos":["RW","CF","CAM"],"ovr":80,"att":80,"def":38,"phy":72,"pac":82,"tec":86,"num":18},
+    {"id":"juv92_19","name":"Pierluigi Casiraghi","pos":["ST"],"ovr":82,"att":83,"def":38,"phy":83,"pac":78,"tec":76,"num":19}
+  ],
+  "manager": {
+    "name": "Giovanni Trapattoni",
+    "ovr": 90
   }
 }
 ,{
