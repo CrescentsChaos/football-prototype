@@ -1011,7 +1011,7 @@
     {"id":"bra94_17","name":"Mazinho","pos":["CM","RM"],"ovr":86,"att":74,"def":83,"phy":82,"pac":78,"tec":85,"num":17},
     {"id":"bra94_18","name":"Paulo Sérgio","pos":["RW","ST"],"ovr":81,"att":81,"def":35,"phy":74,"pac":83,"tec":82,"num":18},
     {"id":"bra94_19","name":"Müller","pos":["ST","RW"],"ovr":84,"att":85,"def":30,"phy":72,"pac":86,"tec":84,"num":19},
-    {"id":"bra94_20","name":"Ronaldo","pos":["ST"],"ovr":82,"att":85,"def":25,"phy":75,"pac":91,"tec":85,"num":20},
+    {"id":"bra94_20","name":"Ronaldo Nazário","pos":["ST"],"ovr":82,"att":85,"def":25,"phy":75,"pac":91,"tec":85,"num":20},
     {"id":"bra94_21","name":"Viola","pos":["ST"],"ovr":79,"att":80,"def":25,"phy":76,"pac":80,"tec":77,"num":21},
     {"id":"bra94_22","name":"Gilmar Rinaldi","pos":["GK"],"ovr":78,"att":15,"def":80,"phy":76,"pac":48,"tec":64,"num":22}
   ],
@@ -1233,7 +1233,7 @@
     {"id":"bra02_17","name":"Kaká","pos":["CAM","CM"],"ovr":82,"att":82,"def":30,"phy":78,"pac":94,"tec":90,"num":23},
     {"id":"bra02_18","name":"Vampeta","pos":["CM","CDM"],"ovr":78,"att":58,"def":72,"phy":80,"pac":70,"tec":76,"num":17},
     {"id":"bra02_19","name":"Denílson","pos":["LW","LM"],"ovr":86,"att":83,"def":30,"phy":76,"pac":91,"tec":94,"num":17},
-    {"id":"bra02_20","name":"Ronaldo","pos":["ST"],"ovr":99,"att":99,"def":25,"phy":91,"pac":96,"tec":95,"num":9},
+    {"id":"bra02_20","name":"Ronaldo Nazário","pos":["ST"],"ovr":99,"att":99,"def":25,"phy":91,"pac":96,"tec":95,"num":9},
     {"id":"bra02_21","name":"Luizão","pos":["ST"],"ovr":83,"att":87,"def":25,"phy":84,"pac":77,"tec":78,"num":21},
     {"id":"bra02_22","name":"Edílson","pos":["ST","RW"],"ovr":80,"att":82,"def":30,"phy":76,"pac":82,"tec":83,"num":20},
     {"id":"bra02_23","name":"Alex","pos":["CB"],"ovr":78,"att":40,"def":80,"phy":82,"pac":65,"tec":68,"num":16},
@@ -18329,7 +18329,7 @@
     {"id":"acm07_27","name":"Serginho","pos":["LB","LM"],"ovr":82,"att":80,"def":70,"phy":74,"pac":87,"tec":84,"num":27},
     {"id":"acm07_32","name":"Cristian Brocchi","pos":["CM","CDM"],"ovr":80,"att":70,"def":79,"phy":83,"pac":76,"tec":77,"num":32},
     {"id":"acm07_44","name":"Massimo Oddo","pos":["RB","RWB"],"ovr":86,"att":78,"def":83,"phy":80,"pac":82,"tec":84,"num":44},
-    {"id":"acm07_99","name":"Ronaldo Nazario","pos":["ST"],"ovr":89,"att":92,"def":25,"phy":78,"pac":85,"tec":92,"num":99}
+    {"id":"acm07_99","name":"Ronaldo Nazário","pos":["ST"],"ovr":89,"att":92,"def":25,"phy":78,"pac":85,"tec":92,"num":99}
   ],
   "manager": {
     "name": "Carlo Ancelotti",
@@ -20265,7 +20265,7 @@
     {"id":"rma03_24","name":"Claude Makélélé","pos":["CDM"],"ovr":88,"att":58,"def":89,"phy":84,"pac":74,"tec":78,"num":24},
     {"id":"rma03_7","name":"Raúl","pos":["CF","ST"],"ovr":90,"att":91,"def":45,"phy":74,"pac":82,"tec":90,"num":7},
     {"id":"rma03_9","name":"Fernando Morientes","pos":["ST"],"ovr":84,"att":86,"def":38,"phy":82,"pac":76,"tec":78,"num":9},
-    {"id":"rma03_11","name":"Ronaldo","pos":["ST"],"ovr":92,"att":94,"def":35,"phy":80,"pac":93,"tec":92,"num":11},
+    {"id":"rma03_11","name":"Ronaldo Nazário","pos":["ST"],"ovr":92,"att":94,"def":35,"phy":80,"pac":93,"tec":92,"num":11},
     {"id":"rma03_18","name":"Javier Portillo","pos":["ST"],"ovr":75,"att":78,"def":30,"phy":68,"pac":80,"tec":74,"num":18}
   ],
   "manager": {
