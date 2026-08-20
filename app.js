@@ -11,6 +11,11 @@ var App = (() => {
   let leaguesData = {};
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+  // Which season competition (a league, or the UCL) is currently being simulated —
+  // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
+  // can also tally into that competition's own stat bucket (comp.stats), giving each
+  // league/competition its own top scorers, assists, cards, awards, etc.
+  let currentSeasonComp = null;
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
@@ -48,6 +53,7 @@ var App = (() => {
     search: { epl: '', laliga: '', seriea: '', bundesliga: '', ligue1: '' }
   };
   let seasonActiveTab = 'epl';
+  let seasonActiveSubTab = 'table'; // 'table' | 'stats' | 'awards' — sub-view within a league/UCL tab
   let seasonReportRegistry = []; // flat list of match reports referenced by index from season fixture cards
 
   const FORMATIONS = {
@@ -2659,30 +2665,41 @@ var App = (() => {
   }
 
 
-  function recordRating(player, team, rating) {
-    if (!player || !team) return;
-    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
-    if (competitive) {
-    if (!stats.ratings) stats.ratings = {};
-    if (!stats.ratings[player.id]) {
+  // Shape used for every per-competition stat bucket: season leagues, the season's
+  // UCL, and (already existing) the global `stats` / `tournamentStats` buckets.
+  function blankCompStats() {
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
+  }
+
+  function bumpStatBucket(bucket, type, player, team) {
+    if (!bucket[type]) bucket[type] = {};
+    if (!bucket[type][player.id]) {
       const aff = findPlayerTeams(player.id);
-      stats.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
+      bucket[type][player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, national: aff.national, club: aff.club };
     }
-    const e = stats.ratings[player.id];
+    bucket[type][player.id].count++;
+  }
+
+  function bumpRatingBucket(bucket, player, team, rating) {
+    if (!bucket.ratings) bucket.ratings = {};
+    if (!bucket.ratings[player.id]) {
+      const aff = findPlayerTeams(player.id);
+      bucket.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
+    }
+    const e = bucket.ratings[player.id];
     e.count++;
     e.sum += rating;
     e.avg = Math.round((e.sum / e.count) * 100) / 100;
-    }
-    if (tournament) {
-      if (!tournamentStats.ratings) tournamentStats.ratings = {};
-      if (!tournamentStats.ratings[player.id]) {
-        const aff = findPlayerTeams(player.id);
-        tournamentStats.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
-      }
-      const te = tournamentStats.ratings[player.id];
-      te.count++;
-      te.sum += rating;
-      te.avg = Math.round((te.sum / te.count) * 100) / 100;
+  }
+
+  function recordRating(player, team, rating) {
+    if (!player || !team) return;
+    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
+    if (competitive) bumpRatingBucket(stats, player, team, rating);
+    if (tournament) bumpRatingBucket(tournamentStats, player, team, rating);
+    if (currentSeasonComp) {
+      if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+      bumpRatingBucket(currentSeasonComp.stats, player, team, rating);
     }
   }
 
@@ -2715,29 +2732,13 @@ var App = (() => {
 
   function recordStat(type, player, team) {
     if (!player || !team) return;
-    // Friendlies do not feed global leaderboard — only competitive (tournament) matches
+    // Friendlies do not feed global leaderboard — only competitive (tournament/season) matches
     const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
-    if (competitive) {
-      if (!stats[type]) stats[type] = {};
-      if (!stats[type][player.id]) {
-        const aff = findPlayerTeams(player.id);
-        stats[type][player.id] = {
-          id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0,
-          national: aff.national, club: aff.club
-        };
-      }
-      stats[type][player.id].count++;
-    }
-    if (tournament) {
-      if (!tournamentStats[type]) tournamentStats[type] = {};
-      if (!tournamentStats[type][player.id]) {
-        const aff = findPlayerTeams(player.id);
-        tournamentStats[type][player.id] = {
-          id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0,
-          national: aff.national, club: aff.club
-        };
-      }
-      tournamentStats[type][player.id].count++;
+    if (competitive) bumpStatBucket(stats, type, player, team);
+    if (tournament) bumpStatBucket(tournamentStats, type, player, team);
+    if (currentSeasonComp) {
+      if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+      bumpStatBucket(currentSeasonComp.stats, type, player, team);
     }
   }
 
@@ -4978,7 +4979,8 @@ var App = (() => {
         rounds: buildDoubleRoundRobinRounds(teams),
         currentRound: 0,
         champion: null,
-        finished: false
+        finished: false,
+        stats: blankCompStats()
       };
     });
 
@@ -5000,11 +5002,13 @@ var App = (() => {
       bracketSize: null,
       knockout: { qf: null, sf: null, final: null },
       champion: null,
-      finished: false
+      finished: false,
+      stats: blankCompStats()
     };
 
     season = { year: 1, week: 0, leagues, ucl };
     seasonActiveTab = 'epl';
+    seasonActiveSubTab = 'table';
     renderSeasonDashboard();
     const setup = document.getElementById('season-setup');
     const dash = document.getElementById('season-dashboard');
@@ -5025,15 +5029,20 @@ var App = (() => {
   function simulateLeagueRound(comp) {
     if (!comp || comp.finished) return;
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); return; }
+    if (!comp.stats) comp.stats = blankCompStats();
+    currentSeasonComp = comp;
     simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
       applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
     });
+    currentSeasonComp = null;
     comp.currentRound++;
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); }
   }
 
   function simulateUCLStep(comp) {
     if (!comp || comp.finished) return;
+    if (!comp.stats) comp.stats = blankCompStats();
+    currentSeasonComp = comp;
     if (comp.stage === 'league') {
       if (comp.currentRound >= comp.rounds.length) { comp.stage = 'transition'; }
       else {
@@ -5081,6 +5090,7 @@ var App = (() => {
         try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch (e) {}
       }
     }
+    currentSeasonComp = null;
   }
 
   function seasonIsComplete() {
@@ -5125,7 +5135,8 @@ var App = (() => {
         key: def.key, name: def.name, teams,
         table: teams.map(blankSeasonRow),
         rounds: buildDoubleRoundRobinRounds(teams),
-        currentRound: 0, champion: null, finished: false
+        currentRound: 0, champion: null, finished: false,
+        stats: blankCompStats()
       };
     });
     // Re-qualify the Champions League from this season's just-finished
@@ -5139,7 +5150,8 @@ var App = (() => {
       year, week: 0, leagues,
       ucl: { key: 'ucl', name: 'Champions League', teams: uclTeams, table: uclTeams.map(blankSeasonRow),
         rounds: uclRounds, currentRound: 0, matchesPerTeam, stage: 'league', bracketSize: null,
-        knockout: { qf: null, sf: null, final: null }, champion: null, finished: false }
+        knockout: { qf: null, sf: null, final: null }, champion: null, finished: false,
+        stats: blankCompStats() }
     };
     renderSeasonDashboard();
     toast('Year ' + year + ' kicks off!');
@@ -5148,6 +5160,8 @@ var App = (() => {
   function resetSeason() {
     if (!confirm('Reset the season? All standings and fixtures will be lost.')) return;
     season = null;
+    seasonActiveTab = 'epl';
+    seasonActiveSubTab = 'table';
     seasonSetup = {
       selections: { epl: new Set(), laliga: new Set(), seriea: new Set(), bundesliga: new Set(), ligue1: new Set() },
       search: { epl: '', laliga: '', seriea: '', bundesliga: '', ligue1: '' }
@@ -5162,6 +5176,12 @@ var App = (() => {
 
   function showSeasonComp(key) {
     seasonActiveTab = key;
+    seasonActiveSubTab = 'table';
+    renderSeasonDashboard();
+  }
+
+  function showSeasonSubTab(key) {
+    seasonActiveSubTab = key;
     renderSeasonDashboard();
   }
 
@@ -5172,18 +5192,137 @@ var App = (() => {
     if (title) title.textContent = 'Year ' + season.year + ' · Matchday ' + season.week;
     const tabsEl = document.getElementById('season-comp-tabs');
     if (tabsEl) {
-      const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }];
+      const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }, { key: 'trophies', name: '🏆 Trophy Room' }];
       tabsEl.innerHTML = tabs.map(def => {
-        const comp = def.key === 'ucl' ? season.ucl : season.leagues[def.key];
-        const flag = comp.finished ? ' 🏆' : '';
+        const comp = def.key === 'ucl' ? season.ucl : (def.key === 'trophies' ? null : season.leagues[def.key]);
+        const flag = comp && comp.finished ? ' 🏆' : '';
         return `<button class="lb-tab ${seasonActiveTab === def.key ? 'active' : ''}" onclick="App.showSeasonComp('${def.key}')">${def.name}${flag}</button>`;
       }).join('');
     }
     const contentEl = document.getElementById('season-comp-content');
     if (!contentEl) return;
+    if (seasonActiveTab === 'trophies') {
+      contentEl.innerHTML = renderSeasonTrophyRoomHTML();
+      return;
+    }
     const comp = seasonActiveTab === 'ucl' ? season.ucl : season.leagues[seasonActiveTab];
     if (!comp) { contentEl.innerHTML = ''; return; }
-    contentEl.innerHTML = seasonActiveTab === 'ucl' ? renderUCLSeasonHTML(comp) : renderLeagueCompHTML(comp);
+    if (!comp.stats) comp.stats = blankCompStats();
+
+    const subTabs = [
+      { key: 'table', name: 'Table & Fixtures' },
+      { key: 'stats', name: 'Stats' },
+      { key: 'awards', name: 'Awards' }
+    ];
+    let h = '<div class="leaderboard-tabs" style="margin-bottom:12px">' + subTabs.map(st =>
+      `<button class="lb-tab ${seasonActiveSubTab === st.key ? 'active' : ''}" onclick="App.showSeasonSubTab('${st.key}')">${st.name}</button>`
+    ).join('') + '</div>';
+
+    if (seasonActiveSubTab === 'stats') {
+      h += renderCompStatsHTML(comp);
+    } else if (seasonActiveSubTab === 'awards') {
+      h += renderCompAwardsHTML(comp);
+    } else {
+      h += seasonActiveTab === 'ucl' ? renderUCLSeasonHTML(comp) : renderLeagueCompHTML(comp);
+    }
+    contentEl.innerHTML = h;
+  }
+
+  // ---------- per-competition stats & awards (Season Calendar) ----------
+  function compStatTop(comp, key, n) {
+    return Object.values((comp.stats && comp.stats[key]) || {}).sort((a, b) => b.count - a.count).slice(0, n || 10);
+  }
+
+  function renderCompStatTable(title, icon, rows, colLabel) {
+    if (!rows.length) {
+      return `<div class="group-card" style="margin-bottom:14px"><h4>${icon} ${title}</h4><div class="empty-state" style="padding:16px 0"><p>No data yet — simulate some matchdays.</p></div></div>`;
+    }
+    return `<div class="group-card" style="margin-bottom:14px"><h4>${icon} ${title}</h4>
+      <div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>${colLabel}</th></tr></thead><tbody>
+      ${rows.map((p, i) => `<tr><td class="lb-rank">${i + 1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${p.team}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+
+  function renderCompStatsHTML(comp) {
+    let h = '<div class="group-card league-table-wrap" style="margin-bottom:14px"><h4>' + comp.name + ' — Season Stats</h4>' +
+      '<p style="font-size:0.8rem;color:var(--text-muted)">Top performers across every matchday played in this competition so far.</p></div>';
+    h += renderCompStatTable('Top Scorers', '⚽', compStatTop(comp, 'goals', 15), 'Goals');
+    h += renderCompStatTable('Top Assists', '🎯', compStatTop(comp, 'assists', 15), 'Assists');
+    h += renderCompStatTable('Most Saves', '🧤', compStatTop(comp, 'saves', 15), 'Saves');
+    h += renderCompStatTable('Clean Sheets', '🛡️', compStatTop(comp, 'cleanSheets', 15), 'Clean Sheets');
+    h += renderCompStatTable('Yellow Cards', '🟨', compStatTop(comp, 'yellows', 15), 'Yellows');
+    h += renderCompStatTable('Red Cards', '🟥', compStatTop(comp, 'reds', 15), 'Reds');
+    return h;
+  }
+
+  function assignCompAwards(comp) {
+    const goals = compStatTop(comp, 'goals', 50);
+    const assists = compStatTop(comp, 'assists', 50);
+    const saves = compStatTop(comp, 'saves', 50);
+    const cleanSheets = compStatTop(comp, 'cleanSheets', 50);
+    const motm = compStatTop(comp, 'motm', 50);
+    const ratingsAny = Object.values((comp.stats && comp.stats.ratings) || {})
+      .filter(x => (x.count || 0) > 0)
+      .sort((a, b) => b.avg - a.avg || b.count - a.count);
+    comp.awards = {
+      goldenBoot: goals[0] || null,
+      goldenGlove: saves[0] || null,
+      goldenClean: cleanSheets[0] || null,
+      topAssists: assists[0] || null,
+      mostMotm: motm[0] || null,
+      bestAvgRating: ratingsAny[0] || null,
+      champion: comp.champion || null
+    };
+    return comp.awards;
+  }
+
+  function renderCompAwardsHTML(comp) {
+    const a = assignCompAwards(comp);
+    const card = (title, icon, p, extra) => {
+      if (!p) return `<div class="award-mini"><div class="am-title">${icon} ${title}</div><div class="am-empty">TBD</div></div>`;
+      return `<div class="award-mini"><div class="am-title">${icon} ${title}</div>
+        <div class="am-name">${p.name}</div>
+        <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
+    };
+    let h = '<div class="card-title">' + comp.name + ' Awards' + (comp.finished ? ' (Final)' : ' (In Progress)') + '</div>';
+    h += `<div class="awards-row">
+      ${card('Golden Boot', '👟', a.goldenBoot, (a.goldenBoot && a.goldenBoot.count) + ' goals')}
+      ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
+      ${card('Golden Glove', '🧤', a.goldenGlove, (a.goldenGlove && a.goldenGlove.count) + ' saves')}
+      ${card('Clean Sheet King', '🛡️', a.goldenClean, (a.goldenClean && a.goldenClean.count) + ' clean sheets')}
+      ${card('Most MOTM', '⭐', a.mostMotm, (a.mostMotm && a.mostMotm.count) + ' MOTM')}
+      ${card('Best Avg Rating', '📈', a.bestAvgRating, a.bestAvgRating ? (a.bestAvgRating.avg != null ? a.bestAvgRating.avg.toFixed(2) : '—') + ' (' + a.bestAvgRating.count + ' apps)' : '')}
+    </div>`;
+    if (a.champion) {
+      h += `<div class="award-card" style="margin-top:14px"><div class="award-icon">🏆</div><div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${(a.champion.flag || '') + ' ' + a.champion.name}</p></div></div>`;
+    } else {
+      h += '<p style="color:var(--text-muted);font-size:0.85rem;margin-top:10px">Champion will be crowned once the competition finishes.</p>';
+    }
+    return h;
+  }
+
+  // Season-scoped trophy room: shows only trophies won inside this save's season
+  // play (domestic leagues + Champions League), grouped by year, newest first.
+  function renderSeasonTrophyRoomHTML() {
+    const seasonTrophies = trophies.filter(t => /^(League|Season)\s*\(Y\d+\)$/.test(t.type));
+    if (!seasonTrophies.length) {
+      return '<div class="empty-state"><div class="icon">🏆</div><p>No season trophies yet — simulate matchdays until a league or the Champions League finishes.</p></div>';
+    }
+    const byYear = {};
+    seasonTrophies.forEach(t => {
+      const m = t.type.match(/Y(\d+)/);
+      const y = m ? m[1] : '?';
+      if (!byYear[y]) byYear[y] = [];
+      byYear[y].push(t);
+    });
+    const years = Object.keys(byYear).sort((a, b) => Number(b) - Number(a));
+    let h = '<div class="card-title">🏆 Season Trophy Room</div>';
+    years.forEach(y => {
+      h += `<div class="group-card" style="margin-bottom:14px"><h4>Year ${y}</h4>` +
+        byYear[y].map(t => `<div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`).join('') +
+        '</div>';
+    });
+    return h;
   }
 
   function renderStandingsTable(comp, highlightTop) {
@@ -5304,7 +5443,7 @@ var App = (() => {
     simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
-    showSeasonComp, viewSeasonReport
+    showSeasonComp, showSeasonSubTab, viewSeasonReport
   };
 })();
 
