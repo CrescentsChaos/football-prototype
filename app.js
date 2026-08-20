@@ -15,6 +15,7 @@ var App = (() => {
     if (st) st.textContent = 'Starting…';
   // playerId -> { type, matchesOut, returnDay, teamName }
   let injuryBook = {};
+  let suspensionBook = {}; // playerId -> { returnDay, teamName, playerName } — 1-match ban after a red card
   let globalMatchDay = 1;
   let trophies = []; // {name, team, type, date}
   let currentMatch = null;
@@ -241,10 +242,10 @@ var App = (() => {
 
   function buildSquad(team, formationKey) {
     const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
-    const players = shuffleArray([...(team.players || [])].filter(p => !isPlayerInjured(p.id)));
+    const players = shuffleArray([...(team.players || [])].filter(p => !isPlayerInjured(p.id) && !isPlayerSuspended(p.id)));
     if (players.length < 11) {
-      // Emergency: allow injured if roster too thin
-      players.push(...shuffleArray([...(team.players||[])].filter(p => isPlayerInjured(p.id))));
+      // Emergency: allow injured/suspended if roster too thin
+      players.push(...shuffleArray([...(team.players||[])].filter(p => isPlayerInjured(p.id) || isPlayerSuspended(p.id))));
     }
     const used = new Set();
     const starting = [];
@@ -1309,7 +1310,7 @@ var App = (() => {
         addEvent(m.minute, 'et', 'End of the first period of extra time', null);
       }
       m.status = 'ET ' + Math.min(etMin, 30) + "'";
-      if (Math.random() < 0.006) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
+      if (Math.random() < 0.0025) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     }
     generateEvents();
     // Substitutions: aim for at least 3 per team (max 5)
@@ -1329,7 +1330,7 @@ var App = (() => {
       if ((m.homeSubsUsed || 0) < 3) trySubstitution('home');
       if ((m.awaySubsUsed || 0) < 3) trySubstitution('away');
     }
-    if (Math.random() < 0.0035) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
+    if (Math.random() < 0.0015) tryInjury(Math.random() < 0.5 ? 'home' : 'away');
     updateScoreboard();
     if (!silent) updateStatsPanel();
   }
@@ -1521,9 +1522,9 @@ var App = (() => {
       const alreadyYellow = (m.cards[defendingSide][fouler.id] || 0) >= 1;
       const aggression = 1 + Math.max(0, (75 - (fouler.def || 70)) / 80) + Math.max(0, ((fouler.phy || 70) - 80) / 100);
       let yellowChance = 0.08 * aggression + (foulCount - 1) * 0.14;
-      let straightRedChance = 0.012 * aggression;
-      if (alreadyYellow) yellowChance += 0.18;
-      if (foulCount >= 3) yellowChance += 0.2;
+      let straightRedChance = 0.004 * aggression;
+      if (alreadyYellow) yellowChance += 0.12;
+      if (foulCount >= 3) yellowChance += 0.12;
       yellowChance = Math.min(0.72, yellowChance);
       const roll = Math.random();
       const victim = pickPlayer(attTeam, ['ST','RW','LW','CAM','CM']);
@@ -1674,7 +1675,7 @@ var App = (() => {
       const varTeam = attTeam;
       const defSide = defendingSide;
       const scenario = Math.random();
-      if (scenario < 0.35) {
+      if (scenario < 0.42) {
         // Potential goal review
         addEvent(m.minute, 'var', `📺 VAR checking possible offside in the build-up (${varTeam.team.short})...`, varSide);
         if (Math.random() < 0.55) {
@@ -1682,7 +1683,7 @@ var App = (() => {
         } else {
           addEvent(m.minute, 'var', `VAR: Goal disallowed — offside against ${varTeam.team.short}`, varSide);
         }
-      } else if (scenario < 0.7) {
+      } else if (scenario < 0.87) {
         // Penalty review for attacking team
         const fouled = pickPlayer(attTeam, ['ST','RW','LW','CAM']);
         const fouler = pickPlayer(defTeam, ['CB','RB','LB','CDM']);
@@ -1721,7 +1722,7 @@ var App = (() => {
         // Red card review
         const player = pickPlayer(defTeam, ['CB','ST','CDM','CM']);
         addEvent(m.minute, 'var', `📺 VAR checking possible red card (${defTeam.team.short})...`, defSide);
-        if (player && Math.random() < 0.4) {
+        if (player && Math.random() < 0.16) {
           defTeam.stats.reds++;
           recordStat('reds', player, defTeam.team);
           if (!m.playerMatchStats) m.playerMatchStats = {};
@@ -1947,6 +1948,12 @@ var App = (() => {
     return globalMatchDay < rec.returnDay;
   }
 
+  function isPlayerSuspended(playerId) {
+    const rec = suspensionBook[playerId];
+    if (!rec) return false;
+    return globalMatchDay < rec.returnDay;
+  }
+
   function tryInjury(side) {
     const m = currentMatch;
     if (!m) return;
@@ -1974,7 +1981,9 @@ var App = (() => {
     else if (roll < 0.85) info = injuryTypes[3 + Math.floor(Math.random() * 4)];
     else info = injuryTypes[7 + Math.floor(Math.random() * 3)];
     const outMatches = info.min + Math.floor(Math.random() * (info.max - info.min + 1));
-    const returnDay = globalMatchDay + outMatches;
+    // +1 because globalMatchDay still refers to the match being played right now; the
+    // player needs to sit out `outMatches` matchdays starting from the *next* one.
+    const returnDay = globalMatchDay + outMatches + 1;
     injuryBook[injured.id] = {
       type: info.type,
       matchesOut: outMatches,
@@ -2215,6 +2224,22 @@ var App = (() => {
     Object.keys(injuryBook).forEach(id => {
       if (injuryBook[id].returnDay <= globalMatchDay) delete injuryBook[id];
     });
+    // Clear served suspensions
+    Object.keys(suspensionBook).forEach(id => {
+      if (suspensionBook[id].returnDay <= globalMatchDay) delete suspensionBook[id];
+    });
+    // Ban anyone sent off this match for the next matchday
+    Object.entries(m.playerMatchStats).forEach(([id, ps]) => {
+      if (!ps.red) return;
+      const onHome = (m.home.squad.all || []).some(p => p.id === id);
+      const teamObj = onHome ? m.home.team : m.away.team;
+      suspensionBook[id] = {
+        returnDay: globalMatchDay + 1,
+        teamName: teamObj ? teamObj.name : '',
+        playerName: ps.name
+      };
+    });
+    try { localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook)); } catch(e) {}
     saveStats();
     updateScoreboard();
     updateStatsPanel();
@@ -2662,6 +2687,7 @@ var App = (() => {
     try {
       localStorage.setItem('apexSimStats', JSON.stringify(stats));
       localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook));
+      localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook));
       localStorage.setItem('apexMatchDay', String(globalMatchDay));
     } catch(e) {}
   }
@@ -2674,6 +2700,8 @@ var App = (() => {
       if (t) trophies = JSON.parse(t);
       const ib = localStorage.getItem('apexInjuryBook');
       if (ib) injuryBook = JSON.parse(ib);
+      const sb = localStorage.getItem('apexSuspensionBook');
+      if (sb) suspensionBook = JSON.parse(sb);
       const md = localStorage.getItem('apexMatchDay');
       if (md) globalMatchDay = parseInt(md, 10) || 1;
     } catch(e) {}
@@ -2709,10 +2737,13 @@ var App = (() => {
       return;
     }
     const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating' };
-    el.innerHTML = `<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>${labels[type]||type}</th></tr></thead><tbody>
+    const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
+    el.innerHTML = `<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th>${appsCol}<th>${labels[type]||type}</th></tr></thead><tbody>
       ${data.map((p,i) => {
         const aff = [p.national, p.club].filter(Boolean).join(' · ') || p.team;
-        return `<tr><td class="lb-rank">${i+1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${aff}</td><td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
+        const apps = (stats.ratings && stats.ratings[p.id]) ? stats.ratings[p.id].count : 0;
+        const appsCell = type === 'ratings' ? '' : `<td>${apps}</td>`;
+        return `<tr><td class="lb-rank">${i+1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${aff}</td>${appsCell}<td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
       }).join('')}
     </tbody></table></div>`;
   }
@@ -4383,6 +4414,7 @@ var App = (() => {
     const motm = (stats.motm[playerId] || {}).count || 0;
     const y = (stats.yellows[playerId] || {}).count || 0;
     const rd = (stats.reds[playerId] || {}).count || 0;
+    const apps = (stats.ratings[playerId] || {}).count || 0;
     const primary = (team && team.color) || '#d4af37';
     const secondary = (team && team.secondary) || '#fff';
     const ms = (currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) || null;
@@ -4423,6 +4455,7 @@ var App = (() => {
       ${matchBlock}
       <div class="card-title">Career (competitive)</div>
       <div class="profile-stats-grid">
+        <div class="profile-stat"><div class="val">${apps}</div><div class="lbl">Apps</div></div>
         <div class="profile-stat"><div class="val">${g}</div><div class="lbl">Goals</div></div>
         <div class="profile-stat"><div class="val">${a}</div><div class="lbl">Assists</div></div>
         <div class="profile-stat"><div class="val">${motm}</div><div class="lbl">MOTM</div></div>
@@ -4484,8 +4517,8 @@ var App = (() => {
       const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">⚽</div><p>No goals yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">👟</div><div class="award-info"><h4>Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'ballon') {
       // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
@@ -4551,8 +4584,8 @@ var App = (() => {
       const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🎬</div><div class="award-info"><h4>Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Nominated Goals</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Nominated Goals</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'muller') {
       // Gerd Müller Award — best pure striker: goals heavily weighted, ST/CF preference
@@ -4577,8 +4610,8 @@ var App = (() => {
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🎯</div><div class="award-info"><h4>Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'yashin') {
       // Yashin Award — best goalkeeper: saves + clean sheets
@@ -4600,8 +4633,8 @@ var App = (() => {
       const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card"><div class="award-icon">🧤</div><div class="award-info"><h4>Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
