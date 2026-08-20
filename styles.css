@@ -629,6 +629,11 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   align-items: center; justify-content: center; padding: 16px;
 }
 .modal-overlay.active { display: flex; }
+/* Player profile can be opened from inside the team profile (or a match
+   report) modal, so it must always stack above them regardless of DOM
+   order — otherwise it renders visually underneath the modal it was
+   opened from. */
+#player-modal { z-index: 600; }
 .modal {
   background: linear-gradient(165deg, var(--bg-2), var(--bg-1));
   border: 1px solid var(--border-strong);

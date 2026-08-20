@@ -2818,17 +2818,20 @@ var App = (() => {
   }
 
   function resetLeaderboard() {
-    if (!confirm('Reset all leaderboard stats? This cannot be undone.')) return;
+    if (!confirm('Reset all leaderboard stats and trophies? This cannot be undone.')) return;
     stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
     tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
-    // Note: this only resets leaderboard stat buckets. It must never touch the
-    // `trophies` record (Trophy Room / past champions) or any in-progress
-    // tournament UI (bracket, podium, groups, fixtures) — those are cleared
-    // only by resetTournament(), never as a side effect of a stats reset.
+    trophies = [];
     try { localStorage.removeItem('apexSimStats'); } catch(e) {}
+    try { localStorage.removeItem('apexTrophies'); } catch(e) {}
     saveStats();
     showLeaderboard('goals');
-    toast('Leaderboard reset');
+    // Refresh the Awards tab too, in case the Trophy Room (or the overview's
+    // trophy count) is currently showing — otherwise it'd keep displaying
+    // the now-cleared trophies until the user navigates away and back.
+    const activeAwardTab = document.querySelector('.award-tab.active');
+    if (activeAwardTab && activeAwardTab.dataset.award) showAwards(activeAwardTab.dataset.award);
+    toast('Leaderboard and trophies reset');
   }
 
   function showLeaderboard(type) {
