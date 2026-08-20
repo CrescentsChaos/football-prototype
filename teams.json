@@ -22343,6 +22343,272 @@
     "ovr": 84
   }
 }
+,{
+  "id": "rayo2027",
+  "name": "Rayo Vallecano 2026-27",
+  "short": "RAY",
+  "flag": "",
+  "color": "#E30613",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"ray27_1","name":"Daniel Cárdenas","pos":["GK"],"ovr":81,"att":10,"def":82,"phy":78,"pac":46,"tec":72,"num":1},
+    {"id":"ray27_13","name":"Augusto Batalla","pos":["GK"],"ovr":84,"att":10,"def":85,"phy":81,"pac":50,"tec":74,"num":13},
+    {"id":"ray27_30","name":"Miguel Ángel Morro","pos":["GK"],"ovr":77,"att":10,"def":78,"phy":75,"pac":45,"tec":65,"num":30},
+    {"id":"ray27_5","name":"Luiz Felipe","pos":["CB"],"ovr":83,"att":48,"def":85,"phy":84,"pac":74,"tec":74,"num":5},
+    {"id":"ray27_24","name":"Florian Lejeune","pos":["CB"],"ovr":84,"att":52,"def":86,"phy":85,"pac":68,"tec":76,"num":24},
+    {"id":"ray27_22","name":"Pelayo Fernández","pos":["CB"],"ovr":80,"att":44,"def":82,"phy":81,"pac":75,"tec":71,"num":22},
+    {"id":"ray27_33","name":"Jozhua Vertrouwd","pos":["CB","LB"],"ovr":79,"att":46,"def":81,"phy":80,"pac":78,"tec":72,"num":33},
+    {"id":"ray27_2","name":"Andrei Raiu","pos":["RB","RWB"],"ovr":85,"att":78,"def":82,"phy":82,"pac":93,"tec":80,"num":2},
+    {"id":"ray27_20","name":"Iván Balliu","pos":["RB","RWB"],"ovr":82,"att":74,"def":81,"phy":79,"pac":79,"tec":77,"num":20},
+    {"id":"ray27_3","name":"Pacha Espino","pos":["LB","LWB"],"ovr":82,"att":76,"def":80,"phy":79,"pac":81,"tec":78,"num":3},
+    {"id":"ray27_23","name":"Óscar Valentín","pos":["CDM","CM"],"ovr":84,"att":70,"def":86,"phy":85,"pac":74,"tec":81,"num":23},
+    {"id":"ray27_6","name":"Pathé Ciss","pos":["CDM","CM"],"ovr":83,"att":68,"def":84,"phy":88,"pac":71,"tec":75,"num":6},
+    {"id":"ray27_4","name":"Pedro Díaz","pos":["CM","CDM"],"ovr":84,"att":78,"def":82,"phy":79,"pac":76,"tec":85,"num":4},
+    {"id":"ray27_8","name":"Unai López","pos":["CM","CAM"],"ovr":83,"att":80,"def":72,"phy":75,"pac":77,"tec":85,"num":8},
+    {"id":"ray27_17","name":"Fran Pérez","pos":["RM","RW","LM"],"ovr":82,"att":81,"def":45,"phy":73,"pac":88,"tec":83,"num":21},
+    {"id":"ray27_7","name":"Isi Palazón","pos":["RW","RM","CAM"],"ovr":86,"att":85,"def":55,"phy":74,"pac":84,"tec":88,"num":7},
+    {"id":"ray27_18","name":"Álvaro García","pos":["LW","LM"],"ovr":85,"att":84,"def":46,"phy":72,"pac":91,"tec":85,"num":18},
+    {"id":"ray27_19","name":"Jorge de Frutos","pos":["RW","RM","LW"],"ovr":84,"att":83,"def":45,"phy":76,"pac":90,"tec":83,"num":19},
+    {"id":"ray27_9","name":"Raúl de Tomás","pos":["ST"],"ovr":84,"att":85,"def":38,"phy":77,"pac":79,"tec":84,"num":9},
+    {"id":"ray27_10","name":"Sergio Camello","pos":["ST"],"ovr":83,"att":84,"def":38,"phy":74,"pac":82,"tec":81,"num":10},
+    {"id":"ray27_11","name":"Randy Nteka","pos":["ST","CAM"],"ovr":81,"att":82,"def":40,"phy":85,"pac":78,"tec":77,"num":11}
+  ],
+  "manager": {
+    "name": "Iñigo Pérez",
+    "ovr": 85
+  }
+}
+,{
+  "id": "celta2027",
+  "name": "RC Celta de Vigo 2026-27",
+  "short": "CEL",
+  "flag": "",
+  "color": "#85D3F2",
+  "secondary": "#004B87",
+  "players": [
+    {"id":"cel27_1","name":"Iván Villar","pos":["GK"],"ovr":81,"att":10,"def":82,"phy":78,"pac":47,"tec":72,"num":1},
+    {"id":"cel27_13","name":"Ionu Radu","pos":["GK"],"ovr":83,"att":10,"def":84,"phy":80,"pac":49,"tec":74,"num":13},
+    {"id":"cel27_25","name":"Altay Bayndr","pos":["GK"],"ovr":84,"att":10,"def":85,"phy":82,"pac":50,"tec":75,"num":25},
+    {"id":"cel27_2","name":"Carl Starfelt","pos":["CB"],"ovr":84,"att":48,"def":86,"phy":84,"pac":73,"tec":75,"num":2},
+    {"id":"cel27_3","name":"Marcos Alonso","pos":["CB","LB"],"ovr":83,"att":55,"def":85,"phy":81,"pac":70,"tec":80,"num":3},
+    {"id":"cel27_4","name":"Abdoulaye Faye","pos":["CB"],"ovr":82,"att":46,"def":84,"phy":86,"pac":76,"tec":71,"num":4},
+    {"id":"cel27_5","name":"Sergio Carreira","pos":["RB","RWB"],"ovr":81,"att":74,"def":79,"phy":78,"pac":83,"tec":78,"num":5},
+    {"id":"cel27_12","name":"Manuel Fernández","pos":["CB"],"ovr":80,"att":44,"def":82,"phy":83,"pac":71,"tec":70,"num":12},
+    {"id":"cel27_14","name":"Álvaro Núñez","pos":["RB","RWB"],"ovr":80,"att":75,"def":78,"phy":76,"pac":84,"tec":77,"num":14},
+    {"id":"cel27_17","name":"Javi Rueda","pos":["RB","RWB"],"ovr":81,"att":76,"def":79,"phy":77,"pac":85,"tec":78,"num":17},
+    {"id":"cel27_20","name":"Javier Rodríguez","pos":["CB","RB"],"ovr":81,"att":46,"def":83,"phy":80,"pac":74,"tec":72,"num":20},
+    {"id":"cel27_6","name":"Ilaix Moriba","pos":["CM","CDM"],"ovr":84,"att":76,"def":82,"phy":84,"pac":78,"tec":85,"num":6},
+    {"id":"cel27_8","name":"Miguel Román","pos":["CM","CDM"],"ovr":82,"att":73,"def":82,"phy":81,"pac":74,"tec":83,"num":8},
+    {"id":"cel27_15","name":"Matías Vecino","pos":["CM","CDM"],"ovr":83,"att":77,"def":81,"phy":83,"pac":70,"tec":84,"num":15},
+    {"id":"cel27_19","name":"Williot Swedberg","pos":["CAM","CM","LW"],"ovr":83,"att":82,"def":52,"phy":76,"pac":84,"tec":86,"num":19},
+    {"id":"cel27_21","name":"Aleix Febas","pos":["CM","CAM"],"ovr":84,"att":81,"def":60,"phy":71,"pac":81,"tec":88,"num":21},
+    {"id":"cel27_23","name":"Hugo Álvarez","pos":["LW","LM","CAM"],"ovr":84,"att":83,"def":48,"phy":73,"pac":87,"tec":87,"num":23},
+    {"id":"cel27_7","name":"Borja Iglesias","pos":["ST"],"ovr":84,"att":85,"def":38,"phy":86,"pac":76,"tec":80,"num":7},
+    {"id":"cel27_9","name":"Ferran Jutglà","pos":["ST","LW"],"ovr":83,"att":84,"def":40,"phy":75,"pac":84,"tec":82,"num":9},
+    {"id":"cel27_10","name":"Iago Aspas","pos":["ST","CAM","RW"],"ovr":86,"att":87,"def":45,"phy":68,"pac":80,"tec":91,"num":10},
+    {"id":"cel27_11","name":"Pablo Durán","pos":["ST","RW"],"ovr":81,"att":82,"def":36,"phy":78,"pac":82,"tec":78,"num":11},
+    {"id":"cel27_18","name":"Carles Pérez","pos":["RW","LW"],"ovr":83,"att":83,"def":42,"phy":72,"pac":88,"tec":84,"num":18}
+  ],
+  "manager": {
+    "name": "Claudio Giráldez",
+    "ovr": 85
+  }
+}
+,{
+  "id": "deportivo2027",
+  "name": "RC Deportivo de La Coruña 2026-27",
+  "short": "DEP",
+  "flag": "",
+  "color": "#002855",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"dep27_1","name":"Germán Parreño","pos":["GK"],"ovr":80,"att":10,"def":81,"phy":78,"pac":46,"tec":70,"num":1},
+    {"id":"dep27_13","name":"Leo Román","pos":["GK"],"ovr":84,"att":10,"def":85,"phy":81,"pac":50,"tec":74,"num":13},
+    {"id":"dep27_25","name":"Álvaro Fernández","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":48,"tec":72,"num":25},
+    {"id":"dep27_26","name":"Eric Puerto","pos":["GK"],"ovr":77,"att":10,"def":78,"phy":75,"pac":45,"tec":65,"num":26},
+    {"id":"dep27_4","name":"Lucas Noubi","pos":["CB"],"ovr":82,"att":45,"def":84,"phy":84,"pac":73,"tec":72,"num":4},
+    {"id":"dep27_5","name":"Dani Barcia","pos":["CB"],"ovr":81,"att":44,"def":83,"phy":82,"pac":72,"tec":71,"num":5},
+    {"id":"dep27_3","name":"Arnau Comas","pos":["CB"],"ovr":81,"att":46,"def":83,"phy":81,"pac":70,"tec":73,"num":3},
+    {"id":"dep27_22","name":"Bright Ede","pos":["CB"],"ovr":78,"att":42,"def":80,"phy":81,"pac":74,"tec":68,"num":22},
+    {"id":"dep27_24","name":"Angeliño","pos":["LB","LWB"],"ovr":85,"att":80,"def":81,"phy":78,"pac":86,"tec":84,"num":24},
+    {"id":"dep27_12","name":"Giacomo Quagliata","pos":["LB","LWB"],"ovr":81,"att":76,"def":79,"phy":77,"pac":83,"tec":78,"num":12},
+    {"id":"dep27_2","name":"Adrià Altimira","pos":["RB","RWB"],"ovr":81,"att":75,"def":79,"phy":78,"pac":84,"tec":77,"num":2},
+    {"id":"dep27_15","name":"Miguel Loureiro","pos":["RB","RWB"],"ovr":82,"att":74,"def":81,"phy":80,"pac":80,"tec":76,"num":15},
+    {"id":"dep27_23","name":"Ximo Navarro","pos":["RB","CB"],"ovr":79,"att":68,"def":81,"phy":77,"pac":69,"tec":74,"num":23},
+    {"id":"dep27_16","name":"Lorenzo Amatucci","pos":["CDM","CM"],"ovr":83,"att":74,"def":84,"phy":82,"pac":76,"tec":85,"num":16},
+    {"id":"dep27_14","name":"Riki Rodríguez","pos":["CM","CDM"],"ovr":82,"att":75,"def":81,"phy":79,"pac":73,"tec":84,"num":14},
+    {"id":"dep27_8","name":"Diego Villares","pos":["CM","CDM"],"ovr":82,"att":74,"def":82,"phy":83,"pac":75,"tec":81,"num":8},
+    {"id":"dep27_6","name":"Charlie Patiño","pos":["CM","CAM"],"ovr":83,"att":79,"def":75,"phy":74,"pac":77,"tec":86,"num":6},
+    {"id":"dep27_21","name":"Mario Soriano","pos":["CAM","CM","LW"],"ovr":84,"att":83,"def":55,"phy":73,"pac":82,"tec":88,"num":21},
+    {"id":"dep27_18","name":"Jonathan Asp Jensen","pos":["CAM","CM"],"ovr":82,"att":81,"def":52,"phy":70,"pac":83,"tec":87,"num":18},
+    {"id":"dep27_10","name":"Yeremay Hernández","pos":["LW","CAM","LM"],"ovr":87,"att":86,"def":45,"phy":72,"pac":92,"tec":90,"num":10},
+    {"id":"dep27_11","name":"David Mella","pos":["RW","LW"],"ovr":84,"att":83,"def":44,"phy":74,"pac":91,"tec":85,"num":11},
+    {"id":"dep27_19","name":"Luismi Cruz","pos":["RW","LW","CAM"],"ovr":82,"att":82,"def":42,"phy":70,"pac":88,"tec":84,"num":19},
+    {"id":"dep27_7","name":"Pierre-Emerick Aubameyang","pos":["ST"],"ovr":85,"att":87,"def":35,"phy":78,"pac":84,"tec":83,"num":7},
+    {"id":"dep27_9","name":"Zakaria Eddahchouri","pos":["ST"],"ovr":82,"att":83,"def":36,"phy":82,"pac":80,"tec":79,"num":9},
+    {"id":"dep27_31","name":"Bil Nsongo","pos":["ST"],"ovr":79,"att":80,"def":34,"phy":81,"pac":83,"tec":76,"num":31}
+  ],
+  "manager": {
+    "name": "Antonio Hidalgo",
+    "ovr": 84
+  }
+}
+,{
+  "id": "espanyol2027",
+  "name": "RCD Espanyol 2026-27",
+  "short": "ESP",
+  "flag": "",
+  "color": "#0072CE",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"esp27_1","name":"Àngel Fortuño","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":48,"tec":68,"num":1},
+    {"id":"esp27_13","name":"Marko Dmitrovi","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":80,"pac":45,"tec":72,"num":13},
+    {"id":"esp27_31","name":"Llorenç Serred","pos":["GK"],"ovr":75,"att":10,"def":76,"phy":74,"pac":44,"tec":64,"num":31},
+    {"id":"esp27_3","name":"Quilindschy Hartman","pos":["LB","LWB"],"ovr":83,"att":78,"def":81,"phy":79,"pac":85,"tec":80,"num":3},
+    {"id":"esp27_4","name":"Urko González de Zárate","pos":["CB","CDM"],"ovr":82,"att":52,"def":84,"phy":83,"pac":71,"tec":76,"num":4},
+    {"id":"esp27_5","name":"Clemens Riedel","pos":["CB"],"ovr":80,"att":45,"def":82,"phy":82,"pac":73,"tec":70,"num":5},
+    {"id":"esp27_6","name":"Leandro Cabrera","pos":["CB"],"ovr":80,"att":46,"def":82,"phy":81,"pac":67,"tec":69,"num":6},
+    {"id":"esp27_14","name":"Unai Núñez","pos":["CB"],"ovr":81,"att":44,"def":83,"phy":82,"pac":70,"tec":71,"num":14},
+    {"id":"esp27_15","name":"Miguel Rubio","pos":["CB"],"ovr":80,"att":45,"def":82,"phy":84,"pac":68,"tec":68,"num":15},
+    {"id":"esp27_16","name":"Vanja Drkuši","pos":["CB"],"ovr":81,"att":46,"def":83,"phy":82,"pac":72,"tec":70,"num":16},
+    {"id":"esp27_23","name":"Omar El Hilali","pos":["RB","RWB"],"ovr":83,"att":76,"def":82,"phy":80,"pac":85,"tec":78,"num":23},
+    {"id":"esp27_2","name":"Rubén Sánchez","pos":["RB","RWB"],"ovr":80,"att":75,"def":78,"phy":79,"pac":84,"tec":75,"num":2},
+    {"id":"esp27_29","name":"Roger Hinojo","pos":["LB"],"ovr":76,"att":72,"def":75,"phy":74,"pac":80,"tec":71,"num":29},
+    {"id":"esp27_8","name":"Edu Expósito","pos":["CM","CAM"],"ovr":82,"att":78,"def":74,"phy":75,"pac":76,"tec":83,"num":8},
+    {"id":"esp27_10","name":"Pol Lozano","pos":["CDM","CM"],"ovr":81,"att":72,"def":82,"phy":80,"pac":74,"tec":81,"num":10},
+    {"id":"esp27_20","name":"Gabriel Moscardo","pos":["CDM","CM"],"ovr":83,"att":75,"def":84,"phy":83,"pac":77,"tec":84,"num":20},
+    {"id":"esp27_26","name":"Rafel Bauzà","pos":["CM"],"ovr":77,"att":70,"def":76,"phy":75,"pac":73,"tec":76,"num":26},
+    {"id":"esp27_28","name":"Francisco Javier Hernández","pos":["CAM","CM"],"ovr":76,"att":75,"def":50,"phy":71,"pac":79,"tec":78,"num":28},
+    {"id":"esp27_7","name":"Javi Puado","pos":["LW","LM","ST"],"ovr":84,"att":85,"def":45,"phy":73,"pac":86,"tec":85,"num":7},
+    {"id":"esp27_11","name":"Pere Milla","pos":["LW","RW","ST"],"ovr":80,"att":81,"def":46,"phy":76,"pac":78,"tec":79,"num":11},
+    {"id":"esp27_17","name":"Jofre Carreras","pos":["RW","RM"],"ovr":80,"att":80,"def":44,"phy":74,"pac":87,"tec":78,"num":17},
+    {"id":"esp27_22","name":"Álex Calatrava","pos":["LW","CAM"],"ovr":79,"att":80,"def":42,"phy":70,"pac":84,"tec":82,"num":22},
+    {"id":"esp27_24","name":"Tyrhys Dolan","pos":["LW","RW","CAM"],"ovr":81,"att":82,"def":43,"phy":72,"pac":89,"tec":83,"num":24},
+    {"id":"esp27_9","name":"Roberto Fernández","pos":["ST"],"ovr":83,"att":85,"def":35,"phy":82,"pac":81,"tec":80,"num":9},
+    {"id":"esp27_18","name":"Marcos Fernández","pos":["ST"],"ovr":78,"att":79,"def":33,"phy":75,"pac":82,"tec":75,"num":18},
+    {"id":"esp27_19","name":"Kike García","pos":["ST"],"ovr":79,"att":81,"def":36,"phy":83,"pac":70,"tec":74,"num":19}
+  ],
+  "manager": {
+    "name": "Manolo González",
+    "ovr": 82
+  }
+}
+,{
+  "id": "realsociedad2027",
+  "name": "Real Sociedad 2026-27",
+  "short": "RSO",
+  "flag": "",
+  "color": "#0066B3",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"rso27_1","name":"Álex Remiro","pos":["GK"],"ovr":85,"att":10,"def":86,"phy":81,"pac":52,"tec":75,"num":1},
+    {"id":"rso27_13","name":"Unai Marrero","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":46,"tec":67,"num":13},
+    {"id":"rso27_41","name":"Theo Folgado","pos":["GK"],"ovr":74,"att":10,"def":75,"phy":72,"pac":44,"tec":62,"num":41},
+    {"id":"rso27_2","name":"Jon Aramburu","pos":["RB","RWB"],"ovr":82,"att":76,"def":80,"phy":79,"pac":85,"tec":77,"num":2},
+    {"id":"rso27_20","name":"Álvaro Odriozola","pos":["RB","RWB"],"ovr":80,"att":77,"def":76,"phy":74,"pac":86,"tec":78,"num":20},
+    {"id":"rso27_33","name":"Iñaki Rupérez","pos":["RB"],"ovr":76,"att":71,"def":75,"phy":74,"pac":80,"tec":70,"num":33},
+    {"id":"rso27_5","name":"Igor Zubeldia","pos":["CB","CDM"],"ovr":84,"att":52,"def":86,"phy":83,"pac":73,"tec":77,"num":5},
+    {"id":"rso27_20_cb","name":"Jon Pacheco","pos":["CB"],"ovr":82,"att":45,"def":84,"phy":81,"pac":74,"tec":73,"num":20},
+    {"id":"rso27_31","name":"Jon Martín","pos":["CB"],"ovr":80,"att":44,"def":82,"phy":83,"pac":71,"tec":70,"num":31},
+    {"id":"rso27_37","name":"Luken Beitia","pos":["CB"],"ovr":75,"att":40,"def":77,"phy":78,"pac":68,"tec":65,"num":37},
+    {"id":"rso27_17","name":"Sergio Gómez","pos":["LB","LWB","LW"],"ovr":84,"att":81,"def":78,"phy":76,"pac":86,"tec":85,"num":17},
+    {"id":"rso27_3","name":"Aihen Muñoz","pos":["LB"],"ovr":80,"att":74,"def":79,"phy":77,"pac":82,"tec":76,"num":3},
+    {"id":"rso27_12","name":"Javi López","pos":["LB","LWB"],"ovr":81,"att":75,"def":80,"phy":78,"pac":84,"tec":78,"num":12},
+    {"id":"rso27_4","name":"Jon Gorrotxategi","pos":["CDM","CM"],"ovr":79,"att":70,"def":81,"phy":80,"pac":74,"tec":79,"num":4},
+    {"id":"rso27_12_mid","name":"Yangel Herrera","pos":["CDM","CM"],"ovr":83,"att":75,"def":84,"phy":85,"pac":76,"tec":80,"num":12},
+    {"id":"rso27_8","name":"Beñat Turrientes","pos":["CM","CDM"],"ovr":82,"att":76,"def":82,"phy":81,"pac":77,"tec":83,"num":8},
+    {"id":"rso27_18","name":"Carlos Soler","pos":["CM","CAM"],"ovr":84,"att":82,"def":75,"phy":76,"pac":78,"tec":86,"num":18},
+    {"id":"rso27_24","name":"Luka Sui","pos":["CM","CAM"],"ovr":83,"att":80,"def":74,"phy":79,"pac":79,"tec":85,"num":24},
+    {"id":"rso27_21","name":"Arsen Zakharyan","pos":["CAM","CM","LW"],"ovr":82,"att":81,"def":52,"phy":72,"pac":82,"tec":87,"num":21},
+    {"id":"rso27_15","name":"Pablo Marín","pos":["CAM","CM"],"ovr":80,"att":79,"def":50,"phy":71,"pac":80,"tec":83,"num":15},
+    {"id":"rso27_36","name":"Alex Lebarbier","pos":["CM"],"ovr":75,"att":70,"def":73,"phy":70,"pac":72,"tec":75,"num":36},
+    {"id":"rso27_14","name":"Takefusa Kubo","pos":["RW","RM","CAM"],"ovr":86,"att":85,"def":46,"phy":70,"pac":91,"tec":89,"num":14},
+    {"id":"rso27_7","name":"Ander Barrenetxea","pos":["LW","LM"],"ovr":83,"att":82,"def":45,"phy":74,"pac":88,"tec":84,"num":7},
+    {"id":"rso27_11","name":"Gonçalo Guedes","pos":["LW","RW","ST"],"ovr":83,"att":84,"def":42,"phy":75,"pac":87,"tec":83,"num":11},
+    {"id":"rso27_22","name":"Mikel Goti","pos":["CAM","RW"],"ovr":78,"att":79,"def":44,"phy":71,"pac":83,"tec":80,"num":22},
+    {"id":"rso27_10","name":"Mikel Oyarzabal","pos":["ST","LW","CAM"],"ovr":86,"att":87,"def":50,"phy":76,"pac":83,"tec":88,"num":10},
+    {"id":"rso27_9","name":"Orri Óskarsson","pos":["ST"],"ovr":82,"att":84,"def":35,"phy":80,"pac":82,"tec":79,"num":9},
+    {"id":"rso27_19","name":"Jon Karrikaburu","pos":["ST"],"ovr":79,"att":81,"def":34,"phy":81,"pac":79,"tec":76,"num":19}
+  ],
+  "manager": {
+    "name": "Pellegrino Matarazzo",
+    "ovr": 83
+  }
+}
+,{
+  "id": "sevilla2027",
+  "name": "Sevilla FC 2026-27",
+  "short": "SEV",
+  "flag": "",
+  "color": "#CE1126",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"sev27_1","name":"Odysseas Vlachodimos","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":50,"tec":73,"num":1},
+    {"id":"sev27_13","name":"Fran González","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":46,"tec":68,"num":13},
+    {"id":"sev27_2","name":"José Ángel Carmona","pos":["RB","RWB"],"ovr":83,"att":77,"def":82,"phy":81,"pac":86,"tec":78,"num":2},
+    {"id":"sev27_3","name":"Julio Díaz","pos":["LB","LWB"],"ovr":78,"att":73,"def":77,"phy":75,"pac":82,"tec":72,"num":3},
+    {"id":"sev27_4","name":"Kike Salas","pos":["CB"],"ovr":82,"att":46,"def":84,"phy":83,"pac":73,"tec":72,"num":4},
+    {"id":"sev27_5","name":"Andrés Castrín","pos":["CB"],"ovr":80,"att":44,"def":82,"phy":84,"pac":70,"tec":69,"num":5},
+    {"id":"sev27_6","name":"Lucien Agoumé","pos":["CDM","CM"],"ovr":83,"att":75,"def":84,"phy":85,"pac":76,"tec":82,"num":6},
+    {"id":"sev27_7","name":"Alfonso González","pos":["LW","RW"],"ovr":79,"att":80,"def":40,"phy":72,"pac":85,"tec":80,"num":7},
+    {"id":"sev27_8","name":"Joan Jordán","pos":["CM","CDM"],"ovr":81,"att":76,"def":80,"phy":78,"pac":73,"tec":83,"num":8},
+    {"id":"sev27_9","name":"Robbie Ure","pos":["ST"],"ovr":80,"att":82,"def":34,"phy":79,"pac":81,"tec":77,"num":9},
+    {"id":"sev27_10","name":"Peque Fernández","pos":["CAM","CM","ST"],"ovr":82,"att":83,"def":45,"phy":71,"pac":83,"tec":86,"num":10},
+    {"id":"sev27_11","name":"Rubén Vargas","pos":["LW","RW","AM"],"ovr":84,"att":85,"def":44,"phy":74,"pac":89,"tec":86,"num":11},
+    {"id":"sev27_12","name":"Arouna Sangante","pos":["CB"],"ovr":82,"att":45,"def":84,"phy":85,"pac":75,"tec":71,"num":12},
+    {"id":"sev27_15","name":"Fabio Cardoso","pos":["CB"],"ovr":80,"att":44,"def":82,"phy":81,"pac":68,"tec":70,"num":15},
+    {"id":"sev27_16","name":"Isaac Romero","pos":["ST","LW"],"ovr":83,"att":85,"def":36,"phy":80,"pac":87,"tec":82,"num":16},
+    {"id":"sev27_17","name":"Gabriel Suazo","pos":["LB","LWB"],"ovr":82,"att":77,"def":80,"phy":78,"pac":85,"tec":79,"num":17},
+    {"id":"sev27_18","name":"Jon Guridi","pos":["CM","CAM"],"ovr":80,"att":78,"def":74,"phy":76,"pac":77,"tec":81,"num":18},
+    {"id":"sev27_19","name":"Joaquín Martínez","pos":["RB","RWB"],"ovr":81,"att":74,"def":80,"phy":79,"pac":83,"tec":75,"num":19},
+    {"id":"sev27_20","name":"Djibril Sow","pos":["CM","CDM"],"ovr":82,"att":76,"def":80,"phy":79,"pac":78,"tec":83,"num":20},
+    {"id":"sev27_21","name":"Chidera Ejuke","pos":["LW","RW"],"ovr":82,"att":83,"def":38,"phy":71,"pac":90,"tec":85,"num":21},
+    {"id":"sev27_22","name":"Nemanja Gudelj","pos":["CB","CDM"],"ovr":81,"att":65,"def":83,"phy":82,"pac":66,"tec":76,"num":22},
+    {"id":"sev27_23","name":"Marcao","pos":["CB"],"ovr":80,"att":45,"def":82,"phy":80,"pac":71,"tec":74,"num":23},
+    {"id":"sev27_24","name":"Adnan Januzaj","pos":["RW","LW","CAM"],"ovr":80,"att":81,"def":38,"phy":68,"pac":84,"tec":85,"num":24},
+    {"id":"sev27_28","name":"Manu Bueno","pos":["CM"],"ovr":77,"att":72,"def":76,"phy":73,"pac":74,"tec":78,"num":28}
+  ],
+  "manager": {
+    "name": "Luis García Plaza",
+    "ovr": 83
+  }
+}
+,{
+  "id": "valencia2027",
+  "name": "Valencia CF 2026-27",
+  "short": "VAL",
+  "flag": "",
+  "color": "#FF6600",
+  "secondary": "#FFFFFF",
+  "players": [
+    {"id":"val27_1","name":"Stole Dimitrievski","pos":["GK"],"ovr":83,"att":10,"def":84,"phy":80,"pac":48,"tec":73,"num":1},
+    {"id":"val27_13","name":"Julen Agirrezabala","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":52,"tec":72,"num":13},
+    {"id":"val27_25","name":"Cristian Rivero","pos":["GK"],"ovr":76,"att":10,"def":77,"phy":74,"pac":44,"tec":63,"num":25},
+    {"id":"val27_2","name":"Thierry Correia","pos":["RB","RWB"],"ovr":83,"att":76,"def":81,"phy":80,"pac":88,"tec":78,"num":2},
+    {"id":"val27_12","name":"Dimitri Foulquier","pos":["RB","RWB"],"ovr":79,"att":70,"def":80,"phy":81,"pac":79,"tec":71,"num":12},
+    {"id":"val27_14","name":"José Luis Gayà","pos":["LB","LWB"],"ovr":85,"att":81,"def":82,"phy":78,"pac":86,"tec":84,"num":14},
+    {"id":"val27_21","name":"Jesús Vázquez","pos":["LB"],"ovr":79,"att":74,"def":78,"phy":75,"pac":83,"tec":76,"num":21},
+    {"id":"val27_3","name":"Mosquera","pos":["CB"],"ovr":83,"att":48,"def":85,"phy":82,"pac":76,"tec":75,"num":3},
+    {"id":"val27_4","name":"Mouctar Diakhaby","pos":["CB","CDM"],"ovr":82,"att":50,"def":83,"phy":86,"pac":72,"tec":71,"num":4},
+    {"id":"val27_5","name":"César Tárrega","pos":["CB"],"ovr":80,"att":45,"def":82,"phy":83,"pac":71,"tec":69,"num":5},
+    {"id":"val27_24","name":"Yarek Gasiorowski","pos":["CB","LB"],"ovr":81,"att":46,"def":83,"phy":80,"pac":74,"tec":74,"num":24},
+    {"id":"val27_6","name":"Pepelu","pos":["CDM","CM"],"ovr":85,"att":78,"def":85,"phy":83,"pac":75,"tec":86,"num":6},
+    {"id":"val27_8","name":"Javi Guerra","pos":["CM","CDM","CAM"],"ovr":85,"att":80,"def":81,"phy":82,"pac":78,"tec":87,"num":8},
+    {"id":"val27_18","name":"André Almeida","pos":["CAM","CM"],"ovr":83,"att":82,"def":54,"phy":71,"pac":79,"tec":88,"num":18},
+    {"id":"val27_20","name":"Enzo Barrenechea","pos":["CDM","CM"],"ovr":81,"att":72,"def":83,"phy":84,"pac":74,"tec":78,"num":20},
+    {"id":"val27_15","name":"Diego López","pos":["RW","LW","RM"],"ovr":83,"att":83,"def":44,"phy":75,"pac":89,"tec":83,"num":15},
+    {"id":"val27_16","name":"Luis Rioja","pos":["LW","LM"],"ovr":82,"att":83,"def":45,"phy":73,"pac":87,"tec":82,"num":16},
+    {"id":"val27_11","name":"Arnaut Danjuma","pos":["LW","RW","ST"],"ovr":84,"att":85,"def":42,"phy":76,"pac":90,"tec":86,"num":11},
+    {"id":"val27_17","name":"Fran Pérez","pos":["RW","RM"],"ovr":79,"att":79,"def":43,"phy":74,"pac":88,"tec":77,"num":17},
+    {"id":"val27_10","name":"Rafa Mir","pos":["ST"],"ovr":82,"att":84,"def":35,"phy":81,"pac":82,"tec":78,"num":10},
+    {"id":"val27_9","name":"Hugo Duro","pos":["ST"],"ovr":84,"att":85,"def":38,"phy":82,"pac":83,"tec":80,"num":9},
+    {"id":"val27_22","name":"Alberto Marí","pos":["ST"],"ovr":78,"att":80,"def":34,"phy":77,"pac":79,"tec":75,"num":22}
+  ],
+  "manager": {
+    "name": "Carlos Corberán",
+    "ovr": 84
+  }
+}
 
 
 
