@@ -152,6 +152,7 @@
               <div class="score-numbers"><span id="live-home-score">0</span> - <span id="live-away-score">0</span></div>
               <div class="score-time" id="live-minute">0'</div>
               <div class="match-status" id="live-status">1st Half</div>
+              <div class="match-venue" id="live-venue" style="font-size:0.7rem;color:var(--text-muted);margin-top:2px"></div>
             </div>
             <div class="score-team away">
               <span class="flag" id="live-away-flag"></span>
@@ -233,7 +234,7 @@
     <section id="view-season" class="view">
       <div id="season-setup" class="card">
         <div class="card-title">Season Setup</div>
-        <p style="color:var(--text-secondary);margin-bottom:16px">Pick the clubs for each competition. A club can only play in one domestic league, but can also be entered into the Champions League. Each league needs at least 4 clubs; Champions League needs at least 4.</p>
+        <p style="color:var(--text-secondary);margin-bottom:16px">Clubs for each league are pulled automatically from leagues.json (fall back to picking manually if a league has no match yet). Every league plays a full home-and-away, double round-robin season — the table topper is crowned champion. The top 4 clubs from each league automatically qualify as Champions League candidates for next season, just like real life.</p>
         <div id="season-setup-comps"></div>
         <div id="season-setup-msg" style="color:var(--text-muted);font-size:0.85rem;margin-top:10px"></div>
         <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">

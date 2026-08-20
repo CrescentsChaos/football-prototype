@@ -6,6 +6,9 @@ var App = (() => {
 
   let teamsData = { national: [], club: [] };
   let allTeams = [];
+  // leagues.json: { "La Liga": ["Real Madrid 2026-27", ...], ... } — defines which
+  // clubs belong to which domestic league, independent of teams.json.
+  let leaguesData = {};
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
     // Clear previous tournament UI
@@ -27,17 +30,22 @@ var App = (() => {
   let tournamentType = 'worldcup';
 
   // ========== SEASON CALENDAR ==========
+  // "name" must match a key in leagues.json exactly so team pools can be
+  // looked up automatically instead of picked by hand.
   const SEASON_LEAGUE_DEFS = [
     { key: 'epl', name: 'Premier League' },
-    { key: 'bundesliga', name: 'Bundesliga' },
     { key: 'laliga', name: 'La Liga' },
     { key: 'seriea', name: 'Serie A' },
-    { key: 'leagueone', name: 'League One' }
+    { key: 'bundesliga', name: 'Bundesliga' },
+    { key: 'ligue1', name: 'Ligue 1' }
   ];
+  // How many table-toppers from each domestic league qualify as Champions
+  // League candidates the following season (real-life style qualification).
+  const UCL_QUALIFY_PER_LEAGUE = 4;
   let season = null; // active season object, or null if not started
   let seasonSetup = {
-    selections: { epl: new Set(), bundesliga: new Set(), laliga: new Set(), seriea: new Set(), leagueone: new Set(), ucl: new Set() },
-    search: { epl: '', bundesliga: '', laliga: '', seriea: '', leagueone: '', ucl: '' }
+    selections: { epl: new Set(), laliga: new Set(), seriea: new Set(), bundesliga: new Set(), ligue1: new Set() },
+    search: { epl: '', laliga: '', seriea: '', bundesliga: '', ligue1: '' }
   };
   let seasonActiveTab = 'epl';
   let seasonReportRegistry = []; // flat list of match reports referenced by index from season fixture cards
@@ -118,6 +126,24 @@ var App = (() => {
       }
       allTeams = [...(teamsData.national || []), ...(teamsData.club || [])];
       if (!allTeams.length) throw new Error('No teams found');
+
+      // Load leagues.json (which clubs belong to which domestic league).
+      // Optional — the app still works without it, it just falls back to
+      // manual club selection in Season Setup.
+      try {
+        const lUrls = isHosted
+          ? ['leagues.json?v=' + Date.now() + '&r=' + Math.random().toString(36).slice(2), './leagues.json?v=' + Date.now(), 'leagues.json']
+          : ['leagues.json?v=' + Date.now()];
+        for (const url of lUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { leaguesData = data; console.log('Loaded leagues from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('leagues.json not loaded', e); }
+
       loadStats();
       populateTeamSelects();
       populateFormations();
@@ -248,6 +274,10 @@ var App = (() => {
 
   function getTeam(id) { return allTeams.find(t => t.id === id); }
 
+  // Every match is played at the home team's stadium. Falls back to Wembley
+  // Stadium whenever a team in teams.json doesn't define its own "stadium".
+  function getStadium(team) { return (team && team.stadium) ? team.stadium : 'Wembley Stadium'; }
+
   function updateTeamPreview(side) {
     const sel = document.getElementById(side + '-team');
     const el = document.getElementById(side + '-preview');
@@ -255,7 +285,8 @@ var App = (() => {
     const team = getTeam(sel.value);
     if (!team) { el.innerHTML = ''; return; }
     const mgr = team.manager ? team.manager.name : '';
-    el.innerHTML = `<span class="team-flag">${team.flag || ''}</span><div><div class="team-name">${team.name}</div><div class="manager-name">${mgr ? 'Manager: ' + mgr : ''}</div><div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div></div>`;
+    const venueLine = side === 'home' ? `<div style="font-size:0.8rem;color:var(--text-muted)">🏟️ ${getStadium(team)}</div>` : '';
+    el.innerHTML = `<span class="team-flag">${team.flag || ''}</span><div><div class="team-name">${team.name}</div><div class="manager-name">${mgr ? 'Manager: ' + mgr : ''}</div><div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
   }
 
   function buildSquad(team, formationKey) {
@@ -855,6 +886,7 @@ var App = (() => {
   function buildMatchReport(m) {
     if (!m) return null;
     return {
+      venue: getStadium(m.home.team),
       home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation },
       away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation },
       events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
@@ -896,6 +928,7 @@ var App = (() => {
           <div style="flex:1;text-align:right"><div style="font-size:1.4rem">${a.flag||''}</div><strong>${a.name}</strong><div class="goal-scorers away-scorers">${fmtG(goalsA)}</div></div>
         </div>
         <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">${h.formation||''} vs ${a.formation||''}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">🏟️ ${report.venue || 'Wembley Stadium'}</div>
       </div>
       <div class="card-title">Key Events</div>
       <div style="max-height:220px;overflow-y:auto;margin-bottom:12px">${eventsHtml || '<span style="color:var(--text-muted)">No events logged</span>'}</div>
@@ -2396,6 +2429,7 @@ var App = (() => {
     set('live-away-score', as_);
     set('live-minute', m.inPens ? 'Pens' : (m.minute + "'"));
     set('live-status', m.status);
+    set('live-venue', '🏟️ ' + getStadium(m.home.team));
     renderGoalTimeline();
   }
 
@@ -4516,6 +4550,7 @@ var App = (() => {
           <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
           <div style="color:var(--gold);font-size:0.8rem;margin-top:4px">Manager: ${mgr.name || '—'} ${mgr.ovr ? '· ' + mgr.ovr + ' OVR' : ''}</div>
+          <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px">🏟️ ${getStadium(team)}</div>
         </div>
       </div>
       <div class="card-title" style="margin-top:14px">Squad</div>
@@ -4690,23 +4725,54 @@ var App = (() => {
     return (teamsData.club || []);
   }
 
+  // leagues.json lists teams like "Real Madrid 2026-27" — strip the season
+  // suffix so it can be matched against whatever team names teams.json uses.
+  function normalizeLeagueName(s) {
+    return (s || '').toLowerCase().replace(/\s*\d{4}-\d{2,4}\s*$/, '').trim();
+  }
+
+  // Resolves the club roster leagues.json defines for a given league name
+  // (e.g. "La Liga") against the clubs actually present in teams.json.
+  // Returns [] if leagues.json has no entry or none of its names match yet
+  // (e.g. before teams.json has been filled in) — callers should fall back
+  // to the full club pool in that case.
+  function getLeagueTeamPool(leagueName) {
+    const names = leaguesData[leagueName];
+    if (!names || !names.length) return [];
+    const pool = seasonClubPool();
+    const matched = [];
+    names.forEach(n => {
+      const norm = normalizeLeagueName(n);
+      let t = pool.find(x => (x.name || '').toLowerCase() === (n || '').toLowerCase());
+      if (!t) t = pool.find(x => normalizeLeagueName(x.name) === norm);
+      if (!t) t = pool.find(x => norm && (normalizeLeagueName(x.name).includes(norm) || norm.includes(normalizeLeagueName(x.name))));
+      if (t && !matched.includes(t)) matched.push(t);
+    });
+    return matched;
+  }
+
   function renderSeasonSetup() {
     const el = document.getElementById('season-setup-comps');
     if (!el) return;
-    const pool = seasonClubPool();
-    const sections = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }];
-    el.innerHTML = sections.map(def => {
+    const fullPool = seasonClubPool();
+    el.innerHTML = SEASON_LEAGUE_DEFS.map(def => {
       const sel = seasonSetup.selections[def.key];
       const q = (seasonSetup.search[def.key] || '').toLowerCase();
+      // Prefer the roster leagues.json defines for this league; only fall
+      // back to the full club pool (manual picking) if nothing matched yet
+      // (e.g. teams.json hasn't been filled in with matching names).
+      const leaguePool = getLeagueTeamPool(def.name);
+      const usingLeagueFile = leaguePool.length > 0;
+      const pool = usingLeagueFile ? leaguePool : fullPool;
       const visible = pool.filter(t => !q || (t.name || '').toLowerCase().includes(q) || (t.short || '').toLowerCase().includes(q));
-      const isUcl = def.key === 'ucl';
       return `<div class="card" style="margin-bottom:14px">
-        <div class="card-title">${def.name} <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem">(${sel.size} selected)</span></div>
+        <div class="card-title">${def.name} <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem">(${sel.size} selected${usingLeagueFile ? ' · from leagues.json' : ''})</span></div>
+        ${usingLeagueFile ? '' : `<div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:8px">No leagues.json match found yet for ${def.name} — pick clubs manually below (add matching names to teams.json to auto-fill this).</div>`}
         <input type="search" placeholder="Search clubs..." value="${(seasonSetup.search[def.key]||'').replace(/"/g,'&quot;')}" oninput="App.searchSeasonTeams('${def.key}', this.value)" style="margin-bottom:10px;width:100%" autocomplete="off">
         <div class="teams-checkbox-grid">
           ${visible.map(t => {
             const checked = sel.has(t.id);
-            const usedElsewhere = !isUcl && SEASON_LEAGUE_DEFS.some(d => d.key !== def.key && seasonSetup.selections[d.key].has(t.id));
+            const usedElsewhere = !usingLeagueFile && SEASON_LEAGUE_DEFS.some(d => d.key !== def.key && seasonSetup.selections[d.key].has(t.id));
             return `<label class="team-check ${checked ? 'selected' : ''}" style="${usedElsewhere ? 'opacity:0.4' : ''}">
               <input type="checkbox" ${checked ? 'checked' : ''} ${usedElsewhere ? 'disabled' : ''} onchange="App.toggleSeasonTeam('${def.key}','${t.id}')">
               <span>${t.flag || ''} ${t.name}</span>
@@ -4714,7 +4780,10 @@ var App = (() => {
           }).join('') || '<div class="empty-state"><p>No clubs found</p></div>'}
         </div>
       </div>`;
-    }).join('');
+    }).join('') + `<div class="card" style="margin-bottom:14px;border-color:var(--accent-gold)">
+        <div class="card-title">🏆 Champions League</div>
+        <div style="color:var(--text-muted);font-size:0.85rem">No manual selection needed — the top ${UCL_QUALIFY_PER_LEAGUE} clubs from each league table automatically qualify as Champions League candidates. In Year 1 (before any table exists), qualifiers are seeded from each club's squad strength.</div>
+      </div>`;
   }
 
   function searchSeasonTeams(compKey, value) {
@@ -4727,28 +4796,33 @@ var App = (() => {
     if (!sel) return;
     if (sel.has(teamId)) sel.delete(teamId);
     else {
-      // A club may only sit in one domestic league at a time (UCL can overlap)
-      if (compKey !== 'ucl') {
-        SEASON_LEAGUE_DEFS.forEach(d => { if (d.key !== compKey) seasonSetup.selections[d.key].delete(teamId); });
-      }
+      // A club may only sit in one domestic league at a time.
+      SEASON_LEAGUE_DEFS.forEach(d => { if (d.key !== compKey) seasonSetup.selections[d.key].delete(teamId); });
       sel.add(teamId);
     }
     renderSeasonSetup();
   }
 
   function autoFillSeason() {
-    const pool = shuffleArray([...seasonClubPool()]);
     Object.values(seasonSetup.selections).forEach(s => s.clear());
-    const perLeague = Math.max(4, Math.min(10, Math.floor(pool.length / (SEASON_LEAGUE_DEFS.length + 1))));
-    let cursor = 0;
-    SEASON_LEAGUE_DEFS.forEach(def => {
-      for (let i = 0; i < perLeague && cursor < pool.length; i++) seasonSetup.selections[def.key].add(pool[cursor++].id);
+    // Prefer leagues.json rosters where available.
+    const leagueFileDefs = SEASON_LEAGUE_DEFS.filter(def => getLeagueTeamPool(def.name).length > 0);
+    leagueFileDefs.forEach(def => {
+      getLeagueTeamPool(def.name).forEach(t => seasonSetup.selections[def.key].add(t.id));
     });
-    // Champions League: draw from clubs already placed into domestic leagues (like real UCL)
-    const domesticIds = SEASON_LEAGUE_DEFS.flatMap(def => [...seasonSetup.selections[def.key]]);
-    shuffleArray(domesticIds).slice(0, Math.min(16, domesticIds.length)).forEach(id => seasonSetup.selections.ucl.add(id));
+    // Any leagues without a leagues.json match get a random spread from the remaining pool.
+    const remainingDefs = SEASON_LEAGUE_DEFS.filter(def => !leagueFileDefs.includes(def));
+    if (remainingDefs.length) {
+      const used = new Set(leagueFileDefs.flatMap(def => [...seasonSetup.selections[def.key]]));
+      const pool = shuffleArray(seasonClubPool().filter(t => !used.has(t.id)));
+      const perLeague = Math.max(4, Math.min(10, Math.floor(pool.length / remainingDefs.length)));
+      let cursor = 0;
+      remainingDefs.forEach(def => {
+        for (let i = 0; i < perLeague && cursor < pool.length; i++) seasonSetup.selections[def.key].add(pool[cursor++].id);
+      });
+    }
     renderSeasonSetup();
-    toast('Auto-filled all competitions');
+    toast('Auto-filled all leagues' + (leagueFileDefs.length ? ' from leagues.json' : ''));
   }
 
   function clearSeasonSetup() {
@@ -4858,6 +4932,30 @@ var App = (() => {
     return { fixtures, played: false };
   }
 
+  // ---------- Champions League qualification ----------
+  // Year 1: no table exists yet, so seed qualifiers by squad strength (like
+  // a pre-season club-strength ranking). Every later year uses the actual
+  // final league standings (real-life style: table-toppers qualify).
+  function computeInitialUCLQualifiers(leagueTeams) {
+    const qualifiers = [];
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const ranked = [...(leagueTeams[def.key] || [])].sort((a, b) => teamAvgOvr(b) - teamAvgOvr(a));
+      ranked.slice(0, UCL_QUALIFY_PER_LEAGUE).forEach(t => qualifiers.push(t));
+    });
+    return qualifiers;
+  }
+
+  function computeUCLQualifiersFromStandings() {
+    const qualifiers = [];
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const comp = season.leagues[def.key];
+      if (!comp) return;
+      const standings = sortedTable(comp.table).map(r => r.team);
+      standings.slice(0, UCL_QUALIFY_PER_LEAGUE).forEach(t => qualifiers.push(t));
+    });
+    return qualifiers;
+  }
+
   // ---------- starting a season ----------
   function startSeason() {
     const leagueTeams = {};
@@ -4867,10 +4965,8 @@ var App = (() => {
       if (ids.length < 4) msg += `${def.name} needs at least 4 clubs (has ${ids.length}). `;
       leagueTeams[def.key] = ids.map(id => getTeam(id)).filter(Boolean);
     }
-    const uclIds = [...seasonSetup.selections.ucl];
-    if (uclIds.length < 4) msg += `Champions League needs at least 4 clubs (has ${uclIds.length}). `;
     const el = document.getElementById('season-setup-msg');
-    if (msg) { if (el) el.textContent = msg; toast('Fix the competitions highlighted below'); return; }
+    if (msg) { if (el) el.textContent = msg; toast('Fix the leagues highlighted below'); return; }
     if (el) el.textContent = '';
 
     const leagues = {};
@@ -4886,7 +4982,9 @@ var App = (() => {
       };
     });
 
-    const uclTeams = uclIds.map(id => getTeam(id)).filter(Boolean);
+    // Champions League candidates qualify automatically — top clubs from
+    // each domestic league, not a manual pick.
+    const uclTeams = computeInitialUCLQualifiers(leagueTeams);
     const matchesPerTeam = Math.max(2, Math.min(8, uclTeams.length - 1));
     const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
     const uclRounds = [];
@@ -5030,8 +5128,10 @@ var App = (() => {
         currentRound: 0, champion: null, finished: false
       };
     });
-    const uclTeams = season.ucl.teams;
-    const matchesPerTeam = season.ucl.matchesPerTeam;
+    // Re-qualify the Champions League from this season's just-finished
+    // final standings — the top clubs from each league carry forward.
+    const uclTeams = computeUCLQualifiersFromStandings();
+    const matchesPerTeam = Math.max(2, Math.min(8, uclTeams.length - 1));
     const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
     const uclRounds = [];
     for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
@@ -5049,8 +5149,8 @@ var App = (() => {
     if (!confirm('Reset the season? All standings and fixtures will be lost.')) return;
     season = null;
     seasonSetup = {
-      selections: { epl: new Set(), bundesliga: new Set(), laliga: new Set(), seriea: new Set(), leagueone: new Set(), ucl: new Set() },
-      search: { epl: '', bundesliga: '', laliga: '', seriea: '', leagueone: '', ucl: '' }
+      selections: { epl: new Set(), laliga: new Set(), seriea: new Set(), bundesliga: new Set(), ligue1: new Set() },
+      search: { epl: '', laliga: '', seriea: '', bundesliga: '', ligue1: '' }
     };
     renderSeasonSetup();
     const setup = document.getElementById('season-setup');
@@ -5127,7 +5227,8 @@ var App = (() => {
   function renderLeagueCompHTML(comp) {
     let h = '<div class="group-card league-table-wrap">';
     h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? comp.champion.flag + ' ' + comp.champion.name : '—') : '') + '</h4>';
-    h += renderStandingsTable(comp, 1);
+    h += renderStandingsTable(comp, UCL_QUALIFY_PER_LEAGUE);
+    h += `<p style="font-size:0.75rem;color:var(--text-muted);margin-top:6px">Green: top ${UCL_QUALIFY_PER_LEAGUE} qualify for next season's Champions League</p>`;
     h += '</div>';
     const allFixtures = [].concat(...comp.rounds);
     h += renderFixtureList(allFixtures);
