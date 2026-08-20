@@ -13,9 +13,10 @@ var App = (() => {
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
-  // playerId -> { type, matchesOut, returnDay, teamName }
+  // playerId -> { type, matchesLeft, teamName, playerName } — counts down once per
+  // this player's team's match played while they're sidelined
   let injuryBook = {};
-  let suspensionBook = {}; // playerId -> { returnDay, teamName, playerName } — 1-match ban after a red card
+  let suspensionBook = {}; // playerId -> { matchesLeft, teamName, playerName } — 1-match ban after a red card
   let globalMatchDay = 1;
   let trophies = []; // {name, team, type, date}
   let currentMatch = null;
@@ -24,6 +25,22 @@ var App = (() => {
   let isPlaying = false;
   let tournament = null;
   let tournamentType = 'worldcup';
+
+  // ========== SEASON CALENDAR ==========
+  const SEASON_LEAGUE_DEFS = [
+    { key: 'epl', name: 'Premier League' },
+    { key: 'bundesliga', name: 'Bundesliga' },
+    { key: 'laliga', name: 'La Liga' },
+    { key: 'seriea', name: 'Serie A' },
+    { key: 'leagueone', name: 'League One' }
+  ];
+  let season = null; // active season object, or null if not started
+  let seasonSetup = {
+    selections: { epl: new Set(), bundesliga: new Set(), laliga: new Set(), seriea: new Set(), leagueone: new Set(), ucl: new Set() },
+    search: { epl: '', bundesliga: '', laliga: '', seriea: '', leagueone: '', ucl: '' }
+  };
+  let seasonActiveTab = 'epl';
+  let seasonReportRegistry = []; // flat list of match reports referenced by index from season fixture cards
 
   const FORMATIONS = {
     '4-3-3': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
@@ -138,6 +155,7 @@ var App = (() => {
     if (view === 'leaderboard') showLeaderboard('goals');
     if (view === 'awards') showAwards('overview');
     if (view === 'teams') renderTeamsList();
+    if (view === 'season') goToSeason();
   }
 
   function randomMatch(category) {
@@ -1944,14 +1962,12 @@ var App = (() => {
 
   function isPlayerInjured(playerId) {
     const rec = injuryBook[playerId];
-    if (!rec) return false;
-    return globalMatchDay < rec.returnDay;
+    return !!rec && rec.matchesLeft > 0;
   }
 
   function isPlayerSuspended(playerId) {
     const rec = suspensionBook[playerId];
-    if (!rec) return false;
-    return globalMatchDay < rec.returnDay;
+    return !!rec && rec.matchesLeft > 0;
   }
 
   function tryInjury(side) {
@@ -1981,19 +1997,15 @@ var App = (() => {
     else if (roll < 0.85) info = injuryTypes[3 + Math.floor(Math.random() * 4)];
     else info = injuryTypes[7 + Math.floor(Math.random() * 3)];
     const outMatches = info.min + Math.floor(Math.random() * (info.max - info.min + 1));
-    // +1 because globalMatchDay still refers to the match being played right now; the
-    // player needs to sit out `outMatches` matchdays starting from the *next* one.
-    const returnDay = globalMatchDay + outMatches + 1;
     injuryBook[injured.id] = {
       type: info.type,
-      matchesOut: outMatches,
-      returnDay,
+      matchesLeft: outMatches,
       teamName: sideData.team.name,
       playerName: injured.name
     };
     m.injuries.push(injured.id);
     addEvent(m.minute, 'injury',
-      `🩹 <span class="player">${injured.name}</span> — ${info.type}. Out for ${outMatches} matchday${outMatches>1?'s':''} (back MD ${returnDay})`,
+      `🩹 <span class="player">${injured.name}</span> — ${info.type}. Out for ${outMatches} match${outMatches>1?'es':''}`,
       side);
     try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
@@ -2220,25 +2232,37 @@ var App = (() => {
     }
     /* ratings live in lineup */ renderLineups();
     globalMatchDay++;
-    // Clear recovered injuries
-    Object.keys(injuryBook).forEach(id => {
-      if (injuryBook[id].returnDay <= globalMatchDay) delete injuryBook[id];
+    // Progress injury/suspension countdowns for both squads. A match only counts
+    // against a ban if the player sat it out entirely (no stats recorded this
+    // match) — a player freshly injured or sent off *during* this match already
+    // has stats here, so their ban starts counting from their team's next match.
+    [m.home.team, m.away.team].forEach(teamObj => {
+      if (!teamObj) return;
+      (teamObj.players || []).forEach(p => {
+        const inj = injuryBook[p.id];
+        if (inj && inj.matchesLeft > 0 && !m.playerMatchStats[p.id]) {
+          inj.matchesLeft--;
+          if (inj.matchesLeft <= 0) delete injuryBook[p.id];
+        }
+        const sus = suspensionBook[p.id];
+        if (sus && sus.matchesLeft > 0 && !m.playerMatchStats[p.id]) {
+          sus.matchesLeft--;
+          if (sus.matchesLeft <= 0) delete suspensionBook[p.id];
+        }
+      });
     });
-    // Clear served suspensions
-    Object.keys(suspensionBook).forEach(id => {
-      if (suspensionBook[id].returnDay <= globalMatchDay) delete suspensionBook[id];
-    });
-    // Ban anyone sent off this match for the next matchday
+    // Ban anyone sent off this match for their team's next match
     Object.entries(m.playerMatchStats).forEach(([id, ps]) => {
       if (!ps.red) return;
       const onHome = (m.home.squad.all || []).some(p => p.id === id);
       const teamObj = onHome ? m.home.team : m.away.team;
       suspensionBook[id] = {
-        returnDay: globalMatchDay + 1,
+        matchesLeft: 1,
         teamName: teamObj ? teamObj.name : '',
         playerName: ps.name
       };
     });
+    try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
     try { localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook)); } catch(e) {}
     saveStats();
     updateScoreboard();
@@ -4652,6 +4676,507 @@ var App = (() => {
     }
   }
 
+  // ========== SEASON CALENDAR: setup ==========
+  function goToSeason() {
+    if (season) { renderSeasonDashboard(); }
+    else { renderSeasonSetup(); }
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = season ? 'none' : 'block';
+    if (dash) dash.style.display = season ? 'block' : 'none';
+  }
+
+  function seasonClubPool() {
+    return (teamsData.club || []);
+  }
+
+  function renderSeasonSetup() {
+    const el = document.getElementById('season-setup-comps');
+    if (!el) return;
+    const pool = seasonClubPool();
+    const sections = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }];
+    el.innerHTML = sections.map(def => {
+      const sel = seasonSetup.selections[def.key];
+      const q = (seasonSetup.search[def.key] || '').toLowerCase();
+      const visible = pool.filter(t => !q || (t.name || '').toLowerCase().includes(q) || (t.short || '').toLowerCase().includes(q));
+      const isUcl = def.key === 'ucl';
+      return `<div class="card" style="margin-bottom:14px">
+        <div class="card-title">${def.name} <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem">(${sel.size} selected)</span></div>
+        <input type="search" placeholder="Search clubs..." value="${(seasonSetup.search[def.key]||'').replace(/"/g,'&quot;')}" oninput="App.searchSeasonTeams('${def.key}', this.value)" style="margin-bottom:10px;width:100%" autocomplete="off">
+        <div class="teams-checkbox-grid">
+          ${visible.map(t => {
+            const checked = sel.has(t.id);
+            const usedElsewhere = !isUcl && SEASON_LEAGUE_DEFS.some(d => d.key !== def.key && seasonSetup.selections[d.key].has(t.id));
+            return `<label class="team-check ${checked ? 'selected' : ''}" style="${usedElsewhere ? 'opacity:0.4' : ''}">
+              <input type="checkbox" ${checked ? 'checked' : ''} ${usedElsewhere ? 'disabled' : ''} onchange="App.toggleSeasonTeam('${def.key}','${t.id}')">
+              <span>${t.flag || ''} ${t.name}</span>
+            </label>`;
+          }).join('') || '<div class="empty-state"><p>No clubs found</p></div>'}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function searchSeasonTeams(compKey, value) {
+    seasonSetup.search[compKey] = value;
+    renderSeasonSetup();
+  }
+
+  function toggleSeasonTeam(compKey, teamId) {
+    const sel = seasonSetup.selections[compKey];
+    if (!sel) return;
+    if (sel.has(teamId)) sel.delete(teamId);
+    else {
+      // A club may only sit in one domestic league at a time (UCL can overlap)
+      if (compKey !== 'ucl') {
+        SEASON_LEAGUE_DEFS.forEach(d => { if (d.key !== compKey) seasonSetup.selections[d.key].delete(teamId); });
+      }
+      sel.add(teamId);
+    }
+    renderSeasonSetup();
+  }
+
+  function autoFillSeason() {
+    const pool = shuffleArray([...seasonClubPool()]);
+    Object.values(seasonSetup.selections).forEach(s => s.clear());
+    const perLeague = Math.max(4, Math.min(10, Math.floor(pool.length / (SEASON_LEAGUE_DEFS.length + 1))));
+    let cursor = 0;
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      for (let i = 0; i < perLeague && cursor < pool.length; i++) seasonSetup.selections[def.key].add(pool[cursor++].id);
+    });
+    // Champions League: draw from clubs already placed into domestic leagues (like real UCL)
+    const domesticIds = SEASON_LEAGUE_DEFS.flatMap(def => [...seasonSetup.selections[def.key]]);
+    shuffleArray(domesticIds).slice(0, Math.min(16, domesticIds.length)).forEach(id => seasonSetup.selections.ucl.add(id));
+    renderSeasonSetup();
+    toast('Auto-filled all competitions');
+  }
+
+  function clearSeasonSetup() {
+    Object.values(seasonSetup.selections).forEach(s => s.clear());
+    renderSeasonSetup();
+  }
+
+  // ---------- scheduling helpers ----------
+  function circleMethodRounds(teamIds) {
+    let ids = teamIds.slice();
+    if (ids.length % 2 !== 0) ids.push(null);
+    const n = ids.length;
+    const rounds = [];
+    let arr = ids.slice();
+    for (let r = 0; r < n - 1; r++) {
+      const pairs = [];
+      for (let i = 0; i < n / 2; i++) {
+        const a = arr[i], b = arr[n - 1 - i];
+        if (a != null && b != null) pairs.push((r + i) % 2 === 0 ? [a, b] : [b, a]);
+      }
+      rounds.push(pairs);
+      const fixed = arr[0];
+      const rest = arr.slice(1);
+      rest.unshift(rest.pop());
+      arr = [fixed, ...rest];
+    }
+    return rounds;
+  }
+
+  function buildDoubleRoundRobinRounds(teams) {
+    const ids = teams.map(t => t.id);
+    if (ids.length < 2) return [];
+    const firstLeg = circleMethodRounds(ids);
+    const secondLeg = firstLeg.map(round => round.map(([a, b]) => [b, a]));
+    return [...firstLeg, ...secondLeg].map(pairs => pairs.map(([home, away]) => ({
+      home, away, played: false, homeScore: null, awayScore: null, report: null
+    })));
+  }
+
+  function blankSeasonRow(team) {
+    return { team, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 };
+  }
+
+  function applyResultToTable(table, homeId, awayId, hg, ag) {
+    const ht = table.find(r => r.team.id === homeId);
+    const at = table.find(r => r.team.id === awayId);
+    if (!ht || !at) return;
+    ht.played++; at.played++;
+    ht.gf += hg; ht.ga += ag; at.gf += ag; at.ga += hg;
+    if (hg > ag) { ht.won++; ht.pts += 3; at.lost++; }
+    else if (ag > hg) { at.won++; at.pts += 3; ht.lost++; }
+    else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+  }
+
+  function sortedTable(table) {
+    return [...table].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+  }
+
+  function bracketSizeFor(n) {
+    let size = 2;
+    while (size * 2 <= n && size * 2 <= 8) size *= 2;
+    return size;
+  }
+
+  function seedPairsForSize(size) {
+    if (size === 8) return [[0, 7], [3, 4], [2, 5], [1, 6]];
+    if (size === 4) return [[0, 3], [1, 2]];
+    return [[0, 1]];
+  }
+
+  function winnerOfResult(homeTeam, awayTeam, result) {
+    if (result.home > result.away) return homeTeam;
+    if (result.away > result.home) return awayTeam;
+    if (result.pens) return result.pens.home > result.pens.away ? homeTeam : awayTeam;
+    return Math.random() < 0.5 ? homeTeam : awayTeam;
+  }
+
+  function simulateRoundFixtures(round, opts, onResult) {
+    (round || []).forEach(fx => {
+      if (fx.played) return;
+      const homeTeam = getTeam(fx.home), awayTeam = getTeam(fx.away);
+      if (!homeTeam || !awayTeam) { fx.played = true; return; }
+      const result = simQuickMatch(homeTeam, awayTeam, { countForLeaderboard: true, allowET: !!opts.allowET, allowPens: !!opts.allowPens });
+      fx.played = true;
+      fx.homeScore = result.home;
+      fx.awayScore = result.away;
+      fx.report = result.report;
+      fx.pens = result.pens;
+      if (onResult) onResult(fx, homeTeam, awayTeam, result);
+    });
+  }
+
+  function buildKnockoutFixtures(teamsInSeed, pairsIdx) {
+    return { fixtures: pairsIdx.map(([i, j]) => ({
+      home: teamsInSeed[i].id, away: teamsInSeed[j].id, played: false, homeScore: null, awayScore: null, report: null, winnerId: null
+    })), played: false };
+  }
+
+  function buildKnockoutFromWinners(winners) {
+    const fixtures = [];
+    for (let i = 0; i < winners.length; i += 2) {
+      const swap = Math.random() < 0.5;
+      const h = swap ? winners[i] : winners[i + 1];
+      const a = swap ? winners[i + 1] : winners[i];
+      fixtures.push({ home: h.id, away: a.id, played: false, homeScore: null, awayScore: null, report: null, winnerId: null });
+    }
+    return { fixtures, played: false };
+  }
+
+  // ---------- starting a season ----------
+  function startSeason() {
+    const leagueTeams = {};
+    let msg = '';
+    for (const def of SEASON_LEAGUE_DEFS) {
+      const ids = [...seasonSetup.selections[def.key]];
+      if (ids.length < 4) msg += `${def.name} needs at least 4 clubs (has ${ids.length}). `;
+      leagueTeams[def.key] = ids.map(id => getTeam(id)).filter(Boolean);
+    }
+    const uclIds = [...seasonSetup.selections.ucl];
+    if (uclIds.length < 4) msg += `Champions League needs at least 4 clubs (has ${uclIds.length}). `;
+    const el = document.getElementById('season-setup-msg');
+    if (msg) { if (el) el.textContent = msg; toast('Fix the competitions highlighted below'); return; }
+    if (el) el.textContent = '';
+
+    const leagues = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const teams = leagueTeams[def.key];
+      leagues[def.key] = {
+        key: def.key, name: def.name, teams,
+        table: teams.map(blankSeasonRow),
+        rounds: buildDoubleRoundRobinRounds(teams),
+        currentRound: 0,
+        champion: null,
+        finished: false
+      };
+    });
+
+    const uclTeams = uclIds.map(id => getTeam(id)).filter(Boolean);
+    const matchesPerTeam = Math.max(2, Math.min(8, uclTeams.length - 1));
+    const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
+    const uclRounds = [];
+    for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
+
+    const ucl = {
+      key: 'ucl', name: 'Champions League', teams: uclTeams,
+      table: uclTeams.map(blankSeasonRow),
+      rounds: uclRounds,
+      currentRound: 0,
+      matchesPerTeam,
+      stage: 'league',
+      bracketSize: null,
+      knockout: { qf: null, sf: null, final: null },
+      champion: null,
+      finished: false
+    };
+
+    season = { year: 1, week: 0, leagues, ucl };
+    seasonActiveTab = 'epl';
+    renderSeasonDashboard();
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = 'none';
+    if (dash) dash.style.display = 'block';
+    toast('Season started — good luck!');
+  }
+
+  function crownLeagueChampion(comp) {
+    const standings = sortedTable(comp.table);
+    comp.champion = standings[0] ? standings[0].team : null;
+    if (comp.champion) {
+      trophies.push({ name: comp.name, team: comp.champion.name, type: 'League (Y' + (season ? season.year : 1) + ')', date: Date.now() });
+      try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch (e) {}
+    }
+  }
+
+  function simulateLeagueRound(comp) {
+    if (!comp || comp.finished) return;
+    if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); return; }
+    simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+      applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
+    });
+    comp.currentRound++;
+    if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); }
+  }
+
+  function simulateUCLStep(comp) {
+    if (!comp || comp.finished) return;
+    if (comp.stage === 'league') {
+      if (comp.currentRound >= comp.rounds.length) { comp.stage = 'transition'; }
+      else {
+        simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+          applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
+        });
+        comp.currentRound++;
+      }
+      if (comp.currentRound >= comp.rounds.length) {
+        const size = bracketSizeFor(comp.teams.length);
+        comp.bracketSize = size;
+        const standings = sortedTable(comp.table).map(r => r.team);
+        const qualifiers = standings.slice(0, size);
+        const firstRound = buildKnockoutFixtures(qualifiers, seedPairsForSize(size));
+        if (size <= 2) { comp.knockout.final = firstRound; comp.stage = 'final'; }
+        else if (size === 4) { comp.knockout.sf = firstRound; comp.stage = 'sf'; }
+        else { comp.knockout.qf = firstRound; comp.stage = 'qf'; }
+      }
+    } else if (comp.stage === 'qf') {
+      simulateRoundFixtures(comp.knockout.qf.fixtures, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+        fx.winnerId = winnerOfResult(h, a, result).id;
+      });
+      comp.knockout.qf.played = true;
+      const winners = comp.knockout.qf.fixtures.map(f => getTeam(f.winnerId));
+      comp.knockout.sf = buildKnockoutFromWinners(winners);
+      comp.stage = 'sf';
+    } else if (comp.stage === 'sf') {
+      simulateRoundFixtures(comp.knockout.sf.fixtures, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+        fx.winnerId = winnerOfResult(h, a, result).id;
+      });
+      comp.knockout.sf.played = true;
+      const winners = comp.knockout.sf.fixtures.map(f => getTeam(f.winnerId));
+      comp.knockout.final = buildKnockoutFromWinners(winners);
+      comp.stage = 'final';
+    } else if (comp.stage === 'final') {
+      simulateRoundFixtures(comp.knockout.final.fixtures, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+        fx.winnerId = winnerOfResult(h, a, result).id;
+      });
+      comp.knockout.final.played = true;
+      const champ = getTeam(comp.knockout.final.fixtures[0].winnerId);
+      comp.champion = champ;
+      comp.finished = true;
+      if (champ) {
+        trophies.push({ name: 'Champions League', team: champ.name, type: 'Season (Y' + (season ? season.year : 1) + ')', date: Date.now() });
+        try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch (e) {}
+      }
+    }
+  }
+
+  function seasonIsComplete() {
+    if (!season) return true;
+    return SEASON_LEAGUE_DEFS.every(def => season.leagues[def.key].finished) && season.ucl.finished;
+  }
+
+  function simulateSeasonWeek() {
+    if (!season) return;
+    withLoading('Simulating matchday…', function() {
+      SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
+      simulateUCLStep(season.ucl);
+      season.week++;
+      renderSeasonDashboard();
+      if (seasonIsComplete()) toast('Season complete — check the standings and Trophies!');
+    });
+  }
+
+  function simulateSeasonToEnd() {
+    if (!season) return;
+    withLoading('Simulating rest of season…', function() {
+      let safety = 0;
+      while (!seasonIsComplete() && safety < 500) {
+        SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
+        simulateUCLStep(season.ucl);
+        season.week++;
+        safety++;
+      }
+      renderSeasonDashboard();
+      toast('Season complete — check the standings and Trophies!');
+    });
+  }
+
+  function startNewSeasonYear() {
+    if (!season) return;
+    if (!seasonIsComplete()) { toast('Finish this season first (or Simulate To End)'); return; }
+    const year = season.year + 1;
+    const leagues = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const teams = season.leagues[def.key].teams;
+      leagues[def.key] = {
+        key: def.key, name: def.name, teams,
+        table: teams.map(blankSeasonRow),
+        rounds: buildDoubleRoundRobinRounds(teams),
+        currentRound: 0, champion: null, finished: false
+      };
+    });
+    const uclTeams = season.ucl.teams;
+    const matchesPerTeam = season.ucl.matchesPerTeam;
+    const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
+    const uclRounds = [];
+    for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
+    season = {
+      year, week: 0, leagues,
+      ucl: { key: 'ucl', name: 'Champions League', teams: uclTeams, table: uclTeams.map(blankSeasonRow),
+        rounds: uclRounds, currentRound: 0, matchesPerTeam, stage: 'league', bracketSize: null,
+        knockout: { qf: null, sf: null, final: null }, champion: null, finished: false }
+    };
+    renderSeasonDashboard();
+    toast('Year ' + year + ' kicks off!');
+  }
+
+  function resetSeason() {
+    if (!confirm('Reset the season? All standings and fixtures will be lost.')) return;
+    season = null;
+    seasonSetup = {
+      selections: { epl: new Set(), bundesliga: new Set(), laliga: new Set(), seriea: new Set(), leagueone: new Set(), ucl: new Set() },
+      search: { epl: '', bundesliga: '', laliga: '', seriea: '', leagueone: '', ucl: '' }
+    };
+    renderSeasonSetup();
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = 'block';
+    if (dash) dash.style.display = 'none';
+    toast('Season reset');
+  }
+
+  function showSeasonComp(key) {
+    seasonActiveTab = key;
+    renderSeasonDashboard();
+  }
+
+  function renderSeasonDashboard() {
+    if (!season) return;
+    seasonReportRegistry = []; // rebuilt fresh each render so onclick indices stay valid
+    const title = document.getElementById('season-status-title');
+    if (title) title.textContent = 'Year ' + season.year + ' · Matchday ' + season.week;
+    const tabsEl = document.getElementById('season-comp-tabs');
+    if (tabsEl) {
+      const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }];
+      tabsEl.innerHTML = tabs.map(def => {
+        const comp = def.key === 'ucl' ? season.ucl : season.leagues[def.key];
+        const flag = comp.finished ? ' 🏆' : '';
+        return `<button class="lb-tab ${seasonActiveTab === def.key ? 'active' : ''}" onclick="App.showSeasonComp('${def.key}')">${def.name}${flag}</button>`;
+      }).join('');
+    }
+    const contentEl = document.getElementById('season-comp-content');
+    if (!contentEl) return;
+    const comp = seasonActiveTab === 'ucl' ? season.ucl : season.leagues[seasonActiveTab];
+    if (!comp) { contentEl.innerHTML = ''; return; }
+    contentEl.innerHTML = seasonActiveTab === 'ucl' ? renderUCLSeasonHTML(comp) : renderLeagueCompHTML(comp);
+  }
+
+  function renderStandingsTable(comp, highlightTop) {
+    const sorted = sortedTable(comp.table);
+    let h = '<table class="group-table"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
+    sorted.forEach((r, i) => {
+      const gd = r.gf - r.ga;
+      const mark = (highlightTop && i < highlightTop) ? ' style="background:rgba(0,200,83,0.12)"' : '';
+      h += `<tr${mark}><td>${i + 1}</td><td>${r.team.flag || ''} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
+    });
+    h += '</tbody></table>';
+    return h;
+  }
+
+  function renderFixtureList(fixtures) {
+    const unplayed = fixtures.filter(f => !f.played).slice(0, 10);
+    const played = fixtures.filter(f => f.played).slice(-8).reverse();
+    let h = '';
+    if (unplayed.length) {
+      h += '<div class="card-title" style="margin-top:12px">Upcoming</div>';
+      unplayed.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        h += `<div class="fixture-item"><span class="fixture-teams">${home.flag || ''} ${home.short} vs ${away.flag || ''} ${away.short}</span></div>`;
+      });
+    }
+    if (played.length) {
+      h += '<div class="card-title" style="margin-top:12px">Recent Results</div>';
+      played.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
+        h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
+          <span class="fixture-teams">${home.flag || ''} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
+      });
+    }
+    return h;
+  }
+
+  function renderLeagueCompHTML(comp) {
+    let h = '<div class="group-card league-table-wrap">';
+    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? comp.champion.flag + ' ' + comp.champion.name : '—') : '') + '</h4>';
+    h += renderStandingsTable(comp, 1);
+    h += '</div>';
+    const allFixtures = [].concat(...comp.rounds);
+    h += renderFixtureList(allFixtures);
+    return h;
+  }
+
+  function renderKnockoutRoundHTML(title, ko) {
+    if (!ko) return '';
+    let h = '<div class="card-title" style="margin-top:12px">' + title + '</div>';
+    ko.fixtures.forEach(f => {
+      const home = getTeam(f.home), away = getTeam(f.away);
+      if (!home || !away) return;
+      if (!f.played) {
+        h += `<div class="fixture-item"><span class="fixture-teams">${home.flag || ''} ${home.short} vs ${away.flag || ''} ${away.short}</span></div>`;
+      } else {
+        const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
+        const pensTxt = f.pens ? ` (pens ${f.pens.home}-${f.pens.away})` : '';
+        const winner = getTeam(f.winnerId);
+        h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
+          <span class="fixture-teams">${home.flag || ''} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
+      }
+    });
+    return h;
+  }
+
+  function renderUCLSeasonHTML(comp) {
+    let h = '<div class="group-card league-table-wrap">';
+    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? comp.champion.flag + ' ' + comp.champion.name : '—') : '') + '</h4>';
+    if (comp.stage === 'league' || !comp.bracketSize) {
+      h += renderStandingsTable(comp, comp.teams.length >= 8 ? 8 : comp.teams.length);
+      h += '</div>';
+      const allFixtures = [].concat(...comp.rounds);
+      h += renderFixtureList(allFixtures);
+    } else {
+      h += renderStandingsTable(comp, comp.bracketSize);
+      h += '</div>';
+      h += renderKnockoutRoundHTML('Quarterfinals', comp.knockout.qf);
+      h += renderKnockoutRoundHTML('Semifinals', comp.knockout.sf);
+      h += renderKnockoutRoundHTML('Final', comp.knockout.final);
+    }
+    return h;
+  }
+
+  function viewSeasonReport(idx) {
+    const report = seasonReportRegistry[idx];
+    if (!report) { toast('No detailed report for this match'); return; }
+    showMatchReport(report);
+  }
+
   function goToSquadBuilder() {
     switchView('match');
     const setup = document.getElementById('match-setup');
@@ -4675,7 +5200,10 @@ var App = (() => {
     setTacticsLive, continueToET, continueToPens, skipETAndEnd,
     renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
     simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport,
-    simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport
+    simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
+    goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
+    startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
+    showSeasonComp, viewSeasonReport
   };
 })();
 

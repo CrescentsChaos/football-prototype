@@ -27,6 +27,7 @@
         <button class="nav-tab active" data-view="home" aria-current="page">Home</button>
         <button class="nav-tab" data-view="match">Match</button>
         <button class="nav-tab" data-view="tournament">Tournament</button>
+        <button class="nav-tab" data-view="season">Season</button>
         <button class="nav-tab" data-view="leaderboard">Leaderboard</button>
         <button class="nav-tab" data-view="awards">Awards</button>
         <button class="nav-tab" data-view="teams">Teams</button>
@@ -65,6 +66,11 @@
             <div class="icon">📋</div>
             <h3>Squad Builder</h3>
             <p>Manually pick formation and starting XI, then simulate the match your way.</p>
+          </div>
+          <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('season')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('season')}">
+            <div class="icon">📅</div>
+            <h3>Season Calendar</h3>
+            <p>Run a full year: Premier League, Bundesliga, La Liga, Serie A, League One and the Champions League — all at once.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('leaderboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('leaderboard')}">
             <div class="icon">📊</div>
@@ -219,6 +225,37 @@
         <div class="card" style="margin-top:20px" id="tour-leaderboard-mini">
           <div class="card-title">Tournament Stats</div>
           <div id="tour-awards"></div><div id="tour-stats-preview"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEASON CALENDAR -->
+    <section id="view-season" class="view">
+      <div id="season-setup" class="card">
+        <div class="card-title">Season Setup</div>
+        <p style="color:var(--text-secondary);margin-bottom:16px">Pick the clubs for each competition. A club can only play in one domestic league, but can also be entered into the Champions League. Each league needs at least 4 clubs; Champions League needs at least 4.</p>
+        <div id="season-setup-comps"></div>
+        <div id="season-setup-msg" style="color:var(--text-muted);font-size:0.85rem;margin-top:10px"></div>
+        <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="App.autoFillSeason()">🎲 Auto-Fill All</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.clearSeasonSetup()">↺ Clear</button>
+          <button class="btn btn-primary" onclick="App.startSeason()">📅 Start Season</button>
+        </div>
+      </div>
+
+      <div id="season-dashboard" style="display:none">
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title" id="season-status-title">Year 1 · Matchday 0</div>
+          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="App.simulateSeasonWeek()">▶ Simulate Next Matchday</button>
+            <button class="btn btn-secondary" onclick="App.simulateSeasonToEnd()">⚡ Simulate To End of Season</button>
+            <button class="btn btn-secondary" onclick="App.startNewSeasonYear()">🔁 Start Next Season</button>
+            <button class="btn btn-danger btn-sm" onclick="App.resetSeason()" style="margin-left:auto">↺ Reset Season</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="leaderboard-tabs" id="season-comp-tabs"></div>
+          <div id="season-comp-content"></div>
         </div>
       </div>
     </section>
