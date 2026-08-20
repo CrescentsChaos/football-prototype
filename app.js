@@ -1474,8 +1474,18 @@ var App = (() => {
     if (!m) return;
     const homeStr = calcTeamStrength(m.home);
     const awayStr = calcTeamStrength(m.away);
-    const total = homeStr.att + awayStr.att + 50;
-    const homeChance = (homeStr.att + 10) / total;
+    // Which side creates the next chance is driven by attacking quality vs the
+    // opponent's defensive quality (not just raw attack), run through a logistic
+    // curve so real quality gaps (e.g. a title contender's front line vs a
+    // relegation-battler's back line) show up clearly over 90 minutes/a season,
+    // while a small flat home-advantage nudge and a soft floor/ceiling keep any
+    // single chance from ever being a certainty either way — upsets stay possible.
+    const homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10;
+    const awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10;
+    const HOME_ADV = 3.2; // small, realistic home-field nudge, not a thumb on the scale
+    const qualityGap = (homeCreate - awayCreate) + HOME_ADV;
+    let homeChance = 1 / (1 + Math.exp(-qualityGap / 11));
+    homeChance = Math.min(0.85, Math.max(0.15, homeChance));
     // Build up real passing volume for both teams this minute (feeds player stats + rating).
     simulateMinutePassing();
     // Possession is now derived from actual completed-pass share (like real match data
@@ -1522,7 +1532,7 @@ var App = (() => {
       // Attributes matter: att/tec/ovr vs defence
       const shotQuality = ((shooter.att || 70) * 0.45 + (shooter.tec || 70) * 0.35 + (shooter.ovr || 75) * 0.2) / 100;
       const defAvg = calcTeamStrength(defTeam).def / 100;
-      const onTargetChance = Math.min(0.62, Math.max(0.14, 0.18 + shotQuality * 0.32 - defAvg * 0.14));
+      const onTargetChance = Math.min(0.64, Math.max(0.12, 0.16 + shotQuality * 0.36 - defAvg * 0.20));
       if (Math.random() < onTargetChance) {
         attTeam.stats.shotsOn++;
         if (!m.playerMatchStats) m.playerMatchStats={};
@@ -1891,9 +1901,13 @@ var App = (() => {
       if (preferred.length) pool = preferred;
     }
     if (!pool.length) return null;
-    // Weight selection toward higher ovr / relevant attrs
+    // Weight selection toward higher ovr / relevant attrs (mild curve — this
+    // path covers secondary events like corners/fouls, so quality should
+    // nudge things without dominating the way it does for the main
+    // goal/assist picker above).
     const weights = pool.map(p => {
-      let w = (p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2;
+      const composite = (p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2;
+      let w = Math.pow(Math.max(composite, 40) / 92, 1.4) * 92;
       return Math.max(5, w);
     });
     const total = weights.reduce((a, b) => a + b, 0);
@@ -1934,7 +1948,15 @@ var App = (() => {
     const weights = pool.map(p => {
       const slot = p.slot || (p.pos || [])[0] || 'CM';
       const roleW = (roleWeights && roleWeights[slot] != null) ? roleWeights[slot] : 1;
-      const w = ((p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2) * roleW;
+      // Composite quality (0-100ish scale). Raised to a modest power so real
+      // separation in ability (a Mbappe/Haaland-tier ovr/att/tec vs a squad
+      // fill-in) compounds into a clearly higher share of goals/assists over
+      // a season — like real-world Golden Boot races — without ever reducing
+      // a lesser player's chance to zero on any single kick. This is
+      // symmetric for every player regardless of club, so it favors quality,
+      // not any particular team.
+      const composite = (p.ovr || 70) * 0.5 + (p.att || 70) * 0.35 + (p.tec || 70) * 0.15;
+      const w = Math.pow(Math.max(composite, 30) / 70, 2.2) * 100 * roleW;
       return Math.max(1, w);
     });
     const total = weights.reduce((a, b) => a + b, 0);
