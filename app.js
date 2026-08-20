@@ -16,11 +16,6 @@ var App = (() => {
   // can also tally into that competition's own stat bucket (comp.stats), giving each
   // league/competition its own top scorers, assists, cards, awards, etc.
   let currentSeasonComp = null;
-    // Clear previous tournament UI
-    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
-    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
-    const st = document.getElementById('tour-stage-title');
-    if (st) st.textContent = 'Starting…';
   // playerId -> { type, matchesLeft, teamName, playerName } — counts down once per
   // this player's team's match played while they're sidelined
   let injuryBook = {};
@@ -601,6 +596,7 @@ var App = (() => {
       homeSubsUsed: 0, awaySubsUsed: 0, maxSubs: 5,
       injuries: [], cards: { home: {}, away: {} }, possession: 50,
       subLog: { home: {}, away: {} }, // playerId -> { outMin, inMin, replaced, replacedBy }
+      leftPitch: { home: [], away: [] }, // playerIds who have left the pitch (sub'd off, sent off, or injured off) — can never return
       tactics: { home: 'balanced', away: 'balanced' },
       playerMatchStats: {},
       goalList: []
@@ -891,15 +887,38 @@ var App = (() => {
 
   function buildMatchReport(m) {
     if (!m) return null;
+    const allStats = m.playerMatchStats ? JSON.parse(JSON.stringify(m.playerMatchStats)) : {};
+    const homeIds = new Set((m.home.squad && m.home.squad.all || []).map(p => p.id));
+    const homeRatings = [], awayRatings = [];
+    Object.values(allStats).forEach(ps => {
+      (homeIds.has(ps.id) ? homeRatings : awayRatings).push(ps);
+    });
+    const byRating = (x, y) => (y.rating || 0) - (x.rating || 0);
+    homeRatings.sort(byRating);
+    awayRatings.sort(byRating);
     return {
       venue: getStadium(m.home.team),
-      home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation },
-      away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation },
+      home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation, ratings: homeRatings },
+      away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation, ratings: awayRatings },
       events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
       goals: JSON.parse(JSON.stringify(m.goalList || [])),
-      ratings: m.playerMatchStats ? JSON.parse(JSON.stringify(m.playerMatchStats)) : {},
+      ratings: allStats,
       finished: true
     };
+  }
+
+  // Shared row renderer so a tournament/season match report and the live
+  // post-match panel render a player's rating line identically.
+  function renderRatingRow(p) {
+    const rc = (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+    const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals, 3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists, 2)) : '');
+    return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
+        <span class="player-num">${p.num || ''}</span>
+        <span style="flex:1;font-weight:600">${p.name}</span>
+        <span>${icons}</span>
+        <span class="xg">xG ${(p.xg || 0).toFixed(2)} · xA ${(p.xa || 0).toFixed(2)}</span>
+        <span class="rating-badge ${rc}">${(p.rating || 0).toFixed(1)}</span>
+      </div>`;
   }
 
   function showMatchReport(report) {
@@ -914,8 +933,10 @@ var App = (() => {
     const goalsH = (report.goals || []).filter(g => g.side === 'home');
     const goalsA = (report.goals || []).filter(g => g.side === 'away');
     const fmtG = (arr) => arr.map(g => `${g.minute}' ${g.player}${g.method ? ' ('+g.method+')' : ''}`).join('<br>') || '—';
-    const ratings = Object.values(report.ratings || {}).sort((x,y) => (y.rating||0)-(x.rating||0));
-    const homeIds = new Set(); // approximate by team name match later
+    // Prefer the home/away-split ratings captured by buildMatchReport; fall back
+    // to the old flat map for any legacy report objects saved before this split existed.
+    const homeRatings = h.ratings || Object.values(report.ratings || {});
+    const awayRatings = a.ratings || [];
     let eventsHtml = (report.events || []).filter(e => e.type !== 'pressure' || Math.random() < 0.3).slice(-80).map(e => {
       const t = (e.text || '').replace(/<[^>]+>/g, '');
       return `<div class="report-event"><span class="re-min">${e.minute}'</span> <span class="re-type">${e.type}</span> ${t}</div>`;
@@ -954,12 +975,12 @@ var App = (() => {
         <tr><td>Saves</td><td>${(h.stats&&h.stats.saves)||0}</td><td>${(a.stats&&a.stats.saves)||0}</td></tr>
         <tr><td>Yellow / Red</td><td>${(h.stats&&h.stats.yellows)||0} / ${(h.stats&&h.stats.reds)||0}</td><td>${(a.stats&&a.stats.yellows)||0} / ${(a.stats&&a.stats.reds)||0}</td></tr>
       </tbody></table></div>
-      <div class="card-title">Player Ratings</div>
-      <div style="max-height:200px;overflow-y:auto">
-        ${ratings.slice(0,22).map(p => {
-          const rc = (p.rating||0) >= 7.5 ? 'rating-high' : (p.rating||0) >= 6.5 ? 'rating-mid' : 'rating-low';
-          return `<div class="pm-player"><span class="player-num">${p.num||''}</span><span style="flex:1">${p.name}</span><span class="rating-badge ${rc}">${(p.rating||0).toFixed(1)}</span></div>`;
-        }).join('') || '—'}
+      <div class="card-title">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
+      <div style="max-height:280px;overflow-y:auto">
+        <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${h.flag||''} ${h.name}</div>
+        ${homeRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
+        <div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${a.flag||''} ${a.name}</div>
+        ${awayRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
       </div>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
@@ -1932,16 +1953,31 @@ var App = (() => {
     const sideData = m[side];
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     if (used >= (m.maxSubs || 5)) return;
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
     const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
     // Anyone currently on pitch (starter or previous sub)
     const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
     const onPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
-    // Prefer lower rated / tired-looking out
-    const sorted = [...onPitch].sort((a, b) => (a.ovr || 70) - (b.ovr || 70));
-    const candidatesOut = sorted.filter(p => (p.slot || (p.pos||[])[0]) !== 'GK').slice(0, Math.max(2, Math.floor(sorted.length / 2)));
+    // Prefer lower rated / tired-looking out. Exclude GKs, and — normally —
+    // exclude players who already came on as a substitute themselves, since a
+    // manager doesn't typically sub off a sub they just brought on. Fall back
+    // to including them only if there's genuinely no other outfield option.
+    const alreadySubbedIn = (p) => !!(m.subLog[side] && m.subLog[side][p.id] && m.subLog[side][p.id].inMin != null);
+    let outfieldPool = onPitch.filter(p => (p.slot || (p.pos||[])[0]) !== 'GK');
+    let freshPool = outfieldPool.filter(p => !alreadySubbedIn(p));
+    const pool = freshPool.length ? freshPool : outfieldPool;
+    const sorted = [...pool].sort((a, b) => (a.ovr || 70) - (b.ovr || 70));
+    const candidatesOut = sorted.slice(0, Math.max(2, Math.floor(sorted.length / 2)));
     if (!candidatesOut.length) return;
     const outPlayer = candidatesOut[Math.floor(Math.random() * candidatesOut.length)];
-    const availableSubs = (sideData.squad.subs || []).filter(p => !onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
+    // A substitute can only come from the bench, must not already be on the
+    // pitch, and — critically — must never have left the pitch already this
+    // match (whether as a starter subbed off, a substitute subbed off again,
+    // or a player sent off/injured out).
+    const availableSubs = (sideData.squad.subs || []).filter(p =>
+      !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !leftIds.includes(p.id));
     if (!availableSubs.length) return;
     let candidatesIn = availableSubs.filter(p => canPlay(p, outPlayer.slot || (outPlayer.pos||[])[0]));
     if (!candidatesIn.length) candidatesIn = availableSubs;
@@ -1950,8 +1986,8 @@ var App = (() => {
     const inPlayer = top[Math.floor(Math.random() * top.length)];
     const idx = onPitchIds.indexOf(outPlayer.id);
     if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+    markLeftPitch(m, side, outPlayer.id);
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
-    if (!m.subLog) m.subLog = { home: {}, away: {} };
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
     // Carry slot for in player
@@ -2047,9 +2083,12 @@ var App = (() => {
       `🩹 <span class="player">${injured.name}</span> — ${info.type}. Out for ${outMatches} match${outMatches>1?'es':''}`,
       side);
     try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     if (used < m.maxSubs) {
-      const availableSubs = (sideData.squad.subs || []).filter(p => !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !isPlayerInjured(p.id));
+      const availableSubs = (sideData.squad.subs || []).filter(p =>
+        !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !isPlayerInjured(p.id) && !leftIds.includes(p.id));
       if (availableSubs.length) {
         let candidates = availableSubs.filter(p => canPlay(p, injured.slot || (injured.pos || ['CM'])[0]));
         if (!candidates.length) candidates = availableSubs;
@@ -2057,6 +2096,7 @@ var App = (() => {
         const inPlayer = candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
         const idx = onPitchIds.indexOf(injured.id);
         if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+        markLeftPitch(m, side, injured.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
         addEvent(m.minute, 'sub', `Forced sub: <span class="player">${inPlayer.name}</span> replaces injured <span class="player">${injured.name}</span>`, side);
       } else {
@@ -2072,6 +2112,17 @@ var App = (() => {
     const arr = side === 'home' ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
     const idx = arr.indexOf(playerId);
     if (idx >= 0) arr.splice(idx, 1);
+    markLeftPitch(currentMatch, side, playerId);
+  }
+
+  // A player who has left the pitch for any reason (substituted off, sent off,
+  // or injured off with no replacement) can never take the field again this
+  // match — whether they were an original starter or an earlier substitute.
+  function markLeftPitch(m, side, playerId) {
+    if (!m) return;
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    if (!m.leftPitch[side]) m.leftPitch[side] = [];
+    if (!m.leftPitch[side].includes(playerId)) m.leftPitch[side].push(playerId);
   }
 
   
@@ -2770,11 +2821,10 @@ var App = (() => {
     if (!confirm('Reset all leaderboard stats? This cannot be undone.')) return;
     stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
     tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
-    // Clear previous tournament UI
-    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
-    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
-    const st = document.getElementById('tour-stage-title');
-    if (st) st.textContent = 'Starting…';
+    // Note: this only resets leaderboard stat buckets. It must never touch the
+    // `trophies` record (Trophy Room / past champions) or any in-progress
+    // tournament UI (bracket, podium, groups, fixtures) — those are cleared
+    // only by resetTournament(), never as a side effect of a stats reset.
     try { localStorage.removeItem('apexSimStats'); } catch(e) {}
     saveStats();
     showLeaderboard('goals');
@@ -3951,6 +4001,8 @@ var App = (() => {
       maxSubs: 5,
       injuries: [],
       cards: { home: {}, away: {} },
+      subLog: { home: {}, away: {} },
+      leftPitch: { home: [], away: [] }, // playerIds who have left the pitch (sub'd off, sent off, or injured off) — can never return
       playerMatchStats: {},
       goalList: [],
       allowET: !!opts.allowET,
@@ -4275,6 +4327,13 @@ var App = (() => {
     if (live) live.style.display = 'none';
     const btn = document.getElementById('btn-sim-round');
     if (btn) btn.textContent = 'Simulate Round';
+    // Clear the previous tournament's UI (bracket, podium, groups, fixtures) —
+    // this does NOT touch the persistent `trophies` record, so past champions
+    // still show up in the Trophy Room afterward.
+    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
+    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const st = document.getElementById('tour-stage-title');
+    if (st) st.textContent = 'Starting…';
   }
 
   let teamsFilter = 'all';
@@ -4418,21 +4477,10 @@ var App = (() => {
     const homeIds = new Set((m.home.squad.all||[]).map(p=>p.id));
     const homeP = entries.filter(p => homeIds.has(p.id));
     const awayP = entries.filter(p => !homeIds.has(p.id));
-    const row = (p) => {
-      const rc = p.rating >= 7.5 ? 'rating-high' : p.rating >= 6.5 ? 'rating-mid' : 'rating-low';
-      const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals,3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists,2)) : '');
-      return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
-        <span class="player-num">${p.num||''}</span>
-        <span style="flex:1;font-weight:600">${p.name}</span>
-        <span>${icons}</span>
-        <span class="xg">xG ${(p.xg||0).toFixed(2)} · xA ${(p.xa||0).toFixed(2)}</span>
-        <span class="rating-badge ${rc}">${p.rating.toFixed(1)}</span>
-      </div>`;
-    };
     h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${m.home.team.flag||''} ${m.home.team.name}</div>`;
-    h += homeP.map(row).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += homeP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
     h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${m.away.team.flag||''} ${m.away.team.name}</div>`;
-    h += awayP.map(row).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += awayP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
     el.innerHTML = h;
     el.style.display = 'block';
   }
@@ -4722,8 +4770,16 @@ var App = (() => {
     if (dash) dash.style.display = season ? 'block' : 'none';
   }
 
+  // Season Calendar only plays with the current 2026-27 squads — a club may have
+  // other-season entries in teams.json (e.g. historical or future rosters) that
+  // must never be selectable for leagues, whether auto-matched via leagues.json
+  // or picked manually.
+  const SEASON_YEAR_TAG = '2026-27';
+  function isCurrentSeasonSquad(t) {
+    return !!(t && t.name && t.name.indexOf(SEASON_YEAR_TAG) !== -1);
+  }
   function seasonClubPool() {
-    return (teamsData.club || []);
+    return (teamsData.club || []).filter(isCurrentSeasonSquad);
   }
 
   // leagues.json lists teams like "Real Madrid 2026-27" — strip the season
@@ -5233,25 +5289,30 @@ var App = (() => {
     return Object.values((comp.stats && comp.stats[key]) || {}).sort((a, b) => b.count - a.count).slice(0, n || 10);
   }
 
-  function renderCompStatTable(title, icon, rows, colLabel) {
+  function compApps(comp, playerId) {
+    const r = comp.stats && comp.stats.ratings && comp.stats.ratings[playerId];
+    return r ? r.count : 0;
+  }
+
+  function renderCompStatTable(comp, title, icon, rows, colLabel) {
     if (!rows.length) {
       return `<div class="group-card" style="margin-bottom:14px"><h4>${icon} ${title}</h4><div class="empty-state" style="padding:16px 0"><p>No data yet — simulate some matchdays.</p></div></div>`;
     }
     return `<div class="group-card" style="margin-bottom:14px"><h4>${icon} ${title}</h4>
-      <div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>${colLabel}</th></tr></thead><tbody>
-      ${rows.map((p, i) => `<tr><td class="lb-rank">${i + 1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${p.team}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
+      <div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>${colLabel}</th></tr></thead><tbody>
+      ${rows.map((p, i) => `<tr><td class="lb-rank">${i + 1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${p.team}</td><td>${compApps(comp, p.id)}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
       </tbody></table></div></div>`;
   }
 
   function renderCompStatsHTML(comp) {
     let h = '<div class="group-card league-table-wrap" style="margin-bottom:14px"><h4>' + comp.name + ' — Season Stats</h4>' +
       '<p style="font-size:0.8rem;color:var(--text-muted)">Top performers across every matchday played in this competition so far.</p></div>';
-    h += renderCompStatTable('Top Scorers', '⚽', compStatTop(comp, 'goals', 15), 'Goals');
-    h += renderCompStatTable('Top Assists', '🎯', compStatTop(comp, 'assists', 15), 'Assists');
-    h += renderCompStatTable('Most Saves', '🧤', compStatTop(comp, 'saves', 15), 'Saves');
-    h += renderCompStatTable('Clean Sheets', '🛡️', compStatTop(comp, 'cleanSheets', 15), 'Clean Sheets');
-    h += renderCompStatTable('Yellow Cards', '🟨', compStatTop(comp, 'yellows', 15), 'Yellows');
-    h += renderCompStatTable('Red Cards', '🟥', compStatTop(comp, 'reds', 15), 'Reds');
+    h += renderCompStatTable(comp, 'Top Scorers', '⚽', compStatTop(comp, 'goals', 15), 'Goals');
+    h += renderCompStatTable(comp, 'Top Assists', '🎯', compStatTop(comp, 'assists', 15), 'Assists');
+    h += renderCompStatTable(comp, 'Most Saves', '🧤', compStatTop(comp, 'saves', 15), 'Saves');
+    h += renderCompStatTable(comp, 'Clean Sheets', '🛡️', compStatTop(comp, 'cleanSheets', 15), 'Clean Sheets');
+    h += renderCompStatTable(comp, 'Yellow Cards', '🟨', compStatTop(comp, 'yellows', 15), 'Yellows');
+    h += renderCompStatTable(comp, 'Red Cards', '🟥', compStatTop(comp, 'reds', 15), 'Reds');
     return h;
   }
 
