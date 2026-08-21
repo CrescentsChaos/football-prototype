@@ -9,6 +9,10 @@ var App = (() => {
   // leagues.json: { "La Liga": ["Real Madrid 2026-27", ...], ... } — defines which
   // clubs belong to which domestic league, independent of teams.json.
   let leaguesData = {};
+  // players.json: { "Player Full Name": "portrait-file.jpg", ... } — portrait file
+  // names are resolved against assets/portraits/. Optional; falls back to the
+  // player's shirt number when no portrait is found for their name.
+  let playerPortraits = {};
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
@@ -145,6 +149,22 @@ var App = (() => {
         }
       } catch (e) { console.warn('leagues.json not loaded', e); }
 
+      // Load players.json (player name -> portrait filename). Optional — the
+      // app still works without it, players just show their shirt number.
+      try {
+        const pUrls = isHosted
+          ? ['players.json?v=' + Date.now() + '&r=' + Math.random().toString(36).slice(2), './players.json?v=' + Date.now(), 'players.json']
+          : ['players.json?v=' + Date.now()];
+        for (const url of pUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { playerPortraits = data; console.log('Loaded player portraits from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('players.json not loaded', e); }
+
       loadStats();
       populateTeamSelects();
       populateFormations();
@@ -279,6 +299,44 @@ var App = (() => {
   // Stadium whenever a team in teams.json doesn't define its own "stadium".
   function getStadium(team) { return (team && team.stadium) ? team.stadium : 'Wembley Stadium'; }
 
+  // ========== TEAM LOGOS / PLAYER PORTRAITS ==========
+  // Renders a team's logo (from assets/logos/<team.logo>, set via the "logo"
+  // field in teams.json) as a small inline mark, falling back to the flag
+  // emoji if no logo is set or the image fails to load.
+  function teamMark(team, size) {
+    size = size || 22;
+    const flag = (team && team.flag) || '⚽';
+    if (team && team.logo) {
+      const src = 'assets/logos/' + team.logo;
+      return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px"><img src="${src}" alt="" loading="lazy" onerror="this.parentElement.textContent='${flag}'"></span>`;
+    }
+    return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px">${flag}</span>`;
+  }
+
+  // Larger circular version for profile-avatar style containers (fills the
+  // whole circle). Falls back to the flag emoji on missing/broken image.
+  function teamAvatarMark(team) {
+    const flag = (team && team.flag) || '⚽';
+    if (team && team.logo) {
+      const src = 'assets/logos/' + team.logo;
+      return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain;border-radius:50%" onerror="this.outerHTML='${flag}'">`;
+    }
+    return flag;
+  }
+
+  // Renders a player's portrait (from assets/portraits/<file>, looked up by
+  // exact player name in players.json) filling a circular avatar container,
+  // falling back to the player's shirt number when unavailable.
+  function playerAvatarMark(player) {
+    const num = (player && player.num != null) ? player.num : '?';
+    const file = player && playerPortraits[player.name];
+    if (file) {
+      const src = 'assets/portraits/' + file;
+      return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.outerHTML='${num}'">`;
+    }
+    return num;
+  }
+
   function updateTeamPreview(side) {
     const sel = document.getElementById(side + '-team');
     const el = document.getElementById(side + '-preview');
@@ -287,7 +345,7 @@ var App = (() => {
     if (!team) { el.innerHTML = ''; return; }
     const mgr = team.manager ? team.manager.name : '';
     const venueLine = side === 'home' ? `<div style="font-size:0.8rem;color:var(--text-muted)">🏟️ ${getStadium(team)}</div>` : '';
-    el.innerHTML = `<span class="team-flag">${team.flag || ''}</span><div><div class="team-name">${team.name}</div><div class="manager-name">${mgr ? 'Manager: ' + mgr : ''}</div><div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
+    el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div><div class="manager-name">${mgr ? 'Manager: ' + mgr : ''}</div><div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
   }
 
   function buildSquad(team, formationKey) {
@@ -2492,10 +2550,11 @@ var App = (() => {
     if (currentMatch.silentDeep) return;
     const m = currentMatch;
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    set('live-home-flag', m.home.team.flag || '');
+    const setHTML = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
+    setHTML('live-home-flag', teamMark(m.home.team, 26));
     set('live-home-name', m.home.team.short || m.home.team.name);
     set('live-home-form', (FORMATIONS[m.home.squad.formation] || {}).name || '');
-    set('live-away-flag', m.away.team.flag || '');
+    setHTML('live-away-flag', teamMark(m.away.team, 26));
     set('live-away-name', m.away.team.short || m.away.team.name);
     set('live-away-form', (FORMATIONS[m.away.squad.formation] || {}).name || '');
     const hm = document.querySelector('.score-team.home .mgr');
@@ -2608,7 +2667,7 @@ var App = (() => {
         </div>`;
       });
       return `<div class="mini-pitch team-pitch">
-        <div class="pitch-label">${s.team.flag || ''} ${s.team.short} · ${form.name}</div>
+        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}</div>
         ${dots}
       </div>`;
     };
@@ -2677,7 +2736,7 @@ var App = (() => {
       const form = (FORMATIONS[s.squad.formation] || {}).name || s.squad.formation || '';
       const tac = (m.tactics && m.tactics[side]) || 'balanced';
       let h = `<div class="lineup-team">
-        <h4>${s.team.flag || ''} ${s.team.short || s.team.name} · ${form}
+        <h4>${teamMark(s.team, 18)} ${s.team.short || s.team.name} · ${form}
           <span class="subs-badge">${used}/${m.maxSubs || 5} subs</span>
           <span class="tac-badge">${tac}</span>
         </h4>
@@ -2901,7 +2960,7 @@ var App = (() => {
       const checked = firstRender || prevChecked.has(t.id);
       return `<label class="team-check ${checked ? 'selected' : ''}" data-id="${t.id}">
         <input type="checkbox" value="${t.id}" ${checked ? 'checked' : ''}>
-        <span>${t.flag || ''} ${t.name}</span>
+        <span>${teamMark(t, 20)} ${t.name}</span>
         <span class="player-ovr" style="margin-left:auto">${teamAvgOvr(t).toFixed(0)}</span>
       </label>`;
     }).join('') || '<div class="empty-state"><p>No teams found</p></div>';
@@ -4402,6 +4461,7 @@ var App = (() => {
     if (teamsSort === 'name') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     else if (teamsSort === 'ovr') list.sort((a, b) => teamAvgOvr(b) - teamAvgOvr(a));
     else if (teamsSort === 'players') list.sort((a, b) => (b.players || []).length - (a.players || []).length);
+    else if (teamsSort === 'flag') list.sort((a, b) => (a.flag || '').localeCompare(b.flag || '') || (a.name || '').localeCompare(b.name || ''));
     return list;
   }
 
@@ -4418,7 +4478,7 @@ var App = (() => {
       const primary = t.color || '#d4af37';
       return `<div class="team-check" style="cursor:pointer;border-left:3px solid ${primary}" onclick="App.showTeamProfile('${t.id}')">
         <div style="display:flex;align-items:center;gap:8px;width:100%">
-          <span style="font-size:1.5rem">${t.flag || '⚽'}</span>
+          <span style="font-size:1.5rem">${teamMark(t, 32)}</span>
           <div style="flex:1;min-width:0">
             <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</strong>
             <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''}</div>
@@ -4577,10 +4637,10 @@ var App = (() => {
     }
     content.innerHTML = `
       <div class="profile-header">
-        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${player.num || '?'}</div>
+        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
         <div>
           <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
-          <div style="color:var(--text-2);font-size:0.85rem">${(team && team.flag) || ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
+          <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'}</div>
         </div>
       </div>
@@ -4619,7 +4679,7 @@ var App = (() => {
     if (!modal || !content) return;
     content.innerHTML = `
       <div class="profile-header" style="border-bottom:2px solid ${primary};padding-bottom:14px">
-        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary};font-size:1.6rem">${team.flag || '⚽'}</div>
+        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary};font-size:1.6rem">${teamAvatarMark(team)}</div>
         <div style="flex:1;min-width:0">
           <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
@@ -5535,6 +5595,190 @@ var App = (() => {
 
 // Expose for inline onclick handlers
 try { window.App = App; } catch (e) {}
+
+// ========== SEARCHABLE DROPDOWNS ==========
+// Auto-enhances every native <select> in the page (present now or added
+// later, e.g. formation pickers rebuilt mid-match) into a searchable custom
+// dropdown: a button + panel with a text search box, instead of the plain
+// browser <select> list. The original <select> stays in the DOM (hidden) as
+// the real source of truth, so all existing .value reads/writes and
+// onchange="" handlers keep working untouched.
+(function () {
+  function closeAllPanels(except) {
+    document.querySelectorAll('.ss-wrap.open').forEach(w => { if (w !== except) w.classList.remove('open'); });
+  }
+
+  function collectOptions(select) {
+    const items = [];
+    Array.from(select.children).forEach(node => {
+      if (node.tagName === 'OPTGROUP') {
+        Array.from(node.children).forEach(opt => items.push({ value: opt.value, label: opt.textContent, group: node.label }));
+      } else if (node.tagName === 'OPTION') {
+        items.push({ value: node.value, label: node.textContent, group: null });
+      }
+    });
+    return items;
+  }
+
+  function enhanceSelect(select) {
+    if (!select || select.dataset.ssEnhanced || select.closest('.ss-wrap')) return;
+    select.dataset.ssEnhanced = '1';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ss-wrap ' + select.className;
+    select.parentNode.insertBefore(wrap, select);
+    wrap.appendChild(select);
+    select.classList.add('ss-native');
+    select.tabIndex = -1;
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'ss-trigger';
+    if (select.hasAttribute('aria-label')) trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
+    wrap.appendChild(trigger);
+
+    const isTeamSelect = select.id === 'home-team' || select.id === 'away-team';
+    const panel = document.createElement('div');
+    panel.className = 'ss-panel';
+    panel.innerHTML = (isTeamSelect ? `<div class="ss-tabs">
+        <button type="button" class="ss-tab active" data-cat="all">All</button>
+        <button type="button" class="ss-tab" data-cat="National Teams">National</button>
+        <button type="button" class="ss-tab" data-cat="Club Teams">Clubs</button>
+      </div>` : '') +
+      `<div class="ss-search-wrap"><input type="text" class="ss-search" placeholder="Search…" autocomplete="off" spellcheck="false"></div>
+      <div class="ss-options" role="listbox"></div>`;
+    wrap.appendChild(panel);
+
+    const searchInput = panel.querySelector('.ss-search');
+    const optionsEl = panel.querySelector('.ss-options');
+    let activeCat = 'all';
+
+    function updateTrigger() {
+      const opt = select.options[select.selectedIndex];
+      trigger.textContent = opt ? opt.textContent : 'Select…';
+    }
+
+    function renderOptions() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      let items = collectOptions(select);
+      if (isTeamSelect && activeCat !== 'all') items = items.filter(i => i.group === activeCat);
+      if (q) items = items.filter(i => i.label.toLowerCase().includes(q));
+      if (!items.length) { optionsEl.innerHTML = '<div class="ss-empty">No matches</div>'; return; }
+      let html = '';
+      let lastGroup;
+      items.forEach(i => {
+        if (i.group !== lastGroup) {
+          if (i.group && (!isTeamSelect || activeCat === 'all')) html += `<div class="ss-group-label">${i.group}</div>`;
+          lastGroup = i.group;
+        }
+        const sel = i.value === select.value ? ' selected' : '';
+        html += `<div class="ss-option${sel}" data-value="${String(i.value).replace(/"/g, '&quot;')}" role="option">${i.label}</div>`;
+      });
+      optionsEl.innerHTML = html;
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = !wrap.classList.contains('open');
+      closeAllPanels(wrap);
+      wrap.classList.toggle('open', willOpen);
+      if (willOpen) {
+        searchInput.value = '';
+        renderOptions();
+        setTimeout(() => searchInput.focus(), 0);
+      }
+    });
+
+    searchInput.addEventListener('input', renderOptions);
+    panel.addEventListener('click', (e) => e.stopPropagation());
+
+    if (isTeamSelect) {
+      panel.querySelectorAll('.ss-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          panel.querySelectorAll('.ss-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          activeCat = tab.dataset.cat;
+          renderOptions();
+        });
+      });
+    }
+
+    optionsEl.addEventListener('click', (e) => {
+      const opt = e.target.closest('.ss-option');
+      if (!opt) return;
+      select.value = opt.dataset.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      wrap.classList.remove('open');
+    });
+
+    // Keep the trigger label in sync even when code sets select.value
+    // programmatically (no native 'change' event fires in that case).
+    const proto = window.HTMLSelectElement && HTMLSelectElement.prototype;
+    const desc = proto && Object.getOwnPropertyDescriptor(proto, 'value');
+    if (desc && desc.configurable) {
+      Object.defineProperty(select, 'value', {
+        get() { return desc.get.call(select); },
+        set(v) { desc.set.call(select, v); updateTrigger(); },
+        configurable: true
+      });
+    }
+
+    // Options list changes (e.g. formation <select> rebuilt) — refresh label/list.
+    new MutationObserver(() => { updateTrigger(); if (wrap.classList.contains('open')) renderOptions(); })
+      .observe(select, { childList: true });
+
+    updateTrigger();
+  }
+
+  document.addEventListener('click', () => closeAllPanels(null));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllPanels(null); });
+
+  function scanAndEnhance(root) {
+    (root || document).querySelectorAll('select').forEach(enhanceSelect);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => scanAndEnhance(document));
+  if (document.readyState !== 'loading') scanAndEnhance(document);
+
+  // Catch selects created later (formation pickers, live tactics selects, etc.)
+  new MutationObserver((mutations) => {
+    mutations.forEach(m => {
+      m.addedNodes.forEach(node => {
+        if (node.nodeType !== 1) return;
+        if (node.tagName === 'SELECT') enhanceSelect(node);
+        else if (node.querySelectorAll) scanAndEnhance(node);
+      });
+    });
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
+// ========== SCROLL TO TOP / BOTTOM ==========
+(function () {
+  function init() {
+    const group = document.getElementById('scroll-fab-group');
+    const topBtn = document.getElementById('scroll-fab-top');
+    const bottomBtn = document.getElementById('scroll-fab-bottom');
+    if (!group || !topBtn || !bottomBtn) return;
+
+    function toggleVisibility() {
+      const scrollable = document.documentElement.scrollHeight > window.innerHeight + 200;
+      group.classList.toggle('show', scrollable);
+      const nearTop = window.scrollY < 200;
+      const nearBottom = window.scrollY + window.innerHeight > document.documentElement.scrollHeight - 200;
+      topBtn.classList.toggle('disabled', nearTop);
+      bottomBtn.classList.toggle('disabled', nearBottom);
+    }
+
+    topBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    bottomBtn.addEventListener('click', () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+    window.addEventListener('scroll', toggleVisibility, { passive: true });
+    window.addEventListener('resize', toggleVisibility);
+    new MutationObserver(toggleVisibility).observe(document.body, { childList: true, subtree: true });
+    toggleVisibility();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState !== 'loading') init();
+})();
 
 // Start the app
 if (document.readyState === 'loading') {

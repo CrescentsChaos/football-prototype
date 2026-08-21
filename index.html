@@ -316,6 +316,7 @@
             <option value="name">Sort: Name</option>
             <option value="ovr">Sort: Strength</option>
             <option value="players">Sort: Squad size</option>
+            <option value="flag">Sort: Flag</option>
           </select>
           <select id="teams-type" onchange="App.filterTeams(this.value)" aria-label="Filter team type">
             <option value="all">All teams</option>
@@ -340,6 +341,11 @@
   </div>
   <div class="modal-overlay" id="modal" role="dialog" aria-modal="true">
     <div class="modal" id="modal-content"></div>
+  </div>
+
+  <div class="scroll-fab-group" id="scroll-fab-group">
+    <button type="button" class="scroll-fab" id="scroll-fab-top" title="Scroll to top" aria-label="Scroll to top">▲</button>
+    <button type="button" class="scroll-fab" id="scroll-fab-bottom" title="Scroll to bottom" aria-label="Scroll to bottom">▼</button>
   </div>
 
   <script src="app.js"></script>
