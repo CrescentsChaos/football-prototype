@@ -582,6 +582,69 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .lb-player { font-weight: 600; }
 .lb-team { color: var(--text-2); font-size: 0.85rem; }
 
+/* Leaderboard rank badges + player portraits */
+.lb-rank-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-family: var(--display); font-weight: 800; font-size: 0.85rem;
+  color: var(--gold); background: rgba(240,193,75,0.08);
+}
+.lb-rank-badge.rank-1, .lb-rank-badge.rank-2, .lb-rank-badge.rank-3 {
+  font-size: 1.1rem; background: none;
+}
+.lb-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: var(--bg-3); border: 1px solid var(--border-strong);
+  vertical-align: middle;
+}
+.lb-avatar-fallback {
+  font-family: var(--display); font-weight: 800; font-size: 0.8rem;
+  color: var(--bg-0); background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+}
+.lb-player-cell { display: flex; align-items: center; gap: 8px; }
+.lb-player-name { font-weight: 600; }
+.lb-table tr.lb-row-top td { background: rgba(240,193,75,0.05); }
+.lb-table tr.lb-row-top.rank-1 td { background: rgba(240,193,75,0.14); box-shadow: inset 3px 0 0 var(--gold); }
+.lb-table tr.lb-row-top.rank-2 td { background: rgba(192,192,192,0.10); box-shadow: inset 3px 0 0 #c0c0c0; }
+.lb-table tr.lb-row-top.rank-3 td { background: rgba(205,127,50,0.10); box-shadow: inset 3px 0 0 #cd7f32; }
+
+/* Podium — top 3 of the main leaderboard, awards-show style */
+.lb-podium {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end;
+  gap: 10px; margin-bottom: 18px;
+}
+.lb-podium-slot {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: linear-gradient(160deg, var(--bg-3), var(--bg-2));
+  border: 1px solid var(--border-strong); border-radius: 14px;
+  padding: 16px 8px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+.lb-podium-slot.slot-1 { order: 2; padding-top: 22px; border-color: var(--gold); box-shadow: 0 0 24px var(--gold-glow); }
+.lb-podium-slot.slot-2 { order: 1; }
+.lb-podium-slot.slot-3 { order: 3; }
+.lb-podium-rank { font-size: 1.6rem; margin-bottom: 6px; }
+.lb-podium-slot .lb-avatar { width: 56px; height: 56px; margin-bottom: 8px; }
+.lb-podium-slot .lb-avatar-fallback { font-size: 1.2rem; }
+.lb-podium-name { font-weight: 800; font-size: 0.85rem; }
+.lb-podium-team { font-size: 0.68rem; color: var(--text-3); margin-top: 2px; }
+.lb-podium-value { margin-top: 6px; font-family: var(--display); font-weight: 800; font-size: 1.1rem; color: var(--gold); }
+@media (max-width: 480px) {
+  .lb-podium-name { font-size: 0.72rem; }
+  .lb-podium-team { display: none; }
+}
+
+/* Compact ranked rows used inside the tournament stats grid */
+.lb-mini-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.lb-mini-row .lb-rank-badge { width: 20px; height: 20px; font-size: 0.72rem; }
+.lb-mini-row .lb-avatar { width: 26px; height: 26px; }
+.lb-mini-name { flex: 1; }
+.lb-mini-count { color: var(--accent-gold, var(--gold)); }
+.lb-mini-row.lb-mini-top.rank-1 { color: var(--gold); }
+
 /* Awards */
 .awards-row {
   display: grid;
@@ -595,6 +658,8 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   box-shadow: 0 4px 20px rgba(0,0,0,0.25);
 }
 .award-mini .am-title { font-size: 0.7rem; color: var(--gold); font-weight: 700; margin-bottom: 6px; }
+.award-mini .lb-avatar { margin: 0 auto 8px; }
+.award-mini .lb-avatar-fallback { font-size: 1rem; }
 .award-mini .am-name { font-weight: 800; font-size: 0.95rem; }
 .award-mini .am-meta { font-size: 0.72rem; color: var(--text-3); margin-top: 4px; }
 .award-card {
@@ -602,7 +667,16 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   background: var(--bg-2); border-radius: 12px; padding: 16px;
   border: 1px solid var(--border); margin-bottom: 10px;
 }
+.award-card .lb-avatar-fallback { font-size: 1.2rem; }
 .award-icon { font-size: 2rem; }
+.trophy-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; border-radius: 10px; overflow: hidden;
+}
+.trophy-mark-fallback {
+  background: radial-gradient(circle, rgba(240,193,75,0.18), transparent 70%);
+  line-height: 1;
+}
 .award-winner { color: var(--gold); font-weight: 700; }
 
 /* Ratings */

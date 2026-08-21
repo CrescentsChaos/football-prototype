@@ -13,6 +13,10 @@ var App = (() => {
   // names are resolved against assets/portraits/. Optional; falls back to the
   // player's shirt number when no portrait is found for their name.
   let playerPortraits = {};
+  // trophies.json: { "Trophy or competition name": "trophy-file.png", ... } —
+  // image file names are resolved against assets/trophies/. Optional; falls
+  // back to the 🏆 emoji when no image is found for a given trophy name.
+  let trophyImages = {};
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
@@ -164,6 +168,22 @@ var App = (() => {
           } catch (err) { console.warn('Fetch failed', url, err); }
         }
       } catch (e) { console.warn('players.json not loaded', e); }
+
+      // Load trophies.json (trophy/competition name -> image filename). Optional —
+      // the app still works without it, trophies just show the 🏆 emoji instead.
+      try {
+        const tpUrls = isHosted
+          ? ['trophies.json?v=' + Date.now() + '&r=' + Math.random().toString(36).slice(2), './trophies.json?v=' + Date.now(), 'trophies.json']
+          : ['trophies.json?v=' + Date.now()];
+        for (const url of tpUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { trophyImages = data; console.log('Loaded trophy images from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('trophies.json not loaded', e); }
 
       loadStats();
       populateTeamSelects();
@@ -335,6 +355,52 @@ var App = (() => {
       return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.outerHTML='${num}'">`;
     }
     return num;
+  }
+
+  // Renders a small circular portrait for leaderboard/award rows, looked up
+  // by exact player name in players.json (same source as playerAvatarMark).
+  // Falls back to the player's initials on a coloured circle when no
+  // portrait is found — this keeps two different players who happen to
+  // share a name from silently displaying as visually identical "?" or
+  // number-only avatars, since initials are still derived per-row from
+  // that row's own name/id, never borrowed from another row.
+  function initialsOf(name) {
+    return (name || '?').trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
+  }
+  function lbAvatar(p, size) {
+    size = size || 34;
+    const initials = initialsOf(p && p.name);
+    const file = p && playerPortraits[p.name];
+    if (file) {
+      const src = 'assets/portraits/' + file;
+      return `<span class="lb-avatar" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('lb-avatar-fallback');this.outerHTML='${initials}'"></span>`;
+    }
+    return `<span class="lb-avatar lb-avatar-fallback" style="width:${size}px;height:${size}px">${initials}</span>`;
+  }
+  // Player name + portrait, for use inside a leaderboard/award table cell.
+  function lbPlayerCell(p, size) {
+    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${p.name}</span></div>`;
+  }
+  // Rank badge for position i (0-indexed): medal for top 3, plain number after.
+  function rankBadge(i) {
+    const n = i + 1;
+    if (n === 1) return `<span class="lb-rank-badge rank-1">🥇</span>`;
+    if (n === 2) return `<span class="lb-rank-badge rank-2">🥈</span>`;
+    if (n === 3) return `<span class="lb-rank-badge rank-3">🥉</span>`;
+    return `<span class="lb-rank-badge">${n}</span>`;
+  }
+
+  // Renders a trophy image (from assets/trophies/<file>, looked up by exact
+  // trophy/competition name in trophies.json) inside a rounded container,
+  // falling back to the 🏆 emoji when no image is mapped for that name.
+  function trophyMark(name, size) {
+    size = size || 40;
+    const file = name && trophyImages[name];
+    if (file) {
+      const src = 'assets/trophies/' + file;
+      return `<span class="trophy-mark" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.outerHTML='<span class=&quot;trophy-mark trophy-mark-fallback&quot; style=&quot;width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px&quot;>🏆</span>'"></span>`;
+    }
+    return `<span class="trophy-mark trophy-mark-fallback" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px">🏆</span>`;
   }
 
   function updateTeamPreview(side) {
@@ -2843,20 +2909,43 @@ var App = (() => {
     (teamsData.club || []).forEach(t => {
       if ((t.players || []).some(p => p.id === playerId)) club = t.name;
     });
-    // Same player may only exist on one team in our data; also check by name match across
+    // Same real player may exist as two separate roster entries (club + country)
+    // with different ids — fall back to a name match to link them. Because
+    // different, unrelated players CAN share an identical name, this fallback
+    // only accepts a match when it's unambiguous: exactly one other roster
+    // entry with that name, and its position overlaps the source player's
+    // position. Ambiguous name collisions are left blank rather than risking
+    // attributing one player's country/club to a different, same-named player.
     if (!national || !club) {
-      let pname = null;
+      let srcPlayer = null;
       allTeams.forEach(t => {
         const p = (t.players || []).find(x => x.id === playerId);
-        if (p) pname = p.name;
+        if (p) srcPlayer = p;
       });
-      if (pname) {
-        (teamsData.national || []).forEach(t => {
-          if ((t.players || []).some(p => p.name === pname)) national = t.name;
-        });
-        (teamsData.club || []).forEach(t => {
-          if ((t.players || []).some(p => p.name === pname)) club = t.name;
-        });
+      if (srcPlayer && srcPlayer.name) {
+        const pname = srcPlayer.name;
+        const srcPos = (srcPlayer.pos || [])[0];
+        const posMatches = (p) => !srcPos || !p.pos || !p.pos.length || p.pos.includes(srcPos);
+        if (!national) {
+          const matches = [];
+          (teamsData.national || []).forEach(t => {
+            (t.players || []).forEach(p => {
+              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
+            });
+          });
+          const uniqueTeams = [...new Set(matches)];
+          if (uniqueTeams.length === 1) national = uniqueTeams[0];
+        }
+        if (!club) {
+          const matches = [];
+          (teamsData.club || []).forEach(t => {
+            (t.players || []).forEach(p => {
+              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
+            });
+          });
+          const uniqueTeams = [...new Set(matches)];
+          if (uniqueTeams.length === 1) club = uniqueTeams[0];
+        }
       }
     }
     return { national, club };
@@ -2931,12 +3020,22 @@ var App = (() => {
     }
     const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating' };
     const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
-    el.innerHTML = `<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th>${appsCol}<th>${labels[type]||type}</th></tr></thead><tbody>
+    const top3 = data.slice(0, 3);
+    const podium = top3.length ? `<div class="lb-podium">
+      ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1}">
+          <div class="lb-podium-rank">${i===0?'🥇':i===1?'🥈':'🥉'}</div>
+          ${lbAvatar(p, 56)}
+          <div class="lb-podium-name">${p.name}</div>
+          <div class="lb-podium-team">${[p.national, p.club].filter(Boolean).join(' · ') || p.team || ''}</div>
+          <div class="lb-podium-value">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—') : p.count}</div>
+        </div>`).join('')}
+    </div>` : '';
+    el.innerHTML = `${podium}<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th>${appsCol}<th>${labels[type]||type}</th></tr></thead><tbody>
       ${data.map((p,i) => {
         const aff = [p.national, p.club].filter(Boolean).join(' · ') || p.team;
         const apps = (stats.ratings && stats.ratings[p.id]) ? stats.ratings[p.id].count : 0;
         const appsCell = type === 'ratings' ? '' : `<td>${apps}</td>`;
-        return `<tr><td class="lb-rank">${i+1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${aff}</td>${appsCell}<td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
+        return `<tr class="${i<3?'lb-row-top rank-'+(i+1):''}"><td class="lb-rank">${rankBadge(i)}</td><td class="lb-player">${lbPlayerCell(p)}</td><td class="lb-team">${aff}</td>${appsCell}<td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
       }).join('')}
     </tbody></table></div>`;
   }
@@ -4201,6 +4300,7 @@ var App = (() => {
     const card = (title, icon, p, extra) => {
       if (!p) return `<div class="award-mini"><div class="am-title">${icon} ${title}</div><div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini"><div class="am-title">${icon} ${title}</div>
+        ${lbAvatar(p, 44)}
         <div class="am-name">${p.name}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
     };
@@ -4239,7 +4339,7 @@ var App = (() => {
       return;
     }
     const col = (title, arr) => `<div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">${title}</div>
-      ${arr.map((p,i)=>`<div style="font-size:0.85rem;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">${i+1}. ${p.name} <span style="color:var(--text-muted)">${p.team||''}</span> — <b>${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
+      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${p.name}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
     el.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
         ${col('⚽ Golden Boot', g)}
@@ -4709,9 +4809,9 @@ var App = (() => {
     if (type === 'goldenboot') {
       const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">⚽</div><p>No goals yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card"><div class="award-icon">👟</div><div class="award-info"><h4>Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>👟 Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'ballon') {
       // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
@@ -4768,17 +4868,17 @@ var App = (() => {
         return;
       }
       const leader = data[0];
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🥇</div><div class="award-info"><h4>Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(leader, 64) + '<div class="award-info"><h4>🥇 Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Noms</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td>'+(p.noms||0)+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td>'+(p.noms||0)+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'puskas') {
       // Puskás Award — best/most spectacular individual goal, tallied by nominee count
       const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🎬</div><div class="award-info"><h4>Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>🎬 Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Nominated Goals</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'muller') {
       // Gerd Müller Award — best pure striker: goals heavily weighted, ST/CF preference
@@ -4802,9 +4902,9 @@ var App = (() => {
       });
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🎯</div><div class="award-info"><h4>Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>🎯 Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'yashin') {
       // Yashin Award — best goalkeeper: saves + clean sheets
@@ -4825,22 +4925,22 @@ var App = (() => {
       });
       const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card"><div class="award-icon">🧤</div><div class="award-info"><h4>Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>🧤 Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr><td class="lb-rank">'+(i+1)+'</td><td class="lb-player">'+p.name+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
-      el.innerHTML = trophies.map(t => '<div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+t.team+'</p><p>'+t.type+'</p></div></div>').join('');
+      el.innerHTML = trophies.map(t => '<div class="award-card">' + trophyMark(t.name, 52) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+t.team+'</p><p>'+t.type+'</p></div></div>').join('');
     } else {
       // overview
       const topScorer = Object.values(stats.goals||{}).sort((a,b)=>b.count-a.count)[0];
       const topAst = Object.values(stats.assists||{}).sort((a,b)=>b.count-a.count)[0];
       const topMotm = Object.values(stats.motm||{}).sort((a,b)=>b.count-a.count)[0];
       el.innerHTML = `
-        <div class="award-card"><div class="award-icon">👟</div><div class="award-info"><h4>Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
-        <div class="award-card"><div class="award-icon">🎯</div><div class="award-info"><h4>Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
-        <div class="award-card"><div class="award-icon">⭐</div><div class="award-info"><h4>Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
+        <div class="award-card">${topScorer ? lbAvatar(topScorer, 52) : '<div class="award-icon">👟</div>'}<div class="award-info"><h4>👟 Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
+        <div class="award-card">${topAst ? lbAvatar(topAst, 52) : '<div class="award-icon">🎯</div>'}<div class="award-info"><h4>🎯 Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
+        <div class="award-card">${topMotm ? lbAvatar(topMotm, 52) : '<div class="award-icon">⭐</div>'}<div class="award-info"><h4>⭐ Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
         <div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Trophies</h4><p class="award-winner">${trophies.length} won</p></div></div>`;
     }
   }
@@ -5385,7 +5485,7 @@ var App = (() => {
     }
     return `<div class="group-card" style="margin-bottom:14px"><h4>${icon} ${title}</h4>
       <div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>${colLabel}</th></tr></thead><tbody>
-      ${rows.map((p, i) => `<tr><td class="lb-rank">${i + 1}</td><td class="lb-player">${p.name}</td><td class="lb-team">${p.team}</td><td>${compApps(comp, p.id)}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
+      ${rows.map((p, i) => `<tr class="${i<3?'lb-row-top rank-'+(i+1):''}"><td class="lb-rank">${rankBadge(i)}</td><td class="lb-player">${lbPlayerCell(p)}</td><td class="lb-team">${p.team}</td><td>${compApps(comp, p.id)}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
       </tbody></table></div></div>`;
   }
 
@@ -5427,6 +5527,7 @@ var App = (() => {
     const card = (title, icon, p, extra) => {
       if (!p) return `<div class="award-mini"><div class="am-title">${icon} ${title}</div><div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini"><div class="am-title">${icon} ${title}</div>
+        ${lbAvatar(p, 44)}
         <div class="am-name">${p.name}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
     };
@@ -5440,7 +5541,7 @@ var App = (() => {
       ${card('Best Avg Rating', '📈', a.bestAvgRating, a.bestAvgRating ? (a.bestAvgRating.avg != null ? a.bestAvgRating.avg.toFixed(2) : '—') + ' (' + a.bestAvgRating.count + ' apps)' : '')}
     </div>`;
     if (a.champion) {
-      h += `<div class="award-card" style="margin-top:14px"><div class="award-icon">🏆</div><div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${(a.champion.flag || '') + ' ' + a.champion.name}</p></div></div>`;
+      h += `<div class="award-card" style="margin-top:14px">${trophyMark(comp.name, 52)}<div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${(a.champion.flag || '') + ' ' + a.champion.name}</p></div></div>`;
     } else {
       h += '<p style="color:var(--text-muted);font-size:0.85rem;margin-top:10px">Champion will be crowned once the competition finishes.</p>';
     }
@@ -5465,7 +5566,7 @@ var App = (() => {
     let h = '<div class="card-title">🏆 Season Trophy Room</div>';
     years.forEach(y => {
       h += `<div class="group-card" style="margin-bottom:14px"><h4>Year ${y}</h4>` +
-        byYear[y].map(t => `<div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`).join('') +
+        byYear[y].map(t => `<div class="award-card">${trophyMark(t.name, 52)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`).join('') +
         '</div>';
     });
     return h;
