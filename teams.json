@@ -19214,6 +19214,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#DA291C",
   "secondary": "#FBE122",
+  "logo":"mutd.png",
+  "stadium":"Old Trafford",
   "players": [
     {"id":"mun08_1","name":"Edwin van der Sar","pos":["GK"],"ovr":91,"att":15,"def":92,"phy":80,"pac":52,"tec":78,"num":1},
     {"id":"mun08_2","name":"Gary Neville","pos":["RB"],"ovr":82,"att":68,"def":83,"phy":78,"pac":70,"tec":74,"num":2},
@@ -19537,6 +19539,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#DA020E",
   "secondary": "#FFFFFF",
+  "logo":"mutd.png",
+  "stadium":"Old Trafford",
   "players": [
     {"id":"mun68_1","name":"Alex Stepney","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":78,"pac":52,"tec":62,"num":1},
     {"id":"mun68_13","name":"Jimmy Rimmer","pos":["GK"],"ovr":70,"att":15,"def":71,"phy":70,"pac":48,"tec":52,"num":13},
@@ -19746,6 +19750,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#DA291C",
   "secondary": "#FFFFFF",
+  "logo":"mutd.png",
+  "stadium":"Old Trafford",
   "players": [
     {"id":"mun26_1","name":"Senne Lammens","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":78,"pac":50,"tec":65,"num":1},
     {"id":"mun26_22","name":"Tom Heaton","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":70,"pac":40,"tec":55,"num":22},
@@ -19947,6 +19953,8 @@
   "flag": "🇮🇹",
   "color": "#8E1F2F",
   "secondary": "#F1A611",
+  "logo":"roma.png",
+  "stadium":"Stadio Olimpico",
   "players": [
     {"id":"rom26_99","name":"Mile Svilar","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":80,"pac":50,"tec":68,"num":99},
     {"id":"rom26_95","name":"Pierluigi Gollini","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":74,"pac":45,"tec":60,"num":95},
@@ -19986,6 +19994,8 @@
   "flag": "🇩🇪",
   "color": "#FDE100",
   "secondary": "#000000",
+  "logo":"bvb.png",
+  "stadium":"Signal Iduna Park",
   "players": [
     {"id":"bvb26_1","name":"Gregor Kobel","pos":["GK"],"ovr":87,"att":15,"def":88,"phy":82,"pac":50,"tec":68,"num":1},
     {"id":"bvb26_33","name":"Alexander Meyer","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":58,"num":33},
@@ -20722,6 +20732,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#DA020E",
   "secondary": "#FFFFFF",
+  "logo":"mutd.png",
+  "stadium":"Old Trafford",
   "players": [
     {"id":"mun10_1","name":"Edwin van der Sar","pos":["GK"],"ovr":87,"att":15,"def":88,"phy":78,"pac":45,"tec":70,"num":1},
     {"id":"mun10_29","name":"Tomasz Kuszczak","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":74,"pac":42,"tec":55,"num":29},
@@ -20799,6 +20811,8 @@
   "flag": "🇩🇪",
   "color": "#FDE100",
   "secondary": "#000000",
+  "logo":"bvb.png",
+  "stadium":"Signal Iduna Park",
   "players": [
     {"id":"bvb19_1","name":"Roman Bürki","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":50,"tec":68,"num":1},
     {"id":"bvb19_35","name":"Marwin Hitz","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":75,"pac":45,"tec":60,"num":35},
@@ -20912,6 +20926,8 @@
   "flag": "🇩🇪",
   "color": "#FDE100",
   "secondary": "#000000",
+  "logo":"bvb.png",
+  "stadium":"Signal Iduna Park",
   "players": [
     {"id":"bvb16_38","name":"Roman Bürki","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":76,"pac":50,"tec":66,"num":38},
     {"id":"bvb16_1","name":"Roman Weidenfeller","pos":["GK"],"ovr":78,"att":15,"def":79,"phy":76,"pac":42,"tec":58,"num":1},
@@ -21062,6 +21078,8 @@
   "flag": "🇮🇹",
   "color": "#87D8F7",
   "secondary": "#FFFFFF",
+  "logo":"lazio.png",
+  "stadium":"Stadio Olimpico",
   "players": [
     {"id":"laz99_1","name":"Luca Marchegiani","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":78,"pac":48,"tec":62,"num":1},
     {"id":"laz99_22","name":"Marco Ballotta","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":74,"pac":42,"tec":58,"num":22},
@@ -21098,6 +21116,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#DA291C",
   "secondary": "#FFFFFF",
+  "logo":"mutd.png",
+  "stadium":"Old Trafford",
   "players": [
     {"id":"mun98_1","name":"Peter Schmeichel","pos":["GK"],"ovr":92,"att":15,"def":93,"phy":90,"pac":50,"tec":65,"num":1},
     {"id":"mun98_17","name":"Raimond van der Gouw","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":75,"pac":42,"tec":58,"num":17},
@@ -21121,7 +21141,7 @@
     {"id":"mun98_10","name":"Teddy Sheringham","pos":["CF","ST"],"ovr":83,"att":84,"def":38,"phy":76,"pac":65,"tec":86,"num":10}
   ],
   "manager": {
-    "name": "Alex Ferguson",
+    "name": "Sir Alex Ferguson",
     "ovr": 94
   }
 }
@@ -21169,6 +21189,8 @@
   "flag": "🇮🇹",
   "color": "#000000",
   "secondary": "#FFFFFF",
+  "logo":"juventus-old.png",
+  "stadium":"Allianz Stadium",
   "players": [
     {"id":"juv98_1","name":"Angelo Peruzzi","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":82,"pac":52,"tec":68,"num":1},
     {"id":"juv98_12","name":"Raffaele Ametrano","pos":["GK"],"ovr":68,"att":15,"def":69,"phy":68,"pac":48,"tec":50,"num":12},
@@ -21204,6 +21226,8 @@
   "flag": "🇮🇹",
   "color": "#000000",
   "secondary": "#FFFFFF",
+  "logo":"juventus-old.png",
+  "stadium":"Allianz Stadium",
   "players": [
     {"id":"juv92_1","name":"Angelo Peruzzi","pos":["GK"],"ovr":85,"att":15,"def":86,"phy":83,"pac":52,"tec":65,"num":1},
     {"id":"juv92_12","name":"Michelangelo Rampulla","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":45,"tec":58,"num":12},
@@ -21237,6 +21261,8 @@
   "flag": "🇮🇹",
   "color": "#000000",
   "secondary": "#FFFFFF",
+  "logo":"juventus-old.png",
+  "stadium":"Allianz Stadium",
   "players": [
     {"id":"juv85_1","name":"Stefano Tacconi","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":78,"pac":52,"tec":62,"num":1},
     {"id":"juv85_12","name":"Luciano Bodini","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":48,"tec":55,"num":12},
@@ -21544,6 +21570,8 @@
   "flag": "🇮🇹",
   "color": "#000000",
   "secondary": "#FFFFFF",
+  "logo":"juventus-old.png",
+  "stadium":"Allianz Stadium",
   "players": [
     {"id":"juv18_1","name":"Gianluigi Buffon","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":78,"pac":50,"tec":70,"num":1},
     {"id":"juv18_23","name":"Wojciech Szczęsny","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":76,"pac":52,"tec":68,"num":23},
@@ -21582,6 +21610,8 @@
   "flag": "🇮🇹",
   "color": "#000000",
   "secondary": "#FFFFFF",
+  "logo":"juventus-old.png",
+  "stadium":"Allianz Stadium",
   "players": [
     {"id":"juv15_1","name":"Gianluigi Buffon","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":78,"pac":52,"tec":70,"num":1},
     {"id":"juv15_30","name":"Marco Storari","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":48,"tec":60,"num":30},
@@ -21620,6 +21650,8 @@
   "flag": "🇩🇪",
   "color": "#FDE100",
   "secondary": "#000000",
+  "logo":"bvb.png",
+  "stadium":"Signal Iduna Park",
   "players": [
     {"id":"bvb13_1","name":"Roman Weidenfeller","pos":["GK"],"ovr":85,"att":15,"def":86,"phy":80,"pac":52,"tec":68,"num":1},
     {"id":"bvb13_20","name":"Mitchell Langerak","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":50,"tec":58,"num":20},
@@ -21874,6 +21906,8 @@
   "flag": "🇮🇹",
   "color": "#8E1F2F",
   "secondary": "#F0BC42",
+  "logo":"roma.png",
+  "stadium":"Stadio Olimpico",
   "players": [
     {"id":"asr00_1","name":"Francesco Antonioli","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":76,"pac":48,"tec":60,"num":1},
     {"id":"asr00_12","name":"Cristiano Lupatelli","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":55,"num":12},
@@ -21942,6 +21976,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#DA291C",
   "secondary": "#FFFFFF",
+  "logo":"mutd.png",
+  "stadium":"Old Trafford",
   "players": [
     {"id":"mun93_1","name":"Peter Schmeichel","pos":["GK"],"ovr":90,"att":15,"def":91,"phy":88,"pac":50,"tec":62,"num":1},
     {"id":"mun93_13","name":"Les Sealey","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":40,"tec":55,"num":13},
@@ -21966,7 +22002,7 @@
     {"id":"mun93_20","name":"Dion Dublin","pos":["ST"],"ovr":75,"att":76,"def":35,"phy":82,"pac":72,"tec":71,"num":20}
   ],
   "manager": {
-    "name": "Alex Ferguson",
+    "name": "Sir Alex Ferguson",
     "ovr": 93
   }
 }
@@ -21977,6 +22013,8 @@
   "flag": "🇮🇹",
   "color": "#8E1F2F",
   "secondary": "#F0BC42",
+  "logo":"roma.png",
+  "stadium":"Stadio Olimpico",
   "players": [
     {"id":"asr06_32","name":"Doni","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":48,"tec":62,"num":32},
     {"id":"asr06_1","name":"Gianluca Curci","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":55,"num":1},
@@ -22310,6 +22348,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#DD0000",
   "secondary": "#FFFFFF",
+  "logo":"forest.png",
+  "stadium":"The City Ground",
   "players": [
     {"id":"nfo79_1","name":"Peter Shilton","pos":["GK"],"ovr":91,"att":15,"def":92,"phy":81,"pac":54,"tec":72,"num":1},
     {"id":"nfo79_12","name":"Jim Montgomery","pos":["GK"],"ovr":75,"att":12,"def":76,"phy":74,"pac":45,"tec":55,"num":12},
@@ -22337,10 +22377,12 @@
 },{
   "id": "dortmund2002",
   "name": "Borussia Dortmund 2001-02",
-  "short": "BVB",
+  "short": "BVB01",
   "flag": "🇩🇪",
   "color": "#FDE100",
   "secondary": "#000000",
+  "logo":"bvb.png",
+  "stadium":"Signal Iduna Park",
   "players": [
     {"id":"bvb02_1","name":"Jens Lehmann","pos":["GK"],"ovr":88,"att":15,"def":87,"phy":83,"pac":52,"tec":74,"num":1},
     {"id":"bvb02_20","name":"Philipp Laux","pos":["GK"],"ovr":76,"att":12,"def":77,"phy":75,"pac":45,"tec":55,"num":20},
