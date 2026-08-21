@@ -18642,6 +18642,8 @@
   "flag": "🇩🇪",
   "color": "#DC052D",
   "secondary": "#FFFFFF",
+  "logo":"bayern.png",
+  "stadium":"Allianz Arena",
   "players": [
     {"id":"bay80_1","name":"Walter Junghans","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":45,"tec":58,"num":1},
     {"id":"bay80_22","name":"Manfred Müller","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":42,"tec":55,"num":22},
@@ -18675,6 +18677,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#6CABDD",
   "secondary": "#1C2C5B",
+  "logo":"mci.png",
+  "stadium":"Etihad Stadium",
   "players": [
     {"id":"mci26_1","name":"Gianluigi Donnarumma","pos":["GK"],"ovr":89,"att":15,"def":91,"phy":84,"pac":50,"tec":72,"num":1},
     {"id":"mci26_3","name":"Rúben Dias","pos":["CB"],"ovr":91,"att":40,"def":92,"phy":88,"pac":68,"tec":78,"num":3},
@@ -18786,6 +18790,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#FFFFFF",
+  "logo":"liverpool-old.png",
+  "stadium":"Anfield",
   "players": [
     {"id":"liv13_22","name":"Simon Mignolet","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":22},
     {"id":"liv13_1","name":"Brad Jones","pos":["GK"],"ovr":71,"att":15,"def":72,"phy":72,"pac":40,"tec":55,"num":1},
@@ -18823,6 +18829,8 @@
   "flag": "🇳🇱",
   "color": "#D2122E",
   "secondary": "#FFFFFF",
+  "logo":"ajax.png",
+  "stadium":"Amsterdam ArenA",
   "players": [
     {"id":"ajx94_1","name":"Edwin van der Sar","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":78,"pac":48,"tec":70,"num":1},
     {"id":"ajx94_12","name":"Fred Grim","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":72,"pac":40,"tec":55,"num":12},
@@ -18895,6 +18903,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#034694",
   "secondary": "#FFFFFF",
+  "logo":"chelsea.png",
+  "stadium":"Stamford Bridge Stadium",
   "players": [
     {"id":"che98_1","name":"Ed de Goey","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":80,"pac":45,"tec":62,"num":1},
     {"id":"che98_13","name":"Kevin Hitchcock","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":40,"tec":55,"num":13},
@@ -19051,6 +19061,8 @@
   "flag": "🇩🇪",
   "color": "#DC052D",
   "secondary": "#0066B2",
+  "logo":"bayern.png",
+  "stadium":"Allianz Arena",
   "players": [
     {"id":"bay13_1","name":"Manuel Neuer","pos":["GK"],"ovr":93,"att":15,"def":95,"phy":88,"pac":60,"tec":82,"num":1},
     {"id":"bay13_4","name":"Dante","pos":["CB"],"ovr":88,"att":45,"def":90,"phy":88,"pac":74,"tec":78,"num":4},
@@ -19088,6 +19100,8 @@
   "flag": "🇩🇪",
   "color": "#DC052D",
   "secondary": "#FFFFFF",
+  "logo":"bayern.png",
+  "stadium":"Allianz Arena",
   "players": [
     {"id":"bay20_1","name":"Manuel Neuer","pos":["GK"],"ovr":94,"att":15,"def":96,"phy":88,"pac":62,"tec":84,"num":1},
     {"id":"bay20_2","name":"Álvaro Odriozola","pos":["RB"],"ovr":77,"att":70,"def":74,"phy":72,"pac":86,"tec":75,"num":2},
@@ -19126,6 +19140,8 @@
   "flag": "🇩🇪",
   "color": "#DC052D",
   "secondary": "#FFFFFF",
+  "logo":"bayern.png",
+  "stadium":"Allianz Arena",
   "players": [
     {"id":"bay74_1","name":"Sepp Maier","pos":["GK"],"ovr":94,"att":15,"def":96,"phy":86,"pac":58,"tec":78,"num":1},
     {"id":"bay74_2","name":"Johnny Hansen","pos":["RB"],"ovr":84,"att":70,"def":85,"phy":82,"pac":80,"tec":76,"num":2},
@@ -19158,6 +19174,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#00B2A9",
+  "logo":"liverpool.png",
+  "stadium":"Anfield",
   "players": [
     {"id":"liv20_1","name":"Alisson","pos":["GK"],"ovr":93,"att":15,"def":95,"phy":86,"pac":55,"tec":84,"num":1},
     {"id":"liv20_3","name":"Fabinho","pos":["CDM","CB"],"ovr":90,"att":68,"def":91,"phy":88,"pac":70,"tec":83,"num":3},
@@ -19266,11 +19284,13 @@
 }
 ,{
   "id": "che2011",
-  "name": "Chelsea 2011",
-  "short": "CHE11",
+  "name": "Chelsea 2010-11",
+  "short": "CHE10",
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#034694",
   "secondary": "#FFFFFF",
+  "logo":"chelsea.png",
+  "stadium":"Stamford Bridge Stadium",
   "players": [
     {"id":"che11_1","name":"Petr Čech","pos":["GK"],"ovr":90,"att":15,"def":91,"phy":84,"pac":50,"tec":72,"num":1},
     {"id":"che11_2","name":"Branislav Ivanović","pos":["RB","CB"],"ovr":85,"att":70,"def":86,"phy":88,"pac":76,"tec":74,"num":2},
@@ -19307,6 +19327,8 @@
   "flag": "🇩🇪",
   "color": "#DC052D",
   "secondary": "#0066B2",
+  "logo":"bayern.png",
+  "stadium":"Allianz Arena",
   "players": [
     {"id":"bay26_1","name":"Manuel Neuer","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":80,"pac":52,"tec":85,"num":1},
     {"id":"bay26_26","name":"Sven Ulreich","pos":["GK"],"ovr":74,"att":15,"def":75,"phy":72,"pac":46,"tec":60,"num":26},
@@ -19350,6 +19372,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#00B2A9",
+  "logo":"liverpool.png",
+  "stadium":"Anfield",
   "players": [
     {"id":"liv26_1","name":"Alisson Becker","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":82,"pac":50,"tec":84,"num":1},
     {"id":"liv26_25","name":"Giorgi Mamardashvili","pos":["GK"],"ovr":85,"att":15,"def":86,"phy":82,"pac":48,"tec":68,"num":25},
@@ -20040,6 +20064,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#034694",
   "secondary": "#FFFFFF",
+  "logo":"chelsea.png",
+  "stadium":"Stamford Bridge Stadium",
   "players": [
     {"id":"che26_1","name":"Robert Sánchez","pos":["GK"],"ovr":80,"att":15,"def":80,"phy":78,"pac":48,"tec":65,"num":1},
     {"id":"che26_39","name":"Mike Penders","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":45,"tec":60,"num":39},
@@ -20238,6 +20264,8 @@
   "flag": "🇹🇷",
   "color": "#A80532",
   "secondary": "#FDB913",
+  "logo":"galatasaray.png",
+  "stadium":"RAMS Park",
   "players": [
     {"id":"gal26_1","name":"Uğurcan Çakır","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":78,"pac":48,"tec":65,"num":1},
     {"id":"gal26_19","name":"Günay Güvenç","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":42,"tec":56,"num":19},
@@ -21104,6 +21132,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#034694",
   "secondary": "#FFFFFF",
+  "logo":"chelsea.png",
+  "stadium":"Stamford Bridge Stadium",
   "players": [
     {"id":"che06_1","name":"Petr Čech","pos":["GK"],"ovr":90,"att":15,"def":91,"phy":84,"pac":50,"tec":68,"num":1},
     {"id":"che06_23","name":"Carlo Cudicini","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":23},
@@ -21626,6 +21656,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#034694",
   "secondary": "#FFFFFF",
+  "logo":"chelsea.png",
+  "stadium":"Stamford Bridge Stadium",
   "players": [
     {"id":"che06_1","name":"Petr Čech","pos":["GK"],"ovr":90,"att":15,"def":91,"phy":82,"pac":52,"tec":70,"num":1},
     {"id":"che06_23","name":"Carlo Cudicini","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":75,"pac":50,"tec":65,"num":23},
@@ -21662,6 +21694,8 @@
   "flag": "🇳🇱",
   "color": "#D2122E",
   "secondary": "#FFFFFF",
+  "logo":"ajax.png",
+  "stadium":"Johan Cruijff ArenA",
   "players": [
     {"id":"aja96_1","name":"Edwin van der Sar","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":78,"pac":52,"tec":75,"num":1},
     {"id":"aja96_12","name":"Fred Grim","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":70,"pac":48,"tec":55,"num":12},
@@ -21727,6 +21761,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#6CABDD",
   "secondary": "#FFFFFF",
+  "logo":"mci-old.png",
+  "stadium":"Etihad Stadium",
   "players": [
     {"id":"mci14_1","name":"Joe Hart","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":80,"pac":54,"tec":65,"num":1},
     {"id":"mci14_30","name":"Costel Pantilimon","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":78,"pac":45,"tec":55,"num":30},
@@ -21761,6 +21797,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#034694",
   "secondary": "#FFFFFF",
+  "logo":"chelsea.png",
+  "stadium":"Stamford Bridge Stadium",
   "players": [
     {"id":"che18_13","name":"Thibaut Courtois","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":78,"pac":50,"tec":72,"num":13},
     {"id":"che18_1","name":"Willy Caballero","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":72,"pac":48,"tec":62,"num":1},
@@ -22005,6 +22043,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#6CABDD",
   "secondary": "#1C2C5B",
+  "logo":"mci.png",
+  "stadium":"Etihad Stadium",
   "players": [
     {"id":"mci22_31","name":"Ederson","pos":["GK"],"ovr":88,"att":15,"def":86,"phy":82,"pac":50,"tec":70,"num":31},
     {"id":"mci22_18","name":"Stefan Ortega","pos":["GK"],"ovr":81,"att":15,"def":80,"phy":78,"pac":45,"tec":62,"num":18},
@@ -22040,6 +22080,8 @@
   "flag": "🇳🇱",
   "color": "#D2122E",
   "secondary": "#FFFFFF",
+  "logo":"ajax.png",
+  "stadium":"Amsterdam ArenA",
   "players": [
     {"id":"ajx71_1","name":"Heinz Stuy","pos":["GK"],"ovr":86,"att":10,"def":85,"phy":78,"pac":50,"tec":65,"num":1},
     {"id":"ajx71_16","name":"Sies Wever","pos":["GK"],"ovr":73,"att":10,"def":74,"phy":70,"pac":45,"tec":50,"num":16},
@@ -22070,6 +22112,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#00B2A9",
+  "logo":"liverpool-old.png",
+  "stadium":"Anfield",
   "players": [
     {"id":"liv83_1","name":"Bruce Grobbelaar","pos":["GK"],"ovr":88,"att":15,"def":87,"phy":80,"pac":55,"tec":68,"num":1},
     {"id":"liv83_13","name":"Bob Bolder","pos":["GK"],"ovr":75,"att":12,"def":76,"phy":74,"pac":45,"tec":55,"num":13},
@@ -22136,6 +22180,8 @@
   "flag": "🇧🇷",
   "color": "#FFFFFF",
   "secondary": "#000000",
+  "logo":"santos.png",
+  "stadium":"Vila Belmiro",
   "players": [
     {"id":"san62_1","name":"Gilmar","pos":["GK"],"ovr":92,"att":15,"def":93,"phy":80,"pac":52,"tec":72,"num":1},
     {"id":"san62_12","name":"Laércio","pos":["GK"],"ovr":78,"att":12,"def":79,"phy":75,"pac":45,"tec":55,"num":12},
@@ -22199,6 +22245,8 @@
   "flag": "🇹🇷",
   "color": "#A90432",
   "secondary": "#FBE122",
+  "logo":"galatasaray.png",
+  "stadium":"RAMS Park",
   "players": [
     {"id":"gs00_1","name":"Cláudio Taffarel","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":78,"pac":52,"tec":75,"num":1},
     {"id":"gs00_30","name":"Kerem İnan","pos":["GK"],"ovr":73,"att":12,"def":74,"phy":72,"pac":45,"tec":55,"num":30},
@@ -22959,6 +23007,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#FFFFFF",
+  "logo":"liverpool-old.png",
+  "stadium":"Anfield",
   "players": [
     {"id":"liv77_1","name":"Ray Clemence","pos":["GK"],"ovr":88,"att":10,"def":89,"phy":83,"pac":50,"tec":72,"num":1},
     {"id":"liv77_13","name":"Peter McDonnell","pos":["GK"],"ovr":71,"att":10,"def":72,"phy":70,"pac":45,"tec":58,"num":13},
@@ -22988,6 +23038,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#FFFFFF",
+  "logo":"liverpool-old.png",
+  "stadium":"Anfield",
   "players": [
     {"id":"liv06_25","name":"Pepe Reina","pos":["GK"],"ovr":86,"att":10,"def":87,"phy":81,"pac":52,"tec":75,"num":25},
     {"id":"liv06_1","name":"Jerzy Dudek","pos":["GK"],"ovr":80,"att":10,"def":81,"phy":78,"pac":48,"tec":68,"num":1},
@@ -23020,6 +23072,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#FFFFFF",
+  "logo":"liverpool-old.png",
+  "stadium":"Anfield",
   "players": [
     {"id":"liv08_25","name":"Pepe Reina","pos":["GK"],"ovr":87,"att":10,"def":88,"phy":82,"pac":53,"tec":76,"num":25},
     {"id":"liv08_30","name":"Charles Itandje","pos":["GK"],"ovr":74,"att":10,"def":75,"phy":76,"pac":46,"tec":62,"num":30},
