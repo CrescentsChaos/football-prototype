@@ -1,3 +1,21 @@
 {
-  "Example Trophy Name": "example-trophy.png"
+  "World Cup": "world-cup.png",
+  "Champions League": "champions-league.png",
+  "Premier League": "premier-league.png",
+  "La Liga": "la-liga.png",
+  "Serie A": "serie-a.png",
+  "Bundesliga": "bundesliga.png",
+  "Ligue 1": "ligue-1.png",
+
+  "Golden Boot": "golden-boot.png",
+  "Golden Ball": "golden-ball.png",
+  "Golden Glove": "golden-glove.png",
+  "Top Assists": "top-assists.png",
+  "Most MOTM": "most-motm.png",
+  "Clean Sheet King": "clean-sheet-king.png",
+  "Best Avg Rating": "best-avg-rating.png",
+  "Ballon d'Or": "ballon-dor.png",
+  "Puskás Award": "puskas-award.png",
+  "Gerd Müller Award": "gerd-muller-award.png",
+  "Yashin Trophy": "yashin-trophy.png"
 }
