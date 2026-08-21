@@ -18562,6 +18562,8 @@
   "flag": "🇪🇸",
   "color": "#FFFFFF",
   "secondary": "#FEBE10",
+  "logo":"rma.png",
+  "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma18_1","name":"Keylor Navas","pos":["GK"],"ovr":88,"att":15,"def":90,"phy":80,"pac":54,"tec":72,"num":1},
     {"id":"rma18_2","name":"Dani Carvajal","pos":["RB"],"ovr":89,"att":78,"def":85,"phy":82,"pac":86,"tec":84,"num":2},
@@ -18599,7 +18601,7 @@
   "color": "#FFFFFF",
   "secondary": "#FEBE10",
   "logo":"rma.png",
-  "stadium":"Estadio Santiago Bernabeu",
+  "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma26_1","name":"Thibaut Courtois","pos":["GK"],"ovr":91,"att":15,"def":92,"phy":82,"pac":48,"tec":72,"num":1},
     {"id":"rma26_2","name":"Raúl Asencio","pos":["CB"],"ovr":78,"att":35,"def":80,"phy":78,"pac":72,"tec":70,"num":2},
@@ -18711,6 +18713,8 @@
   "flag": "🇮🇹",
   "color": "#AC101A",
   "secondary": "#000000",
+  "logo":"ac-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"acm90_1","name":"Giovanni Galli","pos":["GK"],"ovr":87,"att":15,"def":89,"phy":81,"pac":50,"tec":70,"num":1},
     {"id":"acm90_2","name":"Mauro Tassotti","pos":["RB"],"ovr":91,"att":72,"def":92,"phy":85,"pac":81,"tec":83,"num":2},
@@ -18745,6 +18749,8 @@
   "flag": "🇮🇹",
   "color": "#AC101A",
   "secondary": "#000000",
+  "logo":"ac-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"acm94_1","name":"Sebastiano Rossi","pos":["GK"],"ovr":91,"att":15,"def":93,"phy":86,"pac":52,"tec":72,"num":1},
     {"id":"acm94_2","name":"Mauro Tassotti","pos":["RB","CB"],"ovr":89,"att":68,"def":90,"phy":84,"pac":78,"tec":81,"num":2},
@@ -18851,6 +18857,8 @@
   "flag": "🇪🇸",
   "color": "#004D98",
   "secondary": "#A50044",
+  "logo":"fc-barcelona.png",
+  "stadium":"Camp Nou",
   "players": [
     {"id":"bar98_1","name":"Ruud Hesp","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":80,"pac":45,"tec":65,"num":1},
     {"id":"bar98_13","name":"Vítor Baía","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":13},
@@ -18924,6 +18932,8 @@
   "flag": "🇪🇸",
   "color": "#FFFFFF",
   "secondary": "#00529F",
+  "logo":"rma.png",
+  "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma59_1","name":"Rogelio Domínguez","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":52,"tec":62,"num":1},
     {"id":"rma59_13","name":"Juan Alonso","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":76,"pac":48,"tec":58,"num":13},
@@ -18959,6 +18969,8 @@
   "flag": "🇮🇹",
   "color": "#AC101A",
   "secondary": "#000000",
+  "logo":"ac-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"acm07_1","name":"Dida","pos":["GK"],"ovr":88,"att":15,"def":90,"phy":82,"pac":50,"tec":72,"num":1},
     {"id":"acm07_2","name":"Cafu","pos":["RB","RWB"],"ovr":87,"att":78,"def":81,"phy":80,"pac":82,"tec":86,"num":2},
@@ -18999,6 +19011,8 @@
   "flag": "🇮🇹",
   "color": "#AC101A",
   "secondary": "#000000",
+  "logo":"ac-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"acm05_1","name":"Dida","pos":["GK"],"ovr":90,"att":15,"def":92,"phy":84,"pac":52,"tec":74,"num":1},
     {"id":"acm05_2","name":"Cafu","pos":["RB","RWB"],"ovr":92,"att":82,"def":86,"phy":84,"pac":88,"tec":89,"num":2},
@@ -19218,6 +19232,8 @@
   "flag": "🇪🇸",
   "color": "#004D98",
   "secondary": "#A50044",
+  "logo":"fc-barcelona.png",
+  "stadium":"Camp Nou",
   "players": [
     {"id":"bar15_1","name":"Marc-André ter Stegen","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":50,"tec":80,"num":1},
     {"id":"bar15_2","name":"Martín Montoya","pos":["RB"],"ovr":76,"att":72,"def":75,"phy":72,"pac":80,"tec":74,"num":2},
@@ -19456,6 +19472,8 @@
   "flag": "🇮🇹",
   "color": "#00539E",
   "secondary": "#000000",
+  "logo":"inter-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"int05_1","name":"Francesco Toldo","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":80,"pac":50,"tec":65,"num":1},
     {"id":"int05_12","name":"Alberto Fontana","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":58,"num":12},
@@ -19745,6 +19763,8 @@
   "flag": "🇮🇹",
   "color": "#0053A0",
   "secondary": "#000000",
+  "logo":"inter-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"int26_1","name":"Josep Martínez","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":1},
     {"id":"int26_49","name":"Ivan Provedel","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":78,"pac":46,"tec":65,"num":49},
@@ -19783,6 +19803,8 @@
   "flag": "🇮🇹",
   "color": "#0080FF",
   "secondary": "#FFFFFF",
+  "logo":"napoli.png",
+  "stadium":"Stadio Diego Armando Maradona",
   "players": [
     {"id":"nap26_1","name":"Alex Meret","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":78,"pac":48,"tec":65,"num":1},
     {"id":"nap26_32","name":"Vanja Milinković-Savić","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":84,"pac":45,"tec":62,"num":32},
@@ -20635,6 +20657,8 @@
   "flag": "🇪🇸",
   "color": "#004D98",
   "secondary": "#A50044",
+  "logo":"fc-barcelona.png",
+  "stadium":"Camp Nou",
   "players": [
     {"id":"bar91_1","name":"Andoni Zubizarreta","pos":["GK"],"ovr":87,"att":15,"def":88,"phy":81,"pac":48,"tec":62,"num":1},
     {"id":"bar91_13","name":"Carles Busquets","pos":["GK"],"ovr":72,"att":15,"def":72,"phy":70,"pac":42,"tec":68,"num":13},
@@ -20900,6 +20924,8 @@
   "flag": "🇪🇸",
   "color": "#FFFFFF",
   "secondary": "#000000",
+  "logo":"rma.png",
+  "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma03_1","name":"Iker Casillas","pos":["GK"],"ovr":87,"att":15,"def":88,"phy":72,"pac":54,"tec":70,"num":1},
     {"id":"rma03_13","name":"César Sánchez","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":72,"pac":50,"tec":60,"num":13},
@@ -20936,6 +20962,8 @@
   "flag": "🇮🇹",
   "color": "#AC121B",
   "secondary": "#000000",
+  "logo":"ac-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"acm11_32","name":"Christian Abbiati","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":45,"tec":62,"num":32},
     {"id":"acm11_1","name":"Marco Amelia","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":76,"pac":42,"tec":58,"num":1},
@@ -21210,6 +21238,8 @@
   "flag": "🇪🇸",
   "color": "#004D98",
   "secondary": "#A50044",
+  "logo":"fc-barcelona.png",
+  "stadium":"Camp Nou",
   "players": [
     {"id":"barca10_1","name":"Víctor Valdés","pos":["GK"],"ovr":85,"att":15,"def":86,"phy":78,"pac":58,"tec":75,"num":1},
     {"id":"barca10_13","name":"José Manuel Pinto","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":50,"tec":62,"num":13},
@@ -21251,6 +21281,8 @@
   "flag": "🇪🇸",
   "color": "#004D98",
   "secondary": "#A50044",
+  "logo":"fc-barcelona.png",
+  "stadium":"Camp Nou",
   "players": [
     {"id":"barca08_1","name":"Víctor Valdés","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":76,"pac":58,"tec":72,"num":1},
     {"id":"barca08_13","name":"José Manuel Pinto","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":70,"pac":50,"tec":60,"num":13},
@@ -21292,6 +21324,8 @@
   "flag": "🇪🇸",
   "color": "#004D98",
   "secondary": "#A50044",
+  "logo":"fc-barcelona.png",
+  "stadium":"Camp Nou",
   "players": [
     {"id":"bar26_1","name":"Joan García","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":78,"pac":50,"tec":72,"num":1},
     {"id":"bar26_13","name":"Wojciech Szczęsny","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":78,"pac":48,"tec":76,"num":13},
@@ -21369,6 +21403,8 @@
   "flag": "🇮🇹",
   "color": "#00539E",
   "secondary": "#000000",
+  "logo":"inter-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"int10_12","name":"Júlio César","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":80,"pac":58,"tec":72,"num":12},
     {"id":"int10_1","name":"Francesco Toldo","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":75,"pac":48,"tec":60,"num":1},
@@ -21406,6 +21442,8 @@
   "flag": "🇮🇹",
   "color": "#00539E",
   "secondary": "#000000",
+  "logo":"inter-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"int98_1","name":"Gianluca Pagliuca","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":80,"pac":54,"tec":68,"num":1},
     {"id":"int98_12","name":"Andrea Mazzantini","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":48,"tec":58,"num":12},
@@ -21760,6 +21798,8 @@
   "flag": "🇪🇸",
   "color": "#FFFFFF",
   "secondary": "#000000",
+  "logo":"rma.png",
+  "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma14_1","name":"Iker Casillas","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":74,"pac":54,"tec":70,"num":1},
     {"id":"rma14_25","name":"Diego López","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":50,"tec":65,"num":25},
@@ -21931,6 +21971,8 @@
   "flag": "🇮🇹",
   "color": "#0053A0",
   "secondary": "#000000",
+  "logo":"inter-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"int88_1","name":"Walter Zenga","pos":["GK"],"ovr":90,"att":15,"def":91,"phy":84,"pac":55,"tec":65,"num":1},
     {"id":"int88_12","name":"Astutillo Malgioglio","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":73,"pac":45,"tec":54,"num":12},
@@ -22060,6 +22102,8 @@
   "flag": "🇮🇹",
   "color": "#0053A0",
   "secondary": "#000000",
+  "logo":"inter-milan.png",
+  "stadium":"San Siro Stadium",
   "players": [
     {"id":"int65_1","name":"Giuliano Sarti","pos":["GK"],"ovr":91,"att":15,"def":92,"phy":82,"pac":55,"tec":68,"num":1},
     {"id":"int65_12","name":"Ottavio Bugatti","pos":["GK"],"ovr":78,"att":15,"def":79,"phy":75,"pac":45,"tec":55,"num":12},
@@ -22846,6 +22890,8 @@
   "flag": "🇪🇸",
   "color": "#FFFFFF",
   "secondary": "#000080",
+  "logo":"rma.png",
+  "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma86_1","name":"José Manuel Ochotorena","pos":["GK"],"ovr":80,"att":10,"def":81,"phy":78,"pac":50,"tec":66,"num":1},
     {"id":"rma86_13","name":"Agustín Rodríguez","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":48,"tec":68,"num":13},
@@ -22877,6 +22923,8 @@
   "flag": "🇪🇸",
   "color": "#FFFFFF",
   "secondary": "#000080",
+  "logo":"rma.png",
+  "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma98_1","name":"Bodo Illgner","pos":["GK"],"ovr":85,"att":10,"def":86,"phy":81,"pac":48,"tec":70,"num":1},
     {"id":"rma98_25","name":"Santiago Cañizares","pos":["GK"],"ovr":84,"att":10,"def":85,"phy":80,"pac":52,"tec":72,"num":25},
