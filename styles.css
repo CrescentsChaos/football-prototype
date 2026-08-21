@@ -726,7 +726,9 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   display: flex; align-items: center; justify-content: center;
   font-size: 1.4rem; font-weight: 800;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  flex-shrink: 0; overflow: hidden;
 }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .profile-stats-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0;
 }
@@ -1298,6 +1300,15 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   border-color: var(--border-strong);
   background: rgba(240,193,75,0.08);
 }
+.tsr-avatar {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; min-width: 32px; min-height: 32px;
+  border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: var(--bg-3); border: 1px solid var(--border-strong);
+  font-family: var(--display); font-weight: 700; font-size: 0.75rem;
+  color: var(--gold);
+}
+.tsr-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .tsr-name { flex: 1; font-weight: 600; }
 .tsr-pos { font-size: 0.72rem; color: var(--cyan); font-weight: 700; min-width: 48px; }
 .tsr-trophy-badge {

@@ -358,38 +358,46 @@ var App = (() => {
     return flag;
   }
 
+  // Looks up a player's portrait filename in players.json. Supports both
+  // keying conventions: by player id (e.g. "rma26_7") or by exact player
+  // name (e.g. "Vinicius Junior") — id is checked first since it's the
+  // more specific, collision-proof key. Returns null if neither is found.
+  function resolvePlayerPortrait(player) {
+    if (!player) return null;
+    if (player.id != null && playerPortraits[player.id]) return playerPortraits[player.id];
+    if (player.name && playerPortraits[player.name]) return playerPortraits[player.name];
+    return null;
+  }
+
   // Renders a player's portrait (from assets/portraits/<file>, looked up by
-  // exact player name in players.json) filling a circular avatar container,
-  // falling back to the player's shirt number when unavailable.
+  // id or name in players.json) filling a circular avatar container. Falls
+  // back to assets/portraits/none.png when no entry exists in players.json,
+  // and further falls back to the player's shirt number if even none.png
+  // fails to load.
   function playerAvatarMark(player) {
     const num = (player && player.num != null) ? player.num : '?';
-    const file = player && playerPortraits[player.name];
-    if (file) {
-      const src = 'assets/portraits/' + file;
-      return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.outerHTML='${num}'">`;
-    }
-    return num;
+    const file = resolvePlayerPortrait(player);
+    const src = 'assets/portraits/' + (file || 'none.png');
+    return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.outerHTML='${num}'">`;
   }
 
   // Renders a small circular portrait for leaderboard/award rows, looked up
-  // by exact player name in players.json (same source as playerAvatarMark).
-  // Falls back to the player's initials on a coloured circle when no
-  // portrait is found — this keeps two different players who happen to
-  // share a name from silently displaying as visually identical "?" or
-  // number-only avatars, since initials are still derived per-row from
-  // that row's own name/id, never borrowed from another row.
+  // by id or name in players.json (same source as playerAvatarMark). Falls
+  // back to assets/portraits/none.png when no portrait is found, and
+  // further falls back to the player's initials on a coloured circle if
+  // even none.png fails to load — this keeps two different players who
+  // happen to share a name from silently displaying as visually identical
+  // avatars, since initials are still derived per-row from that row's own
+  // name/id, never borrowed from another row.
   function initialsOf(name) {
     return (name || '?').trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
   }
   function lbAvatar(p, size) {
     size = size || 34;
     const initials = initialsOf(p && p.name);
-    const file = p && playerPortraits[p.name];
-    if (file) {
-      const src = 'assets/portraits/' + file;
-      return `<span class="lb-avatar" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('lb-avatar-fallback');this.outerHTML='${initials}'"></span>`;
-    }
-    return `<span class="lb-avatar lb-avatar-fallback" style="width:${size}px;height:${size}px">${initials}</span>`;
+    const file = resolvePlayerPortrait(p);
+    const src = 'assets/portraits/' + (file || 'none.png');
+    return `<span class="lb-avatar" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('lb-avatar-fallback');this.outerHTML='${initials}'"></span>`;
   }
   // Player name + portrait, for use inside a leaderboard/award table cell.
   function lbPlayerCell(p, size) {
@@ -1036,8 +1044,8 @@ var App = (() => {
     awayRatings.sort(byRating);
     return {
       venue: getStadium(m.home.team),
-      home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation, ratings: homeRatings },
-      away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation, ratings: awayRatings },
+      home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, logo: m.home.team.logo, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation, ratings: homeRatings },
+      away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, logo: m.away.team.logo, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation, ratings: awayRatings },
       events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
       goals: JSON.parse(JSON.stringify(m.goalList || [])),
       ratings: allStats,
@@ -1088,9 +1096,9 @@ var App = (() => {
       <div style="text-align:center;margin-bottom:14px">
         <div style="font-size:0.85rem;color:var(--text-muted)">Match Report</div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px">
-          <div style="flex:1;text-align:left"><div style="font-size:1.4rem">${h.flag||''}</div><strong>${h.name}</strong><div class="goal-scorers">${fmtG(goalsH)}</div></div>
+          <div style="flex:1;text-align:left"><div style="font-size:1.4rem">${teamMark(h, 28)}</div><strong>${h.name}</strong><div class="goal-scorers">${fmtG(goalsH)}</div></div>
           <div style="font-size:1.6rem;font-weight:800;color:var(--accent-gold)">${scoreLine}</div>
-          <div style="flex:1;text-align:right"><div style="font-size:1.4rem">${a.flag||''}</div><strong>${a.name}</strong><div class="goal-scorers away-scorers">${fmtG(goalsA)}</div></div>
+          <div style="flex:1;text-align:right"><div style="font-size:1.4rem">${teamMark(a, 28)}</div><strong>${a.name}</strong><div class="goal-scorers away-scorers">${fmtG(goalsA)}</div></div>
         </div>
         <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">${h.formation||''} vs ${a.formation||''}</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">🏟️ ${report.venue || 'Wembley Stadium'}</div>
@@ -1115,9 +1123,9 @@ var App = (() => {
       </tbody></table></div>
       <div class="card-title">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
       <div style="max-height:280px;overflow-y:auto">
-        <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${h.flag||''} ${h.name}</div>
+        <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${teamMark(h, 18)} ${h.name}</div>
         ${homeRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
-        <div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${a.flag||''} ${a.name}</div>
+        <div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${teamMark(a, 18)} ${a.name}</div>
         ${awayRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
       </div>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
@@ -3513,7 +3521,7 @@ var App = (() => {
       if (i < 8) mark = ' style="background:rgba(0,200,83,0.12)"';
       else if (i < 24) mark = ' style="background:rgba(255,171,0,0.1)"';
       else mark = ' style="background:rgba(255,82,82,0.08)"';
-      h += `<tr${mark}><td>${i+1}</td><td>${r.team.flag||''} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
+      h += `<tr${mark}><td>${i+1}</td><td>${teamMark(r.team, 18)} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
     });
     h += '</tbody></table>';
     h += '<p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">Green: Top 8 → R16 direct · Amber: 9–24 playoff · Red: 25–36 eliminated</p></div>';
@@ -3549,7 +3557,7 @@ var App = (() => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
         const idx = tournament.fixtures.indexOf(f);
-        h += `<div class="fixture-item"><span class="fixture-teams">${home.flag||''} ${home.short} vs ${away.flag||''} ${away.short}</span>
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
           <button class="btn btn-primary btn-sm" onclick="App.playUCLFixture(${idx})">▶ Live</button>
           <button class="btn btn-secondary btn-sm" onclick="App.simUCLFixture(${idx})">⚡ Instant</button></div>`;
       });
@@ -3559,7 +3567,7 @@ var App = (() => {
           const home = getTeam(f.home), away = getTeam(f.away);
           const idx = tournament.fixtures.indexOf(f);
           h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})">
-            <span class="fixture-teams">${home.flag||''} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
             <span style="font-size:0.7rem;color:var(--accent-gold)">Details</span></div>`;
         });
       }
@@ -3569,7 +3577,7 @@ var App = (() => {
       (tournament.playoff || []).forEach((p, i) => {
         const status = p.played ? (`Agg ${p.aggHome}-${p.aggAway} → ${p.winner ? p.winner.short : ''}`) : (p.leg1 && p.leg1.played ? 'Leg 2' : 'Leg 1');
         h += `<div class="fixture-item ${p.played?'played':''}">
-          <span class="fixture-teams">${p.home.flag||''} ${p.home.short} vs ${p.away.flag||''} ${p.away.short} <small>(${status})</small></span>`;
+          <span class="fixture-teams">${teamMark(p.home,18)} ${p.home.short} vs ${teamMark(p.away,18)} ${p.away.short} <small>(${status})</small></span>`;
         if (!p.played) {
           h += `<button class="btn btn-secondary btn-sm" onclick="App.simPlayoffTie(${i})">⚡ Sim Tie</button>`;
         } else if (p.report || (p.leg2 && p.leg2.report)) {
@@ -3603,7 +3611,7 @@ var App = (() => {
     el.innerHTML = tournament.groups.map(g => {
       const sorted = [...g.teams].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
       return `<div class="group-card"><h4>Group ${g.name}</h4><table class="group-table"><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>
-        ${sorted.map(t => `<tr><td>${t.team.flag || ''} ${t.team.short}</td><td>${t.played}</td><td>${t.won}</td><td>${t.drawn}</td><td>${t.lost}</td><td>${t.gf - t.ga}</td><td class="pts">${t.pts}</td></tr>`).join('')}
+        ${sorted.map(t => `<tr><td>${teamMark(t.team,16)} ${t.team.short}</td><td>${t.played}</td><td>${t.won}</td><td>${t.drawn}</td><td>${t.lost}</td><td>${t.gf - t.ga}</td><td class="pts">${t.pts}</td></tr>`).join('')}
       </tbody></table></div>`;
     }).join('');
     // Fixture list with live play option
@@ -3615,7 +3623,7 @@ var App = (() => {
       unplayed.forEach((f, i) => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
-        h += `<div class="fixture-item"><span class="fixture-teams">${home.flag} ${home.short} vs ${away.flag} ${away.short}</span>
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
           <button class="btn btn-primary btn-sm" onclick="App.playTournamentMatch(${tournament.fixtures.indexOf(f)})">▶ Play Live</button>
           <button class="btn btn-secondary btn-sm" onclick="App.simSingleFixture(${tournament.fixtures.indexOf(f)})">⚡ Instant</button></div>`;
       });
@@ -3626,7 +3634,7 @@ var App = (() => {
           if (!home || !away) return;
           const idx = tournament.fixtures.indexOf(f);
           h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})" title="View full match report">
-            <span class="fixture-teams">${home.flag} ${home.short} vs ${away.flag} ${away.short}</span>
+            <span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
             <span class="fixture-score">${f.homeScore} - ${f.awayScore}</span>
             <span style="font-size:0.7rem;color:var(--accent-gold);margin-left:6px">Details</span>
           </div>`;
@@ -3852,7 +3860,7 @@ var App = (() => {
       try { refreshTournamentStatsUI(); } catch (e) {}
       if (tournament.champion) {
         const stageTitle = document.getElementById('tour-stage-title');
-        if (stageTitle) stageTitle.textContent = 'Champions: ' + (tournament.champion.flag || '') + ' ' + tournament.champion.name;
+        if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
         toast(tournament.champion.name + ' win the Champions League!');
       } else {
         toast('Tournament simulation finished');
@@ -3952,7 +3960,7 @@ var App = (() => {
     try { refreshTournamentStatsUI(); } catch (e) {}
     if (tournament.champion) {
       const stageTitle = document.getElementById('tour-stage-title');
-      if (stageTitle) stageTitle.textContent = 'Champions: ' + (tournament.champion.flag || '') + ' ' + tournament.champion.name;
+      if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
       toast(tournament.champion.name + ' win the tournament!');
     } else {
       toast('Tournament simulation finished');
@@ -4350,7 +4358,7 @@ var App = (() => {
     pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
     recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
     const stageTitle = document.getElementById('tour-stage-title');
-    if (stageTitle) stageTitle.textContent = 'Champions: ' + (team.flag || '') + ' ' + team.name;
+    if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(team, 20) + ' ' + team.name;
     renderTournamentPodium();
     persistAll();
   }
@@ -4374,17 +4382,17 @@ var App = (() => {
       <div class="podium">
         <div class="podium-place">
           <div class="place-num">2</div>
-          <div class="place-team">${second ? (second.flag||'') + ' ' + second.name : '—'}</div>
+          <div class="place-team">${second ? teamMark(second, 20) + ' ' + second.name : '—'}</div>
           <div class="place-label">Runners-up</div>
         </div>
         <div class="podium-place first">
           <div class="place-num">1</div>
-          <div class="place-team">${first.flag||''} ${first.name}</div>
+          <div class="place-team">${teamMark(first, 20)} ${first.name}</div>
           <div class="place-label">Champions</div>
         </div>
         <div class="podium-place">
           <div class="place-num">3</div>
-          <div class="place-team">${third ? (third.flag||'') + ' ' + third.name : '—'}</div>
+          <div class="place-team">${third ? teamMark(third, 20) + ' ' + third.name : '—'}</div>
           <div class="place-label">Third place</div>
         </div>
       </div>`;
@@ -4610,11 +4618,11 @@ var App = (() => {
           : '-';
         return `<div class="bracket-match ${m.played ? 'played' : ''}">
           <div class="bracket-team ${m.winner && m.winner.id === m.home.id ? 'winner' : ''}">
-            <span>${m.home.flag || ''} ${m.home.short}</span>
+            <span>${teamMark(m.home, 18)} ${m.home.short}</span>
             <span class="bracket-score">${m.played ? (m.twoLeg !== false && m.aggHome != null ? m.aggHome : m.homeScore) : '-'}</span>
           </div>
           <div class="bracket-team ${m.winner && m.winner.id === m.away.id ? 'winner' : ''}">
-            <span>${m.away.flag || ''} ${m.away.short}</span>
+            <span>${teamMark(m.away, 18)} ${m.away.short}</span>
             <span class="bracket-score">${m.played ? (m.twoLeg !== false && m.aggAway != null ? m.aggAway : m.awayScore) : '-'}</span>
           </div>
           ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">pens</div>' : ''}
@@ -5032,7 +5040,7 @@ var App = (() => {
     if (!modal || !content) return;
     content.innerHTML = `
       <div class="profile-header" style="border-bottom:2px solid ${primary};padding-bottom:14px">
-        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary};font-size:1.6rem">${teamAvatarMark(team)}</div>
+        <div class="profile-avatar" style="background:${primary};color:${secondary};font-size:1.6rem">${teamAvatarMark(team)}</div>
         <div style="flex:1;min-width:0">
           <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
@@ -5046,7 +5054,7 @@ var App = (() => {
           const wonCount = trophies.filter(t => t.player === p.name).length;
           return `
           <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
-            <span class="player-num">${p.num || ''}</span>
+            <span class="tsr-avatar">${playerAvatarMark(p)}</span>
             <span class="tsr-name">${p.name}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
             <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
             <span class="player-ovr">${p.ovr || ''}</span>
@@ -5284,7 +5292,7 @@ var App = (() => {
             const usedElsewhere = !usingLeagueFile && SEASON_LEAGUE_DEFS.some(d => d.key !== def.key && seasonSetup.selections[d.key].has(t.id));
             return `<label class="team-check ${checked ? 'selected' : ''}" style="${usedElsewhere ? 'opacity:0.4' : ''}">
               <input type="checkbox" ${checked ? 'checked' : ''} ${usedElsewhere ? 'disabled' : ''} onchange="App.toggleSeasonTeam('${def.key}','${t.id}')">
-              <span>${t.flag || ''} ${t.name}</span>
+              <span>${teamMark(t, 18)} ${t.name}</span>
             </label>`;
           }).join('') || '<div class="empty-state"><p>No clubs found</p></div>'}
         </div>
@@ -5816,7 +5824,7 @@ var App = (() => {
       ${card('Best Avg Rating', '📈', a.bestAvgRating, a.bestAvgRating ? (a.bestAvgRating.avg != null ? a.bestAvgRating.avg.toFixed(2) : '—') + ' (' + a.bestAvgRating.count + ' apps)' : '')}
     </div>`;
     if (a.champion) {
-      h += `<div class="award-card" style="margin-top:14px">${trophyMark(comp.name, 52)}<div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${(a.champion.flag || '') + ' ' + a.champion.name}</p></div></div>`;
+      h += `<div class="award-card" style="margin-top:14px">${trophyMark(comp.name, 52)}<div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${teamMark(a.champion, 18) + ' ' + a.champion.name}</p></div></div>`;
     } else {
       h += '<p style="color:var(--text-muted);font-size:0.85rem;margin-top:10px">Champion will be crowned once the competition finishes.</p>';
     }
@@ -5853,7 +5861,7 @@ var App = (() => {
     sorted.forEach((r, i) => {
       const gd = r.gf - r.ga;
       const mark = (highlightTop && i < highlightTop) ? ' style="background:rgba(0,200,83,0.12)"' : '';
-      h += `<tr${mark}><td>${i + 1}</td><td>${r.team.flag || ''} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
+      h += `<tr${mark}><td>${i + 1}</td><td>${teamMark(r.team, 16)} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
     });
     h += '</tbody></table>';
     return h;
@@ -5868,7 +5876,7 @@ var App = (() => {
       unplayed.forEach(f => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
-        h += `<div class="fixture-item"><span class="fixture-teams">${home.flag || ''} ${home.short} vs ${away.flag || ''} ${away.short}</span></div>`;
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span></div>`;
       });
     }
     if (played.length) {
@@ -5878,7 +5886,7 @@ var App = (() => {
         if (!home || !away) return;
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${home.flag || ''} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
           ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
       });
     }
@@ -5887,7 +5895,7 @@ var App = (() => {
 
   function renderLeagueCompHTML(comp) {
     let h = '<div class="group-card league-table-wrap">';
-    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? comp.champion.flag + ' ' + comp.champion.name : '—') : '') + '</h4>';
+    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? teamMark(comp.champion, 18) + ' ' + comp.champion.name : '—') : '') + '</h4>';
     h += renderStandingsTable(comp, UCL_QUALIFY_PER_LEAGUE);
     h += `<p style="font-size:0.75rem;color:var(--text-muted);margin-top:6px">Green: top ${UCL_QUALIFY_PER_LEAGUE} qualify for next season's Champions League</p>`;
     h += '</div>';
@@ -5903,13 +5911,13 @@ var App = (() => {
       const home = getTeam(f.home), away = getTeam(f.away);
       if (!home || !away) return;
       if (!f.played) {
-        h += `<div class="fixture-item"><span class="fixture-teams">${home.flag || ''} ${home.short} vs ${away.flag || ''} ${away.short}</span></div>`;
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span></div>`;
       } else {
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         const pensTxt = f.pens ? ` (pens ${f.pens.home}-${f.pens.away})` : '';
         const winner = getTeam(f.winnerId);
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${home.flag || ''} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
       }
     });
     return h;
@@ -5917,7 +5925,7 @@ var App = (() => {
 
   function renderUCLSeasonHTML(comp) {
     let h = '<div class="group-card league-table-wrap">';
-    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? comp.champion.flag + ' ' + comp.champion.name : '—') : '') + '</h4>';
+    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? teamMark(comp.champion, 18) + ' ' + comp.champion.name : '—') : '') + '</h4>';
     if (comp.stage === 'league' || !comp.bracketSize) {
       h += renderStandingsTable(comp, comp.teams.length >= 8 ? 8 : comp.teams.length);
       h += '</div>';
