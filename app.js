@@ -29,7 +29,13 @@ var App = (() => {
   let injuryBook = {};
   let suspensionBook = {}; // playerId -> { matchesLeft, teamName, playerName } — 1-match ban after a red card
   let globalMatchDay = 1;
-  let trophies = []; // {name, team, type, date}
+  // {name, team, type, date, category:'season'|'season-global'|'tournament', year, player, run}
+  // name    — matches a key in trophies.json so trophyMark() can resolve an image
+  // team    — winning club/nation (team trophies) or the winning player's team (individual awards)
+  // player  — winning player's name, only set for individual awards (feeds the Teams-tab trophy cabinet)
+  // year    — season year (season/season-global trophies)
+  // run     — shared id for every trophy awarded out of the same standalone tournament run
+  let trophies = [];
   let currentMatch = null;
   let simInterval = null;
   let simSpeed = 400;
@@ -58,6 +64,7 @@ var App = (() => {
   let seasonActiveTab = 'epl';
   let seasonActiveSubTab = 'table'; // 'table' | 'stats' | 'awards' — sub-view within a league/UCL tab
   let seasonReportRegistry = []; // flat list of match reports referenced by index from season fixture cards
+  let historyActiveTab = 'team'; // 'team' | 'individual' — which History sub-tab is showing
 
   const FORMATIONS = {
     '4-3-3': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
@@ -186,10 +193,16 @@ var App = (() => {
       } catch (e) { console.warn('trophies.json not loaded', e); }
 
       loadStats();
+      loadPersistedGameState();
       populateTeamSelects();
       populateFormations();
       bindNav();
       renderTeamsList();
+      restoreTournamentUI();
+      restoreSeasonUI();
+      const savedView = (function () { try { return localStorage.getItem('apexActiveView'); } catch (e) { return null; } })();
+      if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
+      setupAutoSave();
       console.log('Apex Sim ready:', allTeams.length, 'teams | source:', source);
       window.__APEX_DATA_SOURCE = source;
     } catch (e) {
@@ -221,6 +234,7 @@ var App = (() => {
     if (tabEl) { tabEl.classList.add('active'); tabEl.setAttribute('aria-current', 'page'); }
     if (view === 'leaderboard') showLeaderboard('goals');
     if (view === 'awards') showAwards('overview');
+    if (view === 'history') showHistory(historyActiveTab || 'team');
     if (view === 'teams') renderTeamsList();
     if (view === 'season') goToSeason();
   }
@@ -2587,6 +2601,7 @@ var App = (() => {
         toast('Tournament match result saved!');
       }
     }
+    persistAll();
   }
 
     // Always offer return after any tournament-linked live match
@@ -2963,6 +2978,132 @@ var App = (() => {
     }
   }
 
+  // ========== TROPHY CASE (team trophies + individual awards) ==========
+  // Every entry uses `name` to key into trophies.json (via trophyMark()) so
+  // it always renders with a real trophy/medal image. Individual awards also
+  // set `player` — that's what powers the Teams-tab trophy cabinet and the
+  // History tab's "Individual Awards" list.
+  function saveTrophiesToStorage() {
+    try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch (e) {}
+  }
+  function pushTeamTrophy(name, teamName, type, extra) {
+    const t = Object.assign({ name, team: teamName, type, date: Date.now() }, extra || {});
+    trophies.push(t);
+    saveTrophiesToStorage();
+    return t;
+  }
+  function pushIndividualTrophy(awardName, playerObj, type, extra) {
+    if (!playerObj || !playerObj.name) return null;
+    const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, type, date: Date.now() }, extra || {});
+    trophies.push(t);
+    saveTrophiesToStorage();
+    return t;
+  }
+  // Records the individual awards computed for a tournament/competition's
+  // `.awards` object (already produced by assignTournamentAwards() /
+  // assignCompAwards()) into the trophy case, one entry per winner.
+  function recordIndividualAwardsFromAwardsObject(awardsObj, type, extra) {
+    if (!awardsObj) return;
+    const map = [
+      ['goldenBoot', 'Golden Boot'], ['goldenBall', 'Golden Ball'], ['goldenGlove', 'Golden Glove'],
+      ['goldenClean', 'Clean Sheet King'], ['topAssists', 'Top Assists'], ['mostMotm', 'Most MOTM'],
+      ['bestAvgRating', 'Best Avg Rating']
+    ];
+    map.forEach(([key, awardName]) => {
+      if (awardsObj[key]) pushIndividualTrophy(awardName, awardsObj[key], type, extra);
+    });
+  }
+
+  // Ballon d'Or ranking algorithm, shared by the interactive Awards > Ballon
+  // d'Or tab and the automatic season-end archiving — kept in one place so
+  // both always agree on who the leader is. Pass in a `stats`-shaped object
+  // (global `stats`, a competition's `comp.stats`, etc).
+  const BALLON_MIN_APPS = 3;
+  function computeBallonRanking(statsSource) {
+    const src = statsSource || stats;
+    const MIN_APPS = BALLON_MIN_APPS;
+    const scores = {};
+    const ensure = (p) => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0 };
+      return scores[p.id];
+    };
+    Object.values(src.ratings || {}).forEach(p => {
+      const e = ensure(p);
+      e.apps = p.count || 0;
+      e.avg = p.avg || 0;
+    });
+    Object.values(src.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 4; });
+    Object.values(src.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.5; });
+    Object.values(src.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 5; });
+    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.35; });
+    Object.values(src.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
+    Object.values(src.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
+    Object.values(scores).forEach(e => {
+      if (e.apps >= MIN_APPS && e.avg > 0) {
+        e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
+      } else if (e.apps > 0 && e.apps < MIN_APPS) {
+        e.pts += e.avg * 0.15;
+      }
+    });
+    const awardLeaders = {
+      goldenboot: new Set(Object.values(src.goals || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      assists: new Set(Object.values(src.assists || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      motm: new Set(Object.values(src.motm || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      yashin: new Set(Object.values(src.saves || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      puskas: new Set(Object.values(src.puskas || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id))
+    };
+    Object.values(scores).forEach(e => {
+      let noms = 0;
+      Object.values(awardLeaders).forEach(set => { if (set.has(e.id)) noms++; });
+      e.noms = noms;
+      if (noms >= 2) e.pts += (noms - 1) * 1.4;
+    });
+    return Object.values(scores)
+      .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
+      .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
+      .slice(0, 50);
+  }
+
+  // Snapshots the current global leaderboard leaders (Golden Boot, Ballon
+  // d'Or, Golden Glove/Yashin, Top Assists, Most MOTM) into the trophy case
+  // as individual awards for the season that just ended, then wipes `stats`
+  // and `tournamentStats` so the new season's leaderboard & Awards tab start
+  // from zero. Team trophies (league/UCL winners) are left untouched — the
+  // trophy case is a permanent record, only the live leaderboard resets.
+  function archiveAndResetGlobalAwards(year) {
+    const extra = { category: 'season-global', year };
+    const type = 'Season Y' + year + ' (Global)';
+    const topOf = (key) => Object.values(stats[key] || {}).sort((a,b) => b.count - a.count)[0] || null;
+    pushIndividualTrophy('Golden Boot', topOf('goals'), type, extra);
+    pushIndividualTrophy('Top Assists', topOf('assists'), type, extra);
+    pushIndividualTrophy('Most MOTM', topOf('motm'), type, extra);
+    pushIndividualTrophy('Golden Glove', topOf('saves'), type, extra);
+    pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
+    const ballon = computeBallonRanking(stats)[0] || null;
+    pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
+    // Only clear tournamentStats if there's no standalone Tournament (World
+    // Cup/UCL, separate from the Season Calendar) currently in progress —
+    // otherwise this would wipe that tournament's own live leaderboard mid-run.
+    if (!tournament || tournament.champion) {
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+    }
+    saveStats();
+  }
+
+  // Called after every season-mutating sim step. Fires exactly once, right
+  // when a season's last matchday completes (all leagues + the Champions
+  // League finished) — archives that season's individual award winners and
+  // resets the global leaderboard/Awards tab for the new season ahead.
+  function finalizeSeasonIfComplete() {
+    if (!season || season.archived) return;
+    if (!seasonIsComplete()) return;
+    season.archived = true;
+    season.completedAt = Date.now();
+    archiveAndResetGlobalAwards(season.year);
+    toast('Season ' + season.year + ' complete! Awards & leaderboard archived to History and reset.');
+  }
+
   function saveStats() {
     try {
       localStorage.setItem('apexSimStats', JSON.stringify(stats));
@@ -2985,6 +3126,98 @@ var App = (() => {
       const md = localStorage.getItem('apexMatchDay');
       if (md) globalMatchDay = parseInt(md, 10) || 1;
     } catch(e) {}
+  }
+
+  // ========== FULL PROGRESS PERSISTENCE (survive a page refresh) ==========
+  // Stats/trophies/injury/suspension books are already saved above. This
+  // additionally persists the in-progress Season Calendar and standalone
+  // Tournament (World Cup / Champions League) state — plus a couple of small
+  // UI bits (which nav tab and which season sub-tab were open) — so a
+  // refresh (or reopening the app later) drops the person back exactly
+  // where they left off instead of wiping their run.
+  function persistAll() {
+    try {
+      if (season) localStorage.setItem('apexSeason', JSON.stringify(season));
+      else localStorage.removeItem('apexSeason');
+      if (tournament) localStorage.setItem('apexTournament', JSON.stringify(tournament));
+      else localStorage.removeItem('apexTournament');
+      localStorage.setItem('apexTournamentType', tournamentType);
+      localStorage.setItem('apexTournamentStats', JSON.stringify(tournamentStats));
+      localStorage.setItem('apexSeasonActiveTab', seasonActiveTab);
+      localStorage.setItem('apexSeasonActiveSubTab', seasonActiveSubTab);
+      const activeTab = document.querySelector('.nav-tab.active');
+      if (activeTab && activeTab.dataset.view) localStorage.setItem('apexActiveView', activeTab.dataset.view);
+    } catch (e) {}
+  }
+
+  function loadPersistedGameState() {
+    try {
+      const s = localStorage.getItem('apexSeason');
+      if (s) season = JSON.parse(s);
+    } catch (e) { season = null; }
+    try {
+      const t = localStorage.getItem('apexTournament');
+      if (t) tournament = JSON.parse(t);
+    } catch (e) { tournament = null; }
+    try {
+      const tt = localStorage.getItem('apexTournamentType');
+      if (tt) tournamentType = tt;
+    } catch (e) {}
+    try {
+      const ts = localStorage.getItem('apexTournamentStats');
+      if (ts) tournamentStats = JSON.parse(ts);
+    } catch (e) {}
+    try {
+      const sat = localStorage.getItem('apexSeasonActiveTab');
+      if (sat) seasonActiveTab = sat;
+      const sst = localStorage.getItem('apexSeasonActiveSubTab');
+      if (sst) seasonActiveSubTab = sst;
+    } catch (e) {}
+  }
+
+  // Re-hydrates the Tournament view's UI from a restored `tournament` object
+  // (called once on load, before the person has clicked back into that tab)
+  // so the setup/live panels and bracket are already correct whenever they do.
+  function restoreTournamentUI() {
+    if (!tournament) return;
+    const setup = document.getElementById('tournament-setup');
+    const live = document.getElementById('tournament-live');
+    if (setup) setup.style.display = 'none';
+    if (live) live.style.display = 'block';
+    const title = document.getElementById('tournament-title');
+    const desc = document.getElementById('tournament-desc');
+    const isWC = tournamentType === 'worldcup';
+    if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
+    if (desc) desc.textContent = isWC
+      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
+      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
+    try {
+      if (tournament.format === 'league') { renderUCLLeague(); renderUCLFixtures(); }
+      else { renderGroups(); }
+      renderBracket();
+      if (tournament.champion) renderTournamentPodium();
+      renderTournamentLeaderboard();
+    } catch (e) {}
+  }
+
+  function restoreSeasonUI() {
+    if (!season) return;
+    try { renderSeasonDashboard(); } catch (e) {}
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = 'none';
+    if (dash) dash.style.display = 'block';
+  }
+
+  // Belt-and-braces autosave: most mutating actions already call persistAll()
+  // directly, but a periodic save plus a save right before the tab is hidden
+  // or closed means nothing is ever more than a couple seconds from being
+  // safely on disk, even from an edge case that isn't explicitly wired up.
+  function setupAutoSave() {
+    setInterval(persistAll, 4000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistAll(); });
+    window.addEventListener('beforeunload', persistAll);
+    window.addEventListener('pagehide', persistAll);
   }
 
   function resetLeaderboard() {
@@ -3130,12 +3363,14 @@ var App = (() => {
     } else {
       startWorldCupTournament(selected);
     }
+    if (tournament) tournament._runId = Date.now();
 
     const setup = document.getElementById('tournament-setup');
     const live = document.getElementById('tournament-live');
     if (setup) setup.style.display = 'none';
     if (live) live.style.display = 'block';
     renderTournamentLeaderboard();
+    persistAll();
   }
 
   function startWorldCupTournament(selected) {
@@ -3424,6 +3659,7 @@ var App = (() => {
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = remaining ? `Group Stage — ${remaining} matches left` : 'Group Stage Complete';
     if (!remaining && tournament.stage === 'groups') advanceToKnockout();
+    persistAll();
   }
 
   function playTournamentMatch(idx) {
@@ -3729,7 +3965,7 @@ var App = (() => {
     showLoading('Simulating match…');
     setTimeout(function() {
       try { _simUCLFixtureWork(idx); }
-      finally { hideLoading(); refreshTournamentStatsUI(); try { renderUCLLeague(); renderUCLFixtures(); } catch(e) {} }
+      finally { hideLoading(); refreshTournamentStatsUI(); try { renderUCLLeague(); renderUCLFixtures(); } catch(e) {} persistAll(); }
     }, 30);
   }
   function _simUCLFixtureWork(idx) {
@@ -3851,6 +4087,7 @@ var App = (() => {
     renderUCLFixtures();
     if (tournament.playoff.every(x => x.played)) finishUCLPlayoffs();
     refreshTournamentStatsUI();
+    persistAll();
   }
 
   function finishUCLPlayoffs() {
@@ -4109,11 +4346,13 @@ var App = (() => {
     }
     assignTournamentAwards();
     const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
-    trophies.push({ name: tName, team: team.name, type: 'Tournament', date: Date.now() });
-    try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch(e) {}
+    const runExtra = { category: 'tournament', run: tournament._runId || Date.now() };
+    pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
+    recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = 'Champions: ' + (team.flag || '') + ' ' + team.name;
     renderTournamentPodium();
+    persistAll();
   }
 
   function renderTournamentPodium() {
@@ -4519,6 +4758,7 @@ var App = (() => {
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
+    persistAll();
   }
 
   let teamsFilter = 'all';
@@ -4632,6 +4872,7 @@ var App = (() => {
               toast('Error: ' + (e && e.message ? e.message : e));
             } finally {
               hideLoading();
+              persistAll();
             }
             resolve(result);
           }, 50);
@@ -4686,6 +4927,17 @@ var App = (() => {
     toast('Back to tournament — results updated');
   }
 
+
+  // Trophy Cabinet: every individual award a player (matched by exact name,
+  // same convention as playerPortraits/trophyImages) has won, newest first.
+  function playerTrophyCabinetHTML(playerName) {
+    const won = trophies.filter(t => t.player === playerName).sort((a, b) => (b.date || 0) - (a.date || 0));
+    if (!won.length) return '';
+    return `<div class="card-title" style="margin-top:14px">🏆 Trophy Cabinet</div>
+      <div class="trophy-cabinet-grid">
+        ${won.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 40)}<div class="tc-name">${t.name}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
+      </div>`;
+  }
 
   function showPlayerProfile(playerId) {
     let player = null, team = null;
@@ -4762,7 +5014,7 @@ var App = (() => {
             <div class="attr-track"><div class="attr-fill" style="width:${v||50}%"></div></div>
             <span class="attr-val">${v||'-'}</span></div>`).join('')}
       </div>
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
+      ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
   }
 
@@ -4788,15 +5040,18 @@ var App = (() => {
           <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px">🏟️ ${getStadium(team)}</div>
         </div>
       </div>
-      <div class="card-title" style="margin-top:14px">Squad</div>
+      <div class="card-title" style="margin-top:14px">Squad <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem">(🏆 = trophy cabinet)</span></div>
       <div class="team-squad-list">
-        ${players.map(p => `
+        ${players.map(p => {
+          const wonCount = trophies.filter(t => t.player === p.name).length;
+          return `
           <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
             <span class="player-num">${p.num || ''}</span>
-            <span class="tsr-name">${p.name}</span>
+            <span class="tsr-name">${p.name}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
             <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
             <span class="player-ovr">${p.ovr || ''}</span>
-          </button>`).join('')}
+          </button>`;
+        }).join('')}
       </div>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
@@ -4816,54 +5071,8 @@ var App = (() => {
         '</tbody></table></div>';
     } else if (type === 'ballon') {
       // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
-      const MIN_APPS = 3;
-      const scores = {};
-      const ensure = (p) => {
-        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0 };
-        return scores[p.id];
-      };
-      Object.values(stats.ratings || {}).forEach(p => {
-        const e = ensure(p);
-        e.apps = p.count || 0;
-        e.avg = p.avg || 0;
-      });
-      Object.values(stats.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 4; });
-      Object.values(stats.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.5; });
-      Object.values(stats.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 5; });
-      Object.values(stats.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.35; });
-      Object.values(stats.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
-      Object.values(stats.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
-      // Rating contribution only if enough appearances (prevents 1-game 9.9 winners)
-      Object.values(scores).forEach(e => {
-        if (e.apps >= MIN_APPS && e.avg > 0) {
-          // Scale rating points by log of apps so volume + quality both matter
-          e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
-        } else if (e.apps > 0 && e.apps < MIN_APPS) {
-          // Tiny contribution only — cannot win on rating alone
-          e.pts += e.avg * 0.15;
-        }
-      });
-      // "Award show appearance" bonus: being a nominee/contender on other individual
-      // award leaderboards (Golden Boot, Assists, MOTM, Yashin-type keeper form, Puskás)
-      // is itself worth something toward the overall Ballon d'Or case — being in the
-      // conversation across multiple award shows should count for something.
-      const awardLeaders = {
-        goldenboot: new Set(Object.values(stats.goals || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
-        assists: new Set(Object.values(stats.assists || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
-        motm: new Set(Object.values(stats.motm || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
-        yashin: new Set(Object.values(stats.saves || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
-        puskas: new Set(Object.values(stats.puskas || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id))
-      };
-      Object.values(scores).forEach(e => {
-        let noms = 0;
-        Object.values(awardLeaders).forEach(set => { if (set.has(e.id)) noms++; });
-        e.noms = noms;
-        if (noms >= 2) e.pts += (noms - 1) * 1.4; // each extra award-show appearance nudges the case
-      });
-      const data = Object.values(scores)
-        .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
-        .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
-        .slice(0, 50);
+      const MIN_APPS = BALLON_MIN_APPS;
+      const data = computeBallonRanking(stats);
       if (!data.length) {
         el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Need players with at least ' + MIN_APPS + ' competitive appearances (or strong goal/assist tallies) for Ballon d\'Or.</p></div>';
         return;
@@ -4932,7 +5141,7 @@ var App = (() => {
         '</tbody></table></div>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
-      el.innerHTML = trophies.map(t => '<div class="award-card">' + trophyMark(t.name, 52) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+t.team+'</p><p>'+t.type+'</p></div></div>').join('');
+      el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 52) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
     } else {
       // overview
       const topScorer = Object.values(stats.goals||{}).sort((a,b)=>b.count-a.count)[0];
@@ -4946,7 +5155,64 @@ var App = (() => {
     }
   }
 
-  // ========== SEASON CALENDAR: setup ==========
+  // ========== HISTORY (previous winners, team + individual) ==========
+  // Reads straight from the permanent `trophies` case (never cleared by a
+  // season reset), grouped newest-first by the run/season-year they came
+  // from so each group reads like one completed competition's honours list.
+  function trophyGroupKey(t) {
+    if (t.category === 'tournament') return 'tournament-' + (t.run || t.date);
+    if (t.category === 'season' || t.category === 'season-global') return 'season-' + (t.year != null ? t.year : '?');
+    return 'other-' + (t.date || 0);
+  }
+  function trophyGroupLabel(t) {
+    if (t.category === 'tournament') {
+      const base = (t.type || '').replace(/\s*Tournament$/, '');
+      return base || 'Tournament';
+    }
+    if (t.category === 'season' || t.category === 'season-global') return 'Season · Year ' + (t.year != null ? t.year : '?');
+    return t.type || 'History';
+  }
+
+  function showHistory(type) {
+    type = type || historyActiveTab || 'team';
+    historyActiveTab = type;
+    document.querySelectorAll('#view-history .award-tab').forEach(t => t.classList.toggle('active', t.dataset.history === type));
+    const el = document.getElementById('history-content');
+    if (!el) return;
+
+    const list = type === 'individual'
+      ? trophies.filter(t => t.player)
+      : trophies.filter(t => !t.player);
+
+    if (!list.length) {
+      el.innerHTML = type === 'individual'
+        ? '<div class="empty-state"><div class="icon">⭐</div><p>No individual awards recorded yet — finish a tournament or a season.</p></div>'
+        : '<div class="empty-state"><div class="icon">🏆</div><p>No champions crowned yet — finish a tournament or a season.</p></div>';
+      return;
+    }
+
+    const groups = {};
+    list.forEach(t => {
+      const key = trophyGroupKey(t);
+      if (!groups[key]) groups[key] = { label: trophyGroupLabel(t), sortKey: t.date || 0, items: [] };
+      groups[key].items.push(t);
+      groups[key].sortKey = Math.max(groups[key].sortKey, t.date || 0);
+    });
+    const orderedKeys = Object.keys(groups).sort((a, b) => groups[b].sortKey - groups[a].sortKey);
+
+    el.innerHTML = orderedKeys.map(key => {
+      const g = groups[key];
+      const items = g.items.map(t => {
+        if (t.player) {
+          return `<div class="award-card">${trophyMark(t.name, 48)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.player}</p><p style="color:var(--text-2);font-size:0.82rem">${t.team || ''}</p></div></div>`;
+        }
+        return `<div class="award-card">${trophyMark(t.name, 48)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`;
+      }).join('');
+      return `<div class="group-card" style="margin-bottom:16px"><h4>${g.label}</h4>${items}</div>`;
+    }).join('');
+  }
+
+
   function goToSeason() {
     if (season) { renderSeasonDashboard(); }
     else { renderSeasonSetup(); }
@@ -5257,14 +5523,17 @@ var App = (() => {
     if (setup) setup.style.display = 'none';
     if (dash) dash.style.display = 'block';
     toast('Season started — good luck!');
+    persistAll();
   }
 
   function crownLeagueChampion(comp) {
     const standings = sortedTable(comp.table);
     comp.champion = standings[0] ? standings[0].team : null;
     if (comp.champion) {
-      trophies.push({ name: comp.name, team: comp.champion.name, type: 'League (Y' + (season ? season.year : 1) + ')', date: Date.now() });
-      try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch (e) {}
+      const year = season ? season.year : 1;
+      const extra = { category: 'season', year };
+      pushTeamTrophy(comp.name, comp.champion.name, 'League (Y' + year + ')', extra);
+      recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
     }
   }
 
@@ -5328,8 +5597,10 @@ var App = (() => {
       comp.champion = champ;
       comp.finished = true;
       if (champ) {
-        trophies.push({ name: 'Champions League', team: champ.name, type: 'Season (Y' + (season ? season.year : 1) + ')', date: Date.now() });
-        try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch (e) {}
+        const year = season ? season.year : 1;
+        const extra = { category: 'season', year };
+        pushTeamTrophy('Champions League', champ.name, 'Season (Y' + year + ')', extra);
+        recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), 'Champions League (Y' + year + ')', extra);
       }
     }
     currentSeasonComp = null;
@@ -5346,8 +5617,8 @@ var App = (() => {
       SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
       simulateUCLStep(season.ucl);
       season.week++;
+      finalizeSeasonIfComplete();
       renderSeasonDashboard();
-      if (seasonIsComplete()) toast('Season complete — check the standings and Trophies!');
     });
   }
 
@@ -5361,8 +5632,8 @@ var App = (() => {
         season.week++;
         safety++;
       }
+      finalizeSeasonIfComplete();
       renderSeasonDashboard();
-      toast('Season complete — check the standings and Trophies!');
     });
   }
 
@@ -5397,6 +5668,7 @@ var App = (() => {
     };
     renderSeasonDashboard();
     toast('Year ' + year + ' kicks off!');
+    persistAll();
   }
 
   function resetSeason() {
@@ -5414,6 +5686,7 @@ var App = (() => {
     if (setup) setup.style.display = 'block';
     if (dash) dash.style.display = 'none';
     toast('Season reset');
+    persistAll();
   }
 
   function showSeasonComp(key) {
@@ -5692,7 +5965,7 @@ var App = (() => {
     simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
-    showSeasonComp, showSeasonSubTab, viewSeasonReport
+    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory
   };
 })();
 

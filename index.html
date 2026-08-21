@@ -30,6 +30,7 @@
         <button class="nav-tab" data-view="season">Season</button>
         <button class="nav-tab" data-view="leaderboard">Leaderboard</button>
         <button class="nav-tab" data-view="awards">Awards</button>
+        <button class="nav-tab" data-view="history">History</button>
         <button class="nav-tab" data-view="teams">Teams</button>
       </nav>
     </div>
@@ -301,6 +302,21 @@
         </div>
         <div id="awards-content">
           <div class="empty-state"><div class="icon">🏆</div><p>Simulate matches and tournaments to unlock awards.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="view-history" class="view">
+      <div class="card">
+        <div class="card-title">History — Previous Winners</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Every champion and individual award crowned so far, newest first. Team trophies and season/global awards live on permanently here even after the leaderboard resets for a new season.</p>
+        <div class="award-tabs">
+          <button class="award-tab active" data-history="team" onclick="App.showHistory('team')">🏆 Team Trophies</button>
+          <button class="award-tab" data-history="individual" onclick="App.showHistory('individual')">⭐ Individual Awards</button>
+        </div>
+        <div id="history-content">
+          <div class="empty-state"><div class="icon">📜</div><p>No history yet — finish a tournament or a season to start the record books.</p></div>
         </div>
       </div>
     </section>

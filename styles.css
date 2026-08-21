@@ -1300,6 +1300,30 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .tsr-name { flex: 1; font-weight: 600; }
 .tsr-pos { font-size: 0.72rem; color: var(--cyan); font-weight: 700; min-width: 48px; }
+.tsr-trophy-badge {
+  font-size: 0.7rem; color: var(--gold); font-weight: 700; margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* Player profile trophy cabinet */
+.trophy-cabinet-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px; margin-top: 4px;
+}
+.trophy-cabinet-item {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 6px; gap: 4px;
+}
+.trophy-cabinet-item .trophy-mark { margin: 0 auto; }
+.trophy-cabinet-item .tc-name { font-size: 0.7rem; font-weight: 700; color: var(--text); line-height: 1.15; }
+.trophy-cabinet-item .tc-type { font-size: 0.62rem; color: var(--text-3); line-height: 1.15; }
+
+/* History tab */
+#view-history .group-card h4 {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--gold); margin-bottom: 10px;
+}
 
 .tour-selected-count {
   background: linear-gradient(135deg, rgba(240,193,75,0.15), rgba(61,139,253,0.1));
