@@ -139,6 +139,22 @@ var App = (() => {
     RW: ['RW','RM','ST','CAM'], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
   };
 
+  // Broad position "line" for a player, used to keep substitutions tactically
+  // sensible — like-for-like where possible, and to spot when a red card has
+  // left a hole specifically in defence.
+  const POS_LINE = {
+    GK: 'GK',
+    CB: 'DEF', RB: 'DEF', LB: 'DEF', RWB: 'DEF', LWB: 'DEF',
+    CDM: 'MID', CM: 'MID', CAM: 'MID', RM: 'MID', LM: 'MID',
+    RW: 'FWD', LW: 'FWD', ST: 'FWD', CF: 'FWD'
+  };
+  function lineOf(p) {
+    if (!p) return 'MID';
+    const slot = p.slot || (p.pos || [])[0] || 'CM';
+    return POS_LINE[slot] || 'MID';
+  }
+
+
   // ========== MANAGER PLAYSTYLES ==========
   // If a team's manager has "playstyle" set in teams.json (and it's one of the
   // names below) that's used as-is; otherwise a random one is assigned once
@@ -2233,6 +2249,7 @@ var App = (() => {
         m.playerMatchStats[fouler.id].red = true;
         addEvent(m.minute, 'red', `🟥 Straight red! ${foulText} — reckless challenge`, defendingSide);
         removeFromPitch(defendingSide, fouler.id);
+        handleRedCardReshuffle(defendingSide, fouler);
       } else if (roll < straightRedChance + yellowChance) {
         m.cards[defendingSide][fouler.id] = (m.cards[defendingSide][fouler.id] || 0) + 1;
         defTeam.stats.yellows++;
@@ -2247,6 +2264,7 @@ var App = (() => {
           m.playerMatchStats[fouler.id].red = true;
           addEvent(m.minute, 'red', `🟥 Second yellow → red! ${foulText}`, defendingSide);
           removeFromPitch(defendingSide, fouler.id);
+          handleRedCardReshuffle(defendingSide, fouler);
         } else {
           addEvent(m.minute, 'yellow', `🟨 Yellow card — ${foulText}${foulCount > 1 ? ' (repeated fouls)' : ''}`, defendingSide);
         }
@@ -2426,6 +2444,7 @@ var App = (() => {
           m.playerMatchStats[player.id].red = true;
           addEvent(m.minute, 'red', `VAR: Red card! <span class="player">${player.name}</span> (${defTeam.team.short}) sent off`, defSide);
           removeFromPitch(defSide, player.id);
+          handleRedCardReshuffle(defSide, player);
         } else {
           const noRedLines = [
             `VAR: No red card — challenge by ${player ? player.name : 'the defender'} was mistimed but not violent conduct`,
@@ -2606,10 +2625,22 @@ var App = (() => {
     let outfieldPool = onPitch.filter(p => (p.slot || (p.pos||[])[0]) !== 'GK');
     let freshPool = outfieldPool.filter(p => !alreadySubbedIn(p));
     const pool = freshPool.length ? freshPool : outfieldPool;
-    const sorted = [...pool].sort((a, b) => (a.ovr || 70) - (b.ovr || 70));
-    const candidatesOut = sorted.slice(0, Math.max(2, Math.floor(sorted.length / 2)));
-    if (!candidatesOut.length) return;
-    const outPlayer = candidatesOut[Math.floor(Math.random() * candidatesOut.length)];
+    // Weighted pick, not just "worst half": lower-rated legs are still the
+    // main driver, but forwards/midfielders get tired and rotated far more
+    // often in real football than centre-backs, so weight the line too —
+    // this stops the engine picking a defender to sub off just because a
+    // striker happens to have a marginally higher OVR that match.
+    const LINE_SUB_WEIGHT = { FWD: 1.3, MID: 1.15, DEF: 0.65, GK: 0 };
+    const weighted = pool.map(p => ({ p, w: Math.max(0.15, (96 - (p.ovr || 70)) * (LINE_SUB_WEIGHT[lineOf(p)] || 1)) }));
+    const totalW = weighted.reduce((s, x) => s + x.w, 0);
+    let outPlayer = null;
+    if (totalW > 0) {
+      let r = Math.random() * totalW;
+      for (const x of weighted) { r -= x.w; if (r <= 0) { outPlayer = x.p; break; } }
+    }
+    if (!outPlayer) outPlayer = pool[Math.floor(Math.random() * pool.length)];
+    if (!outPlayer) return;
+
     // A substitute can only come from the bench, must not already be on the
     // pitch, and — critically — must never have left the pitch already this
     // match (whether as a starter subbed off, a substitute subbed off again,
@@ -2617,8 +2648,19 @@ var App = (() => {
     const availableSubs = (sideData.squad.subs || []).filter(p =>
       !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !leftIds.includes(p.id));
     if (!availableSubs.length) return;
-    let candidatesIn = availableSubs.filter(p => canPlay(p, outPlayer.slot || (outPlayer.pos||[])[0]));
-    if (!candidatesIn.length) candidatesIn = availableSubs;
+
+    // Tiered matching so the incoming player is a genuine like-for-like
+    // replacement: exact slot first, then anyone who shares the outgoing
+    // player's position line (defender for defender, forward for forward),
+    // and only loosen to broad position-compatibility or "whoever's left" if
+    // the bench truly has nothing closer.
+    const outSlot = outPlayer.slot || (outPlayer.pos || [])[0] || 'CM';
+    const outLine = lineOf(outPlayer);
+    let candidatesIn = availableSubs.filter(p => (p.slot || (p.pos || [])[0]) === outSlot);
+    let matchedOwnPosition = true;
+    if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => lineOf(p) === outLine); }
+    if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => canPlay(p, outSlot)); matchedOwnPosition = false; }
+    if (!candidatesIn.length) { candidatesIn = availableSubs; matchedOwnPosition = false; }
     candidatesIn.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
     const top = candidatesIn.slice(0, Math.min(3, candidatesIn.length));
     const inPlayer = top[Math.floor(Math.random() * top.length)];
@@ -2628,10 +2670,65 @@ var App = (() => {
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
-    // Carry slot for in player
-    inPlayer.slot = outPlayer.slot || (outPlayer.pos || ['CM'])[0];
+    // A substitute plays their own main position, not a borrowed one — only
+    // fall back to the outgoing player's slot when the bench had nobody
+    // positionally close, purely so the pitch shape still makes sense.
+    if (!matchedOwnPosition) inPlayer.slot = outSlot;
+    else if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CM'])[0];
     addEvent(m.minute, 'sub',
       `Substitution · ${sideData.team.short}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
+      side);
+    if (!m.silentDeep) { renderLineups(); renderPitch(); }
+  }
+
+  // A manager who's just gone down to 10 men often reshapes rather than just
+  // absorbing the loss — most commonly sacrificing an attacker to bring on a
+  // recognised defender when the sent-off player was part of the back line,
+  // to restore defensive numbers. This is a reaction, not a guarantee: it
+  // only fires for a lost defender, needs a defender left on the bench, and
+  // doesn't happen every single time (some managers/situations just play on).
+  function handleRedCardReshuffle(side, sentOffPlayer) {
+    const m = currentMatch;
+    if (!m || !sentOffPlayer || m.finished) return;
+    if (lineOf(sentOffPlayer) !== 'DEF') return;
+    const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+    if (used >= (m.maxSubs || 5)) return;
+    if (Math.random() > 0.72) return;
+    const sideData = m[side];
+    const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
+    const availableSubs = (sideData.squad.subs || []).filter(p =>
+      !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !leftIds.includes(p.id));
+    const benchDef = availableSubs.filter(p => lineOf(p) === 'DEF').sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
+    if (!benchDef.length) return; // no defensive cover available on the bench
+    const inPlayer = benchDef[0];
+
+    // Sacrifice the most advanced remaining outfield player to restore
+    // defensive numbers — a forward first, then a midfielder, mirroring how
+    // real managers reshape after going down to 10 men.
+    const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
+    const alreadySubbedIn = (p) => !!(m.subLog[side] && m.subLog[side][p.id] && m.subLog[side][p.id].inMin != null);
+    let candidatesOut = onPitch.filter(p => lineOf(p) === 'FWD' && !alreadySubbedIn(p));
+    if (!candidatesOut.length) candidatesOut = onPitch.filter(p => lineOf(p) === 'FWD');
+    if (!candidatesOut.length) candidatesOut = onPitch.filter(p => lineOf(p) === 'MID' && !alreadySubbedIn(p));
+    if (!candidatesOut.length) candidatesOut = onPitch.filter(p => lineOf(p) === 'MID');
+    if (!candidatesOut.length) return; // nothing sensible to sacrifice — leave it
+    candidatesOut.sort((a, b) => (a.ovr || 70) - (b.ovr || 70));
+    const outPlayer = candidatesOut[0];
+
+    const idx = onPitchIds.indexOf(outPlayer.id);
+    if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+    markLeftPitch(m, side, outPlayer.id);
+    if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
+    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
+    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
+    if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CB'])[0];
+    const newUsed = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+    addEvent(m.minute, 'sub',
+      `Tactical reshuffle · ${sideData.team.short} reorganise after going down to 10 men<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span> <span style="opacity:0.6">(defensive cover)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,
       side);
     if (!m.silentDeep) { renderLineups(); renderPitch(); }
   }
