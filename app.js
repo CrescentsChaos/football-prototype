@@ -336,6 +336,10 @@ var App = (() => {
           sessionStorage.removeItem('apexJustReset');
           setTimeout(() => toast('All data reset — fresh start'), 300);
         }
+        if (sessionStorage.getItem('apexJustImported') === '1') {
+          sessionStorage.removeItem('apexJustImported');
+          setTimeout(() => toast('Save imported — progress restored'), 300);
+        }
       } catch (e) {}
       console.log('Apex Sim ready:', allTeams.length, 'teams | source:', source);
       window.__APEX_DATA_SOURCE = source;
@@ -4040,6 +4044,98 @@ var App = (() => {
     toast('Progress saved');
   }
 
+  // ========== EXPORT / IMPORT SAVE FILE ==========
+  // Every piece of persisted state this app writes is namespaced under a
+  // localStorage key starting with "apex" (see resetLeaderboard() below,
+  // which relies on the same fact). That makes a full, exact export/import
+  // straightforward: grab every "apex*" key verbatim (already-serialized
+  // JSON strings, numbers-as-strings, etc.) and write them back out exactly
+  // as they were, rather than re-deriving anything from in-memory state.
+  // This is what lets a save survive a browser switch or a full wipe/refresh.
+  function exportSave() {
+    try {
+      // Flush any pending in-memory changes to localStorage first so the
+      // export reflects the very latest state, not the last autosave tick.
+      persistAll();
+      saveStats();
+      const data = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('apex') === 0) data[k] = localStorage.getItem(k);
+      }
+      if (!Object.keys(data).length) {
+        toast('Nothing to export yet — play a bit first');
+        return;
+      }
+      const payload = {
+        app: 'apex-sim',
+        formatVersion: 1,
+        exportedAt: new Date().toISOString(),
+        data
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `apex-sim-save-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast('Save file exported');
+    } catch (e) {
+      console.error('Export failed', e);
+      toast('Export failed — see console for details');
+    }
+  }
+
+  function triggerImportSave() {
+    const input = document.getElementById('import-save-input');
+    if (input) { input.value = ''; input.click(); }
+  }
+
+  function importSaveFile(event) {
+    const input = event && event.target;
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const payload = JSON.parse(reader.result);
+        const data = payload && payload.data && typeof payload.data === 'object' ? payload.data : null;
+        const validKeys = data ? Object.keys(data).filter(k => k.indexOf('apex') === 0) : [];
+        if (!data || !validKeys.length) {
+          toast("That file doesn't look like an APEX SIM save");
+          return;
+        }
+        if (!confirm('Import this save? This will REPLACE all current progress — leaderboard, trophies, history, active season, tournament, everything — with the contents of this file. This cannot be undone.')) {
+          return;
+        }
+        // Clear every existing "apex*" key first so nothing from the
+        // current save (e.g. a key this version writes that an older
+        // export doesn't have) bleeds into the restored state.
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
+        }
+        keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+        validKeys.forEach(k => { try { localStorage.setItem(k, data[k]); } catch (e) {} });
+        try { sessionStorage.setItem('apexJustImported', '1'); } catch (e) {}
+        location.reload();
+      } catch (err) {
+        console.error('Import failed', err);
+        toast('Import failed — file is not valid JSON');
+      } finally {
+        if (input) input.value = '';
+      }
+    };
+    reader.onerror = () => { toast('Could not read that file'); if (input) input.value = ''; };
+    reader.readAsText(file);
+  }
+
   function resetLeaderboard() {
     if (!confirm('Reset EVERYTHING? This wipes all leaderboard stats, trophies, history, the active season, any tournament in progress, injuries/suspensions, player form and saved settings — every piece of stored data for this app on this device. This cannot be undone.')) return;
     // Full factory reset: clear every bit of persisted state, not just the
@@ -7014,7 +7110,8 @@ var App = (() => {
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     returnToTournament, showPlayerProfile, showTeamProfile, randomMatch,
-    resetLeaderboard, manualSave, searchTeams, sortTeams, searchTournamentTeams,
+    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile,
+    searchTeams, sortTeams, searchTournamentTeams,
     openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker,
     playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
     saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,

@@ -177,9 +177,17 @@ body::before {
   color: var(--bg-0); border-color: transparent;
   animation: navTabPop 0.35s var(--ease-snap);
 }
+
+.header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.save-btn-ghost {
+  background: rgba(255,255,255,0.04); border-color: var(--border-strong); color: var(--text-2);
+}
+.save-btn-ghost:hover { background: rgba(255,255,255,0.08); box-shadow: none; color: var(--text); }
+
 @media (max-width: 640px) {
   .save-btn-label { display: none; }
   .save-btn { padding: 8px 10px; }
+  .header-actions { gap: 6px; }
 }
 
 /* Main */
