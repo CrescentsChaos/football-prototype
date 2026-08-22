@@ -2228,20 +2228,19 @@ var App = (() => {
         }
       }
     } else if (r < 0.94) {
-      // VAR — coherent sequence for one side
+      // VAR — coherent sequence for one side. Note: this is a *standalone*
+      // review of an incident the referee may have missed in open play — it
+      // must never re-litigate a goal, because no goal was actually scored
+      // in this branch. (An actual goal being overturned for offside is
+      // handled separately and correctly by maybeOffsideDisallow(), which
+      // only fires right after a real goal is scored — see pushGoal/goal
+      // event above — so "goal stands/disallowed" VAR messages are always
+      // tied to a goal that really happened.)
       const varSide = attackingSide;
       const varTeam = attTeam;
       const defSide = defendingSide;
       const scenario = Math.random();
-      if (scenario < 0.42) {
-        // Potential goal review
-        addEvent(m.minute, 'var', `📺 VAR checking possible offside in the build-up (${varTeam.team.short})...`, varSide);
-        if (Math.random() < 0.55) {
-          addEvent(m.minute, 'var', `VAR: Goal stands for ${varTeam.team.short}`, varSide);
-        } else {
-          addEvent(m.minute, 'var', `VAR: Goal disallowed — offside against ${varTeam.team.short}`, varSide);
-        }
-      } else if (scenario < 0.87) {
+      if (scenario < 0.55) {
         // Penalty review for attacking team
         const fouled = pickPlayer(attTeam, ['ST','RW','LW','CAM']);
         const fouler = pickPlayer(defTeam, ['CB','RB','LB','CDM']);
