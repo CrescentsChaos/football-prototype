@@ -17,8 +17,8 @@ var App = (() => {
   // image file names are resolved against assets/trophies/. Optional; falls
   // back to the 🏆 emoji when no image is found for a given trophy name.
   let trophyImages = {};
-  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
-  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
   // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
   // can also tally into that competition's own stat bucket (comp.stats), giving each
@@ -90,7 +90,25 @@ var App = (() => {
     '4-4-1-1': { name: '4-4-1-1', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','CAM','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,52],[42,52],[18,48],[50,32],[50,16]] },
     '5-4-1': { name: '5-4-1', slots: ['GK','RWB','CB','CB','CB','LWB','RM','CM','CM','LM','ST'],
-      coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[80,45],[58,50],[42,50],[20,45],[50,18]] }
+      coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[80,45],[58,50],[42,50],[20,45],[50,18]] },
+    '4-1-2-1-2': { name: '4-1-2-1-2 (Diamond)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','CAM','ST','ST'],
+      coords: [[50,92],[80,72],[62,75],[38,75],[20,72],[50,60],[66,46],[34,46],[50,32],[58,16],[42,16]] },
+    '4-2-2-2': { name: '4-2-2-2', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','CAM','ST','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[60,55],[40,55],[70,35],[30,35],[58,16],[42,16]] },
+    '3-1-4-2': { name: '3-1-4-2', slots: ['GK','CB','CB','CB','CDM','RM','CM','CM','LM','ST','ST'],
+      coords: [[50,92],[68,75],[50,78],[32,75],[50,58],[82,42],[60,44],[40,44],[18,42],[58,18],[42,18]] },
+    '4-1-3-2': { name: '4-1-3-2', slots: ['GK','RB','CB','CB','LB','CDM','RM','CAM','LM','ST','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[78,42],[50,40],[22,42],[58,18],[42,18]] },
+    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[75,22],[50,34],[25,22]] },
+    '4-3-3-cdm': { name: '4-3-3 (Holding)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,55],[64,45],[36,45],[78,28],[50,16],[22,28]] },
+    '4-3-3-cam': { name: '4-3-3 (Attack)', slots: ['GK','RB','CB','CB','LB','CM','CM','CAM','RW','ST','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[38,52],[50,38],[78,22],[50,14],[22,22]] },
+    '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[66,26],[34,26],[50,16]] },
+    '5-3-2-attack': { name: '5-3-2 (Attack)', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','ST'],
+      coords: [[50,92],[88,62],[68,72],[50,75],[32,72],[12,62],[62,45],[50,48],[38,45],[58,18],[42,18]] }
   };
 
   const POS_COMPAT = {
@@ -99,6 +117,49 @@ var App = (() => {
     CAM: ['CAM','CM','RW','LW','ST'], RM: ['RM','RW','RWB','CM'], LM: ['LM','LW','LWB','CM'],
     RW: ['RW','RM','ST','CAM'], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
   };
+
+  // ========== MANAGER PLAYSTYLES ==========
+  // If a team's manager has "playstyle" set in teams.json (and it's one of the
+  // names below) that's used as-is; otherwise a random one is assigned once
+  // when team data loads and cached onto team.manager.playstyle so it stays
+  // consistent for the rest of the session.
+  const PLAYSTYLES = ['Long Ball', 'Possession', 'Long Ball Counter', 'Overload', 'Quick Counter', 'Out Wide'];
+
+  // Gameplay effect of each playstyle. These are deliberately modest nudges —
+  // enough to give each style a distinct identity over 90 minutes/a season
+  // without letting any one style dominate results outright.
+  //   attBonus/defBonus   — flat nudge to calcTeamStrength() att/def
+  //   passVolMult         — multiplies a team's per-minute pass volume
+  //   passAccDelta        — flat nudge to individual pass success rate
+  //   possBias            — pts nudge toward/away from more of the ball
+  //   wingBiasMult        — multiplies wide players' (RB/LB/RWB/LWB/RM/LM/RW/LW) share of passing/attacking involvement
+  //   counterBonus        — nudge to attacking-creation strength that rewards this team when they're defending, i.e. breaking quickly
+  const PLAYSTYLE_MODS = {
+    'Long Ball':          { attBonus: 1.5,  defBonus: -0.5, passVolMult: 0.82, passAccDelta: -0.045, possBias: -4, wingBiasMult: 1.0,  counterBonus: 0.4 },
+    'Possession':         { attBonus: -0.5, defBonus: 1.0,  passVolMult: 1.20, passAccDelta: 0.035,  possBias: 6,  wingBiasMult: 1.0,  counterBonus: -0.6 },
+    'Long Ball Counter':  { attBonus: 0.5,  defBonus: 0.5,  passVolMult: 0.80, passAccDelta: -0.03,  possBias: -5, wingBiasMult: 1.0,  counterBonus: 1.4 },
+    'Overload':           { attBonus: 1.0,  defBonus: -0.8, passVolMult: 1.05, passAccDelta: 0.0,    possBias: 2,  wingBiasMult: 1.35, counterBonus: 0.1 },
+    'Quick Counter':      { attBonus: 0.8,  defBonus: 0.2,  passVolMult: 0.94, passAccDelta: -0.01,  possBias: -2, wingBiasMult: 1.1,  counterBonus: 1.6 },
+    'Out Wide':           { attBonus: 0.5,  defBonus: -0.2, passVolMult: 1.0,  passAccDelta: 0.0,    possBias: 1,  wingBiasMult: 1.4,  counterBonus: 0.2 }
+  };
+  const WIDE_SLOTS = new Set(['RB','LB','RWB','LWB','RM','LM','RW','LW']);
+
+  // Resolves (and caches) a team's manager playstyle. If teams.json already
+  // set a valid manager.playstyle it's kept as-is; otherwise a random one is
+  // picked once and stored on the manager object so every part of the UI
+  // that reads team.manager.playstyle agrees for the rest of the session.
+  function getManagerPlaystyle(team) {
+    if (!team) return PLAYSTYLES[0];
+    if (!team.manager) team.manager = {};
+    if (!PLAYSTYLES.includes(team.manager.playstyle)) {
+      team.manager.playstyle = PLAYSTYLES[Math.floor(Math.random() * PLAYSTYLES.length)];
+    }
+    return team.manager.playstyle;
+  }
+
+  function getPlaystyleMods(team) {
+    return PLAYSTYLE_MODS[getManagerPlaystyle(team)] || PLAYSTYLE_MODS['Possession'];
+  }
 
   async function init() {
     try {
@@ -142,6 +203,9 @@ var App = (() => {
       }
       allTeams = [...(teamsData.national || []), ...(teamsData.club || [])];
       if (!allTeams.length) throw new Error('No teams found');
+      // Resolve every team's manager playstyle now (teams.json "playstyle" if
+      // set, otherwise a random one) so it's stable for the rest of the session.
+      allTeams.forEach(getManagerPlaystyle);
 
       // Load leagues.json (which clubs belong to which domestic league).
       // Optional — the app still works without it, it just falls back to
@@ -253,12 +317,12 @@ var App = (() => {
     if (homeSel) homeSel.value = home.id;
     if (awaySel) awaySel.value = away.id;
     updateTeamPreview('home'); updateTeamPreview('away');
-    // Random formations
-    const forms = Object.keys(FORMATIONS);
+    // Formations reflect each team's set formation (from teams.json) if any,
+    // otherwise a per-team default that spreads teams across the pool.
     const hf = document.getElementById('home-formation');
     const af = document.getElementById('away-formation');
-    if (hf) hf.value = forms[Math.floor(Math.random()*forms.length)];
-    if (af) af.value = forms[Math.floor(Math.random()*forms.length)];
+    if (hf) hf.value = pickTeamFormation(home);
+    if (af) af.value = pickTeamFormation(away);
     toast(`${home.flag||''} ${home.name} vs ${away.flag||''} ${away.name}`);
   }
 
@@ -432,8 +496,28 @@ var App = (() => {
     const team = getTeam(sel.value);
     if (!team) { el.innerHTML = ''; return; }
     const mgr = team.manager ? team.manager.name : '';
+    const style = getManagerPlaystyle(team);
     const venueLine = side === 'home' ? `<div style="font-size:0.8rem;color:var(--text-muted)">🏟️ ${getStadium(team)}</div>` : '';
-    el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div><div class="manager-name">${mgr ? 'Manager: ' + mgr : ''}</div><div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
+    el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div><div class="manager-name">${mgr ? 'Manager: ' + mgr : ''}${style ? ' <span class="playstyle-tag">· ' + style + '</span>' : ''}</div><div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
+    const formSel = document.getElementById(side + '-formation');
+    if (formSel) formSel.value = pickTeamFormation(team);
+  }
+
+  // Picks a formation for a team. If the team has a "formation" key set in
+  // teams.json (matching a valid FORMATIONS entry) that formation is used
+  // strictly as the team's default starting shape — though it can still be
+  // changed mid-match via the live tactics panel. Otherwise a formation is
+  // deterministically derived from the team's id/name so the same team
+  // tends to line up the same way match to match, while different teams
+  // spread out across the available formation pool instead of everyone
+  // randomly converging on the same one or two shapes.
+  function pickTeamFormation(team) {
+    if (team && team.formation && FORMATIONS[team.formation]) return team.formation;
+    const forms = Object.keys(FORMATIONS);
+    const key = (team && (team.id || team.name)) || '';
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    return forms[hash % forms.length];
   }
 
   function buildSquad(team, formationKey) {
@@ -1009,7 +1093,8 @@ var App = (() => {
   function pushGoal(side, player, minute, methodDesc) {
     if (!currentMatch) return;
     if (!currentMatch.goalList) currentMatch.goalList = [];
-    currentMatch.goalList.push({ side, player: player.name, num: player.num, minute, method: methodDesc || '' });
+    const isPen = /^penalty/i.test(methodDesc || '');
+    currentMatch.goalList.push({ side, player: player.name, num: player.num, minute, method: methodDesc || '', pen: isPen });
     renderGoalTimeline();
   }
 
@@ -1023,9 +1108,7 @@ var App = (() => {
     }
     const goals = currentMatch.goalList || [];
     const fmt = (arr) => arr.map(g => {
-      const isPen = g.method && /penalt/i.test(g.method);
-      const methodBit = isPen ? ' <span class="gt-method">[Penalty]</span>' : '';
-      return `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.num != null && g.num !== '' ? ' · '+g.num : ''}${methodBit}</div>`;
+      return `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.pen ? ' <span class="pen-tag">[Penalty]</span>' : ''}${g.num != null && g.num !== '' ? ' · '+g.num : ''}</div>`;
     }).join('');
     if (homeEl) homeEl.innerHTML = fmt(goals.filter(g => g.side === 'home'));
     if (awayEl) awayEl.innerHTML = fmt(goals.filter(g => g.side === 'away'));
@@ -1078,7 +1161,7 @@ var App = (() => {
       : `${h.score} - ${a.score}`;
     const goalsH = (report.goals || []).filter(g => g.side === 'home');
     const goalsA = (report.goals || []).filter(g => g.side === 'away');
-    const fmtG = (arr) => arr.map(g => `${g.minute}' ${g.player}${g.method ? ' ('+g.method+')' : ''}`).join('<br>') || '—';
+    const fmtG = (arr) => arr.map(g => `${g.minute}' ${g.player}${g.pen || /^penalty/i.test(g.method || '') ? ' <span class="pen-tag">[Penalty]</span>' : ''}`).join('<br>') || '—';
     // Prefer the home/away-split ratings captured by buildMatchReport; fall back
     // to the old flat map for any legacy report objects saved before this split existed.
     const homeRatings = h.ratings || Object.values(report.ratings || {});
@@ -1381,16 +1464,23 @@ var App = (() => {
 
     r += Math.max(-0.12, Math.min(0.18, ((ps.ovr || 75) - 75) * 0.008));
 
+    // Small organic variance so two players with an identical stat-line don't
+    // always come out with the exact same rating — mirrors the "eye test"
+    // component of a real match rating without swinging results wildly.
+    r += (Math.random() - 0.5) * 0.22;
+
     // Keep ratings realistic: a good, solid game should land in the high 7s/8s.
     // Only a genuine breakout performance — a hat-trick, a brace-plus-assist, a big
     // multi-goal contribution, or a standout shutout for a GK/defender — should be
-    // able to push into the 9.9-10.0 territory. Everything else is capped below that.
+    // able to push into the 9.9-10.0 territory. Non-breakout games get a *soft*,
+    // slightly randomized ceiling each time (not a fixed 9.2 wall every match) so
+    // ratings feel more dynamic while still rarely maxing out without a big game.
     const isBreakout = isGK
       ? (saves >= 7 && (ps.cleanSheet || goals === 0) && !ps.red)
       : isDef
         ? ((goals >= 1 && ps.cleanSheet) || (goals + assists >= 3) || (goals >= 2 && assists >= 1)) && !ps.red
         : (goals >= 3 || (goals >= 2 && assists >= 1) || assists >= 3 || goals + assists >= 4) && !ps.red;
-    const cap = isBreakout ? 10.0 : 9.2;
+    const cap = isBreakout ? 10.0 : 8.7 + Math.random() * 0.9; // ~8.7-9.6, varies match to match
     return Math.max(4.0, Math.min(cap, Math.round(r * 10) / 10));
   }
 
@@ -1565,6 +1655,57 @@ var App = (() => {
     CDM: 1.95, CM: 1.85, CAM: 1.45, RM: 1.2, LM: 1.2, RW: 1.0, LW: 1.0, ST: 0.7
   };
 
+  // Per-minute base chance of a defensive action (tackle/interception/block) for
+  // each position, independent of the main event roll above — this is what makes
+  // defenders (and holding mids) consistently active across 90 minutes rather than
+  // only picking up stats on the rare minutes the main event chain lands on them.
+  const DEF_ACTION_BASE = {
+    CB: 0.075, RB: 0.08, LB: 0.08, RWB: 0.085, LWB: 0.085, CDM: 0.09,
+    CM: 0.05, RM: 0.025, LM: 0.025, RW: 0.018, LW: 0.018, CAM: 0.022, ST: 0.012, GK: 0
+  };
+
+  // Gives every defender (and holding mid) on the pitch an independent per-minute
+  // roll for a tackle/interception/block, weighted by their defensive ability and
+  // the pressure they're under from the opposing attack. Runs every minute
+  // (including "quiet" minutes) so defensive stats build up naturally over 90
+  // minutes instead of relying on the endMatch floor to backfill them.
+  function simulateDefensiveActions() {
+    const m = currentMatch;
+    if (!m) return;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    ['home', 'away'].forEach(side => {
+      const team = m[side];
+      const ids = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const onPitch = (team.squad.all || []).filter(p => ids.includes(p.id));
+      if (!onPitch.length) return;
+      const oppSide = side === 'home' ? m.away : m.home;
+      const oppStr = calcTeamStrength(oppSide);
+      const pressureMult = 0.85 + Math.max(0, (oppStr.att || 70) - 68) / 90;
+      onPitch.forEach(p => {
+        const slot = p.slot || (p.pos || [])[0] || 'CM';
+        const base = DEF_ACTION_BASE[slot];
+        if (!base) return;
+        const defSkill = p.def != null ? p.def : (p.ovr || 70);
+        const skillMult = 0.72 + (defSkill / 100) * 0.6;
+        const chance = Math.min(0.2, base * skillMult * pressureMult);
+        if (Math.random() >= chance) return;
+        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+        const ps = m.playerMatchStats[p.id];
+        const roll = Math.random();
+        if (roll < 0.5) {
+          ps.interceptions = (ps.interceptions || 0) + 1;
+          ps.tackles = (ps.tackles || 0) + 1;
+          team.stats.interceptions = (team.stats.interceptions || 0) + 1;
+        } else if (roll < 0.85) {
+          ps.tackles = (ps.tackles || 0) + 1;
+        } else {
+          ps.blocks = (ps.blocks || 0) + 1;
+          team.stats.blocks = (team.stats.blocks || 0) + 1;
+        }
+      });
+    });
+  }
+
   // Simulates one minute of team passing for both sides: builds up real per-match
   // pass volume (300-1000+ per team), splits it across on-pitch players by role,
   // and gives each player their own completion (success) rate based on ability.
@@ -1579,6 +1720,7 @@ var App = (() => {
       const onPitch = (team.squad.all || []).filter(p => ids.includes(p.id));
       if (!onPitch.length) return;
       const tac = (m.tactics && m.tactics[side]) || 'balanced';
+      const pmods = getPlaystyleMods(team.team);
       // Recent possession share feeds back into how much of the ball this team gets —
       // clamped so it can't spiral away from realistic bounds.
       const possShare = Math.max(0.75, Math.min(1.3, ((team.stats.possession || 50)) / 50));
@@ -1586,10 +1728,13 @@ var App = (() => {
       if (tac === 'attack') baseVol *= 1.08;
       if (tac === 'defend') baseVol *= 0.86;
       if (tac === 'press') baseVol *= 0.78;
+      baseVol *= pmods.passVolMult; // manager playstyle: direct (Long Ball) vs patient (Possession)
       const vol = Math.max(1, baseVol * possShare);
       const weighted = onPitch.map(p => {
         const slot = p.slot || (p.pos || [])[0] || 'CM';
-        return { p, w: PASS_POS_WEIGHT[slot] != null ? PASS_POS_WEIGHT[slot] : 1.2 };
+        let w = PASS_POS_WEIGHT[slot] != null ? PASS_POS_WEIGHT[slot] : 1.2;
+        if (WIDE_SLOTS.has(slot)) w *= pmods.wingBiasMult; // Out Wide / Overload lean on wide play
+        return { p, w };
       });
       const totalW = weighted.reduce((s, x) => s + x.w, 0) || 1;
       weighted.forEach(({ p, w }) => {
@@ -1603,6 +1748,7 @@ var App = (() => {
         let succRate = Math.min(0.97, Math.max(0.52, 0.64 + skill * 0.34));
         if (tac === 'press') succRate -= 0.03;
         if (tac === 'attack') succRate -= 0.015;
+        succRate = Math.min(0.97, Math.max(0.4, succRate + pmods.passAccDelta)); // manager playstyle nudge
         let completed = 0;
         for (let i = 0; i < count; i++) { if (Math.random() < succRate) completed++; }
         ps.passes = (ps.passes || 0) + count;
@@ -1626,21 +1772,34 @@ var App = (() => {
     // relegation-battler's back line) show up clearly over 90 minutes/a season,
     // while a small flat home-advantage nudge and a soft floor/ceiling keep any
     // single chance from ever being a certainty either way — upsets stay possible.
-    const homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10;
-    const awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10;
+    const homeMods = getPlaystyleMods(m.home.team);
+    const awayMods = getPlaystyleMods(m.away.team);
+    // Counter-attacking playstyles (Long Ball Counter, Quick Counter) get a chance
+    // boost that scales with how little of the ball they've had — rewarding them
+    // for breaking quickly rather than for camping in possession.
+    const priorPoss = m.possession != null ? m.possession : 50;
+    const homeCounter = homeMods.counterBonus * Math.max(0, 50 - priorPoss) / 50;
+    const awayCounter = awayMods.counterBonus * Math.max(0, priorPoss - 50) / 50;
+    const homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10 + homeCounter;
+    const awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10 + awayCounter;
     const HOME_ADV = 3.2; // small, realistic home-field nudge, not a thumb on the scale
     const qualityGap = (homeCreate - awayCreate) + HOME_ADV;
     let homeChance = 1 / (1 + Math.exp(-qualityGap / 11));
     homeChance = Math.min(0.85, Math.max(0.15, homeChance));
     // Build up real passing volume for both teams this minute (feeds player stats + rating).
     simulateMinutePassing();
+    // Independent per-minute defensive activity (tackles/interceptions/blocks) —
+    // runs every minute, quiet or not, so defenders stay consistently involved.
+    simulateDefensiveActions();
     // Possession is now derived from actual completed-pass share (like real match data
     // providers compute it), smoothed minute to minute so it doesn't jump around wildly.
     const hp = m.home.stats.passes || 0, ap = m.away.stats.passes || 0;
     const passShareTarget = (hp + ap) > 0 ? 100 * hp / (hp + ap) : 50;
     // Slight tug toward the technically stronger side so quality shows up immediately, not just late.
     const techBias = Math.max(-6, Math.min(6, (homeStr.tec - awayStr.tec) * 0.5));
-    const target = Math.max(22, Math.min(78, passShareTarget * 0.8 + (50 + techBias) * 0.2));
+    // Manager playstyle possession bias (Possession chases the ball, Long Ball/Counter styles cede it).
+    const styleBias = Math.max(-8, Math.min(8, (homeMods.possBias - awayMods.possBias) * 0.5));
+    const target = Math.max(22, Math.min(78, passShareTarget * 0.8 + (50 + techBias + styleBias) * 0.2));
     m.possession = m.possession + (target - m.possession) * 0.12 + (Math.random() - 0.5) * 1.2;
     m.possession = Math.max(20, Math.min(80, m.possession));
     m.home.stats.possession = Math.round(m.possession);
@@ -2027,10 +2186,11 @@ var App = (() => {
     const onPitch = (side.squad.all || []).filter(p => ids.includes(p.id));
     if (!onPitch.length) return { att: 50, def: 50, tec: 50 };
     const mgr = (side.team.manager && side.team.manager.ovr) || 75;
+    const pmods = getPlaystyleMods(side.team);
     const avg = (key, fallback) => onPitch.reduce((s, p) => s + (p[key] != null ? p[key] : fallback), 0) / onPitch.length;
     return {
-      att: avg('att', 70) + (mgr - 75) * 0.12,
-      def: avg('def', 70) + (mgr - 75) * 0.1,
+      att: avg('att', 70) + (mgr - 75) * 0.12 + pmods.attBonus,
+      def: avg('def', 70) + (mgr - 75) * 0.1 + pmods.defBonus,
       tec: avg('tec', 70),
       ovr: avg('ovr', 75),
       phy: avg('phy', 70),
@@ -2477,6 +2637,10 @@ var App = (() => {
       ps.rating = calcPlayerRating(ps);
       const teamObj = (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team;
       recordRating(p, teamObj, ps.rating);
+      // Feed the season-long "Interceptions" leaderboard and Defenders' Award
+      // with this match's accumulated defensive totals.
+      if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
+      if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
     });
     let best = null, bestR = -1;
     Object.values(m.playerMatchStats).forEach(ps => {
@@ -2648,8 +2812,10 @@ var App = (() => {
     set('live-away-form', (FORMATIONS[m.away.squad.formation] || {}).name || '');
     const hm = document.querySelector('.score-team.home .mgr');
     const am = document.querySelector('.score-team.away .mgr');
-    if (hm) hm.textContent = m.home.team.manager ? m.home.team.manager.name : '';
-    if (am) am.textContent = m.away.team.manager ? m.away.team.manager.name : '';
+    const hStyle = getManagerPlaystyle(m.home.team);
+    const aStyle = getManagerPlaystyle(m.away.team);
+    if (hm) hm.textContent = (m.home.team.manager ? m.home.team.manager.name : '') + (hStyle ? ' (' + hStyle + ')' : '');
+    if (am) am.textContent = (m.away.team.manager ? m.away.team.manager.name : '') + (aStyle ? ' (' + aStyle + ')' : '');
     const hs = m.home.penScore != null ? `${m.home.score} (${m.home.penScore})` : m.home.score;
     const as_ = m.away.penScore != null ? `${m.away.score} (${m.away.penScore})` : m.away.score;
     set('live-home-score', hs);
@@ -2748,11 +2914,10 @@ var App = (() => {
           y = Math.max(8, Math.min(92, y + (t % 3 ? 5 : -4)));
         }
         used.push({ x, y });
-        const label = (p.name || '').split(' ').pop();
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};color:${textCol};border:2px solid ${secondary}">
-          <span class="dot-num">${p.num || ''}</span>
-          <span class="dot-name">${label}</span>
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+          ${playerAvatarMark(p)}
+          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${p.name}</span></span>
         </div>`;
       });
       return `<div class="mini-pitch team-pitch">
@@ -2889,16 +3054,24 @@ var App = (() => {
   // Shape used for every per-competition stat bucket: season leagues, the season's
   // UCL, and (already existing) the global `stats` / `tournamentStats` buckets.
   function blankCompStats() {
-    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
   }
 
   function bumpStatBucket(bucket, type, player, team) {
+    bumpStatBucketBy(bucket, type, player, team, 1);
+  }
+
+  // Like bumpStatBucket, but adds an arbitrary amount in one go — used for
+  // per-match accumulated totals (e.g. interceptions/tackles over 90 minutes)
+  // rather than one-off events like a goal or a card.
+  function bumpStatBucketBy(bucket, type, player, team, amount) {
+    if (!amount) return;
     if (!bucket[type]) bucket[type] = {};
     if (!bucket[type][player.id]) {
       const aff = findPlayerTeams(player.id);
       bucket[type][player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, national: aff.national, club: aff.club };
     }
-    bucket[type][player.id].count++;
+    bucket[type][player.id].count += amount;
   }
 
   function bumpRatingBucket(bucket, player, team, rating) {
@@ -2983,6 +3156,19 @@ var App = (() => {
     if (currentSeasonComp) {
       if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
       bumpStatBucket(currentSeasonComp.stats, type, player, team);
+    }
+  }
+
+  // Like recordStat, but adds an accumulated per-match total (e.g. a
+  // defender's interception/tackle count for the whole match) in one go.
+  function recordStatCount(type, player, team, amount) {
+    if (!player || !team || !amount) return;
+    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
+    if (competitive) bumpStatBucketBy(stats, type, player, team, amount);
+    if (tournament) bumpStatBucketBy(tournamentStats, type, player, team, amount);
+    if (currentSeasonComp) {
+      if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+      bumpStatBucketBy(currentSeasonComp.stats, type, player, team, amount);
     }
   }
 
@@ -3089,12 +3275,12 @@ var App = (() => {
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
     // otherwise this would wipe that tournament's own live leaderboard mid-run.
     if (!tournament || tournament.champion) {
-      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
     }
     saveStats();
   }
@@ -3230,8 +3416,8 @@ var App = (() => {
 
   function resetLeaderboard() {
     if (!confirm('Reset all leaderboard stats and trophies? This cannot be undone.')) return;
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {} };
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
     trophies = [];
     try { localStorage.removeItem('apexSimStats'); } catch(e) {}
     try { localStorage.removeItem('apexTrophies'); } catch(e) {}
@@ -3259,7 +3445,7 @@ var App = (() => {
       el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No ${type} recorded yet. Simulate matches!</p></div>`;
       return;
     }
-    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating' };
+    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating', interceptions: 'Interceptions' };
     const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
     const top3 = data.slice(0, 3);
     const podium = top3.length ? `<div class="lb-podium">
@@ -3359,7 +3545,7 @@ var App = (() => {
     const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
     if (selected.length < 4) { toast('Select at least 4 teams'); return; }
 
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
@@ -4411,9 +4597,8 @@ var App = (() => {
     window._koRoundIdx = undefined;
     window._koMatchIdx = undefined;
 
-    const forms = Object.keys(FORMATIONS);
-    const hf = opts.homeForm || forms[Math.floor(Math.random() * forms.length)];
-    const af = opts.awayForm || forms[Math.floor(Math.random() * forms.length)];
+    const hf = opts.homeForm || pickTeamFormation(homeTeam);
+    const af = opts.awayForm || pickTeamFormation(awayTeam);
     const homeSquad = buildSquad(homeTeam, hf);
     const awaySquad = buildSquad(awayTeam, af);
 
@@ -4545,7 +4730,7 @@ var App = (() => {
     if (!tournament.awards) assignTournamentAwards();
     const a = tournament.awards || {};
     const card = (title, icon, p, extra) => {
-      const titleHtml = `<div class="am-title">${trophyMark(title, 22)} ${title}</div>`;
+      const titleHtml = `<div class="am-title">${trophyMark(title, 32)} ${title}</div>`;
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini">${titleHtml}
         ${lbAvatar(p, 44)}
@@ -4831,7 +5016,7 @@ var App = (() => {
           <div style="flex:1;min-width:0">
             <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</strong>
             <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''}</div>
-            <div style="font-size:0.7rem;color:var(--gold)">${(t.manager && t.manager.name) || ''}</div>
+            <div style="font-size:0.7rem;color:var(--gold)">${(t.manager && t.manager.name) || ''} · ${getManagerPlaystyle(t)}</div>
           </div>
           <span class="player-ovr">${ovr}</span>
         </div>
@@ -4943,7 +5128,7 @@ var App = (() => {
     if (!won.length) return '';
     return `<div class="card-title" style="margin-top:14px">🏆 Trophy Cabinet</div>
       <div class="trophy-cabinet-grid">
-        ${won.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 40)}<div class="tc-name">${t.name}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
+        ${won.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 56)}<div class="tc-name">${t.name}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
       </div>`;
   }
 
@@ -5033,6 +5218,7 @@ var App = (() => {
     const primary = team.color || '#d4af37';
     const secondary = team.secondary || '#fff';
     const mgr = team.manager || {};
+    const mgrStyle = getManagerPlaystyle(team);
     const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
     const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
     const modal = document.getElementById('team-modal');
@@ -5040,11 +5226,11 @@ var App = (() => {
     if (!modal || !content) return;
     content.innerHTML = `
       <div class="profile-header" style="border-bottom:2px solid ${primary};padding-bottom:14px">
-        <div class="profile-avatar" style="background:${primary};color:${secondary};font-size:1.6rem">${teamAvatarMark(team)}</div>
+        <div class="profile-avatar profile-avatar-logo" style="color:${secondary};font-size:1.6rem">${teamAvatarMark(team)}</div>
         <div style="flex:1;min-width:0">
           <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
-          <div style="color:var(--gold);font-size:0.8rem;margin-top:4px">Manager: ${mgr.name || '—'} ${mgr.ovr ? '· ' + mgr.ovr + ' OVR' : ''}</div>
+          <div style="color:var(--gold);font-size:0.8rem;margin-top:4px">Manager: ${mgr.name || '—'} ${mgr.ovr ? '· ' + mgr.ovr + ' OVR' : ''} <span class="playstyle-tag">· ${mgrStyle}</span></div>
           <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px">🏟️ ${getStadium(team)}</div>
         </div>
       </div>
@@ -5073,7 +5259,7 @@ var App = (() => {
     if (type === 'goldenboot') {
       const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">⚽</div><p>No goals yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Golden Boot', 24) + ' Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Golden Boot', 34) + ' Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -5086,7 +5272,7 @@ var App = (() => {
         return;
       }
       const leader = data[0];
-      el.innerHTML = '<div class="award-card">' + lbAvatar(leader, 64) + '<div class="award-info"><h4>' + trophyMark("Ballon d'Or", 24) + ' Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(leader, 64) + '<div class="award-info"><h4>' + trophyMark("Ballon d'Or", 34) + ' Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Noms</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td>'+(p.noms||0)+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -5094,7 +5280,7 @@ var App = (() => {
       // Puskás Award — best/most spectacular individual goal, tallied by nominee count
       const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Puskás Award', 24) + ' Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Puskás Award', 34) + ' Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Nominated Goals</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -5120,7 +5306,7 @@ var App = (() => {
       });
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Gerd Müller Award', 24) + ' Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Gerd Müller Award', 34) + ' Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -5143,22 +5329,55 @@ var App = (() => {
       });
       const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Yashin Trophy', 24) + ' Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Yashin Trophy', 34) + ' Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
+    } else if (type === 'defenders') {
+      // Defenders' Award — best defensive campaign: interceptions + tackles,
+      // with clean sheets and a defensive-position bonus factored in.
+      const scores = {};
+      Object.values(stats.interceptions || {}).forEach(p => {
+        scores[p.id] = { id: p.id, name: p.name, team: p.team, interceptions: p.count, tackles: 0, clean: 0, pts: p.count * 1.4 };
+      });
+      Object.values(stats.tackles || {}).forEach(p => {
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, interceptions: 0, tackles: 0, clean: 0, pts: 0 };
+        scores[p.id].tackles = p.count;
+        scores[p.id].pts += p.count * 1.1;
+      });
+      Object.values(stats.cleanSheets || {}).forEach(p => {
+        if (scores[p.id]) { scores[p.id].clean = p.count; scores[p.id].pts += p.count * 1.5; }
+      });
+      Object.values(stats.ratings || {}).forEach(p => {
+        if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.25;
+      });
+      // Bonus if the player is actually a defender on their roster (CB/RB/LB/RWB/LWB).
+      Object.values(scores).forEach(s => {
+        let isDef = false;
+        for (const t of allTeams) {
+          const pl = (t.players || []).find(x => x.id === s.id);
+          if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) { isDef = true; break; }
+        }
+        if (isDef) s.pts += 3;
+      });
+      const data = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧱</div><p>No defensive stats yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark("Defenders' Award", 34) + " Defenders' Award</h4><p class=\"award-winner\">" + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best defender · ' + data[0].interceptions + ' interceptions · ' + data[0].tackles + ' tackles · ' + data[0].team + '</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Int</th><th>Tkl</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.interceptions+'</td><td>'+p.tackles+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table></div>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
-      el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 52) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
+      el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 68) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
     } else {
       // overview
       const topScorer = Object.values(stats.goals||{}).sort((a,b)=>b.count-a.count)[0];
       const topAst = Object.values(stats.assists||{}).sort((a,b)=>b.count-a.count)[0];
       const topMotm = Object.values(stats.motm||{}).sort((a,b)=>b.count-a.count)[0];
       el.innerHTML = `
-        <div class="award-card">${topScorer ? lbAvatar(topScorer, 52) : trophyMark('Golden Boot', 52)}<div class="award-info"><h4>${trophyMark('Golden Boot', 20)} Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
-        <div class="award-card">${topAst ? lbAvatar(topAst, 52) : trophyMark('Top Assists', 52)}<div class="award-info"><h4>${trophyMark('Top Assists', 20)} Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
-        <div class="award-card">${topMotm ? lbAvatar(topMotm, 52) : trophyMark('Most MOTM', 52)}<div class="award-info"><h4>${trophyMark('Most MOTM', 20)} Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
+        <div class="award-card">${topScorer ? lbAvatar(topScorer, 52) : trophyMark('Golden Boot', 68)}<div class="award-info"><h4>${trophyMark('Golden Boot', 30)} Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
+        <div class="award-card">${topAst ? lbAvatar(topAst, 52) : trophyMark('Top Assists', 68)}<div class="award-info"><h4>${trophyMark('Top Assists', 30)} Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
+        <div class="award-card">${topMotm ? lbAvatar(topMotm, 52) : trophyMark('Most MOTM', 68)}<div class="award-info"><h4>${trophyMark('Most MOTM', 30)} Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
         <div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Trophies</h4><p class="award-winner">${trophies.length} won</p></div></div>`;
     }
   }
@@ -5212,9 +5431,9 @@ var App = (() => {
       const g = groups[key];
       const items = g.items.map(t => {
         if (t.player) {
-          return `<div class="award-card">${trophyMark(t.name, 48)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.player}</p><p style="color:var(--text-2);font-size:0.82rem">${t.team || ''}</p></div></div>`;
+          return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.player}</p><p style="color:var(--text-2);font-size:0.82rem">${t.team || ''}</p></div></div>`;
         }
-        return `<div class="award-card">${trophyMark(t.name, 48)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`;
+        return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`;
       }).join('');
       return `<div class="group-card" style="margin-bottom:16px"><h4>${g.label}</h4>${items}</div>`;
     }).join('');
@@ -5807,7 +6026,7 @@ var App = (() => {
   function renderCompAwardsHTML(comp) {
     const a = assignCompAwards(comp);
     const card = (title, icon, p, extra) => {
-      const titleHtml = `<div class="am-title">${trophyMark(title, 22)} ${title}</div>`;
+      const titleHtml = `<div class="am-title">${trophyMark(title, 32)} ${title}</div>`;
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini">${titleHtml}
         ${lbAvatar(p, 44)}
@@ -5824,7 +6043,7 @@ var App = (() => {
       ${card('Best Avg Rating', '📈', a.bestAvgRating, a.bestAvgRating ? (a.bestAvgRating.avg != null ? a.bestAvgRating.avg.toFixed(2) : '—') + ' (' + a.bestAvgRating.count + ' apps)' : '')}
     </div>`;
     if (a.champion) {
-      h += `<div class="award-card" style="margin-top:14px">${trophyMark(comp.name, 52)}<div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${teamMark(a.champion, 18) + ' ' + a.champion.name}</p></div></div>`;
+      h += `<div class="award-card" style="margin-top:14px">${trophyMark(comp.name, 68)}<div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${teamMark(a.champion, 18) + ' ' + a.champion.name}</p></div></div>`;
     } else {
       h += '<p style="color:var(--text-muted);font-size:0.85rem;margin-top:10px">Champion will be crowned once the competition finishes.</p>';
     }
@@ -5849,7 +6068,7 @@ var App = (() => {
     let h = '<div class="card-title">🏆 Season Trophy Room</div>';
     years.forEach(y => {
       h += `<div class="group-card" style="margin-bottom:14px"><h4>Year ${y}</h4>` +
-        byYear[y].map(t => `<div class="award-card">${trophyMark(t.name, 52)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`).join('') +
+        byYear[y].map(t => `<div class="award-card">${trophyMark(t.name, 68)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`).join('') +
         '</div>';
     });
     return h;

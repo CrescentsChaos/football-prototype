@@ -54,12 +54,12 @@
             <p>Random national or club pairing. Or choose National / Club only from Match screen.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.goToTournament('worldcup')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToTournament('worldcup')}">
-            <div class="icon">🏆</div>
+            <div class="icon"><img src="assets/trophies/world-cup.png" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.textContent='🏆'"></div>
             <h3>World Cup</h3>
             <p>National teams battle through groups and knockouts. Track top scorers, assists, clean sheets across the tournament.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.goToTournament('ucl')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToTournament('ucl')}">
-            <div class="icon">⭐</div>
+            <div class="icon"><img src="assets/trophies/champions-league.png" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.textContent='⭐'"></div>
             <h3>Champions League</h3>
             <p>Club competition. Select teams, run the full knockout path, and crown the European champion.</p>
           </div>
@@ -271,6 +271,7 @@
           <button class="lb-tab" data-lb="assists" onclick="App.showLeaderboard('assists')">🎯 Assists</button>
           <button class="lb-tab" data-lb="saves" onclick="App.showLeaderboard('saves')">🧤 Saves</button>
           <button class="lb-tab" data-lb="cleanSheets" onclick="App.showLeaderboard('cleanSheets')">🛡️ Clean Sheets</button>
+          <button class="lb-tab" data-lb="interceptions" onclick="App.showLeaderboard('interceptions')">🧱 Interceptions</button>
           <button class="lb-tab" data-lb="yellows" onclick="App.showLeaderboard('yellows')">🟨 Yellows</button>
           <button class="lb-tab" data-lb="reds" onclick="App.showLeaderboard('reds')">🟥 Reds</button>
           <button class="lb-tab" data-lb="motm" onclick="App.showLeaderboard('motm')">⭐ MOTM</button>
@@ -298,6 +299,7 @@
           <button class="award-tab" data-award="puskas" onclick="App.showAwards('puskas')">Puskás</button>
           <button class="award-tab" data-award="muller" onclick="App.showAwards('muller')">Gerd Müller</button>
           <button class="award-tab" data-award="yashin" onclick="App.showAwards('yashin')">Yashin</button>
+          <button class="award-tab" data-award="defenders" onclick="App.showAwards('defenders')">Defenders' Award</button>
           <button class="award-tab" data-award="trophies" onclick="App.showAwards('trophies')">Trophies</button>
         </div>
         <div id="awards-content">
