@@ -1879,21 +1879,40 @@ var App = (() => {
     if (!m) return;
     if (!m.playerMatchStats) m.playerMatchStats = {};
     let homeCompletedMin = 0, awayCompletedMin = 0;
+    // Ball-control quality — technical ability, overall, and manager combine into
+    // how much a team naturally dictates tempo. This (not just pass accuracy) now
+    // drives raw pass *volume*, so a clearly superior side genuinely racks up more
+    // attempted passes from minute one instead of the two sides staying
+    // symmetric-random and drifting back to an even split by full time.
+    const homeStr = calcTeamStrength(m.home);
+    const awayStr = calcTeamStrength(m.away);
+    const ctrl = (s) => s.tec * 0.55 + s.ovr * 0.25 + (s.mgr != null ? s.mgr : 75) * 0.20;
+    const ctrlDiff = Math.max(-24, Math.min(24, ctrl(homeStr) - ctrl(awayStr)));
+    const ctrlShift = ctrlDiff / 24 * 0.4; // up to +/-40% volume swing from raw quality gap
     ['home', 'away'].forEach(side => {
       const team = m[side];
+      const oppTeam = side === 'home' ? m.away : m.home;
       const ids = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
       const onPitch = (team.squad.all || []).filter(p => ids.includes(p.id));
       if (!onPitch.length) return;
       const tac = (m.tactics && m.tactics[side]) || 'balanced';
       const pmods = getPlaystyleMods(team.team);
-      // Recent possession share feeds back into how much of the ball this team gets —
-      // clamped so it can't spiral away from realistic bounds.
-      const possShare = Math.max(0.75, Math.min(1.3, ((team.stats.possession || 50)) / 50));
+      // Recent possession share still feeds back a little into how much of the ball
+      // this team gets — clamped so it can't spiral away from realistic bounds.
+      const possShare = Math.max(0.8, Math.min(1.25, ((team.stats.possession || 50)) / 50));
       let baseVol = 5.2 + Math.random() * 2.6; // ~5.2-7.8 team passes per minute baseline
       if (tac === 'attack') baseVol *= 1.08;
       if (tac === 'defend') baseVol *= 0.86;
       if (tac === 'press') baseVol *= 0.78;
       baseVol *= pmods.passVolMult; // manager playstyle: direct (Long Ball) vs patient (Possession)
+      baseVol *= (side === 'home' ? (1 + ctrlShift) : (1 - ctrlShift)); // raw quality gap
+      // Game state: a team chasing the game commits more men forward and sees more
+      // of the ball late on; one nursing a lead can afford to sit off it.
+      if (m.minute > 60) {
+        const diff = (team.score || 0) - (oppTeam.score || 0);
+        if (diff <= -1) baseVol *= 1 + Math.min(0.18, Math.abs(diff) * 0.08);
+        else if (diff >= 1) baseVol *= 1 - Math.min(0.1, diff * 0.04);
+      }
       const vol = Math.max(1, baseVol * possShare);
       const weighted = onPitch.map(p => {
         const slot = p.slot || (p.pos || [])[0] || 'CM';
@@ -1945,12 +1964,33 @@ var App = (() => {
     const priorPoss = m.possession != null ? m.possession : 50;
     const homeCounter = homeMods.counterBonus * Math.max(0, 50 - priorPoss) / 50;
     const awayCounter = awayMods.counterBonus * Math.max(0, priorPoss - 50) / 50;
-    const homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10 + homeCounter;
-    const awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10 + awayCounter;
+    // Manager tactical edge — a sharper manager creates a genuine, if modest, extra advantage.
+    const mgrEdge = (homeStr.mgr - awayStr.mgr) * 0.15;
+    let homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10 + homeCounter;
+    let awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10 + awayCounter;
+    // Game-state realism: a team chasing the game late pushes players forward and
+    // creates more (higher risk, higher reward), while a team defending a healthy
+    // lead tends to sit in and cede a bit of territory — this stops one-sided
+    // matches from snowballing into unrealistic 90-minute blowout shot counts.
+    if (m.minute > 55) {
+      const diff = (m.home.score || 0) - (m.away.score || 0);
+      const urgency = Math.min(1, (m.minute - 55) / 35); // ramps up as the clock runs down
+      if (diff <= -1) homeCreate += Math.min(10, Math.abs(diff) * 4) * urgency;
+      else if (diff >= 1) homeCreate -= Math.min(6, diff * 2.5) * urgency;
+      if (diff >= 1) awayCreate += Math.min(10, diff * 4) * urgency;
+      else if (diff <= -1) awayCreate -= Math.min(6, Math.abs(diff) * 2.5) * urgency;
+    }
     const HOME_ADV = 3.2; // small, realistic home-field nudge, not a thumb on the scale
-    const qualityGap = (homeCreate - awayCreate) + HOME_ADV;
-    let homeChance = 1 / (1 + Math.exp(-qualityGap / 11));
-    homeChance = Math.min(0.85, Math.max(0.15, homeChance));
+    // Small per-minute "run of play" jitter — real matches ebb and flow shot to
+    // shot rather than one side holding an identical, static edge for 90 minutes.
+    const jitter = (Math.random() - 0.5) * 7;
+    const qualityGap = (homeCreate - awayCreate) + HOME_ADV + mgrEdge + jitter;
+    // Softer curve (wider denominator) so quality gaps translate into a real but
+    // not overwhelming edge — even a big mismatch shouldn't monopolise 85% of
+    // the game's chances for 90 straight minutes. Clamp narrowed to keep the
+    // weaker side involved throughout, the way real underdogs still get looks.
+    let homeChance = 1 / (1 + Math.exp(-qualityGap / 16));
+    homeChance = Math.min(0.78, Math.max(0.22, homeChance));
     // Build up real passing volume for both teams this minute (feeds player stats + rating).
     simulateMinutePassing();
     // Independent per-minute defensive activity (tackles/interceptions/blocks) —
@@ -1960,13 +2000,16 @@ var App = (() => {
     // providers compute it), smoothed minute to minute so it doesn't jump around wildly.
     const hp = m.home.stats.passes || 0, ap = m.away.stats.passes || 0;
     const passShareTarget = (hp + ap) > 0 ? 100 * hp / (hp + ap) : 50;
-    // Slight tug toward the technically stronger side so quality shows up immediately, not just late.
-    const techBias = Math.max(-6, Math.min(6, (homeStr.tec - awayStr.tec) * 0.5));
+    // Tug toward the side with the real ball-control edge (technical ability,
+    // overall, manager) so genuine quality gaps show up clearly and don't get
+    // washed out by an ever-growing cumulative pass count from early, even minutes.
+    const ctrlBias = Math.max(-14, Math.min(14, ((homeStr.tec * 0.55 + homeStr.ovr * 0.25 + (homeStr.mgr || 75) * 0.20)
+      - (awayStr.tec * 0.55 + awayStr.ovr * 0.25 + (awayStr.mgr || 75) * 0.20)) * 0.9));
     // Manager playstyle possession bias (Possession chases the ball, Long Ball/Counter styles cede it).
     const styleBias = Math.max(-8, Math.min(8, (homeMods.possBias - awayMods.possBias) * 0.5));
-    const target = Math.max(22, Math.min(78, passShareTarget * 0.8 + (50 + techBias + styleBias) * 0.2));
-    m.possession = m.possession + (target - m.possession) * 0.12 + (Math.random() - 0.5) * 1.2;
-    m.possession = Math.max(20, Math.min(80, m.possession));
+    const target = Math.max(20, Math.min(80, passShareTarget * 0.62 + (50 + ctrlBias + styleBias) * 0.38));
+    m.possession = m.possession + (target - m.possession) * 0.16 + (Math.random() - 0.5) * 1.2;
+    m.possession = Math.max(18, Math.min(82, m.possession));
     m.home.stats.possession = Math.round(m.possession);
     m.away.stats.possession = 100 - m.home.stats.possession;
     // Stronger teams create more moments
@@ -1994,6 +2037,52 @@ var App = (() => {
     const attackingSide = Math.random() < homeChance ? 'home' : 'away';
     const defendingSide = attackingSide === 'home' ? 'away' : 'home';
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
+
+    // Even a team that's being dominated still breaks forward on the counter now
+    // and then — a small, independent chance each active minute for the side
+    // that *didn't* win the main possession roll to snatch a quick transition
+    // shot of their own. Scaled by their own attacking ability vs the
+    // dominant side's defence, so it's a real chance, not a freebie.
+    if (Math.random() < 0.05) {
+      const counterStr = attackingSide === 'home' ? awayStr : homeStr;
+      const counterOppStr = attackingSide === 'home' ? homeStr : awayStr;
+      const counterTeam = defTeam, counterOppTeam = attTeam;
+      const cShooter = pickPlayerWeighted(counterTeam, ['ST','RW','LW','CAM','CM'], GOAL_ROLE_WEIGHT);
+      if (cShooter) {
+        counterTeam.stats.shots++;
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[cShooter.id]) m.playerMatchStats[cShooter.id] = blankPlayerMatchStats(cShooter);
+        m.playerMatchStats[cShooter.id].shots++;
+        const cQuality = ((cShooter.att || 70) * 0.45 + (cShooter.tec || 70) * 0.35 + (cShooter.ovr || 75) * 0.2) / 100;
+        const cDefAvg = counterOppStr.def / 100;
+        const cOnTarget = Math.min(0.6, Math.max(0.1, 0.14 + cQuality * 0.34 - cDefAvg * 0.2));
+        if (Math.random() < cOnTarget) {
+          counterTeam.stats.shotsOn++;
+          const cGk = pickPlayer(counterOppTeam, ['GK']);
+          const cGkSkill = cGk ? ((cGk.def || 70) * 0.5 + (cGk.ovr || 75) * 0.3 + (cGk.tec || 70) * 0.2) / 100 : 0.7;
+          const cSaveChance = Math.min(0.88, Math.max(0.35, 0.48 + cGkSkill * 0.36 - cQuality * 0.22));
+          if (Math.random() < cSaveChance) {
+            if (cGk) {
+              counterOppTeam.stats.saves++;
+              recordStat('saves', cGk, counterOppTeam.team);
+              addEvent(m.minute, 'save', `Quick break! <span class="player">${cGk.name}</span> is called into action and saves`, defendingSide);
+            }
+          } else {
+            counterTeam.score++;
+            const method = pickGoalMethod(cShooter);
+            recordStat('goals', cShooter, counterTeam.team);
+            pushGoal(defendingSide, cShooter, m.minute, 'on the counter — ' + method.desc);
+            m.playerMatchStats[cShooter.id].goals++;
+            m.playerMatchStats[cShooter.id].xg += method.xg;
+            addEvent(m.minute, 'goal', `Goal on the break! <span class="player">${cShooter.name}</span> (${counterTeam.team.short}) — ${method.desc}.`, defendingSide, true);
+            maybeOffsideDisallow(defendingSide, cShooter, m.minute);
+          }
+        } else {
+          m.playerMatchStats[cShooter.id].xg += 0.04 + Math.random() * 0.08;
+          addEvent(m.minute, 'miss', sofascoreMiss(cShooter, counterTeam.team), defendingSide);
+        }
+      }
+    }
 
     if (r < 0.22) {
       const shooter = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM','RM','LM'], GOAL_ROLE_WEIGHT);
@@ -2053,6 +2142,8 @@ var App = (() => {
       if (Math.random() < 0.03) {
         const scorer = pickPlayer(attTeam, ['ST','CB','CM','CAM']);
         if (scorer) {
+          attTeam.stats.shots++;
+          attTeam.stats.shotsOn++;
           attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
           if (!m.playerMatchStats) m.playerMatchStats = {};
@@ -2183,8 +2274,12 @@ var App = (() => {
       if (p) addEvent(m.minute, 'offside', `Offside against <span class="player">${p.name}</span>`, attackingSide);
     } else if (r < 0.8) {
       const p = pickPlayer(attTeam, ['ST','CAM','RW','LW']);
-      if (p) {
+      if (p && Math.random() < 0.75) {
         attTeam.stats.shots++;
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+        m.playerMatchStats[p.id].shots++;
+        m.playerMatchStats[p.id].xg += 0.15 + Math.random() * 0.15;
         addEvent(m.minute, 'miss', `Big chance missed by <span class="player">${p.name}</span>!`, attackingSide);
       }
     } else if (r < 0.85) {
@@ -2353,12 +2448,15 @@ var App = (() => {
     const pmods = getPlaystyleMods(side.team);
     const avg = (key, fallback) => onPitch.reduce((s, p) => s + (p[key] != null ? p[key] : fallback), 0) / onPitch.length;
     return {
-      att: avg('att', 70) + (mgr - 75) * 0.12 + pmods.attBonus,
-      def: avg('def', 70) + (mgr - 75) * 0.1 + pmods.defBonus,
+      // Manager overall now carries real weight: a top tactician visibly lifts
+      // both ends of the pitch, a poor one visibly drags them down.
+      att: avg('att', 70) + (mgr - 75) * 0.18 + pmods.attBonus,
+      def: avg('def', 70) + (mgr - 75) * 0.16 + pmods.defBonus,
       tec: avg('tec', 70),
       ovr: avg('ovr', 75),
       phy: avg('phy', 70),
-      pac: avg('pac', 70)
+      pac: avg('pac', 70),
+      mgr: mgr
     };
   }
 
