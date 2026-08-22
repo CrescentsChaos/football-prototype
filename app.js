@@ -20,7 +20,24 @@ var App = (() => {
   // managers.json: { "Manager Full Name": "portrait-file.png", ... } — portrait
   // file names are resolved against assets/mportraits/. Optional; falls back to
   // assets/mportraits/none.png, and further to a 🧑‍💼 badge if that also fails.
-  let managerPortraits = {};
+  // Embedded below (MANAGER_PORTRAITS_DATA) so it works immediately even when
+  // index.html is opened directly (file://), where fetch() of local JSON is
+  // blocked by the browser. If the app IS served over http(s), a fresh fetch
+  // of managers.json (root dir, alongside index.html — NOT inside assets/)
+  // is layered on top, so editing managers.json still works without rebuilding.
+  const MANAGER_PORTRAITS_DATA = {
+    "Carlo Ancelotti": "ancelotti.png",
+    "Pep Guardiola": "guardiola.png",
+    "Jurgen Klopp": "klopp.png",
+    "Diego Simeone": "simeone.png",
+    "Xabi Alonso": "alonso.png",
+    "Mikel Arteta": "arteta.png",
+    "Hansi Flick": "flick.png",
+    "Luis Enrique": "enrique.png",
+    "Thomas Tuchel": "tuchel.png",
+    "Simone Inzaghi": "inzaghi.png"
+  };
+  let managerPortraits = { ...MANAGER_PORTRAITS_DATA };
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
@@ -260,9 +277,12 @@ var App = (() => {
         }
       } catch (e) { console.warn('trophies.json not loaded', e); }
 
-      // Load managers.json (manager name -> portrait filename). Optional —
-      // the app still works without it, managers just show a placeholder
-      // silhouette (assets/mportraits/none.png) instead of a real photo.
+      // Load managers.json (manager name -> portrait filename), resolved
+      // against assets/mportraits/ — managers.json itself lives in the main
+      // project dir, NOT inside assets/. managerPortraits already starts out
+      // populated from the embedded MANAGER_PORTRAITS_DATA above (so this
+      // works even opened straight from disk); a successful fetch here just
+      // layers any newer/edited entries from the on-disk managers.json on top.
       try {
         const mgUrls = isHosted
           ? ['managers.json?v=' + Date.now() + '&r=' + Math.random().toString(36).slice(2), './managers.json?v=' + Date.now(), 'managers.json']
@@ -272,10 +292,16 @@ var App = (() => {
             const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
             if (!res.ok) continue;
             const data = await res.json();
-            if (data && typeof data === 'object') { managerPortraits = data; console.log('Loaded manager portraits from', url); break; }
+            if (data && typeof data === 'object') {
+              const clean = { ...data };
+              delete clean._comment;
+              managerPortraits = { ...MANAGER_PORTRAITS_DATA, ...clean };
+              console.log('Loaded manager portraits from', url);
+              break;
+            }
           } catch (err) { console.warn('Fetch failed', url, err); }
         }
-      } catch (e) { console.warn('managers.json not loaded', e); }
+      } catch (e) { console.warn('managers.json fetch skipped, using embedded portraits', e); }
 
       loadStats();
       loadPersistedGameState();
@@ -511,10 +537,18 @@ var App = (() => {
     return `<span class="trophy-mark trophy-mark-fallback" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px">🏆</span>`;
   }
 
-  // Looks up a manager's portrait filename in managers.json, by exact name.
+  // Looks up a manager's portrait filename in managers.json. Tries an exact
+  // name match first, then falls back to a trimmed/case-insensitive match so
+  // small formatting differences between teams.json and managers.json (extra
+  // whitespace, different casing) don't silently drop a portrait that exists.
   function resolveManagerPortrait(manager) {
     if (!manager || !manager.name) return null;
-    return managerPortraits[manager.name] || null;
+    if (managerPortraits[manager.name]) return managerPortraits[manager.name];
+    const target = manager.name.trim().toLowerCase();
+    for (const key in managerPortraits) {
+      if (key.trim().toLowerCase() === target) return managerPortraits[key];
+    }
+    return null;
   }
 
   // Renders a manager's portrait (from assets/mportraits/<file>, looked up by
@@ -527,7 +561,7 @@ var App = (() => {
     size = size || 32;
     const file = resolveManagerPortrait(manager);
     const src = 'assets/mportraits/' + (file || 'none.png');
-    return `<span class="mgr-avatar" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('mgr-avatar-fallback');this.innerHTML='🧑\u200d💼'"></span>`;
+    return `<span class="mgr-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.55)}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('mgr-avatar-fallback');this.innerHTML='🧑\u200d💼'"></span>`;
   }
 
   function updateTeamPreview(side) {
@@ -5400,7 +5434,7 @@ var App = (() => {
       </div>
       <div class="card-title" style="margin-top:14px">Manager</div>
       <div class="manager-profile-row">
-        <span class="mgr-avatar mgr-avatar-lg">${managerAvatarMark(mgr, 56)}</span>
+        ${managerAvatarMark(mgr, 56)}
         <div style="flex:1;min-width:0">
           <div style="font-weight:700">${mgr.name || '—'}</div>
           <div style="color:var(--text-2);font-size:0.8rem">${mgr.ovr ? mgr.ovr + ' OVR · ' : ''}<span class="playstyle-tag">${mgrStyle}</span></div>
