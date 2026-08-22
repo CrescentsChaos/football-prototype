@@ -19675,40 +19675,7 @@
     "ovr": 89
   }
 }
-,{
-  "id": "sev2026",
-  "name": "Sevilla FC 2026-27",
-  "short": "SEV",
-  "flag": "🇪🇸",
-  "color": "#FFFFFF",
-  "secondary": "#D81E05",
-  "players": [
-    {"id":"sev26_13","name":"Ørjan Nyland","pos":["GK"],"ovr":78,"att":15,"def":79,"phy":76,"pac":45,"tec":60,"num":13},
-    {"id":"sev26_1","name":"Álvaro Fernández","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":48,"tec":58,"num":1},
-    {"id":"sev26_22","name":"Loïc Badé","pos":["CB"],"ovr":81,"att":45,"def":82,"phy":83,"pac":72,"tec":65,"num":22},
-    {"id":"sev26_4","name":"Kike Salas","pos":["CB","LB"],"ovr":77,"att":52,"def":78,"phy":79,"pac":70,"tec":66,"num":4},
-    {"id":"sev26_23","name":"Tanguy Nianzou","pos":["CB"],"ovr":76,"att":42,"def":77,"phy":78,"pac":68,"tec":64,"num":23},
-    {"id":"sev26_3","name":"Adrià Pedrosa","pos":["LB","LWB"],"ovr":77,"att":75,"def":73,"phy":71,"pac":82,"tec":75,"num":3},
-    {"id":"sev26_19","name":"Valentin Barco","pos":["LB","LM"],"ovr":78,"att":78,"def":68,"phy":69,"pac":81,"tec":82,"num":19},
-    {"id":"sev26_16","name":"Juanlu Sánchez","pos":["RB","RWB","RM"],"ovr":78,"att":76,"def":73,"phy":75,"pac":82,"tec":76,"num":16},
-    {"id":"sev26_2","name":"José Ángel Carmona","pos":["RB","CB"],"ovr":76,"att":68,"def":76,"phy":77,"pac":78,"tec":70,"num":2},
-    {"id":"sev26_6","name":"Nemanja Gudelj","pos":["CDM","CB"],"ovr":79,"att":68,"def":80,"phy":82,"pac":65,"tec":74,"num":6},
-    {"id":"sev26_18","name":"Lucien Agoumé","pos":["CDM","CM"],"ovr":77,"att":62,"def":78,"phy":80,"pac":68,"tec":73,"num":18},
-    {"id":"sev26_20","name":"Djibril Sow","pos":["CM","CDM"],"ovr":78,"att":72,"def":76,"phy":77,"pac":74,"tec":77,"num":20},
-    {"id":"sev26_17","name":"Saúl Ñíguez","pos":["CM","LM"],"ovr":78,"att":75,"def":74,"phy":76,"pac":70,"tec":78,"num":17},
-    {"id":"sev26_8","name":"Pedro Ortiz","pos":["CM"],"ovr":72,"att":68,"def":70,"phy":70,"pac":68,"tec":74,"num":8},
-    {"id":"sev26_21","name":"Chidera Ejuke","pos":["LM","LW"],"ovr":79,"att":80,"def":38,"phy":66,"pac":89,"tec":84,"num":21},
-    {"id":"sev26_11","name":"Dodi Lukebakio","pos":["RM","RW","ST"],"ovr":80,"att":82,"def":40,"phy":74,"pac":87,"tec":80,"num":11},
-    {"id":"sev26_10","name":"Suso","pos":["RW","CAM"],"ovr":78,"att":79,"def":42,"phy":60,"pac":66,"tec":85,"num":10},
-    {"id":"sev26_7","name":"Isaac Romero","pos":["ST"],"ovr":79,"att":81,"def":45,"phy":80,"pac":80,"tec":75,"num":7},
-    {"id":"sev26_9","name":"Kelechi Iheanacho","pos":["ST"],"ovr":76,"att":78,"def":35,"phy":72,"pac":74,"tec":76,"num":9},
-    {"id":"sev26_14","name":"Peque Fernández","pos":["ST","CAM"],"ovr":76,"att":77,"def":40,"phy":68,"pac":76,"tec":78,"num":14}
-  ],
-  "manager": {
-    "name": "Míchel",
-    "ovr": 82
-  }
-},
+,
 {
   "id": "atm2014",
   "name": "Atlético Madrid 2013-14",
@@ -19755,6 +19722,8 @@
   "flag": "🇪🇸",
   "color": "#00954C",
   "secondary": "#FFFFFF",
+  "logo":"betis.png",
+  "stadium":"Estadio Benito Villamarín",
   "players": [
     {"id":"bet26_1","name":"Álvaro Vallés","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":1},
     {"id":"bet26_13","name":"Diego Conde","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":73,"pac":46,"tec":58,"num":9},
@@ -20996,6 +20965,8 @@
   "flag": "🇪🇸",
   "color": "#FFEE00",
   "secondary": "#00519E",
+  "logo":"villareal.png",
+  "stadium":"Estadio de la Cerámica",
   "players": [
     {"id":"vil26_1","name":"Luiz Júnior","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":78,"pac":50,"tec":62,"num":1},
     {"id":"vil26_25","name":"Péter Gulácsi","pos":["GK"],"ovr":78,"att":15,"def":79,"phy":74,"pac":42,"tec":60,"num":25},
@@ -22813,6 +22784,8 @@
   "flag": "🇪🇸",
   "color": "#009933",
   "secondary": "#FFFFFF",
+  "logo":"racing.png",
+  "stadium":"El Sardinero",
   "players": [
     {"id":"rac27_1","name":"Simon Eriksson","pos":["GK"],"ovr":80,"att":10,"def":81,"phy":78,"pac":46,"tec":70,"num":1},
     {"id":"rac27_13","name":"Julen Agirrezabala","pos":["GK"],"ovr":84,"att":10,"def":85,"phy":81,"pac":50,"tec":74,"num":13},
@@ -22884,6 +22857,8 @@
   "flag": "🇪🇸",
   "color": "#85D3F2",
   "secondary": "#004B87",
+  "logo":"celtavigo.png",
+  "stadium":"Estadio Abanca-Balaídos",
   "players": [
     {"id":"cel27_1","name":"Iván Villar","pos":["GK"],"ovr":81,"att":10,"def":82,"phy":78,"pac":47,"tec":72,"num":1},
     {"id":"cel27_13","name":"Ionuț Radu","pos":["GK"],"ovr":83,"att":10,"def":84,"phy":80,"pac":49,"tec":74,"num":13},
@@ -22920,6 +22895,8 @@
   "flag": "🇪🇸",
   "color": "#002855",
   "secondary": "#FFFFFF",
+  "logo":"lacoruna.png",
+  "stadium":"Estadio de Riazor",
   "players": [
     {"id":"dep27_1","name":"Germán Parreño","pos":["GK"],"ovr":80,"att":10,"def":81,"phy":78,"pac":46,"tec":70,"num":1},
     {"id":"dep27_13","name":"Leo Román","pos":["GK"],"ovr":84,"att":10,"def":85,"phy":81,"pac":50,"tec":74,"num":13},
@@ -22960,6 +22937,8 @@
   "flag": "🇪🇸",
   "color": "#0072CE",
   "secondary": "#FFFFFF",
+  "logo":"espanyol.png",
+  "stadium":"RCDE Stadium",
   "players": [
     {"id":"esp27_1","name":"Ángel Fortuño","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":48,"tec":68,"num":1},
     {"id":"esp27_13","name":"Marko Dmitrović","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":80,"pac":45,"tec":72,"num":13},
@@ -23000,6 +22979,8 @@
   "flag": "🇪🇸",
   "color": "#0066B3",
   "secondary": "#FFFFFF",
+  "logo":"sociedad.png",
+  "stadium":"Reale Arena",
   "players": [
     {"id":"rso27_1","name":"Álex Remiro","pos":["GK"],"ovr":85,"att":10,"def":86,"phy":81,"pac":52,"tec":75,"num":1},
     {"id":"rso27_13","name":"Unai Marrero","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":46,"tec":67,"num":13},
@@ -23082,6 +23063,8 @@
   "flag": "🇪🇸",
   "color": "#FF6600",
   "secondary": "#FFFFFF",
+  "logo":"valencia.png",
+  "stadium":"Estadio de Mastalla",
   "players": [
     {"id":"val27_1","name":"Stole Dimitrievski","pos":["GK"],"ovr":83,"att":10,"def":84,"phy":80,"pac":48,"tec":73,"num":1},
     {"id":"val27_13","name":"Julen Agirrezabala","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":52,"tec":72,"num":13},
