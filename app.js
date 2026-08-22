@@ -1295,7 +1295,11 @@ var App = (() => {
       </div>`;
   }
 
-  function showMatchReport(report) {
+  let _reportLegsCtx = null; // { legs: [{label, report}], activeIdx, aggText }
+
+  function showMatchReport(report, legsCtx) {
+    _reportLegsCtx = legsCtx || null;
+    const ctx = _reportLegsCtx;
     if (!report) { toast('No match details available'); return; }
     const modal = document.getElementById('match-report-modal');
     const content = document.getElementById('match-report-content');
@@ -1320,9 +1324,16 @@ var App = (() => {
       const t = (e.text || '').replace(/<[^>]+>/g, '');
       return `<div class="report-event"><span class="re-min">${e.minute}'</span> ${t}</div>`;
     }).join('');
+    const legTabsHtml = (ctx && ctx.legs && ctx.legs.length > 1)
+      ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap">
+          ${ctx.legs.map((leg, i) => `<button class="btn btn-sm ${i === ctx.activeIdx ? 'btn-primary' : 'btn-secondary'}" onclick="App.showMatchReportLeg(${i})">${leg.label}</button>`).join('')}
+        </div>
+        ${ctx.aggText ? `<div style="text-align:center;font-size:0.8rem;color:var(--accent-gold);margin-bottom:8px">${ctx.aggText}</div>` : ''}`
+      : '';
     content.innerHTML = `
       <div style="text-align:center;margin-bottom:14px">
         <div style="font-size:0.85rem;color:var(--text-muted)">Match Report</div>
+        ${legTabsHtml}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px">
           <div style="flex:1;text-align:left"><div style="font-size:1.4rem">${teamMark(h, 28)}</div><strong>${h.name}</strong><div class="goal-scorers">${fmtG(goalsH)}</div></div>
           <div style="font-size:1.6rem;font-weight:800;color:var(--accent-gold)">${scoreLine}</div>
@@ -1360,18 +1371,35 @@ var App = (() => {
     modal.classList.add('active');
   }
 
+  // Switch the currently-open match report modal to a different leg (two-leg ties only).
+  function showMatchReportLeg(idx) {
+    if (!_reportLegsCtx || !_reportLegsCtx.legs || !_reportLegsCtx.legs[idx]) return;
+    _reportLegsCtx.activeIdx = idx;
+    showMatchReport(_reportLegsCtx.legs[idx].report, _reportLegsCtx);
+  }
+
   function viewFixtureReport(idx) {
     if (!tournament || !tournament.fixtures[idx] || !tournament.fixtures[idx].report) {
       toast('No detailed report for this match');
       return;
     }
-    showMatchReport(tournament.fixtures[idx].report);
+    showMatchReport(tournament.fixtures[idx].report, null);
   }
 
   function viewKnockoutReport(ri, mi) {
     const m = tournament && tournament.knockout[ri] && tournament.knockout[ri].matches[mi];
-    if (!m || !m.report) { toast('No detailed report for this match'); return; }
-    showMatchReport(m.report);
+    if (!m) { toast('No detailed report for this match'); return; }
+    if (m.twoLeg !== false && m.leg1 && m.leg2 && m.leg1.report && m.leg2.report) {
+      const aggText = (m.aggHome != null) ? `Aggregate: ${m.home.short} ${m.aggHome} - ${m.aggAway} ${m.away.short}${m.penalties ? ' (on penalties)' : ''}` : '';
+      const legs = [
+        { label: `Leg 1 · ${m.leg1.report.home.short} home`, report: m.leg1.report },
+        { label: `Leg 2 · ${m.leg2.report.home.short} home`, report: m.leg2.report }
+      ];
+      showMatchReport(legs[1].report, { legs, activeIdx: 1, aggText });
+      return;
+    }
+    if (!m.report) { toast('No detailed report for this match'); return; }
+    showMatchReport(m.report, null);
   }
 
 
@@ -1980,7 +2008,7 @@ var App = (() => {
       if (diff >= 1) awayCreate += Math.min(10, diff * 4) * urgency;
       else if (diff <= -1) awayCreate -= Math.min(6, Math.abs(diff) * 2.5) * urgency;
     }
-    const HOME_ADV = 3.2; // small, realistic home-field nudge, not a thumb on the scale
+    const HOME_ADV = 4.0; // small, realistic home-field nudge, not a thumb on the scale
     // Small per-minute "run of play" jitter — real matches ebb and flow shot to
     // shot rather than one side holding an identical, static edge for 90 minutes.
     const jitter = (Math.random() - 0.5) * 7;
@@ -2003,8 +2031,8 @@ var App = (() => {
     // Tug toward the side with the real ball-control edge (technical ability,
     // overall, manager) so genuine quality gaps show up clearly and don't get
     // washed out by an ever-growing cumulative pass count from early, even minutes.
-    const ctrlBias = Math.max(-14, Math.min(14, ((homeStr.tec * 0.55 + homeStr.ovr * 0.25 + (homeStr.mgr || 75) * 0.20)
-      - (awayStr.tec * 0.55 + awayStr.ovr * 0.25 + (awayStr.mgr || 75) * 0.20)) * 0.9));
+    const ctrlBias = Math.max(-14, Math.min(14, (((homeStr.tec * 0.55 + homeStr.ovr * 0.25 + (homeStr.mgr || 75) * 0.20)
+      - (awayStr.tec * 0.55 + awayStr.ovr * 0.25 + (awayStr.mgr || 75) * 0.20)) * 0.9) + 1.5)); // +1.5: home crowd nudges tempo too
     // Manager playstyle possession bias (Possession chases the ball, Long Ball/Counter styles cede it).
     const styleBias = Math.max(-8, Math.min(8, (homeMods.possBias - awayMods.possBias) * 0.5));
     const target = Math.max(20, Math.min(80, passShareTarget * 0.62 + (50 + ctrlBias + styleBias) * 0.38));
@@ -2447,11 +2475,15 @@ var App = (() => {
     const mgr = (side.team.manager && side.team.manager.ovr) || 75;
     const pmods = getPlaystyleMods(side.team);
     const avg = (key, fallback) => onPitch.reduce((s, p) => s + (p[key] != null ? p[key] : fallback), 0) / onPitch.length;
+    // Small, realistic home-field boost — crowd support and matchday familiarity
+    // lift a side's sharpness a touch, on both ends of the pitch.
+    const homeBoostAtt = isHome ? 1.2 : 0;
+    const homeBoostDef = isHome ? 1.0 : 0;
     return {
       // Manager overall now carries real weight: a top tactician visibly lifts
       // both ends of the pitch, a poor one visibly drags them down.
-      att: avg('att', 70) + (mgr - 75) * 0.18 + pmods.attBonus,
-      def: avg('def', 70) + (mgr - 75) * 0.16 + pmods.defBonus,
+      att: avg('att', 70) + (mgr - 75) * 0.18 + pmods.attBonus + homeBoostAtt,
+      def: avg('def', 70) + (mgr - 75) * 0.16 + pmods.defBonus + homeBoostDef,
       tec: avg('tec', 70),
       ovr: avg('ovr', 75),
       phy: avg('phy', 70),
@@ -4757,8 +4789,17 @@ var App = (() => {
   function viewPlayoffReport(idx) {
     const p = tournament && tournament.playoff && tournament.playoff[idx];
     if (!p) return;
+    if (p.leg1 && p.leg2 && p.leg1.report && p.leg2.report) {
+      const aggText = (p.aggHome != null) ? `Aggregate: ${p.home.short} ${p.aggHome} - ${p.aggAway} ${p.away.short}${p.penalties ? ' (on penalties)' : ''}` : '';
+      const legs = [
+        { label: `Leg 1 · ${p.leg1.report.home.short} home`, report: p.leg1.report },
+        { label: `Leg 2 · ${p.leg2.report.home.short} home`, report: p.leg2.report }
+      ];
+      showMatchReport(legs[1].report, { legs, activeIdx: 1, aggText });
+      return;
+    }
     const rep = (p.leg2 && p.leg2.report) || (p.leg1 && p.leg1.report);
-    if (rep) showMatchReport(rep);
+    if (rep) showMatchReport(rep, null);
     else toast('Aggregate: ' + p.aggHome + '-' + p.aggAway);
   }
 
@@ -6581,7 +6622,7 @@ var App = (() => {
   function viewSeasonReport(idx) {
     const report = seasonReportRegistry[idx];
     if (!report) { toast('No detailed report for this match'); return; }
-    showMatchReport(report);
+    showMatchReport(report, null);
   }
 
   function goToSquadBuilder() {
@@ -6606,7 +6647,7 @@ var App = (() => {
     saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
     setTacticsLive, continueToET, continueToPens, skipETAndEnd,
     renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
-    simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport,
+    simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, showMatchReportLeg,
     simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
