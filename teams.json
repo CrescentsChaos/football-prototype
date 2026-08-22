@@ -1141,7 +1141,7 @@
   "color": "#D21034",
   "secondary": "#11457E",
   "players": [
-    {"id":"cze04_1","name":"Petr Cech","pos":["GK"],"ovr":91,"att":15,"def":93,"phy":86,"pac":52,"tec":74,"num":1},
+    {"id":"cze04_1","name":"Petr Čech","pos":["GK"],"ovr":91,"att":15,"def":93,"phy":86,"pac":52,"tec":74,"num":1},
     {"id":"cze04_2","name":"Zdeněk Grygera","pos":["RB","CB"],"ovr":84,"att":68,"def":84,"phy":82,"pac":81,"tec":78,"num":2},
     {"id":"cze04_3","name":"Pavel Mareš","pos":["LB"],"ovr":76,"att":65,"def":75,"phy":76,"pac":75,"tec":72,"num":3},
     {"id":"cze04_4","name":"Tomáš Galásek","pos":["CDM","CM"],"ovr":86,"att":58,"def":87,"phy":84,"pac":68,"tec":80,"num":4},
