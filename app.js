@@ -493,6 +493,20 @@ var App = (() => {
     return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.outerHTML='${num}'">`;
   }
 
+  // Shortens a full name to "F. Lastname" for tight spaces like formation
+  // dots — e.g. "Alessandro Nesta" -> "A. Nesta". Only abbreviates when the
+  // surname is longer than 2 characters; short surnames (and single-word
+  // names, which have nothing to abbreviate) are left as-is.
+  function abbreviateName(fullName) {
+    const trimmed = (fullName || '').trim();
+    const spaceIdx = trimmed.indexOf(' ');
+    if (spaceIdx === -1) return trimmed;
+    const first = trimmed.slice(0, spaceIdx);
+    const last = trimmed.slice(spaceIdx + 1).trim();
+    if (last.length > 2 && first.length) return first[0] + '. ' + last;
+    return trimmed;
+  }
+
   // Renders a small circular portrait for leaderboard/award rows, looked up
   // by id or name in players.json (same source as playerAvatarMark). Falls
   // back to assets/portraits/none.png when no portrait is found, and
@@ -598,38 +612,93 @@ var App = (() => {
 
   function buildSquad(team, formationKey) {
     const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
-    const players = shuffleArray([...(team.players || [])].filter(p => !isPlayerInjured(p.id) && !isPlayerSuspended(p.id)));
+    const allPlayers = team.players || [];
+
+    // Soft squad rotation: every player carries a small "recently started"
+    // counter that decays a bit each match. Selection score below docks
+    // players who've started often lately, so the exact same XI doesn't
+    // take the pitch match after match — while still keeping OVR as the
+    // dominant factor, so rotation favors genuinely close alternatives
+    // rather than randomly benching your best player.
+    allPlayers.forEach(p => { p._recentStarts = Math.max(0, (p._recentStarts || 0) - 0.2); });
+    const score = (p) => (p.ovr || 70) - (p._recentStarts || 0) * 3.5 + (Math.random() * 2.5 - 1.25);
+
+    let players = shuffleArray(allPlayers.filter(p => !isPlayerInjured(p.id) && !isPlayerSuspended(p.id)));
     if (players.length < 11) {
       // Emergency: allow injured/suspended if roster too thin
-      players.push(...shuffleArray([...(team.players||[])].filter(p => isPlayerInjured(p.id) || isPlayerSuspended(p.id))));
+      players = players.concat(shuffleArray(allPlayers.filter(p => isPlayerInjured(p.id) || isPlayerSuspended(p.id))));
     }
+
     const used = new Set();
-    const starting = [];
-    for (const slot of formation.slots) {
+    const slotOf = new Map(); // slot index -> player
+
+    // Pass 1 — a player's FIRST-listed position is their real position and
+    // always gets first claim on a matching slot, ahead of anyone who's
+    // merely compatible with it. This stops, e.g., a CB who's also listed
+    // as RB-compatible from being slotted in at CB ahead of a natural RB
+    // just because formation slots happen to be processed in that order.
+    formation.slots.forEach((slot, i) => {
+      const candidates = players.filter(p => !used.has(p.id) && (p.pos || [])[0] === slot)
+        .sort((a, b) => score(b) - score(a));
+      if (candidates.length) {
+        used.add(candidates[0].id);
+        slotOf.set(i, candidates[0]);
+      }
+    });
+
+    // Pass 2 — only for slots still empty after pass 1 (this formation has
+    // no natural fit available). Fill from compatible secondary positions,
+    // preferring whoever's closest to a natural fit (lower index in their
+    // own pos list) before falling back to plain selection score. A player
+    // whose primary position never got a slot in pass 1, and who isn't
+    // needed here either, simply stays unused — i.e., benched — rather
+    // than being forced out of position to make up the numbers.
+    formation.slots.forEach((slot, i) => {
+      if (slotOf.has(i)) return;
       const candidates = players.filter(p => !used.has(p.id) && canPlay(p, slot))
         .sort((a, b) => {
-          const aExact = (a.pos || []).includes(slot) ? 1 : 0;
-          const bExact = (b.pos || []).includes(slot) ? 1 : 0;
-          if (bExact !== aExact) return bExact - aExact;
-          return (b.ovr || 70) - (a.ovr || 70);
+          const aIdx = (a.pos || []).indexOf(slot);
+          const bIdx = (b.pos || []).indexOf(slot);
+          const aRank = aIdx === -1 ? 99 : aIdx;
+          const bRank = bIdx === -1 ? 99 : bIdx;
+          if (aRank !== bRank) return aRank - bRank;
+          return score(b) - score(a);
         });
       if (candidates.length) {
         used.add(candidates[0].id);
-        starting.push({ ...candidates[0], slot, isStarter: true });
+        slotOf.set(i, candidates[0]);
       }
-    }
-    // Fallback fill if not enough
+    });
+
+    const starting = [];
+    formation.slots.forEach((slot, i) => {
+      const p = slotOf.get(i);
+      if (p) starting.push({ ...p, slot, isStarter: true });
+    });
+
+    // Fallback fill if the squad is too thin to fill every slot even via
+    // pass 2 — field whoever's left regardless of position, so we always
+    // put out 11 players.
     while (starting.length < 11) {
       const leftover = players.find(p => !used.has(p.id));
       if (!leftover) break;
       used.add(leftover.id);
       starting.push({ ...leftover, slot: (leftover.pos || ['CM'])[0], isStarter: true });
     }
-    const remaining = players.filter(p => !used.has(p.id)).sort((a, b) => (b.ovr||70) - (a.ovr||70));
+
+    const remaining = players.filter(p => !used.has(p.id)).sort((a, b) => score(b) - score(a));
     const subs = [];
     for (let i = 0; i < remaining.length && (starting.length + subs.length) < 25; i++) {
       subs.push({ ...remaining[i], slot: (remaining[i].pos || ['CM'])[0], isStarter: false });
     }
+
+    // Whoever actually started is now less likely to start again straight
+    // away next match (see rotation decay/score above).
+    starting.forEach(sp => {
+      const orig = allPlayers.find(x => x.id === sp.id);
+      if (orig) orig._recentStarts = (orig._recentStarts || 0) + 1;
+    });
+
     const _seen = new Set();
     const _st = [];
     for (const p of starting) { if (_seen.has(p.id)) continue; _seen.add(p.id); _st.push(p); }
@@ -1472,6 +1541,12 @@ var App = (() => {
     const passesC = ps.passesCompleted || 0;
     const ints = ps.interceptions || 0;
     const blocks = ps.blocks || 0;
+    // Goals conceded by the player's team this match — set by the caller
+    // (endMatch / renderLineups) from the live/final scoreline. A back line
+    // and keeper shipping a hatful of goals should be dragged down for it,
+    // even if they racked up passes/tackles along the way; conceding 0-1 is
+    // normal and isn't penalized.
+    const conceded = ps.goalsConceded || 0;
     if (isGK) {
       r += Math.min(saves * 0.35, 2.4);
       if (saves >= 4) r += 0.25;
@@ -1480,6 +1555,7 @@ var App = (() => {
       if (goals > 0) r += 1.5;
       r += Math.min(passes * 0.01, 0.25);
       r += Math.min(passesC * 0.015, 0.2);
+      if (conceded >= 2) r -= Math.min((conceded - 1) * 0.45, 3.2);
       if (ps.yellow) r -= 0.35;
       if (ps.red) r -= 2.0;
     } else if (isDef) {
@@ -1499,6 +1575,7 @@ var App = (() => {
       r += goals * 1.1;
       r += Math.min(shots * 0.08, 0.3);
       if (tackles + ints >= 6) r += 0.2;
+      if (conceded >= 2) r -= Math.min((conceded - 1) * 0.35, 2.6);
       if (ps.yellow) r -= 0.4;
       if (ps.red) r -= 1.8;
     } else if (isMid) {
@@ -1514,6 +1591,7 @@ var App = (() => {
       r += Math.min(xg * 0.15, 0.3);
       if (passesC >= 30) r += 0.2;
       if (assists >= 2) r += 0.3;
+      if (conceded >= 3) r -= Math.min((conceded - 2) * 0.15, 1.0);
       if (ps.yellow) r -= 0.35;
       if (ps.red) r -= 1.8;
     } else {
@@ -1541,10 +1619,13 @@ var App = (() => {
       r += Math.max(-0.4, Math.min(0.35, accDelta));
     }
 
-    // Shared involvement floor
+    // Shared involvement floor — but a heavy defeat still drags this down;
+    // doing nothing notable in a 7-1 loss isn't a neutral 6.0 game.
     const actions = goals + assists + shots + saves + tackles + Math.floor(passes / 5);
-    if (actions === 0) r = 6.0;
-    else if (actions === 1 && !isGK) r = Math.max(r, 6.2);
+    const concededFloorPenalty = (isGK || isDef) ? Math.min(Math.max(conceded - 1, 0) * 0.4, 3.0)
+      : isMid ? Math.min(Math.max(conceded - 2, 0) * 0.15, 1.0) : 0;
+    if (actions === 0) r = 6.0 - concededFloorPenalty;
+    else if (actions === 1 && !isGK) r = Math.max(r, 6.2 - concededFloorPenalty);
 
     r += Math.max(-0.12, Math.min(0.18, ((ps.ovr || 75) - 75) * 0.008));
 
@@ -1565,7 +1646,7 @@ var App = (() => {
         ? ((goals >= 1 && ps.cleanSheet) || (goals + assists >= 3) || (goals >= 2 && assists >= 1)) && !ps.red
         : (goals >= 3 || (goals >= 2 && assists >= 1) || assists >= 3 || goals + assists >= 4) && !ps.red;
     const cap = isBreakout ? 10.0 : 8.7 + Math.random() * 0.9; // ~8.7-9.6, varies match to match
-    return Math.max(4.0, Math.min(cap, Math.round(r * 10) / 10));
+    return Math.max(2.5, Math.min(cap, Math.round(r * 10) / 10));
   }
 
 
@@ -2713,9 +2794,13 @@ var App = (() => {
           if (!(ps.passes > 0)) { ps.passes = 8; ps.passesCompleted = 6; }
         }
       }
-      // Clean sheet flag for GK rating
+      // Clean sheet flag for GK rating, and goals conceded for GK/DEF/MID
+      // rating penalty (see calcPlayerRating) — both come from the actual
+      // final scoreline, keyed off which side this player was on.
+      const concededSide = (m.home.squad.all||[]).find(x => x.id === p.id) ? 'home' : 'away';
+      ps.goalsConceded = concededSide === 'home' ? m.away.score : m.home.score;
       if ((ps.pos === 'GK' || (ps.posArr||[]).includes('GK'))) {
-        const side = (m.home.squad.all||[]).find(x => x.id === p.id) ? 'home' : 'away';
+        const side = concededSide;
         if ((side === 'home' && m.away.score === 0) || (side === 'away' && m.home.score === 0)) ps.cleanSheet = true;
       }
       ps.rating = calcPlayerRating(ps);
@@ -2995,40 +3080,29 @@ var App = (() => {
       const textCol = luminance(primary) > 160 ? '#0a0e17' : '#ffffff';
       const used = [];
       let dots = '';
-      // Track how many dots have landed in each rough horizontal "row" (by
-      // rounded y) so tightly-packed rows (e.g. a 3-man midfield line) can
-      // alternate their labels above/below the dot instead of stacking all
-      // of them in the same band, where the wide name text would overlap.
-      const rowCounts = {};
       slotPlayers.forEach((p, idx) => {
         if (!p) return;
         let c = coords[idx] || [50, 50];
         let x = c[0], y = c[1];
-        // Collision avoidance: name labels are much wider than the 34px dot,
-        // so push apart mostly along x (weighted distance) with a bigger
-        // minimum gap and more iterations than a simple circle-only check.
+        // Collision avoidance: name labels are wider than the dot, so push
+        // apart mostly along x (weighted distance) with a bigger minimum gap
+        // and more iterations than a simple circle-only check. Labels always
+        // sit below the dot (no more flipping above on crowded rows) —
+        // spacing is handled here instead so names don't need to jump around.
         for (let t = 0; t < 10; t++) {
-          const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 15);
+          const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 19);
           if (!hit) break;
-          x += (x >= hit.x ? 1 : -1) * 7 + (t % 2 ? 2 : -2);
+          x += (x >= hit.x ? 1 : -1) * 8 + (t % 2 ? 2 : -2);
           y += (t % 3 === 0 ? 1 : -1) * 3;
-          x = Math.max(7, Math.min(93, x));
-          y = Math.max(6, Math.min(94, y));
+          x = Math.max(8, Math.min(92, x));
+          y = Math.max(7, Math.min(92, y));
         }
         used.push({ x, y });
 
-        const rowKey = Math.round(y / 9);
-        const closeSameRow = used.slice(0, -1).some(u => Math.round(u.y / 9) === rowKey && Math.abs(u.x - x) < 20);
-        rowCounts[rowKey] = (rowCounts[rowKey] || 0) + 1;
-        // Near the bottom edge (goalkeeper row) the label would otherwise be
-        // clipped by the pitch's own bottom edge — always flip it above.
-        const nearBottomEdge = y > 84;
-        const labelAbove = nearBottomEdge || (closeSameRow && rowCounts[rowKey] % 2 === 0);
-
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}${labelAbove ? ' label-above' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
           <span class="dot-avatar">${playerAvatarMark(p)}</span>
-          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${p.name}</span></span>
+          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${abbreviateName(p.name)}</span></span>
         </div>`;
       });
       const mgrTag = s.team.manager && s.team.manager.name
@@ -3077,6 +3151,9 @@ var App = (() => {
       const inj = (m.injuries || []).includes(p.id);
       if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
       const ps = m.playerMatchStats[p.id];
+      // Keep the live rating badge in sync with the current scoreline too,
+      // not just the final rating computed at full time in endMatch.
+      ps.goalsConceded = side === 'home' ? m.away.score : m.home.score;
       const subInfo = (m.subLog[side] || {})[p.id];
       const sentOff = !!ps.red;
       const icons = playerLineIcons(ps, subInfo, on, inj);

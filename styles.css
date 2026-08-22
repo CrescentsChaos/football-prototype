@@ -370,7 +370,10 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   min-height: 320px; max-height: 460px;
   aspect-ratio: 68/100;
   box-shadow: inset 0 0 40px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
-  overflow: hidden;
+  /* Name labels always sit below the dot now (never flipped above), so the
+     bottom-row (GK) label needs room to extend past the pitch's own edge
+     instead of being clipped. */
+  overflow: visible;
 }
 .mini-pitch::before {
   content: '';
@@ -390,10 +393,10 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   z-index: 2; pointer-events: none;
 }
 .player-dot {
-  position: absolute; width: 34px; height: 34px; border-radius: 50%;
+  position: absolute; width: 46px; height: 46px; border-radius: 50%;
   transform: translate(-50%, -50%);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.65rem; font-weight: 800;
+  font-size: 0.7rem; font-weight: 800;
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   z-index: 3; cursor: default;
 }
@@ -403,20 +406,22 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .player-dot .dot-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .player-dot .dot-label {
-  position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
+  /* Always below the dot — never flipped above it, even in crowded rows or
+     near the pitch edge (the goalkeeper's label is allowed to extend past
+     the pitch box; see overflow: visible on .mini-pitch/.team-pitch). */
+  position: absolute; top: 100%; margin-top: 4px; left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   white-space: nowrap; pointer-events: none; overflow: visible; z-index: 4;
 }
-.player-dot.label-above .dot-label { bottom: auto; top: -28px; }
 .player-dot .dot-num {
-  font-size: 0.52rem; font-weight: 800; line-height: 1.2;
+  font-size: 0.58rem; font-weight: 800; line-height: 1.2;
   color: var(--accent-gold); background: rgba(0,0,0,0.7);
   padding: 0 4px; border-radius: 3px; text-shadow: none;
 }
 .player-dot .dot-name {
-  font-size: 0.52rem; white-space: nowrap; color: #fff;
+  font-size: 0.58rem; white-space: nowrap; color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.9); font-weight: 700;
-  max-width: 64px; overflow: hidden; text-overflow: ellipsis;
+  max-width: 76px; overflow: hidden; text-overflow: ellipsis;
   line-height: 1.1; pointer-events: none;
   background: rgba(0,0,0,0.35); padding: 0 3px; border-radius: 2px;
 }
