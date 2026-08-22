@@ -1740,16 +1740,51 @@ var App = (() => {
     clearInterval(simInterval); isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
-    // Instant Result / Finish Match have no one to click the ET/pens prompt,
-    // so resolve draws straight through instead of stalling at m._awaitingET —
-    // that stall was what let the minute counter run past 90 and climb well
-    // past 200 while safety just kept ticking without ever finishing.
+    // Instant Result has no one to click the ET/pens prompt, so resolve draws
+    // straight through instead of stalling at m._awaitingET — that stall was
+    // what let the minute counter run past 90 and climb well past 200 while
+    // safety just kept ticking without ever finishing. quietSim additionally
+    // suppresses all live-view rendering, which is correct here since this is
+    // used for the "Instant Result" button, not a fast-forward of a match the
+    // user is actively watching (see finishMatch() for that).
     currentMatch.silentDeep = true;
+    currentMatch.quietSim = true;
     let safety = 0;
     while (currentMatch && !currentMatch.finished && safety < 200) {
       tick(true);
       safety++;
     }
+  }
+
+  // "Finish Match" — unlike Instant Result, this is used mid-live-match, so it
+  // should visibly race through the remaining minutes (scoreboard/events feed
+  // still updating) rather than silently jumping straight to a final result.
+  // It reuses silentDeep so any ET/pens decision auto-resolves instead of
+  // stalling on a prompt (same reasoning as Instant Result), but leaves
+  // quietSim off so every tick still renders — it's a fast Play, not a
+  // silent one.
+  function finishMatch() {
+    if (!currentMatch || currentMatch.finished) return;
+    clearInterval(simInterval);
+    isPlaying = true;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '⏩ Fast-forwarding…';
+    currentMatch.silentDeep = true;
+    currentMatch.quietSim = false;
+    const FF_MS = 18; // fast enough to feel like a fast-forward, not a jump-cut
+    simInterval = setInterval(() => {
+      if (!currentMatch) { clearInterval(simInterval); isPlaying = false; return; }
+      if (currentMatch.finished) {
+        clearInterval(simInterval); isPlaying = false;
+        if (btn) btn.textContent = '▶ Play';
+        return;
+      }
+      // silent=true on the tick call so it doesn't stop for the normal
+      // half-time pause (which is separate from the silentDeep/ET handling
+      // above) — Finish Match should never stall waiting for another click.
+      tick(true);
+      updateStatsPanel();
+    }, FF_MS);
   }
 
   function resetMatch() {
@@ -2684,7 +2719,7 @@ var App = (() => {
     addEvent(m.minute, 'sub',
       `Substitution · ${sideData.team.short}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
       side);
-    if (!m.silentDeep) { renderLineups(); renderPitch(); }
+    if (!m.quietSim) { renderLineups(); renderPitch(); }
   }
 
   // A manager who's just gone down to 10 men often reshapes rather than just
@@ -2736,7 +2771,7 @@ var App = (() => {
     addEvent(m.minute, 'sub',
       `Tactical reshuffle · ${sideData.team.short} reorganise after going down to 10 men<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span> <span style="opacity:0.6">(defensive cover)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,
       side);
-    if (!m.silentDeep) { renderLineups(); renderPitch(); }
+    if (!m.quietSim) { renderLineups(); renderPitch(); }
   }
 
   function changeFormationLive(side, formKey) {
@@ -2761,7 +2796,7 @@ var App = (() => {
       p.slot = slots[assigned.length + i] || (p.pos||['CM'])[0];
     });
     addEvent(m.minute, 'whistle', `📐 ${sideData.team.short} switch shape to ${formKey}`, side);
-    if (!m.silentDeep) { renderLineups(); updateScoreboard(); }
+    if (!m.quietSim) { renderLineups(); updateScoreboard(); }
     toast(sideData.team.short + ' → ' + formKey);
   }
 
@@ -2869,7 +2904,7 @@ var App = (() => {
   
   function renderMomentumAndHeat() {
     const m = currentMatch;
-    if (!m || m.silentDeep) return;
+    if (!m || m.quietSim) return;
     let wrap = document.getElementById('momentum-heat');
     if (!wrap) {
       const live = document.getElementById('match-live');
@@ -3207,7 +3242,7 @@ var App = (() => {
   function addEvent(minute, type, text, side, isGoal) {
     if (!currentMatch) return;
     currentMatch.events.push({ minute, type, text, side });
-    if (currentMatch.silentDeep) return;
+    if (currentMatch.quietSim) return;
     const feed = document.getElementById('events-feed');
     if (!feed) return;
     const icons = { goal: '⚽', save: '🧤', yellow: '🟨', red: '🟥', sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: '📢', pressure: '🔥', motm: '⭐', var: '📺', pen: '⚽', skill: '✨', handball: '✋', et: '⏱️' };
@@ -3222,7 +3257,7 @@ var App = (() => {
 
   function updateScoreboard() {
     if (!currentMatch) return;
-    if (currentMatch.silentDeep) return;
+    if (currentMatch.quietSim) return;
     const m = currentMatch;
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     const setHTML = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
@@ -3266,7 +3301,7 @@ var App = (() => {
 
   function updateStatsPanel() {
     if (!currentMatch) return;
-    if (currentMatch.silentDeep) return;
+    if (currentMatch.quietSim) return;
     const h = currentMatch.home.stats, a = currentMatch.away.stats;
     const ts = (h.shots + a.shots) || 1, ton = (h.shotsOn + a.shotsOn) || 1;
     const tc = (h.corners + a.corners) || 1, tf = (h.fouls + a.fouls) || 1, tsv = (h.saves + a.saves) || 1;
@@ -3467,7 +3502,7 @@ var App = (() => {
         parent.parentNode.insertBefore(ctrl, parent);
       }
     }
-    if (ctrl && !m.finished && !m.silentDeep) {
+    if (ctrl && !m.finished && !m.quietSim) {
       const forms = Object.keys(FORMATIONS).map(f => `<option value="${f}">${f}</option>`).join('');
       ctrl.innerHTML = `
         <div class="live-tac-row">
@@ -5174,6 +5209,15 @@ var App = (() => {
       maxSubs: 5,
       injuries: [],
       cards: { home: {}, away: {} },
+      // possession must start at 50 here exactly like startMatch() does —
+      // without it, m.possession is undefined the first time generateEvents()
+      // smooths it toward a target, which turns it into NaN. NaN then poisons
+      // qualityGap/homeChance downstream, and `Math.random() < NaN` is always
+      // false, so the "away" side wins every single attacking-side roll for
+      // the whole match — hence one team racking up 20+ shots while the other
+      // gets 0-5 (and the report showing a flat 50/50 possession is just the
+      // "||50" display fallback masking the NaN, not a real 50/50 game).
+      possession: 50,
       subLog: { home: {}, away: {} },
       leftPitch: { home: [], away: [] }, // playerIds who have left the pitch (sub'd off, sent off, or injured off) — can never return
       playerMatchStats: {},
@@ -5181,6 +5225,7 @@ var App = (() => {
       allowET: !!opts.allowET,
       allowPens: !!opts.allowPens,
       silentDeep: true,
+      quietSim: true,
       countForLeaderboard: tournament ? true : !!opts.countForLeaderboard,
       inET: false,
       inPens: false
@@ -5645,7 +5690,7 @@ var App = (() => {
   
   function renderPostMatchRatings() {
     if (!currentMatch || !currentMatch.playerMatchStats) return;
-    if (currentMatch.silentDeep) return;
+    if (currentMatch.quietSim) return;
     const el = document.getElementById('post-match-ratings');
     if (!el) return;
     const m = currentMatch;
@@ -6773,7 +6818,7 @@ var App = (() => {
 
   return {
     init, switchView, goToMatch, goToTournament, updateTeamPreview,
-    startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, resetMatch,
+    startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, finishMatch, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
