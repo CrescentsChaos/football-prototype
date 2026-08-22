@@ -17,6 +17,10 @@ var App = (() => {
   // image file names are resolved against assets/trophies/. Optional; falls
   // back to the 🏆 emoji when no image is found for a given trophy name.
   let trophyImages = {};
+  // managers.json: { "Manager Full Name": "portrait-file.png", ... } — portrait
+  // file names are resolved against assets/mportraits/. Optional; falls back to
+  // assets/mportraits/none.png, and further to a 🧑‍💼 badge if that also fails.
+  let managerPortraits = {};
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
@@ -256,8 +260,26 @@ var App = (() => {
         }
       } catch (e) { console.warn('trophies.json not loaded', e); }
 
+      // Load managers.json (manager name -> portrait filename). Optional —
+      // the app still works without it, managers just show a placeholder
+      // silhouette (assets/mportraits/none.png) instead of a real photo.
+      try {
+        const mgUrls = isHosted
+          ? ['managers.json?v=' + Date.now() + '&r=' + Math.random().toString(36).slice(2), './managers.json?v=' + Date.now(), 'managers.json']
+          : ['managers.json?v=' + Date.now()];
+        for (const url of mgUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { managerPortraits = data; console.log('Loaded manager portraits from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('managers.json not loaded', e); }
+
       loadStats();
       loadPersistedGameState();
+      restorePlayerForms();
       populateTeamSelects();
       populateFormations();
       bindNav();
@@ -489,6 +511,25 @@ var App = (() => {
     return `<span class="trophy-mark trophy-mark-fallback" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px">🏆</span>`;
   }
 
+  // Looks up a manager's portrait filename in managers.json, by exact name.
+  function resolveManagerPortrait(manager) {
+    if (!manager || !manager.name) return null;
+    return managerPortraits[manager.name] || null;
+  }
+
+  // Renders a manager's portrait (from assets/mportraits/<file>, looked up by
+  // name in managers.json) inside a circular avatar. Falls back to
+  // assets/mportraits/none.png when no entry exists in managers.json, and
+  // further falls back to a suit-and-tie badge if even none.png fails to load.
+  // Used anywhere a manager appears: match setup preview, live scoreboard,
+  // formation pitch label, Teams tab list, and the full Team profile modal.
+  function managerAvatarMark(manager, size) {
+    size = size || 32;
+    const file = resolveManagerPortrait(manager);
+    const src = 'assets/mportraits/' + (file || 'none.png');
+    return `<span class="mgr-avatar" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('mgr-avatar-fallback');this.innerHTML='🧑\u200d💼'"></span>`;
+  }
+
   function updateTeamPreview(side) {
     const sel = document.getElementById(side + '-team');
     const el = document.getElementById(side + '-preview');
@@ -498,7 +539,8 @@ var App = (() => {
     const mgr = team.manager ? team.manager.name : '';
     const style = getManagerPlaystyle(team);
     const venueLine = side === 'home' ? `<div style="font-size:0.8rem;color:var(--text-muted)">🏟️ ${getStadium(team)}</div>` : '';
-    el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div><div class="manager-name">${mgr ? 'Manager: ' + mgr : ''}${style ? ' <span class="playstyle-tag">· ' + style + '</span>' : ''}</div><div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
+    const mgrLine = mgr ? `<div class="manager-name">${managerAvatarMark(team.manager, 20)} Manager: ${mgr}${style ? ' <span class="playstyle-tag">· ' + style + '</span>' : ''}</div>` : '';
+    el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div>${mgrLine}<div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
     const formSel = document.getElementById(side + '-formation');
     if (formSel) formSel.value = pickTeamFormation(team);
   }
@@ -2637,6 +2679,11 @@ var App = (() => {
       ps.rating = calcPlayerRating(ps);
       const teamObj = (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team;
       recordRating(p, teamObj, ps.rating);
+      // Nudge this player's persistent form (and therefore their effective
+      // OVR) based on how they actually played in this match — the real
+      // roster player, not the shallow per-match squad clone, so it sticks.
+      const realPlayer = (teamObj.players || []).find(x => x.id === p.id);
+      if (realPlayer) updatePlayerForm(realPlayer, ps.rating);
       // Feed the season-long "Interceptions" leaderboard and Defenders' Award
       // with this match's accumulated defensive totals.
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
@@ -2810,12 +2857,14 @@ var App = (() => {
     setHTML('live-away-flag', teamMark(m.away.team, 26));
     set('live-away-name', m.away.team.short || m.away.team.name);
     set('live-away-form', (FORMATIONS[m.away.squad.formation] || {}).name || '');
-    const hm = document.querySelector('.score-team.home .mgr');
-    const am = document.querySelector('.score-team.away .mgr');
+    const hm = document.getElementById('live-home-mgr');
+    const am = document.getElementById('live-away-mgr');
     const hStyle = getManagerPlaystyle(m.home.team);
     const aStyle = getManagerPlaystyle(m.away.team);
-    if (hm) hm.textContent = (m.home.team.manager ? m.home.team.manager.name : '') + (hStyle ? ' (' + hStyle + ')' : '');
-    if (am) am.textContent = (m.away.team.manager ? m.away.team.manager.name : '') + (aStyle ? ' (' + aStyle + ')' : '');
+    const hMgrName = m.home.team.manager ? m.home.team.manager.name : '';
+    const aMgrName = m.away.team.manager ? m.away.team.manager.name : '';
+    if (hm) hm.innerHTML = hMgrName ? managerAvatarMark(m.home.team.manager, 18) + ' ' + hMgrName + (hStyle ? ' (' + hStyle + ')' : '') : '';
+    if (am) am.innerHTML = aMgrName ? aMgrName + (aStyle ? ' (' + aStyle + ')' : '') + ' ' + managerAvatarMark(m.away.team.manager, 18) : '';
     const hs = m.home.penScore != null ? `${m.home.score} (${m.home.penScore})` : m.home.score;
     const as_ = m.away.penScore != null ? `${m.away.score} (${m.away.penScore})` : m.away.score;
     set('live-home-score', hs);
@@ -2904,24 +2953,46 @@ var App = (() => {
       const textCol = luminance(primary) > 160 ? '#0a0e17' : '#ffffff';
       const used = [];
       let dots = '';
+      // Track how many dots have landed in each rough horizontal "row" (by
+      // rounded y) so tightly-packed rows (e.g. a 3-man midfield line) can
+      // alternate their labels above/below the dot instead of stacking all
+      // of them in the same band, where the wide name text would overlap.
+      const rowCounts = {};
       slotPlayers.forEach((p, idx) => {
         if (!p) return;
         let c = coords[idx] || [50, 50];
         let x = c[0], y = c[1];
-        for (let t = 0; t < 6; t++) {
-          if (!used.some(u => Math.hypot(u.x - x, u.y - y) < 8)) break;
-          x = Math.max(10, Math.min(90, x + (t % 2 ? 6 : -6)));
-          y = Math.max(8, Math.min(92, y + (t % 3 ? 5 : -4)));
+        // Collision avoidance: name labels are much wider than the 34px dot,
+        // so push apart mostly along x (weighted distance) with a bigger
+        // minimum gap and more iterations than a simple circle-only check.
+        for (let t = 0; t < 10; t++) {
+          const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 15);
+          if (!hit) break;
+          x += (x >= hit.x ? 1 : -1) * 7 + (t % 2 ? 2 : -2);
+          y += (t % 3 === 0 ? 1 : -1) * 3;
+          x = Math.max(7, Math.min(93, x));
+          y = Math.max(6, Math.min(94, y));
         }
         used.push({ x, y });
+
+        const rowKey = Math.round(y / 9);
+        const closeSameRow = used.slice(0, -1).some(u => Math.round(u.y / 9) === rowKey && Math.abs(u.x - x) < 20);
+        rowCounts[rowKey] = (rowCounts[rowKey] || 0) + 1;
+        // Near the bottom edge (goalkeeper row) the label would otherwise be
+        // clipped by the pitch's own bottom edge — always flip it above.
+        const nearBottomEdge = y > 84;
+        const labelAbove = nearBottomEdge || (closeSameRow && rowCounts[rowKey] % 2 === 0);
+
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
-          ${playerAvatarMark(p)}
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}${labelAbove ? ' label-above' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+          <span class="dot-avatar">${playerAvatarMark(p)}</span>
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${p.name}</span></span>
         </div>`;
       });
+      const mgrTag = s.team.manager && s.team.manager.name
+        ? `<span class="pitch-mgr">${managerAvatarMark(s.team.manager, 16)} ${s.team.manager.name}</span>` : '';
       return `<div class="mini-pitch team-pitch">
-        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}</div>
+        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}${mgrTag}</div>
         ${dots}
       </div>`;
     };
@@ -3097,6 +3168,85 @@ var App = (() => {
     }
   }
 
+  // ========== DYNAMIC PLAYER FORM ==========
+  // Every player carries a rolling `form` value (-5..+5) that moves after
+  // every match they play based on that match's rating: good performances
+  // push it up, bad ones push it down, and it decays back toward 0 over time
+  // so form always reflects *recent* matches, not a whole career. Form is
+  // then folded straight into the player's `ovr` (clamped to baseOvr ± 5),
+  // which is the single number every other part of the app already reads
+  // for squad strength, squad-builder sorting, and display — so a player who
+  // plays badly for a stretch genuinely gets a lower rating, and a player on
+  // a hot streak genuinely gets a higher one, without a second parallel
+  // "true skill" number anywhere else in the codebase.
+  const FORM_MIN = -5, FORM_MAX = 5;
+  const FORM_DECAY = 0.82;
+  function updatePlayerForm(player, rating) {
+    if (!player) return;
+    if (typeof player.baseOvr !== 'number') player.baseOvr = player.ovr || 70;
+    if (typeof player.form !== 'number') player.form = 0;
+    // Decay first so last match's swing fades before this one is applied.
+    player.form *= FORM_DECAY;
+    if (rating >= 8.2) player.form += 1.6;
+    else if (rating >= 7.4) player.form += 1.0;
+    else if (rating >= 6.7) player.form += 0.45;
+    else if (rating >= 6.1) player.form += 0.1;
+    else if (rating >= 5.5) player.form -= 0.5;
+    else if (rating >= 4.8) player.form -= 1.1;
+    else player.form -= 1.8;
+    player.form = Math.max(FORM_MIN, Math.min(FORM_MAX, Math.round(player.form * 100) / 100));
+    player.ovr = Math.max(40, Math.min(99, Math.round(player.baseOvr + player.form)));
+  }
+
+  // Small ▲/▼/— indicator used next to a player's OVR wherever a squad list
+  // renders one, so a slump or a hot streak is visible at a glance.
+  function formArrow(player) {
+    const f = (player && typeof player.form === 'number') ? player.form : 0;
+    if (f >= 2.2) return '<span class="form-arrow form-hot" title="On fire">🔥</span>';
+    if (f >= 0.6) return '<span class="form-arrow form-up" title="Good form">▲</span>';
+    if (f <= -2.2) return '<span class="form-arrow form-cold" title="Poor form">❄️</span>';
+    if (f <= -0.6) return '<span class="form-arrow form-down" title="Below par">▼</span>';
+    return '<span class="form-arrow form-flat" title="Steady form">—</span>';
+  }
+  // Longer text version used in the player profile modal.
+  function formLabel(player) {
+    const f = (player && typeof player.form === 'number') ? player.form : 0;
+    if (f >= 2.2) return 'On fire 🔥';
+    if (f >= 0.6) return 'Good form ▲';
+    if (f <= -2.2) return 'Poor form ❄️';
+    if (f <= -0.6) return 'Below par ▼';
+    return 'Steady —';
+  }
+
+  // Persist every non-zero form value (+ the baseOvr it's measured against)
+  // so a page refresh doesn't silently reset every player back to neutral.
+  function persistPlayerForms() {
+    try {
+      const map = {};
+      allTeams.forEach(t => (t.players || []).forEach(p => {
+        if (typeof p.form === 'number' && Math.abs(p.form) > 0.01) {
+          map[p.id] = { form: p.form, baseOvr: p.baseOvr, ovr: p.ovr };
+        }
+      }));
+      localStorage.setItem('apexPlayerForms', JSON.stringify(map));
+    } catch (e) {}
+  }
+  function restorePlayerForms() {
+    try {
+      const raw = localStorage.getItem('apexPlayerForms');
+      if (!raw) return;
+      const map = JSON.parse(raw);
+      allTeams.forEach(t => (t.players || []).forEach(p => {
+        const e = map[p.id];
+        if (e) {
+          p.form = e.form;
+          p.baseOvr = (typeof e.baseOvr === 'number') ? e.baseOvr : p.ovr;
+          p.ovr = e.ovr;
+        }
+      }));
+    } catch (e) {}
+  }
+
   function findPlayerTeams(playerId) {
     let national = null, club = null;
     (teamsData.national || []).forEach(t => {
@@ -3189,6 +3339,18 @@ var App = (() => {
   function pushIndividualTrophy(awardName, playerObj, type, extra) {
     if (!playerObj || !playerObj.name) return null;
     const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, type, date: Date.now() }, extra || {});
+    trophies.push(t);
+    saveTrophiesToStorage();
+    return t;
+  }
+  // Manager awards live alongside individual player awards in the trophy
+  // case, but key off `manager` (a name) instead of `player` — awarded
+  // whenever their team lifts a trophy (league title, UCL, or a standalone
+  // World Cup/Champions League run), crediting the manager for that
+  // team's success. Shows in Awards > Manager and History > Individual.
+  function pushManagerAward(awardName, team, type, extra) {
+    if (!team || !team.manager || !team.manager.name) return null;
+    const t = Object.assign({ name: awardName, team: team.name, manager: team.manager.name, type, date: Date.now() }, extra || {});
     trophies.push(t);
     saveTrophiesToStorage();
     return t;
@@ -3339,6 +3501,7 @@ var App = (() => {
       localStorage.setItem('apexTournamentStats', JSON.stringify(tournamentStats));
       localStorage.setItem('apexSeasonActiveTab', seasonActiveTab);
       localStorage.setItem('apexSeasonActiveSubTab', seasonActiveSubTab);
+      persistPlayerForms();
       const activeTab = document.querySelector('.nav-tab.active');
       if (activeTab && activeTab.dataset.view) localStorage.setItem('apexActiveView', activeTab.dataset.view);
     } catch (e) {}
@@ -4542,6 +4705,7 @@ var App = (() => {
     const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
     const runExtra = { category: 'tournament', run: tournament._runId || Date.now() };
     pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
+    pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
     recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(team, 20) + ' ' + team.name;
@@ -5016,7 +5180,7 @@ var App = (() => {
           <div style="flex:1;min-width:0">
             <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</strong>
             <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''}</div>
-            <div style="font-size:0.7rem;color:var(--gold)">${(t.manager && t.manager.name) || ''} · ${getManagerPlaystyle(t)}</div>
+            <div style="font-size:0.7rem;color:var(--gold);display:flex;align-items:center;gap:4px">${t.manager && t.manager.name ? managerAvatarMark(t.manager, 16) : ''}${(t.manager && t.manager.name) || ''} · ${getManagerPlaystyle(t)}</div>
           </div>
           <span class="player-ovr">${ovr}</span>
         </div>
@@ -5187,7 +5351,7 @@ var App = (() => {
         <div>
           <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
-          <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'}</div>
+          <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span></div>
         </div>
       </div>
       ${matchBlock}
@@ -5219,6 +5383,7 @@ var App = (() => {
     const secondary = team.secondary || '#fff';
     const mgr = team.manager || {};
     const mgrStyle = getManagerPlaystyle(team);
+    const mgrAwardCount = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
     const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
     const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
     const modal = document.getElementById('team-modal');
@@ -5230,8 +5395,16 @@ var App = (() => {
         <div style="flex:1;min-width:0">
           <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
-          <div style="color:var(--gold);font-size:0.8rem;margin-top:4px">Manager: ${mgr.name || '—'} ${mgr.ovr ? '· ' + mgr.ovr + ' OVR' : ''} <span class="playstyle-tag">· ${mgrStyle}</span></div>
           <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px">🏟️ ${getStadium(team)}</div>
+        </div>
+      </div>
+      <div class="card-title" style="margin-top:14px">Manager</div>
+      <div class="manager-profile-row">
+        <span class="mgr-avatar mgr-avatar-lg">${managerAvatarMark(mgr, 56)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700">${mgr.name || '—'}</div>
+          <div style="color:var(--text-2);font-size:0.8rem">${mgr.ovr ? mgr.ovr + ' OVR · ' : ''}<span class="playstyle-tag">${mgrStyle}</span></div>
+          <div style="color:var(--gold);font-size:0.78rem;margin-top:2px">🏅 ${mgrAwardCount} manager award${mgrAwardCount === 1 ? '' : 's'}</div>
         </div>
       </div>
       <div class="card-title" style="margin-top:14px">Squad <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem">(🏆 = trophy cabinet)</span></div>
@@ -5243,6 +5416,7 @@ var App = (() => {
             <span class="tsr-avatar">${playerAvatarMark(p)}</span>
             <span class="tsr-name">${p.name}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
             <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
+            ${formArrow(p)}
             <span class="player-ovr">${p.ovr || ''}</span>
           </button>`;
         }).join('')}
@@ -5366,9 +5540,32 @@ var App = (() => {
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Int</th><th>Tkl</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.interceptions+'</td><td>'+p.tackles+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
+    } else if (type === 'manager') {
+      // Manager Award — tallies every manager award won (league titles,
+      // Champions League, World Cup) into a leaderboard, crediting the
+      // manager currently in charge of the team that earned each award.
+      const mgrTrophies = trophies.filter(t => t.manager);
+      if (!mgrTrophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">👔</div><p>No manager awards yet — win a league, Champions League or World Cup.</p></div>'; return; }
+      const byMgr = {};
+      mgrTrophies.forEach(t => {
+        if (!byMgr[t.manager]) byMgr[t.manager] = { name: t.manager, team: t.team, count: 0, latest: 0 };
+        byMgr[t.manager].count++;
+        byMgr[t.manager].team = t.team; // most recent team on record
+        byMgr[t.manager].latest = Math.max(byMgr[t.manager].latest, t.date || 0);
+      });
+      const data = Object.values(byMgr).sort((a,b) => b.count - a.count || b.latest - a.latest).slice(0, 50);
+      const leader = data[0];
+      const leaderTeam = allTeams.find(t => t.manager && t.manager.name === leader.name);
+      el.innerHTML = '<div class="award-card">' + managerAvatarMark(leaderTeam ? leaderTeam.manager : { name: leader.name }, 64) + '<div class="award-info"><h4>👔 Manager of the Moment</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.count + ' award' + (leader.count===1?'':'s') + ' won</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Manager</th><th>Team</th><th>Awards</th></tr></thead><tbody>' +
+        data.map((m,i) => {
+          const t = allTeams.find(tt => tt.manager && tt.manager.name === m.name);
+          return '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player"><div class="lb-player-cell">' + managerAvatarMark(t ? t.manager : { name: m.name }, 34) + '<span class="lb-player-name">'+m.name+'</span></div></td><td class="lb-team">'+m.team+'</td><td style="font-weight:700;color:var(--gold)">'+m.count+'</td></tr>';
+        }).join('') +
+        '</tbody></table></div>';
     } else if (type === 'trophies') {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
-      el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 68) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
+      el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 68) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.manager ? '👔 ' + t.manager + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
     } else {
       // overview
       const topScorer = Object.values(stats.goals||{}).sort((a,b)=>b.count-a.count)[0];
@@ -5408,8 +5605,8 @@ var App = (() => {
     if (!el) return;
 
     const list = type === 'individual'
-      ? trophies.filter(t => t.player)
-      : trophies.filter(t => !t.player);
+      ? trophies.filter(t => t.player || t.manager)
+      : trophies.filter(t => !t.player && !t.manager);
 
     if (!list.length) {
       el.innerHTML = type === 'individual'
@@ -5432,6 +5629,9 @@ var App = (() => {
       const items = g.items.map(t => {
         if (t.player) {
           return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.player}</p><p style="color:var(--text-2);font-size:0.82rem">${t.team || ''}</p></div></div>`;
+        }
+        if (t.manager) {
+          return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">👔 ${t.manager}</p><p style="color:var(--text-2);font-size:0.82rem">${t.team || ''}</p></div></div>`;
         }
         return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`;
       }).join('');
@@ -5760,6 +5960,7 @@ var App = (() => {
       const year = season ? season.year : 1;
       const extra = { category: 'season', year };
       pushTeamTrophy(comp.name, comp.champion.name, 'League (Y' + year + ')', extra);
+      pushManagerAward(comp.name + ' Manager of the Season', comp.champion, 'League (Y' + year + ')', extra);
       recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
     }
   }
@@ -5827,6 +6028,7 @@ var App = (() => {
         const year = season ? season.year : 1;
         const extra = { category: 'season', year };
         pushTeamTrophy('Champions League', champ.name, 'Season (Y' + year + ')', extra);
+        pushManagerAward('Champions League Winning Manager', champ, 'Season (Y' + year + ')', extra);
         recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), 'Champions League (Y' + year + ')', extra);
       }
     }
