@@ -331,6 +331,12 @@ var App = (() => {
       const savedView = (function () { try { return localStorage.getItem('apexActiveView'); } catch (e) { return null; } })();
       if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
       setupAutoSave();
+      try {
+        if (sessionStorage.getItem('apexJustReset') === '1') {
+          sessionStorage.removeItem('apexJustReset');
+          setTimeout(() => toast('All data reset — fresh start'), 300);
+        }
+      } catch (e) {}
       console.log('Apex Sim ready:', allTeams.length, 'teams | source:', source);
       window.__APEX_DATA_SOURCE = source;
     } catch (e) {
@@ -3236,8 +3242,22 @@ var App = (() => {
     if (am) am.innerHTML = aMgrName ? aMgrName + (aStyle ? ' (' + aStyle + ')' : '') + ' ' + managerAvatarMark(m.away.team.manager, 18) : '';
     const hs = m.home.penScore != null ? `${m.home.score} (${m.home.penScore})` : m.home.score;
     const as_ = m.away.penScore != null ? `${m.away.score} (${m.away.penScore})` : m.away.score;
-    set('live-home-score', hs);
-    set('live-away-score', as_);
+    // Pop the scoreline when it actually changes, so a goal feels like a
+    // goal rather than the number just silently updating.
+    const popIfChanged = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const changed = el.textContent !== String(val) && el.dataset.popped !== undefined;
+      el.textContent = val;
+      el.dataset.popped = '1';
+      if (changed) {
+        el.classList.remove('score-pop');
+        void el.offsetWidth; // restart animation
+        el.classList.add('score-pop');
+      }
+    };
+    popIfChanged('live-home-score', hs);
+    popIfChanged('live-away-score', as_);
     set('live-minute', m.inPens ? 'Pens' : (m.minute + "'"));
     set('live-status', m.status);
     set('live-venue', '🏟️ ' + getStadium(m.home.team));
@@ -3939,20 +3959,24 @@ var App = (() => {
   }
 
   function resetLeaderboard() {
-    if (!confirm('Reset all leaderboard stats and trophies? This cannot be undone.')) return;
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
-    trophies = [];
-    try { localStorage.removeItem('apexSimStats'); } catch(e) {}
-    try { localStorage.removeItem('apexTrophies'); } catch(e) {}
-    saveStats();
-    showLeaderboard('goals');
-    // Refresh the Awards tab too, in case the Trophy Room (or the overview's
-    // trophy count) is currently showing — otherwise it'd keep displaying
-    // the now-cleared trophies until the user navigates away and back.
-    const activeAwardTab = document.querySelector('.award-tab.active');
-    if (activeAwardTab && activeAwardTab.dataset.award) showAwards(activeAwardTab.dataset.award);
-    toast('Leaderboard and trophies reset');
+    if (!confirm('Reset EVERYTHING? This wipes all leaderboard stats, trophies, history, the active season, any tournament in progress, injuries/suspensions, player form and saved settings — every piece of stored data for this app on this device. This cannot be undone.')) return;
+    // Full factory reset: clear every bit of persisted state, not just the
+    // leaderboard tables. We wipe every localStorage key this app owns
+    // (all of them are namespaced with the "apex" prefix) rather than
+    // trying to enumerate and reset every in-memory variable by hand,
+    // then reload so the app boots from a completely clean slate — this
+    // guarantees no stale in-memory state (season, tournament, injury
+    // book, player forms, etc.) can survive the reset.
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+    } catch (e) {}
+    try { sessionStorage.setItem('apexJustReset', '1'); } catch (e) {}
+    location.reload();
   }
 
   function showLeaderboard(type) {
