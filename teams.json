@@ -19645,6 +19645,8 @@
   "flag": "🇪🇸",
   "color": "#E20613",
   "secondary": "#FFFFFF",
+  "logo":"atletico-madrid.png",
+  "stadium ":"Riyadh Air Metropolitano",
   "players": [
     {"id":"atm26_13","name":"Jan Oblak","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":83,"pac":50,"tec":65,"num":13},
     {"id":"atm26_1","name":"Juan Musso","pos":["GK"],"ovr":78,"att":15,"def":79,"phy":76,"pac":48,"tec":55,"num":1},
@@ -19714,6 +19716,8 @@
   "flag": "🇪🇸",
   "color": "#CB3524",
   "secondary": "#FFFFFF",
+  "logo":"atletico-madrid.png",
+  "stadium ":"Estadio de Metropolitano",
   "players": [
     {"id":"atm14_13","name":"Thibaut Courtois","pos":["GK"],"ovr":87,"att":15,"def":88,"phy":76,"pac":50,"tec":70,"num":13},
     {"id":"atm14_1","name":"Daniel Aranzubia","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":58,"num":1},
@@ -19990,6 +19994,8 @@
   "flag": "🇹🇷",
   "color": "#002D62",
   "secondary": "#FFE700",
+  "logo":"fenerbahce.png",
+  "stadium ":"Ülker Stadyumu",
   "players": [
     {"id":"fen26_31","name":"Ederson","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":78,"pac":58,"tec":80,"num":31},
     {"id":"fen26_40","name":"Dominik Livaković","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":76,"pac":48,"tec":62,"num":40},
@@ -20239,6 +20245,8 @@
   "flag": "🇫🇷",
   "color": "#00A3E0",
   "secondary": "#FFFFFF",
+  "logo":"marseille.png",
+  "stadium ":"Orange Vélodrome",
   "players": [
     {"id":"om26_12","name":"Jeffrey de Lange","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":74,"pac":45,"tec":62,"num":12},
     {"id":"om26_92","name":"Théo Vermot","pos":["GK"],"ovr":70,"att":15,"def":70,"phy":68,"pac":40,"tec":52,"num":92},
@@ -20475,6 +20483,8 @@
   "flag": "🇵🇹",
   "color": "#002B7F",
   "secondary": "#FFFFFF",
+  "logo":"porto.png",
+  "stadium ":"Estádio do Dragão",
   "players": [
     {"id":"fcp26_99","name":"Diogo Costa","pos":["GK"],"ovr":85,"att":15,"def":86,"phy":80,"pac":50,"tec":75,"num":99},
     {"id":"fcp26_14","name":"Cláudio Ramos","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":73,"pac":44,"tec":58,"num":14},
@@ -20515,6 +20525,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#FFFFFF",
   "secondary": "#000000",
+  "logo":"fulham.png",
+  "stadium ":"Craven Cottage",
   "players": [
     {"id":"ful26_1","name":"Bernd Leno","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":76,"pac":46,"tec":68,"num":1},
     {"id":"ful26_23","name":"Benjamin Lecomte","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":42,"tec":60,"num":23},
@@ -20663,6 +20675,8 @@
   "flag": "🇺🇸",
   "color": "#F7B5CD",
   "secondary": "#000000",
+  "logo":"miami.png",
+  "stadium ":"Chase Stadium",
   "players": [
     {"id":"mia26_1","name":"Drake Callender","pos":["GK"],"ovr":77,"att":15,"def":78,"phy":76,"pac":48,"tec":62,"num":1},
     {"id":"mia26_19","name":"Oscar Ustari","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":70,"pac":40,"tec":55,"num":19},
@@ -20865,6 +20879,8 @@
   "flag": "🇫🇷",
   "color": "#E21836",
   "secondary": "#FFFFFF",
+  "logo":"lille.png",
+  "stadium ":"Stade Pierre-Mauroy",
   "players": [
     {"id":"lil26_30","name":"Lucas Chevalier","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":80,"pac":50,"tec":70,"num":30},
     {"id":"lil26_1","name":"Vito Mannone","pos":["GK"],"ovr":72,"att":15,"def":73,"phy":72,"pac":38,"tec":55,"num":1},
@@ -21630,6 +21646,8 @@
   "flag": "🇵🇹",
   "color": "#004B93",
   "secondary": "#FFFFFF",
+  "logo":"porto.png",
+  "stadium ":"Estádio do Dragão",
   "players": [
     {"id":"por04c_99","name":"Vítor Baía","pos":["GK"],"ovr":87,"att":15,"def":88,"phy":78,"pac":54,"tec":70,"num":99},
     {"id":"por04c_13","name":"Nuno","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":48,"tec":58,"num":13},
@@ -22345,11 +22363,13 @@
   }
 },{
   "id": "marseille1992",
-  "name": "Marseille 1992-93",
+  "name": "Olympique de Marseille 1992-93",
   "short": "OM92",
   "flag": "🇫🇷",
   "color": "#0096FF",
   "secondary": "#FFFFFF",
+  "logo":"marseille-old.png",
+  "stadium ":"Orange Vélodrome",
   "players": [
     {"id":"om92_1","name":"Fabien Barthez","pos":["GK"],"ovr":88,"att":15,"def":87,"phy":78,"pac":55,"tec":72,"num":1},
     {"id":"om92_16","name":"Pascal Olmeta","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":80,"pac":48,"tec":65,"num":16},
@@ -22516,6 +22536,8 @@
   "flag": "🇪🇸",
   "color": "#EE2523",
   "secondary": "#FFFFFF",
+  "logo":"bilbao.png",
+  "stadium ":"San Mamés",
   "players": [
     {"id":"ath27_1","name":"Unai Simón","pos":["GK"],"ovr":87,"att":12,"def":86,"phy":82,"pac":50,"tec":75,"num":1},
     {"id":"ath27_13","name":"Alex Padilla","pos":["GK"],"ovr":78,"att":10,"def":78,"phy":76,"pac":46,"tec":60,"num":13},
@@ -22632,6 +22654,8 @@
   "flag": "🇪🇸",
   "color": "#006633",
   "secondary": "#FFFFFF",
+  "logo":"elche.png",
+  "stadium ":"Estadio Manuel Martínez Valero",
   "players": [
     {"id":"elc27_1","name":"Matías Dituro","pos":["GK"],"ovr":81,"att":10,"def":82,"phy":78,"pac":45,"tec":75,"num":1},
     {"id":"elc27_43","name":"Alejandro Iturbe","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":48,"tec":65,"num":43},
@@ -22669,6 +22693,8 @@
   "flag": "🇪🇸",
   "color": "#00539F",
   "secondary": "#002B49",
+  "logo":"getafe.png",
+  "stadium ":"Estadio Coliseum",
   "players": [
     {"id":"get27_1","name":"Jiří Letáček","pos":["GK"],"ovr":81,"att":10,"def":82,"phy":78,"pac":46,"tec":70,"num":1},
     {"id":"get27_13","name":"David Soria","pos":["GK"],"ovr":83,"att":10,"def":84,"phy":80,"pac":48,"tec":72,"num":13},
@@ -22707,6 +22733,8 @@
   "flag": "🇪🇸",
   "color": "#002D62",
   "secondary": "#A80032",
+  "logo":"levante.png",
+  "stadium ":"Estadi Ciutat de València",
   "players": [
     {"id":"lev27_1","name":"Pablo Cuñat","pos":["GK"],"ovr":80,"att":10,"def":81,"phy":78,"pac":46,"tec":70,"num":1},
     {"id":"lev27_13","name":"Mathew Ryan","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":45,"tec":74,"num":13},
@@ -22743,6 +22771,8 @@
   "flag": "🇪🇸",
   "color": "#00539F",
   "secondary": "#FFFFFF",
+  "logo":"malaga.png",
+  "stadium ":"La Rosaleda",
   "players": [
     {"id":"mlg27_1","name":"Alfonso Herrero","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":48,"tec":73,"num":1},
     {"id":"mlg27_13","name":"Carlos López","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":46,"tec":66,"num":13},
@@ -23260,6 +23290,8 @@
   "flag": "🇩🇪",
   "color": "#CA151B",
   "secondary": "#FFFFFF",
+  "logo":"augsburg.png",
+  "stadium ":"WWK Arena",
   "players": [
     {"id":"fca27_1","name":"Finn Dahmen","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":46,"tec":70,"num":1},
     {"id":"fca27_22","name":"Nediljko Labrović","pos":["GK"],"ovr":77,"att":10,"def":78,"phy":78,"pac":45,"tec":66,"num":22},
@@ -23296,6 +23328,8 @@
   "flag": "🇩🇪",
   "color": "#E1000F",
   "secondary": "#000000",
+  "logo":"frankfurt.png",
+  "stadium ":"Deutsche Bank Park",
   "players": [
     {"id":"sge27_1","name":"Kevin Trapp","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":48,"tec":73,"num":1},
     {"id":"sge27_40","name":"Kauã Santos","pos":["GK"],"ovr":77,"att":10,"def":78,"phy":77,"pac":52,"tec":68,"num":40},
