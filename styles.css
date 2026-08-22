@@ -157,6 +157,31 @@ body::before {
 }
 .nav-tab:active { transform: scale(0.96); }
 
+.save-btn {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  background: rgba(240,193,75,0.08); border: 1px solid var(--gold-dim);
+  color: var(--gold); font-family: var(--display); font-weight: 700;
+  font-size: 0.78rem; letter-spacing: 0.4px; text-transform: uppercase;
+  padding: 8px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out),
+              background var(--dur-base) var(--ease-smooth),
+              box-shadow var(--dur-base) var(--ease-smooth),
+              transform var(--dur-fast) var(--ease-out),
+              border-color var(--dur-base) var(--ease-smooth);
+}
+.save-btn:hover { background: rgba(240,193,75,0.16); box-shadow: 0 4px 16px var(--gold-glow); transform: translateY(-1px); }
+.save-btn:active { transform: scale(0.96); }
+.save-btn-icon { font-size: 0.95rem; line-height: 1; }
+.save-btn.just-saved {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  color: var(--bg-0); border-color: transparent;
+  animation: navTabPop 0.35s var(--ease-snap);
+}
+@media (max-width: 640px) {
+  .save-btn-label { display: none; }
+  .save-btn { padding: 8px 10px; }
+}
+
 /* Main */
 .main-content {
   position: relative; z-index: 1;

@@ -4019,6 +4019,27 @@ var App = (() => {
     window.addEventListener('pagehide', persistAll);
   }
 
+  // Manual save, triggered by the header Save button. persistAll() already
+  // runs constantly in the background (autosave, mutating actions, tab
+  // hide/close), so this doesn't do anything those don't already cover —
+  // it exists purely so the person can get an explicit, visible confirmation
+  // that their progress is safely written to this browser's storage right now.
+  function manualSave() {
+    persistAll();
+    const btn = document.getElementById('manual-save-btn');
+    if (btn) {
+      const label = btn.querySelector('.save-btn-label');
+      const prevLabel = label ? label.textContent : null;
+      btn.classList.add('just-saved');
+      if (label) label.textContent = 'Saved!';
+      setTimeout(() => {
+        btn.classList.remove('just-saved');
+        if (label && prevLabel !== null) label.textContent = prevLabel;
+      }, 1200);
+    }
+    toast('Progress saved');
+  }
+
   function resetLeaderboard() {
     if (!confirm('Reset EVERYTHING? This wipes all leaderboard stats, trophies, history, the active season, any tournament in progress, injuries/suspensions, player form and saved settings — every piece of stored data for this app on this device. This cannot be undone.')) return;
     // Full factory reset: clear every bit of persisted state, not just the
@@ -6993,7 +7014,7 @@ var App = (() => {
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     returnToTournament, showPlayerProfile, showTeamProfile, randomMatch,
-    resetLeaderboard, searchTeams, sortTeams, searchTournamentTeams,
+    resetLeaderboard, manualSave, searchTeams, sortTeams, searchTournamentTeams,
     openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker,
     playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
     saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
