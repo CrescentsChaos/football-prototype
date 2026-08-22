@@ -90,53 +90,73 @@
     <!-- MATCH -->
     <section id="view-match" class="view">
       <div id="match-setup">
-        <div class="card" style="margin-bottom:24px">
-          <div class="card-title">Select Teams & Formations</div>
-          <div class="team-select-grid">
-            <div class="team-panel">
-              <h3>HOME</h3>
-              <select id="home-team" class="team-dropdown" onchange="App.updateTeamPreview('home')" aria-label="Home team"></select>
-              <div id="home-preview" class="team-preview"></div>
-              <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
-              <select id="home-formation" class="formation-select" onchange="App.onFormationChange('home')" aria-label="Home formation"></select>
-              <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('home')">⚙️ Squad Builder</button>
+        <div class="card kickoff-hero" id="kickoff-hero" style="margin-bottom:24px">
+          <div class="kh-badge-row"><span class="kh-badge">⚽ Match Preview</span></div>
+          <div class="kh-grid">
+            <div class="kh-side kh-home">
+              <span class="kh-side-label">Home</span>
+              <select id="home-team" class="team-dropdown kh-select" onchange="App.updateTeamPreview('home')" aria-label="Home team"></select>
+              <div id="home-preview" class="kh-team-block"></div>
             </div>
-            <div class="vs-badge">VS</div>
-            <div class="team-panel">
-              <h3>AWAY</h3>
-              <select id="away-team" class="team-dropdown" onchange="App.updateTeamPreview('away')" aria-label="Away team"></select>
-              <div id="away-preview" class="team-preview"></div>
-              <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
-              <select id="away-formation" class="formation-select" onchange="App.onFormationChange('away')" aria-label="Away formation"></select>
-              <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('away')">⚙️ Squad Builder</button>
+            <div class="kh-center">
+              <div class="kh-h2h" id="kh-h2h"></div>
+              <button type="button" class="kh-kickoff-btn" onclick="App.startMatch()">⏵ Start Match</button>
+              <div class="kh-pill-row">
+                <button type="button" class="kh-pill" onclick="App.swapKickoffSides()">🔀 Select Sides</button>
+                <button type="button" class="kh-pill" onclick="App.toggleKickoffAdvanced()">⚙️ Select Kits</button>
+              </div>
+              <div class="kh-pill-row">
+                <button type="button" class="kh-pill" onclick="App.quickSimMatch()">⚡ Instant Result</button>
+                <button type="button" class="kh-pill" onclick="App.randomMatch('all')">🎲 Random Matchup</button>
+              </div>
             </div>
-          </div>
-          <div id="squad-builder-panel" class="squad-builder" style="display:none;margin-top:16px">
-            <div class="card-title" id="sb-title">Squad Builder</div>
-            <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:10px">Assign each formation slot, then tick bench players. No duplicates allowed.</p>
-            <div id="sb-slots" class="sb-slots"></div>
-            <div class="card-title" style="margin-top:14px">Bench</div>
-            <div id="sb-bench" class="sb-bench"></div>
-            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" onclick="App.saveSquadBuilder()">Save Lineup</button>
-              <button class="btn btn-secondary btn-sm" onclick="App.autoFillSquadBuilder()">Auto-fill Best XI</button>
-              <button class="btn btn-secondary btn-sm" onclick="App.closeSquadBuilder()">Close</button>
+            <div class="kh-side kh-away">
+              <span class="kh-side-label">Away</span>
+              <select id="away-team" class="team-dropdown kh-select" onchange="App.updateTeamPreview('away')" aria-label="Away team"></select>
+              <div id="away-preview" class="kh-team-block"></div>
             </div>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-top:12px">
-            <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
-              <input type="checkbox" id="opt-et" style="accent-color:var(--accent-gold);width:16px;height:16px"> Extra Time if draw
-            </label>
-            <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
-              <input type="checkbox" id="opt-pens" style="accent-color:var(--accent-gold);width:16px;height:16px"> Penalties if still draw
-            </label>
+
+          <div class="kh-advanced" id="kh-advanced" style="display:none">
+            <div class="kh-advanced-grid">
+              <div class="kh-advanced-col">
+                <label>Home Formation</label>
+                <select id="home-formation" class="formation-select" onchange="App.onFormationChange('home');App.renderKickoffInfobar()" aria-label="Home formation"></select>
+                <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('home')">⚙️ Home Squad Builder</button>
+              </div>
+              <div class="kh-advanced-col">
+                <label>Away Formation</label>
+                <select id="away-formation" class="formation-select" onchange="App.onFormationChange('away');App.renderKickoffInfobar()" aria-label="Away formation"></select>
+                <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('away')">⚙️ Away Squad Builder</button>
+              </div>
+            </div>
+            <div id="squad-builder-panel" class="squad-builder" style="display:none;margin-top:16px">
+              <div class="card-title" id="sb-title">Squad Builder</div>
+              <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:10px">Assign each formation slot, then tick bench players. No duplicates allowed.</p>
+              <div id="sb-slots" class="sb-slots"></div>
+              <div class="card-title" style="margin-top:14px">Bench</div>
+              <div id="sb-bench" class="sb-bench"></div>
+              <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" onclick="App.saveSquadBuilder()">Save Lineup</button>
+                <button class="btn btn-secondary btn-sm" onclick="App.autoFillSquadBuilder()">Auto-fill Best XI</button>
+                <button class="btn btn-secondary btn-sm" onclick="App.closeSquadBuilder()">Close</button>
+              </div>
+            </div>
+            <div class="kh-toggles">
+              <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="opt-et" style="accent-color:var(--accent-gold);width:16px;height:16px" onchange="App.renderKickoffInfobar()"> Extra Time if draw
+              </label>
+              <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="opt-pens" style="accent-color:var(--accent-gold);width:16px;height:16px" onchange="App.renderKickoffInfobar()"> Penalties if still draw
+              </label>
+            </div>
+            <div class="kh-extra-actions">
+              <button class="btn btn-secondary btn-sm" onclick="App.randomMatch('national')">🎲 Random National</button>
+              <button class="btn btn-secondary btn-sm" onclick="App.randomMatch('club')">🎲 Random Club</button>
+            </div>
           </div>
-          <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="App.startMatch()">⚽ Kick Off</button>
-            <button class="btn btn-secondary" onclick="App.quickSimMatch()">⚡ Instant Result</button>
-            <button class="btn btn-secondary" onclick="App.randomMatch('national')">🎲 Random National</button>
-            <button class="btn btn-secondary" onclick="App.randomMatch('club')">🎲 Random Club</button>
-          </div>
+
+          <div class="kh-infobar" id="kh-infobar"></div>
         </div>
       </div>
 
