@@ -18474,7 +18474,7 @@
     },
     {
       "id": "bra19",
-      "name": "Neymar",
+      "name": "Neymar Jr",
       "pos": ["LW", "CAM", "ST"],
       "ovr": 87,
       "att": 90,
@@ -19409,6 +19409,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#EF0107",
   "secondary": "#063672",
+  "logo":"arsenal.png",
+  "stadium ":"Emirates Stadium",
   "players": [
     {"id":"ars26_1","name":"David Raya","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":80,"pac":50,"tec":85,"num":1},
     {"id":"ars26_13","name":"Kepa Arrizabalaga","pos":["GK"],"ovr":79,"att":15,"def":80,"phy":72,"pac":48,"tec":72,"num":13},
@@ -19445,12 +19447,90 @@
   }
 }
 ,{
+  "id": "psg1516",
+  "name": "Paris Saint-Germain 2015-16",
+  "short": "PSG",
+  "flag": "🇫🇷",
+  "color": "#002B5C",
+  "secondary": "#DA291C",
+  "logo":"psg.png",
+  "stadium ":"Perc de Princes",
+  "players": [
+    {"id":"psg16_16","name":"Kevin Trapp","pos":["GK"],"ovr":83,"att":10,"def":84,"phy":78,"pac":50,"tec":72,"num":16},
+    {"id":"psg16_1","name":"Salvatore Sirigu","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":77,"pac":46,"tec":68,"num":1},
+    {"id":"psg16_30","name":"Nicolas Douchez","pos":["GK"],"ovr":75,"att":10,"def":76,"phy":72,"pac":42,"tec":60,"num":30},
+    {"id":"psg16_23","name":"Gregory van der Wiel","pos":["RB"],"ovr":79,"att":74,"def":77,"phy":76,"pac":83,"tec":77,"num":23},
+    {"id":"psg16_19","name":"Serge Aurier","pos":["RB","RWB"],"ovr":82,"att":76,"def":81,"phy":85,"pac":84,"tec":76,"num":19},
+    {"id":"psg16_2","name":"Thiago Silva","pos":["CB"],"ovr":90,"att":52,"def":92,"phy":84,"pac":74,"tec":80,"num":2},
+    {"id":"psg16_32","name":"David Luiz","pos":["CB","CDM"],"ovr":84,"att":68,"def":83,"phy":82,"pac":73,"tec":78,"num":32},
+    {"id":"psg16_5","name":"Marquinhos","pos":["CB","RB"],"ovr":82,"att":50,"def":84,"phy":79,"pac":78,"tec":75,"num":5},
+    {"id":"psg16_3","name":"Presnel Kimpembe","pos":["CB","LB"],"ovr":73,"att":45,"def":74,"phy":76,"pac":71,"tec":68,"num":3},
+    {"id":"psg16_17","name":"Maxwell","pos":["LB","LWB"],"ovr":81,"att":76,"def":79,"phy":74,"pac":77,"tec":82,"num":17},
+    {"id":"psg16_20","name":"Layvin Kurzawa","pos":["LB","LWB"],"ovr":80,"att":78,"def":76,"phy":77,"pac":81,"tec":79,"num":20},
+    {"id":"psg16_8","name":"Thiago Motta","pos":["CDM","CM"],"ovr":85,"att":72,"def":84,"phy":82,"pac":58,"tec":86,"num":8},
+    {"id":"psg16_14","name":"Blaise Matuidi","pos":["CM","CDM","LM"],"ovr":86,"att":78,"def":85,"phy":88,"pac":82,"tec":80,"num":14},
+    {"id":"psg16_6","name":"Marco Verratti","pos":["CM","CDM"],"ovr":87,"att":78,"def":80,"phy":72,"pac":77,"tec":91,"num":6},
+    {"id":"psg16_25","name":"Adrien Rabiot","pos":["CM","CDM"],"ovr":80,"att":75,"def":77,"phy":80,"pac":74,"tec":82,"num":25},
+    {"id":"psg16_4","name":"Benjamin Stambouli","pos":["CDM","CM"],"ovr":77,"att":65,"def":78,"phy":78,"pac":66,"tec":75,"num":4},
+    {"id":"psg16_11","name":"Ángel Di María","pos":["RW","RM","CAM"],"ovr":88,"att":87,"def":48,"phy":72,"pac":88,"tec":90,"num":11},
+    {"id":"psg16_7","name":"Lucas Moura","pos":["RW","RM"],"ovr":82,"att":81,"def":40,"phy":70,"pac":93,"tec":86,"num":7},
+    {"id":"psg16_27","name":"Javier Pastore","pos":["CAM","CM","LW"],"ovr":83,"att":82,"def":50,"phy":71,"pac":76,"tec":89,"num":27},
+    {"id":"psg16_18","name":"Zlatan Ibrahimović","pos":["ST"],"ovr":91,"att":93,"def":35,"phy":88,"pac":73,"tec":92,"num":18},
+    {"id":"psg16_9","name":"Edinson Cavani","pos":["ST","LW"],"ovr":86,"att":87,"def":48,"phy":83,"pac":85,"tec":80,"num":9},
+    {"id":"psg16_29","name":"Jean-Kévin Augustin","pos":["ST"],"ovr":72,"att":73,"def":30,"phy":71,"pac":82,"tec":72,"num":29}
+  ],
+  "manager": {
+    "name": "Laurent Blanc",
+    "ovr": 87
+  }
+}
+,{
+  "id": "psg2223",
+  "name": "Paris Saint-Germain 2022-23",
+  "short": "PSG",
+  "flag": "🇫🇷",
+  "color": "#002B5C",
+  "secondary": "#DA291C",
+  "logo":"psg.png",
+  "stadium ":"Perc de Princes",
+  "players": [
+    {"id":"psg23_99","name":"Gianluigi Donnarumma","pos":["GK"],"ovr":88,"att":10,"def":89,"phy":84,"pac":52,"tec":72,"num":99},
+    {"id":"psg23_1","name":"Keylor Navas","pos":["GK"],"ovr":87,"att":10,"def":88,"phy":78,"pac":50,"tec":75,"num":1},
+    {"id":"psg23_16","name":"Sergio Rico","pos":["GK"],"ovr":76,"att":10,"def":77,"phy":75,"pac":45,"tec":65,"num":16},
+    {"id":"psg23_2","name":"Achraf Hakimi","pos":["RB","RWB"],"ovr":87,"att":82,"def":78,"phy":79,"pac":92,"tec":83,"num":2},
+    {"id":"psg23_26","name":"Nordi Mukiele","pos":["RB","CB","RWB"],"ovr":79,"att":71,"def":80,"phy":81,"pac":82,"tec":74,"num":26},
+    {"id":"psg23_5","name":"Marquinhos","pos":["CB"],"ovr":88,"att":55,"def":89,"phy":81,"pac":79,"tec":78,"num":5},
+    {"id":"psg23_4","name":"Sergio Ramos","pos":["CB"],"ovr":84,"att":62,"def":85,"phy":82,"pac":63,"tec":77,"num":4},
+    {"id":"psg23_3","name":"Presnel Kimpembe","pos":["CB","LB"],"ovr":83,"att":50,"def":84,"phy":85,"pac":76,"tec":72,"num":3},
+    {"id":"psg23_31","name":"El Chadaille Bitshiabu","pos":["CB"],"ovr":72,"att":40,"def":73,"phy":78,"pac":68,"tec":64,"num":31},
+    {"id":"psg23_25","name":"Nuno Mendes","pos":["LB","LWB"],"ovr":82,"att":79,"def":77,"phy":76,"pac":90,"tec":81,"num":25},
+    {"id":"psg23_14","name":"Juan Bernat","pos":["LB","LWB"],"ovr":78,"att":75,"def":76,"phy":70,"pac":77,"tec":80,"num":14},
+    {"id":"psg23_6","name":"Marco Verratti","pos":["CM","CDM"],"ovr":89,"att":79,"def":80,"phy":71,"pac":75,"tec":92,"num":6},
+    {"id":"psg23_8","name":"Fabian Ruiz","pos":["CM","CAM"],"ovr":83,"att":80,"def":73,"phy":75,"pac":67,"tec":85,"num":8},
+    {"id":"psg23_17","name":"Vitinha","pos":["CM","CAM"],"ovr":81,"att":78,"def":72,"phy":71,"pac":77,"tec":84,"num":17},
+    {"id":"psg23_18","name":"Renato Sanches","pos":["CM","CDM"],"ovr":80,"att":77,"def":75,"phy":83,"pac":82,"tec":82,"num":18},
+    {"id":"psg23_28","name":"Carlos Soler","pos":["CM","CAM","RM"],"ovr":81,"att":80,"def":70,"phy":74,"pac":78,"tec":82,"num":28},
+    {"id":"psg23_33","name":"Warren Zaïre-Emery","pos":["CM","CDM"],"ovr":74,"att":70,"def":72,"phy":75,"pac":76,"tec":77,"num":33},
+    {"id":"psg23_30","name":"Lionel Messi","pos":["RW","CF","CAM"],"ovr":91,"att":92,"def":34,"phy":64,"pac":81,"tec":95,"num":30},
+    {"id":"psg23_10","name":"Neymar Jr","pos":["LW","CAM","CF"],"ovr":89,"att":89,"def":37,"phy":63,"pac":87,"tec":94,"num":10},
+    {"id":"psg23_7","name":"Kylian Mbappé","pos":["ST","LW"],"ovr":91,"att":93,"def":36,"phy":76,"pac":97,"tec":90,"num":7},
+    {"id":"psg23_44","name":"Hugo Ekitiké","pos":["ST"],"ovr":76,"att":77,"def":30,"phy":70,"pac":81,"tec":76,"num":44},
+    {"id":"psg23_19","name":"Pablo Sarabia","pos":["RW","RM","CAM"],"ovr":80,"att":80,"def":52,"phy":68,"pac":76,"tec":82,"num":19}
+  ],
+  "manager": {
+    "name": "Christophe Galtier",
+    "ovr": 83
+  }
+}
+,{
   "id": "psg2026",
   "name": "Paris Saint-Germain 2026-27",
   "short": "PSG",
   "flag": "🇫🇷",
   "color": "#004170",
   "secondary": "#DA291C",
+  "logo":"psg.png",
+  "stadium ":"Perc de Princes",
   "players": [
     {"id":"psg26_16","name":"Alessandro Longoni","pos":["GK"],"ovr":70,"att":15,"def":71,"phy":72,"pac":48,"tec":60,"num":16},
     {"id":"psg26_30","name":"Lucas Chevalier","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":80,"pac":50,"tec":78,"num":30},
@@ -19707,6 +19787,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#95BFE5",
   "secondary": "#670E36",
+  "logo":"aston.png",
+  "stadium ":"Villa Park",
   "players": [
     {"id":"avl26_23","name":"Emiliano Martínez","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":84,"pac":50,"tec":68,"num":23},
     {"id":"avl26_40","name":"Marco Bizot","pos":["GK"],"ovr":78,"att":15,"def":79,"phy":76,"pac":45,"tec":60,"num":40},
@@ -20114,6 +20196,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#132257",
   "secondary": "#FFFFFF",
+  "logo":"spurs.png",
+  "stadium ":"Tottenham Hotspur Stadium",
   "players": [
     {"id":"tot26_1","name":"Guglielmo Vicario","pos":["GK"],"ovr":84,"att":15,"def":85,"phy":80,"pac":50,"tec":68,"num":1},
     {"id":"tot26_20","name":"Fraser Forster","pos":["GK"],"ovr":74,"att":15,"def":75,"phy":76,"pac":35,"tec":55,"num":20},
@@ -21037,6 +21121,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#132257",
   "secondary": "#FFFFFF",
+  "logo":"spurs.png",
+  "stadium ":"Tottenham Hotspur Stadium",
   "players": [
     {"id":"tot12_25","name":"Hugo Lloris","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":78,"pac":58,"tec":68,"num":25},
     {"id":"tot12_24","name":"Brad Friedel","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":38,"tec":60,"num":24},
@@ -21413,6 +21499,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#EF0107",
   "secondary": "#FFFFFF",
+  "logo":"arsenal.png",
+  "stadium ":"Emirates Stadium",
   "players": [
     {"id":"ars04_1","name":"Jens Lehmann","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":80,"pac":50,"tec":68,"num":1},
     {"id":"ars04_13","name":"Stuart Taylor","pos":["GK"],"ovr":71,"att":15,"def":72,"phy":70,"pac":48,"tec":55,"num":13},
@@ -21755,6 +21843,8 @@
   "flag": "🇳🇱",
   "color": "#EE1C25",
   "secondary": "#FFFFFF",
+  "logo":"psv.png",
+  "stadium ":"The Philips Stadium",
   "players": [
     {"id":"psv88_1","name":"Hans van Breukelen","pos":["GK"],"ovr":87,"att":15,"def":88,"phy":80,"pac":52,"tec":68,"num":1},
     {"id":"psv88_12","name":"Patrick Lodewijks","pos":["GK"],"ovr":71,"att":15,"def":72,"phy":70,"pac":48,"tec":55,"num":12},
@@ -22310,6 +22400,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#003090",
   "secondary": "#FDBE11",
+  "logo":"lci.png",
+  "stadium ":"The King Power Stadium",
   "players": [
     {"id":"lei16_1","name":"Kasper Schmeichel","pos":["GK"],"ovr":86,"att":15,"def":86,"phy":83,"pac":55,"tec":70,"num":1},
     {"id":"lei16_32","name":"Mark Schwarzer","pos":["GK"],"ovr":78,"att":12,"def":79,"phy":75,"pac":42,"tec":60,"num":32},
@@ -22900,6 +22992,8 @@
   "flag": "🇪🇸",
   "color": "#CE1126",
   "secondary": "#FFFFFF",
+  "logo":"sevilla.png",
+  "stadium ":"Sánchez-Pizjuán Stadium",
   "players": [
     {"id":"sev27_1","name":"Odysseas Vlachodimos","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":50,"tec":73,"num":1},
     {"id":"sev27_13","name":"Fran González","pos":["GK"],"ovr":78,"att":10,"def":79,"phy":76,"pac":46,"tec":68,"num":13},
