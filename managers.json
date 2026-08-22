@@ -1,0 +1,22 @@
+{
+  "_comment": "Manager name -> portrait filename, resolved against assets/mportraits/. Key must match team.manager.name in teams.json EXACTLY (case + spelling). Drop the actual image files into assets/mportraits/ using these filenames. Remove this _comment key if you like — it's ignored.",
+  "Carlo Ancelotti": "ancelotti.png",
+  "Pep Guardiola": "guardiola.png",
+  "Jurgen Klopp": "klopp.png",
+  "Diego Simeone": "simeone.png",
+  "Xabi Alonso": "alonso.png",
+  "Mikel Arteta": "arteta.png",
+  "Hansi Flick": "flick.png",
+  "Luis Enrique": "enrique.png",
+  "Thomas Tuchel": "tuchel.png",
+  "Simone Inzaghi": "inzaghi.png",
+  "Arrigo Sacchi":"sacchi.png",
+  "Massimiliano Allegri":"allegri.png",
+  "Fabio Capello":"capello.png",
+  "Unai Emery":"emery.png",
+  "Louis van Gaal":"vangaal.png",
+  "Sir Alex Ferguson":"ferguson.png",
+  "José Mourinho":"mourinho.png",
+  "Arsène Wenger":"wenger.png",
+  "Lionel Scaloni":"scaloni.png"
+}
