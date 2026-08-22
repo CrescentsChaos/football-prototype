@@ -23386,6 +23386,56 @@
   }
 }
 ,{
+  "id": "chelsea2027",
+  "name": "Chelsea 2026-27",
+  "short": "CHE",
+  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "color": "#034694",
+  "secondary": "#FFFFFF",
+  "logo": "chelsea.png",
+  "stadium": "Stamford Bridge",
+  "players": [
+    {"id":"che27_1","name":"Robert Sánchez","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":78,"pac":50,"tec":72,"num":1},
+    {"id":"che27_39","name":"Mike Penders","pos":["GK"],"ovr":76,"att":10,"def":77,"phy":75,"pac":45,"tec":65,"num":39},
+    {"id":"che27_44","name":"Gabriel Slonina","pos":["GK"],"ovr":75,"att":10,"def":76,"phy":74,"pac":48,"tec":64,"num":44},
+    {"id":"che27_28","name":"Teddy Sharman-Lowe","pos":["GK"],"ovr":71,"att":10,"def":72,"phy":70,"pac":42,"tec":60,"num":28},
+    {"id":"che27_24","name":"Reece James","pos":["RB","RWB"],"ovr":86,"att":81,"def":84,"phy":85,"pac":81,"tec":85,"num":24},
+    {"id":"che27_27","name":"Malo Gusto","pos":["RB","RWB"],"ovr":82,"att":78,"def":80,"phy":78,"pac":87,"tec":80,"num":27},
+    {"id":"che27_2","name":"Marco Palestra","pos":["RB","RWB"],"ovr":79,"att":77,"def":76,"phy":77,"pac":84,"tec":78,"num":2},
+    {"id":"che27_6","name":"Levi Colwill","pos":["CB","LB"],"ovr":84,"att":55,"def":85,"phy":82,"pac":76,"tec":78,"num":6},
+    {"id":"che27_3","name":"Wesley Fofana","pos":["CB"],"ovr":83,"att":50,"def":84,"phy":83,"pac":78,"tec":74,"num":3},
+    {"id":"che27_5","name":"Maxence Lacroix","pos":["CB"],"ovr":82,"att":48,"def":83,"phy":84,"pac":85,"tec":72,"num":5},
+    {"id":"che27_38","name":"Tosin Adarabioyo","pos":["CB"],"ovr":79,"att":45,"def":80,"phy":80,"pac":68,"tec":71,"num":38},
+    {"id":"che27_19","name":"Mamadou Sarr","pos":["CB"],"ovr":77,"att":42,"def":78,"phy":79,"pac":73,"tec":68,"num":19},
+    {"id":"che27_30","name":"Aarón Anselmino","pos":["CB"],"ovr":76,"att":44,"def":77,"phy":78,"pac":72,"tec":69,"num":30},
+    {"id":"che27_34","name":"Josh Acheampong","pos":["CB","RB"],"ovr":75,"att":62,"def":75,"phy":74,"pac":77,"tec":70,"num":34},
+    {"id":"che27_21","name":"Jorrel Hato","pos":["LB","CB"],"ovr":82,"att":74,"def":82,"phy":79,"pac":82,"tec":80,"num":21},
+    {"id":"che27_4","name":"Valentín Barco","pos":["LB","LWB","LM"],"ovr":80,"att":78,"def":74,"phy":72,"pac":83,"tec":82,"num":4},
+    {"id":"che27_29","name":"Pep Chavarría","pos":["LB","LWB"],"ovr":77,"att":73,"def":76,"phy":75,"pac":82,"tec":74,"num":29},
+    {"id":"che27_25","name":"Moisés Caicedo","pos":["CDM","CM"],"ovr":86,"att":72,"def":87,"phy":86,"pac":79,"tec":82,"num":25},
+    {"id":"che27_8","name":"Enzo Fernández","pos":["CM","CDM"],"ovr":86,"att":81,"def":78,"phy":77,"pac":72,"tec":88,"num":8},
+    {"id":"che27_45","name":"Roméo Lavia","pos":["CDM","CM"],"ovr":81,"att":71,"def":81,"phy":80,"pac":75,"tec":81,"num":45},
+    {"id":"che27_16","name":"Dário Essugo","pos":["CDM","CM"],"ovr":78,"att":68,"def":79,"phy":82,"pac":76,"tec":76,"num":16},
+    {"id":"che27_14","name":"Jordan Henderson","pos":["CM","CDM"],"ovr":77,"att":70,"def":76,"phy":74,"pac":62,"tec":78,"num":14},
+    {"id":"che27_10","name":"Cole Palmer","pos":["CAM","RW","ST"],"ovr":88,"att":88,"def":52,"phy":74,"pac":82,"tec":90,"num":10},
+    {"id":"che27_17","name":"Morgan Rogers","pos":["CAM","LW","CM"],"ovr":84,"att":84,"def":58,"phy":82,"pac":84,"tec":85,"num":17},
+    {"id":"che27_7","name":"Pedro Neto","pos":["RW","LW"],"ovr":83,"att":82,"def":45,"phy":71,"pac":91,"tec":85,"num":7},
+    {"id":"che27_11","name":"Jamie Gittens","pos":["LW","RW"],"ovr":81,"att":80,"def":40,"phy":68,"pac":89,"tec":83,"num":11},
+    {"id":"che27_23","name":"Geovany Quenda","pos":["RW","RM"],"ovr":79,"att":78,"def":48,"phy":70,"pac":87,"tec":82,"num":23},
+    {"id":"che27_41","name":"Estêvão Willian","pos":["RW","CAM"],"ovr":80,"att":80,"def":42,"phy":66,"pac":86,"tec":85,"num":41},
+    {"id":"che27_33","name":"Mykhailo Mudryk","pos":["LW","LM"],"ovr":80,"att":78,"def":40,"phy":69,"pac":92,"tec":79,"num":33},
+    {"id":"che27_9","name":"João Pedro","pos":["ST","CAM"],"ovr":84,"att":85,"def":46,"phy":78,"pac":83,"tec":85,"num":9},
+    {"id":"che27_15","name":"Nicolas Jackson","pos":["ST"],"ovr":83,"att":84,"def":40,"phy":79,"pac":86,"tec":78,"num":15},
+    {"id":"che27_12","name":"Liam Delap","pos":["ST"],"ovr":80,"att":81,"def":38,"phy":84,"pac":80,"tec":74,"num":12},
+    {"id":"che27_22","name":"Emmanuel Emegha","pos":["ST"],"ovr":79,"att":80,"def":35,"phy":82,"pac":84,"tec":73,"num":22},
+    {"id":"che27_18","name":"Danny Welbeck","pos":["ST"],"ovr":77,"att":78,"def":42,"phy":73,"pac":73,"tec":77,"num":18}
+  ],
+  "manager": {
+    "name": "Xabi Alonso",
+    "ovr": 88
+  }
+}
+,{
   "id": "brentford2027",
   "name": "Brentford FC 2026-27",
   "short": "BRE",
