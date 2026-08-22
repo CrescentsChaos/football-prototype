@@ -6,10 +6,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>APEX SIM — Football Simulator</title>
-  <meta name="description" content="APEX SIM — a browser-based football simulator with a live match engine, formations, injuries, a 36-team Champions League format and a full World Cup. Build your night of football.">
+  <meta name="description" content="APEX SIM — a browser-based football simulation platform with a live match engine, formations, injuries, domestic seasons, a 36-team Champions League format and a full World Cup.">
   <meta name="theme-color" content="#05080f">
   <meta property="og:title" content="APEX SIM — Football Simulator">
-  <meta property="og:description" content="Live match engine · Formations · Injuries · UCL 36-team league · World Cup.">
+  <meta property="og:description" content="A football simulation platform with a live match engine, domestic seasons and international tournaments.">
   <meta property="og:type" content="website">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23111a2b' stroke='%23f0c14b' stroke-width='6'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,47 +41,37 @@
     <section id="view-home" class="view active">
       <div class="hero">
         <h1>APEX SIM</h1>
-        <p>Live match engine · Formations · Injuries · UCL 36-team league · World Cup. Build your night of football.</p>
+        <p>A football simulation platform with a full live match engine, domestic seasons and international tournaments.</p>
         <div class="mode-grid">
           <div class="mode-card" role="button" tabindex="0" onclick="App.goToMatch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToMatch()}">
             <div class="icon">🏟️</div>
-            <h3>Friendly Match</h3>
-            <p>Pick two teams, choose formations, and simulate a full 90-minute match with live commentary, cards, goals and more.</p>
-          </div>
-          <div class="mode-card" role="button" tabindex="0" onclick="App.randomMatch('all')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.randomMatch('all')}">
-            <div class="icon">🎲</div>
-            <h3>Random Match</h3>
-            <p>Random national or club pairing. Or choose National / Club only from Match screen.</p>
+            <h3>Kick Off</h3>
+            <p>Select two teams and formations — or go random, or build your own lineup with Squad Builder — then simulate live.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.goToTournament('worldcup')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToTournament('worldcup')}">
             <div class="icon"><img src="assets/trophies/world-cup.png" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.textContent='🏆'"></div>
             <h3>World Cup</h3>
-            <p>National teams battle through groups and knockouts. Track top scorers, assists, clean sheets across the tournament.</p>
+            <p>National teams compete through groups and knockouts, with scorers, assists and clean sheets tracked throughout.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.goToTournament('ucl')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToTournament('ucl')}">
             <div class="icon"><img src="assets/trophies/champions-league.png" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.textContent='⭐'"></div>
             <h3>Champions League</h3>
-            <p>Club competition. Select teams, run the full knockout path, and crown the European champion.</p>
-          </div>
-          <div class="mode-card" role="button" tabindex="0" onclick="App.goToSquadBuilder()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToSquadBuilder()}">
-            <div class="icon">📋</div>
-            <h3>Squad Builder</h3>
-            <p>Manually pick formation and starting XI, then simulate the match your way.</p>
+            <p>Club competition featuring a league phase, playoffs and two-legged knockouts, ending in a single final.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('season')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('season')}">
             <div class="icon">📅</div>
             <h3>Season Calendar</h3>
-            <p>Run a full year: Premier League, Bundesliga, La Liga, Serie A, League One and the Champions League — all at once.</p>
+            <p>Run a full season across the Premier League, La Liga, Serie A, Bundesliga, League One and the Champions League.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('leaderboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('leaderboard')}">
             <div class="icon">📊</div>
             <h3>Leaderboards</h3>
-            <p>Global stats: goals, assists, saves, clean sheets. Updated after every simulated match.</p>
+            <p>Career statistics across every match played — goals, assists, saves and clean sheets.</p>
           </div>
           <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('awards')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('awards')}">
             <div class="icon">🏆</div>
             <h3>Awards</h3>
-            <p>Golden Boot, Ballon d'Or, trophies and player of the match awards.</p>
+            <p>Golden Boot, Ballon d'Or and Player of the Match, awarded automatically as results come in.</p>
           </div>
         </div>
       </div>
