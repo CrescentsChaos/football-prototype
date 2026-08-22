@@ -3666,16 +3666,19 @@ var App = (() => {
 
   // Persist every non-zero form value (+ the baseOvr it's measured against)
   // so a page refresh doesn't silently reset every player back to neutral.
+  function collectPlayerFormsMap() {
+    const map = {};
+    allTeams.forEach(t => (t.players || []).forEach(p => {
+      if (typeof p.form === 'number' && Math.abs(p.form) > 0.01) {
+        map[p.id] = { form: p.form, baseOvr: p.baseOvr, ovr: p.ovr };
+      }
+    }));
+    return map;
+  }
   function persistPlayerForms() {
     try {
-      const map = {};
-      allTeams.forEach(t => (t.players || []).forEach(p => {
-        if (typeof p.form === 'number' && Math.abs(p.form) > 0.01) {
-          map[p.id] = { form: p.form, baseOvr: p.baseOvr, ovr: p.ovr };
-        }
-      }));
-      localStorage.setItem('apexPlayerForms', JSON.stringify(map));
-    } catch (e) {}
+      return safeSetItem('apexPlayerForms', JSON.stringify(collectPlayerFormsMap()));
+    } catch (e) { return false; }
   }
   function restorePlayerForms() {
     try {
@@ -3774,7 +3777,7 @@ var App = (() => {
   // set `player` — that's what powers the Teams-tab trophy cabinet and the
   // History tab's "Individual Awards" list.
   function saveTrophiesToStorage() {
-    try { localStorage.setItem('apexTrophies', JSON.stringify(trophies)); } catch (e) {}
+    try { return safeSetItem('apexTrophies', JSON.stringify(trophies)); } catch (e) { return false; }
   }
   function pushTeamTrophy(name, teamName, type, extra) {
     const t = Object.assign({ name, team: teamName, type, date: Date.now() }, extra || {});
@@ -3906,13 +3909,41 @@ var App = (() => {
     toast('Season ' + season.year + ' complete! Awards & leaderboard archived to History and reset.');
   }
 
-  function saveStats() {
+  // True once we've warned the person this session that browser storage is
+  // full — avoids re-toasting every 4s from the autosave interval below.
+  let _storageQuotaWarned = false;
+  function isQuotaError(e) {
+    return !!e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 ||
+      e.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+  }
+  // Wraps localStorage.setItem so a full-storage failure is surfaced to the
+  // person (once per session) instead of vanishing into an empty catch.
+  // Silently swallowing a failed write here is exactly how a browser save
+  // could quietly stop matching the matches actually played — the write
+  // looks like it happened (no error shown) but the old, smaller value is
+  // still sitting in localStorage. Returns true on success, false on failure.
+  function safeSetItem(key, value) {
     try {
-      localStorage.setItem('apexSimStats', JSON.stringify(stats));
-      localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook));
-      localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook));
-      localStorage.setItem('apexMatchDay', String(globalMatchDay));
-    } catch(e) {}
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      if (isQuotaError(e) && !_storageQuotaWarned) {
+        _storageQuotaWarned = true;
+        toast('Browser storage is full — use Export Save now to back up your progress to a file');
+      }
+      return false;
+    }
+  }
+
+  function saveStats() {
+    let ok = true;
+    try {
+      ok = safeSetItem('apexSimStats', JSON.stringify(stats)) && ok;
+      ok = safeSetItem('apexInjuryBook', JSON.stringify(injuryBook)) && ok;
+      ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
+      ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
+    } catch(e) { ok = false; }
+    return ok;
   }
   function loadStats() {
     try {
@@ -3938,19 +3969,21 @@ var App = (() => {
   // refresh (or reopening the app later) drops the person back exactly
   // where they left off instead of wiping their run.
   function persistAll() {
+    let ok = true;
     try {
-      if (season) localStorage.setItem('apexSeason', JSON.stringify(season));
+      if (season) ok = safeSetItem('apexSeason', JSON.stringify(season)) && ok;
       else localStorage.removeItem('apexSeason');
-      if (tournament) localStorage.setItem('apexTournament', JSON.stringify(tournament));
+      if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament)) && ok;
       else localStorage.removeItem('apexTournament');
-      localStorage.setItem('apexTournamentType', tournamentType);
-      localStorage.setItem('apexTournamentStats', JSON.stringify(tournamentStats));
-      localStorage.setItem('apexSeasonActiveTab', seasonActiveTab);
-      localStorage.setItem('apexSeasonActiveSubTab', seasonActiveSubTab);
-      persistPlayerForms();
+      ok = safeSetItem('apexTournamentType', tournamentType) && ok;
+      ok = safeSetItem('apexTournamentStats', JSON.stringify(tournamentStats)) && ok;
+      ok = safeSetItem('apexSeasonActiveTab', seasonActiveTab) && ok;
+      ok = safeSetItem('apexSeasonActiveSubTab', seasonActiveSubTab) && ok;
+      ok = persistPlayerForms() && ok;
       const activeTab = document.querySelector('.nav-tab.active');
-      if (activeTab && activeTab.dataset.view) localStorage.setItem('apexActiveView', activeTab.dataset.view);
-    } catch (e) {}
+      if (activeTab && activeTab.dataset.view) safeSetItem('apexActiveView', activeTab.dataset.view);
+    } catch (e) { ok = false; }
+    return ok;
   }
 
   function loadPersistedGameState() {
@@ -4029,19 +4062,24 @@ var App = (() => {
   // it exists purely so the person can get an explicit, visible confirmation
   // that their progress is safely written to this browser's storage right now.
   function manualSave() {
-    persistAll();
+    const okSeason = persistAll();
+    const okStats = saveStats();
+    const ok = okSeason && okStats;
     const btn = document.getElementById('manual-save-btn');
     if (btn) {
       const label = btn.querySelector('.save-btn-label');
       const prevLabel = label ? label.textContent : null;
       btn.classList.add('just-saved');
-      if (label) label.textContent = 'Saved!';
+      if (label) label.textContent = ok ? 'Saved!' : 'Storage full!';
       setTimeout(() => {
         btn.classList.remove('just-saved');
         if (label && prevLabel !== null) label.textContent = prevLabel;
       }, 1200);
     }
-    toast('Progress saved');
+    // safeSetItem() already toasts a one-time "storage is full" warning on
+    // failure, so only toast the happy path here to avoid two conflicting
+    // messages.
+    if (ok) toast('Progress saved');
   }
 
   // ========== EXPORT / IMPORT SAVE FILE ==========
@@ -4052,17 +4090,57 @@ var App = (() => {
   // JSON strings, numbers-as-strings, etc.) and write them back out exactly
   // as they were, rather than re-deriving anything from in-memory state.
   // This is what lets a save survive a browser switch or a full wipe/refresh.
-  function exportSave() {
+  // Builds the export payload straight from the live in-memory game state
+  // (season, tournament, stats, trophies, etc.) rather than reading it back
+  // out of localStorage. This matters because localStorage writes can fail
+  // silently under quota pressure (a long season's accumulated match
+  // reports can get large) — if that happens, the localStorage copy can be
+  // an older, smaller snapshot than what's actually on screen, and an
+  // export built from localStorage would quietly ship that stale, earlier
+  // point instead of the matches actually just played. Reading straight
+  // from memory means the export always matches exactly what's currently
+  // showing, independent of whether the last autosave tick succeeded.
+  function collectExportData() {
+    const data = {};
+    // Start from whatever's already in localStorage, so any "apex*" key
+    // this function doesn't special-case below (small UI/session bits)
+    // still makes it into the export.
     try {
-      // Flush any pending in-memory changes to localStorage first so the
-      // export reflects the very latest state, not the last autosave tick.
-      persistAll();
-      saveStats();
-      const data = {};
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (k && k.indexOf('apex') === 0) data[k] = localStorage.getItem(k);
       }
+    } catch (e) {}
+    // Now overwrite every key that has a live in-memory source of truth,
+    // so these always reflect the exact current point — not a possibly
+    // stale localStorage copy.
+    try {
+      if (season) data.apexSeason = JSON.stringify(season);
+      else delete data.apexSeason;
+      if (tournament) data.apexTournament = JSON.stringify(tournament);
+      else delete data.apexTournament;
+      data.apexTournamentType = tournamentType;
+      data.apexTournamentStats = JSON.stringify(tournamentStats);
+      data.apexSeasonActiveTab = seasonActiveTab;
+      data.apexSeasonActiveSubTab = seasonActiveSubTab;
+      data.apexSimStats = JSON.stringify(stats);
+      data.apexTrophies = JSON.stringify(trophies);
+      data.apexInjuryBook = JSON.stringify(injuryBook);
+      data.apexSuspensionBook = JSON.stringify(suspensionBook);
+      data.apexMatchDay = String(globalMatchDay);
+      data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
+    } catch (e) {}
+    return data;
+  }
+
+  function exportSave() {
+    try {
+      // Best-effort: also try to flush to localStorage so autosave/reload
+      // stay in sync. If this fails (e.g. storage is full), the export
+      // below still succeeds and is still exact — it doesn't depend on
+      // this write having worked.
+      try { persistAll(); saveStats(); } catch (e) {}
+      const data = collectExportData();
       if (!Object.keys(data).length) {
         toast('Nothing to export yet — play a bit first');
         return;
@@ -4122,7 +4200,17 @@ var App = (() => {
           if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
         }
         keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
-        validKeys.forEach(k => { try { localStorage.setItem(k, data[k]); } catch (e) {} });
+        // Track failures instead of swallowing them — a quota failure here
+        // would otherwise reload the page into a save that's silently
+        // missing the season/tournament progress the file actually had.
+        const failedKeys = [];
+        validKeys.forEach(k => { if (!safeSetItem(k, data[k])) failedKeys.push(k); });
+        if (failedKeys.length) {
+          alert('Import partially failed — this browser\'s storage is full, so ' +
+            failedKeys.length + ' item(s) from the file (' + failedKeys.join(', ') +
+            ') could not be restored. Free up space (e.g. import in a different browser, ' +
+            'or clear old site data) and try again.');
+        }
         try { sessionStorage.setItem('apexJustImported', '1'); } catch (e) {}
         location.reload();
       } catch (err) {
@@ -6649,6 +6737,24 @@ var App = (() => {
     currentSeasonComp = null;
   }
 
+  // Derives the season-wide "Matchday" counter from actual progress instead
+  // of a manually-incremented counter, so it stays correct no matter which
+  // route a fixture was played through (live, instant, or bulk simulate) —
+  // this is what's shown as "Year N · Matchday W" in the season header.
+  // Matchday W means "every domestic league has completed round W" (a
+  // finished league is treated as having completed all of its rounds), so
+  // the counter only advances once the slowest league catches up — exactly
+  // matching what "Play Now" already shows per league.
+  function computeSeasonWeek(s) {
+    if (!s || !s.leagues) return 0;
+    const rounds = SEASON_LEAGUE_DEFS.map(def => {
+      const comp = s.leagues[def.key];
+      if (!comp) return 0;
+      return comp.finished ? comp.rounds.length : comp.currentRound;
+    });
+    return rounds.length ? Math.min(...rounds) : 0;
+  }
+
   // Advances a competition's matchday once every fixture in the current
   // round has been played (whether via live play, instant sim, or batch
   // simulation). Mirrors the round-increment logic that used to live only
@@ -6664,6 +6770,10 @@ var App = (() => {
       comp.finished = true;
       crownLeagueChampion(comp);
     }
+    // Keep the season-wide Matchday counter in sync — this is the fix for
+    // live/instant single-fixture play never advancing it (only the bulk
+    // "Simulate Matchday" actions used to update it directly).
+    if (season) season.week = computeSeasonWeek(season);
     finalizeSeasonIfComplete();
   }
 
@@ -6745,7 +6855,7 @@ var App = (() => {
     withLoading('Simulating matchday…', function() {
       SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
       simulateUCLStep(season.ucl);
-      season.week++;
+      season.week = computeSeasonWeek(season);
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
     });
@@ -6758,7 +6868,7 @@ var App = (() => {
       while (!seasonIsComplete() && safety < 500) {
         SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
         simulateUCLStep(season.ucl);
-        season.week++;
+        season.week = computeSeasonWeek(season);
         safety++;
       }
       finalizeSeasonIfComplete();
