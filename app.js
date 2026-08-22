@@ -1718,6 +1718,11 @@ var App = (() => {
     clearInterval(simInterval); isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
+    // Instant Result / Finish Match have no one to click the ET/pens prompt,
+    // so resolve draws straight through instead of stalling at m._awaitingET —
+    // that stall was what let the minute counter run past 90 and climb well
+    // past 200 while safety just kept ticking without ever finishing.
+    currentMatch.silentDeep = true;
     let safety = 0;
     while (currentMatch && !currentMatch.finished && safety < 200) {
       tick(true);
@@ -2013,12 +2018,14 @@ var App = (() => {
     // shot rather than one side holding an identical, static edge for 90 minutes.
     const jitter = (Math.random() - 0.5) * 7;
     const qualityGap = (homeCreate - awayCreate) + HOME_ADV + mgrEdge + jitter;
-    // Softer curve (wider denominator) so quality gaps translate into a real but
-    // not overwhelming edge — even a big mismatch shouldn't monopolise 85% of
-    // the game's chances for 90 straight minutes. Clamp narrowed to keep the
-    // weaker side involved throughout, the way real underdogs still get looks.
-    let homeChance = 1 / (1 + Math.exp(-qualityGap / 16));
-    homeChance = Math.min(0.78, Math.max(0.22, homeChance));
+    // Curve tuned so a real quality gap (a top side vs a relegation-battler)
+    // actually shows up as a clear, lopsided share of the game's chances —
+    // previously this saturated at 78/22 for even a modest gap, which let
+    // big underdogs hang around far too often. The weaker side still gets
+    // some of the ball (upsets stay possible, just rarer), but a genuine
+    // mismatch now pushes much closer to the clamp's true edges.
+    let homeChance = 1 / (1 + Math.exp(-qualityGap / 13));
+    homeChance = Math.min(0.90, Math.max(0.10, homeChance));
     // Build up real passing volume for both teams this minute (feeds player stats + rating).
     simulateMinutePassing();
     // Independent per-minute defensive activity (tackles/interceptions/blocks) —
@@ -2071,7 +2078,13 @@ var App = (() => {
     // that *didn't* win the main possession roll to snatch a quick transition
     // shot of their own. Scaled by their own attacking ability vs the
     // dominant side's defence, so it's a real chance, not a freebie.
-    if (Math.random() < 0.05) {
+    // Base rate trimmed (was 0.05) and now scaled by the counter-attacking side's
+    // own attacking quality — a top side still snatches these breaks fairly
+    // often, but a genuinely weak side shouldn't get this "free" chance at the
+    // same rate as a good one just for being the team not on the ball.
+    const counterBaseStr = attackingSide === 'home' ? awayStr : homeStr;
+    const counterProb = Math.max(0.015, Math.min(0.05, 0.02 + (counterBaseStr.att - 70) / 600));
+    if (Math.random() < counterProb) {
       const counterStr = attackingSide === 'home' ? awayStr : homeStr;
       const counterOppStr = attackingSide === 'home' ? homeStr : awayStr;
       const counterTeam = defTeam, counterOppTeam = attTeam;
@@ -2083,12 +2096,12 @@ var App = (() => {
         m.playerMatchStats[cShooter.id].shots++;
         const cQuality = ((cShooter.att || 70) * 0.45 + (cShooter.tec || 70) * 0.35 + (cShooter.ovr || 75) * 0.2) / 100;
         const cDefAvg = counterOppStr.def / 100;
-        const cOnTarget = Math.min(0.6, Math.max(0.1, 0.14 + cQuality * 0.34 - cDefAvg * 0.2));
+        const cOnTarget = Math.min(0.65, Math.max(0.06, 0.12 + cQuality * 0.40 - cDefAvg * 0.24));
         if (Math.random() < cOnTarget) {
           counterTeam.stats.shotsOn++;
           const cGk = pickPlayer(counterOppTeam, ['GK']);
           const cGkSkill = cGk ? ((cGk.def || 70) * 0.5 + (cGk.ovr || 75) * 0.3 + (cGk.tec || 70) * 0.2) / 100 : 0.7;
-          const cSaveChance = Math.min(0.88, Math.max(0.35, 0.48 + cGkSkill * 0.36 - cQuality * 0.22));
+          const cSaveChance = Math.min(0.92, Math.max(0.30, 0.46 + cGkSkill * 0.40 - cQuality * 0.26));
           if (Math.random() < cSaveChance) {
             if (cGk) {
               counterOppTeam.stats.saves++;
@@ -2119,7 +2132,10 @@ var App = (() => {
       // Attributes matter: att/tec/ovr vs defence
       const shotQuality = ((shooter.att || 70) * 0.45 + (shooter.tec || 70) * 0.35 + (shooter.ovr || 75) * 0.2) / 100;
       const defAvg = calcTeamStrength(defTeam).def / 100;
-      const onTargetChance = Math.min(0.64, Math.max(0.12, 0.16 + shotQuality * 0.36 - defAvg * 0.20));
+      // Wider clamp + stronger quality/defence weighting so a genuine class gap
+      // (a clinical attack vs a shaky back line, or vice versa) actually shows
+      // up in conversion, not just in shot volume.
+      const onTargetChance = Math.min(0.70, Math.max(0.08, 0.14 + shotQuality * 0.42 - defAvg * 0.24));
       if (Math.random() < onTargetChance) {
         attTeam.stats.shotsOn++;
         if (!m.playerMatchStats) m.playerMatchStats={};
@@ -2127,7 +2143,7 @@ var App = (() => {
         m.playerMatchStats[shooter.id].shots++;
         const gk = pickPlayer(defTeam, ['GK']);
         const gkSkill = gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7;
-        const saveChance = Math.min(0.88, Math.max(0.35, 0.46 + gkSkill * 0.38 - shotQuality * 0.22));
+        const saveChance = Math.min(0.92, Math.max(0.30, 0.44 + gkSkill * 0.42 - shotQuality * 0.26));
         if (Math.random() < saveChance) {
           if (gk) {
             defTeam.stats.saves++;
