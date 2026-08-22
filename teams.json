@@ -18560,7 +18560,7 @@
   "stadium":"Estadio Santiago Bernabéu",
   "players": [
     {"id":"rma18_1","name":"Keylor Navas","pos":["GK"],"ovr":88,"att":15,"def":90,"phy":80,"pac":54,"tec":72,"num":1},
-    {"id":"rma18_2","name":"Dani Carvajal","pos":["RB"],"ovr":89,"att":78,"def":85,"phy":82,"pac":86,"tec":84,"num":2},
+    {"id":"rma18_2","name":"Daniel Carvajal","pos":["RB"],"ovr":89,"att":78,"def":85,"phy":82,"pac":86,"tec":84,"num":2},
     {"id":"rma18_3","name":"Jesús Vallejo","pos":["CB"],"ovr":78,"att":35,"def":80,"phy":76,"pac":68,"tec":70,"num":3},
     {"id":"rma18_4","name":"Sergio Ramos","pos":["CB"],"ovr":95,"att":70,"def":96,"phy":91,"pac":77,"tec":82,"num":4},
     {"id":"rma18_5","name":"Raphaël Varane","pos":["CB"],"ovr":90,"att":45,"def":91,"phy":85,"pac":85,"tec":78,"num":5},
