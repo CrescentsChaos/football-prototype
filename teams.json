@@ -19949,6 +19949,8 @@
   "flag": "🇮🇹",
   "color": "#003399",
   "secondary": "#FFFFFF",
+  "logo":"como.png",
+  "stadium ":"Stadio Giuseppe Sinigaglia",
   "players": [
     {"id":"com26_1","name":"Jean Butez","pos":["GK"],"ovr":80,"att":15,"def":81,"phy":76,"pac":48,"tec":62,"num":1},
     {"id":"com26_12","name":"Emil Audero","pos":["GK"],"ovr":78,"att":15,"def":79,"phy":75,"pac":46,"tec":60,"num":12},
@@ -20274,6 +20276,8 @@
   "flag": "🇲🇨",
   "color": "#E20613",
   "secondary": "#FFFFFF",
+  "logo":"monaco.png",
+  "stadium ":"Stade Louis II",
   "players": [
     {"id":"asm26_1","name":"Lukas Hradecky","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":76,"pac":44,"tec":65,"num":1},
     {"id":"asm26_16","name":"Philipp Köhn","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":46,"tec":60,"num":16},
@@ -20391,6 +20395,8 @@
   "flag": "🇹🇷",
   "color": "#000000",
   "secondary": "#FFFFFF",
+  "logo":"besiktas.png",
+  "stadium ":"Tüpraş Stadyumu",
   "players": [
     {"id":"bjk26_1","name":"Alexander Nübel","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":78,"pac":48,"tec":72,"num":1},
     {"id":"bjk26_80","name":"Doğan Alemdar","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":74,"pac":42,"tec":58,"num":80},
@@ -20580,6 +20586,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#1B458F",
   "secondary": "#C4122E",
+  "logo":"palace.png",
+  "stadium ":"Selhurst Park",
   "players": [
     {"id":"cry26_1","name":"Dean Henderson","pos":["GK"],"ovr":80,"att":15,"def":80,"phy":77,"pac":46,"tec":65,"num":1},
     {"id":"cry26_31","name":"Remi Matthews","pos":["GK"],"ovr":70,"att":15,"def":70,"phy":71,"pac":40,"tec":52,"num":31},
@@ -20616,6 +20624,8 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#0057B8",
   "secondary": "#FFFFFF",
+  "logo":"brighton.png",
+  "stadium ":"Amex Stadium",
   "players": [
     {"id":"bha26_1","name":"Bart Verbruggen","pos":["GK"],"ovr":82,"att":15,"def":83,"phy":78,"pac":48,"tec":72,"num":1},
     {"id":"bha26_23","name":"Jason Steele","pos":["GK"],"ovr":74,"att":15,"def":75,"phy":72,"pac":42,"tec":65,"num":23},
@@ -20691,6 +20701,8 @@
   "flag": "🇸🇦",
   "color": "#0054A6",
   "secondary": "#FFFFFF",
+  "logo":"alhilal.png",
+  "stadium ":"Kingdom Arena",
   "players": [
     {"id":"hil26_37","name":"Yassine Bounou","pos":["GK"],"ovr":85,"att":15,"def":86,"phy":80,"pac":50,"tec":72,"num":37},
     {"id":"hil26_33","name":"Mohammed Al-Owais","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":74,"pac":45,"tec":60,"num":33},
@@ -20731,6 +20743,8 @@
   "flag": "🇸🇦",
   "color": "#FFF100",
   "secondary": "#003399",
+  "logo":"alnassr.png",
+  "stadium ":"Al-Awwal Park",
   "players": [
     {"id":"nas26_24","name":"Bento","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":78,"pac":50,"tec":65,"num":24},
     {"id":"nas26_1","name":"Nawaf Al-Aqidi","pos":["GK"],"ovr":73,"att":15,"def":74,"phy":72,"pac":45,"tec":58,"num":1},
@@ -22025,6 +22039,8 @@
   "flag": "🇮🇹",
   "color": "#4B0082",
   "secondary": "#FFFFFF",
+  "logo":"fiorentina.png",
+  "stadium ":"Stadio Artemio Franchi",
   "players": [
     {"id":"fio98_1","name":"Francesco Toldo","pos":["GK"],"ovr":88,"att":15,"def":89,"phy":84,"pac":50,"tec":62,"num":1},
     {"id":"fio98_22","name":"Valerio Fiori","pos":["GK"],"ovr":74,"att":15,"def":75,"phy":72,"pac":42,"tec":55,"num":22},
@@ -22539,6 +22555,8 @@
   "flag": "🇪🇸",
   "color": "#D71920",
   "secondary": "#003366",
+  "logo":"osasuna.png",
+  "stadium ":"El Sadar",
   "players": [
     {"id":"osa27_1","name":"Sergio Herrera","pos":["GK"],"ovr":83,"att":10,"def":84,"phy":80,"pac":48,"tec":72,"num":1},
     {"id":"osa27_13","name":"Aitor Fernández","pos":["GK"],"ovr":79,"att":10,"def":80,"phy":77,"pac":46,"tec":68,"num":13},
@@ -22576,6 +22594,8 @@
   "flag": "🇪🇸",
   "color": "#003399",
   "secondary": "#FFFFFF",
+  "logo":"dalaves.png",
+  "stadium ":"Estiado de Mendizorroza",
   "players": [
     {"id":"alv27_1","name":"Antonio Sivera","pos":["GK"],"ovr":82,"att":10,"def":83,"phy":79,"pac":48,"tec":72,"num":1},
     {"id":"alv27_13","name":"Jesús Owono","pos":["GK"],"ovr":77,"att":10,"def":78,"phy":75,"pac":46,"tec":65,"num":13},
