@@ -1483,28 +1483,36 @@ var App = (() => {
       if (ps.yellow) r -= 0.35;
       if (ps.red) r -= 2.0;
     } else if (isDef) {
-      r += Math.min(tackles * 0.28, 1.6);
-      r += Math.min(ints * 0.3, 1.2);
-      r += Math.min(blocks * 0.25, 0.9);
-      r += Math.min(passes * 0.015, 0.45);
-      r += Math.min(passesC * 0.02, 0.4);
+      // Defensive actions and pass volume used to be capped *separately*
+      // (tackles up to +1.6, interceptions +1.2, blocks +0.9, passes +0.45,
+      // completed passes +0.4 — up to +4.55 combined). Since the match sim
+      // gives every CB/full-back realistic tackle counts and heavy pass
+      // volume most matches just by playing 90 minutes, that let defenders
+      // stack those caps and sit near the rating ceiling on a routine game
+      // with zero goal involvement, crowding out attackers for MOTM. Now
+      // defensive actions and passing each have one combined cap instead,
+      // so an ordinary solid game lands in the 7s and genuine standout
+      // contributions (or a goal/assist) are what push a defender higher.
+      r += Math.min(tackles * 0.18 + ints * 0.2 + blocks * 0.15, 1.3);
+      r += Math.min(passes * 0.008 + passesC * 0.012, 0.35);
       r += assists * 0.7;
       r += goals * 1.1;
       r += Math.min(shots * 0.08, 0.3);
-      if (tackles + ints >= 4) r += 0.25;
+      if (tackles + ints >= 6) r += 0.2;
       if (ps.yellow) r -= 0.4;
       if (ps.red) r -= 1.8;
     } else if (isMid) {
+      // Same fix as defenders above: passing and defensive-action credit
+      // are combined caps now instead of stacking separately (previously up
+      // to +1.2 passing and +1.5 defensive actions before any goal/assist).
       r += assists * 0.95;
       r += goals * 1.15;
-      r += Math.min(passes * 0.02, 0.65);
-      r += Math.min(passesC * 0.025, 0.55);
-      r += Math.min(tackles * 0.18, 0.8);
-      r += Math.min(ints * 0.22, 0.7);
+      r += Math.min(passes * 0.012 + passesC * 0.016, 0.55);
+      r += Math.min(tackles * 0.1 + ints * 0.12, 0.5);
       r += Math.min(shots * 0.1, 0.45);
       r += Math.min(xa * 0.2, 0.4);
       r += Math.min(xg * 0.15, 0.3);
-      if (passesC >= 25) r += 0.25;
+      if (passesC >= 30) r += 0.2;
       if (assists >= 2) r += 0.3;
       if (ps.yellow) r -= 0.35;
       if (ps.red) r -= 1.8;
