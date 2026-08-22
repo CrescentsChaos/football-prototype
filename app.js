@@ -49,7 +49,6 @@ var App = (() => {
   // this player's team's match played while they're sidelined
   let injuryBook = {};
   let suspensionBook = {}; // playerId -> { matchesLeft, teamName, playerName } — 1-match ban after a red card
-  let h2hRecords = {}; // "teamIdA|teamIdB" (sorted) -> { wins: { [teamId]: count }, draws: count } — real head-to-head record, built up as matches are actually played
   let globalMatchDay = 1;
   // {name, team, type, date, category:'season'|'season-global'|'tournament', year, player, run}
   // name    — matches a key in trophies.json so trophyMark() can resolve an image
@@ -323,8 +322,8 @@ var App = (() => {
       loadStats();
       loadPersistedGameState();
       restorePlayerForms();
-      populateFormations();
       populateTeamSelects();
+      populateFormations();
       bindNav();
       renderTeamsList();
       restoreTournamentUI();
@@ -468,59 +467,6 @@ var App = (() => {
   // Stadium whenever a team in teams.json doesn't define its own "stadium".
   function getStadium(team) { return (team && team.stadium) ? team.stadium : 'Wembley Stadium'; }
 
-  // ========== HEAD-TO-HEAD RECORD (Match Preview "Overall H2H") ==========
-  // Keyed by the two team ids sorted alphabetically, so the same pairing
-  // always resolves to the same record regardless of which team is home.
-  function h2hKey(idA, idB) { return [idA, idB].sort().join('|'); }
-  // Records the result of a finished match between two teams. winnerId is
-  // the id of the winning team (decided by penalties if it went that far),
-  // or null for a draw.
-  function recordH2H(idA, idB, winnerId) {
-    if (!idA || !idB || idA === idB) return;
-    const key = h2hKey(idA, idB);
-    if (!h2hRecords[key]) h2hRecords[key] = { wins: {}, draws: 0 };
-    const rec = h2hRecords[key];
-    if (winnerId) rec.wins[winnerId] = (rec.wins[winnerId] || 0) + 1;
-    else rec.draws = (rec.draws || 0) + 1;
-  }
-  // Returns { aWins, bWins, draws } oriented to teamA/teamB as passed in.
-  function getH2H(teamA, teamB) {
-    if (!teamA || !teamB) return { aWins: 0, bWins: 0, draws: 0 };
-    const rec = h2hRecords[h2hKey(teamA.id, teamB.id)];
-    if (!rec) return { aWins: 0, bWins: 0, draws: 0 };
-    return { aWins: (rec.wins && rec.wins[teamA.id]) || 0, bWins: (rec.wins && rec.wins[teamB.id]) || 0, draws: rec.draws || 0 };
-  }
-
-  // ========== STAR PLAYERS (Match Preview) ==========
-  // Picks up to `max` "star" players to headline a team on the Match
-  // Preview screen: 90+ rated players first (sorted highest OVR first), or
-  // if the squad has none, the single highest-rated player available (ties
-  // broken randomly). Only players with a resolvable portrait/avatar are
-  // eligible — a star chip with no picture to show isn't worth showing.
-  function getStarPlayers(team, max) {
-    max = max || 3;
-    const pool = (team && team.players || []).filter(p => resolvePlayerPortrait(p));
-    if (!pool.length) return [];
-    const nineties = pool.filter(p => (p.ovr || 0) >= 90).sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
-    if (nineties.length) return nineties.slice(0, max);
-    const sorted = [...pool].sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
-    const topRating = sorted[0].ovr || 0;
-    const topTier = shuffleArray(sorted.filter(p => (p.ovr || 0) === topRating));
-    const rest = sorted.filter(p => (p.ovr || 0) !== topRating);
-    return [...topTier, ...rest].slice(0, max);
-  }
-  // Renders the star player chip row for a team's Match Preview panel.
-  function starPlayersHTML(team) {
-    const stars = getStarPlayers(team, 3);
-    if (!stars.length) return '';
-    return `<div class="kh-stars">${stars.map(p => `
-      <button type="button" class="kh-star-chip" onclick="App.showPlayerProfile('${p.id}')" title="${p.name}">
-        <span class="kh-star-avatar">${playerAvatarMark(p)}</span>
-        <span class="kh-star-name">${abbreviateName(p.name)}</span>
-        <span class="kh-star-ovr">${p.ovr || '—'}</span>
-      </button>`).join('')}</div>`;
-  }
-
   // ========== TEAM LOGOS / PLAYER PORTRAITS ==========
   // Renders a team's logo (from assets/logos/<team.logo>, set via the "logo"
   // field in teams.json) as a small inline mark, falling back to the flag
@@ -659,111 +605,14 @@ var App = (() => {
     const el = document.getElementById(side + '-preview');
     if (!sel || !el) return;
     const team = getTeam(sel.value);
-    const hero = document.getElementById('kickoff-hero');
-    if (!team) {
-      el.innerHTML = '';
-      renderKickoffH2H();
-      renderKickoffInfobar();
-      return;
-    }
+    if (!team) { el.innerHTML = ''; return; }
     const mgr = team.manager ? team.manager.name : '';
     const style = getManagerPlaystyle(team);
-    const primary = team.color || (side === 'home' ? '#f0c14b' : '#3d8bfd');
-    const players = team.players || [];
-    const avgOvr = players.length ? Math.round(players.reduce((s, p) => s + (p.ovr || 70), 0) / players.length) : null;
-    const mgrLine = mgr ? `<div class="kh-team-mgr">${managerAvatarMark(team.manager, 18)} ${mgr}${style ? ' <span class="playstyle-tag">· ' + style + '</span>' : ''}</div>` : '';
-    const venueLine = side === 'home' ? `<div class="kh-team-venue">🏟️ ${getStadium(team)}</div>` : '';
-    el.innerHTML = `
-      <button type="button" class="kh-crest-wrap" style="--team-color:${primary}" onclick="App.showTeamProfile('${team.id}')" title="${team.name} — full profile">
-        <span class="kh-crest">${teamAvatarMark(team)}</span>
-      </button>
-      <div class="kh-team-name">${team.name}</div>
-      <div class="kh-team-sub">${avgOvr ? 'OVR ' + avgOvr + ' · ' : ''}${players.length} players</div>
-      ${mgrLine}
-      ${venueLine}
-      ${starPlayersHTML(team)}
-    `;
+    const venueLine = side === 'home' ? `<div style="font-size:0.8rem;color:var(--text-muted)">🏟️ ${getStadium(team)}</div>` : '';
+    const mgrLine = mgr ? `<div class="manager-name">${managerAvatarMark(team.manager, 20)} Manager: ${mgr}${style ? ' <span class="playstyle-tag">· ' + style + '</span>' : ''}</div>` : '';
+    el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div>${mgrLine}<div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
     const formSel = document.getElementById(side + '-formation');
     if (formSel) formSel.value = pickTeamFormation(team);
-    if (hero) hero.style.setProperty('--' + side + '-color', primary);
-    renderKickoffH2H();
-    renderKickoffInfobar();
-  }
-
-  // Renders the "Overall H2H" wins/draws/wins circles between the two
-  // selected teams, built from real recorded results (see recordH2H, called
-  // from endMatch) — starts at 0-0-0 for any pairing that hasn't been
-  // played yet rather than inventing numbers.
-  function renderKickoffH2H() {
-    const el = document.getElementById('kh-h2h');
-    if (!el) return;
-    const homeSel = document.getElementById('home-team');
-    const awaySel = document.getElementById('away-team');
-    const home = homeSel && getTeam(homeSel.value);
-    const away = awaySel && getTeam(awaySel.value);
-    if (!home || !away) { el.innerHTML = ''; return; }
-    const rec = getH2H(home, away);
-    const homeCol = home.color || 'var(--gold)';
-    const awayCol = away.color || 'var(--blue)';
-    el.innerHTML = `
-      <div class="kh-h2h-title">Overall H2H</div>
-      <div class="kh-h2h-row">
-        <div class="kh-h2h-item">
-          <div class="kh-h2h-circle" style="--ring:${homeCol}">${rec.aWins}</div>
-          <div class="kh-h2h-label" style="color:${homeCol}">Wins</div>
-        </div>
-        <div class="kh-h2h-item">
-          <div class="kh-h2h-circle kh-h2h-draw">${rec.draws}</div>
-          <div class="kh-h2h-label">Draws</div>
-        </div>
-        <div class="kh-h2h-item">
-          <div class="kh-h2h-circle" style="--ring:${awayCol}">${rec.bWins}</div>
-          <div class="kh-h2h-label" style="color:${awayCol}">Wins</div>
-        </div>
-      </div>`;
-  }
-
-  // Renders the bottom info strip (stadium, formations, extra time /
-  // penalties status) under the Match Preview hero.
-  function renderKickoffInfobar() {
-    const el = document.getElementById('kh-infobar');
-    if (!el) return;
-    const homeSel = document.getElementById('home-team');
-    const home = homeSel && getTeam(homeSel.value);
-    if (!home) { el.innerHTML = ''; return; }
-    const homeForm = document.getElementById('home-formation');
-    const awayForm = document.getElementById('away-formation');
-    const et = document.getElementById('opt-et');
-    const pens = document.getElementById('opt-pens');
-    const items = [
-      ['🏟️', 'Stadium', getStadium(home)],
-      ['📋', 'Home', (homeForm && homeForm.value) || '—'],
-      ['📋', 'Away', (awayForm && awayForm.value) || '—'],
-      ['⏱️', 'Extra Time', (et && et.checked) ? 'On' : 'Off'],
-      ['🎯', 'Penalties', (pens && pens.checked) ? 'On' : 'Off']
-    ];
-    el.innerHTML = items.map(([icon, label, val]) =>
-      `<div class="kh-info-chip"><span class="kh-info-icon">${icon}</span><span class="kh-info-label">${label}:</span> <span class="kh-info-val">${val}</span></div>`
-    ).join('');
-  }
-
-  // Toggles the collapsible formations/squad-builder/extra-time panel below
-  // the Match Preview hero (the "⚙️ Select Kits" pill).
-  function toggleKickoffAdvanced() {
-    const el = document.getElementById('kh-advanced');
-    if (!el) return;
-    el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
-  }
-
-  // Swaps which team is Home and which is Away (the "🔀 Select Sides" pill).
-  function swapKickoffSides() {
-    const h = document.getElementById('home-team');
-    const a = document.getElementById('away-team');
-    if (!h || !a || !h.value || !a.value) { toast('Select both teams first'); return; }
-    const hv = h.value, av = a.value;
-    h.value = av; a.value = hv;
-    updateTeamPreview('home'); updateTeamPreview('away');
-    toast('Sides swapped');
   }
 
   // Picks a formation for a team. If the team has a "formation" key set in
@@ -3183,16 +3032,6 @@ var App = (() => {
     try { renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI(); } catch(e) {}
     if (tournament) { try { refreshTournamentStatsUI(); } catch(e) {} }
     addEvent(m.minute || 90, 'whistle', `Full Time! ${m.home.team.short} ${m.home.score} - ${m.away.score} ${m.away.team.short}`, null);
-    // Track the real head-to-head record for this exact pairing (Match
-    // Preview's "Overall H2H"). A penalty shootout counts as a decisive win.
-    {
-      const hFinal = m.home.penScore != null ? m.home.penScore : m.home.score;
-      const aFinal = m.away.penScore != null ? m.away.penScore : m.away.score;
-      let winnerId = null;
-      if (hFinal > aFinal) winnerId = m.home.team.id;
-      else if (aFinal > hFinal) winnerId = m.away.team.id;
-      recordH2H(m.home.team.id, m.away.team.id, winnerId);
-    }
     if (m.away.score === 0) {
       const gk = (m.home.squad.starting || []).find(p => (p.pos || []).includes('GK'));
       if (gk) recordStat('cleanSheets', gk, m.home.team);
@@ -4043,7 +3882,6 @@ var App = (() => {
       localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook));
       localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook));
       localStorage.setItem('apexMatchDay', String(globalMatchDay));
-      localStorage.setItem('apexH2H', JSON.stringify(h2hRecords));
     } catch(e) {}
   }
   function loadStats() {
@@ -4059,8 +3897,6 @@ var App = (() => {
       if (sb) suspensionBook = JSON.parse(sb);
       const md = localStorage.getItem('apexMatchDay');
       if (md) globalMatchDay = parseInt(md, 10) || 1;
-      const h2h = localStorage.getItem('apexH2H');
-      if (h2h) h2hRecords = JSON.parse(h2h);
     } catch(e) {}
   }
 
@@ -6997,8 +6833,7 @@ var App = (() => {
     simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
-    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
-    renderKickoffH2H, renderKickoffInfobar, toggleKickoffAdvanced, swapKickoffSides
+    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory
   };
 })();
 
