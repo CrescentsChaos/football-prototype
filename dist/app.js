@@ -5686,8 +5686,19 @@ var App = (() => {
         // Track failures instead of swallowing them — a quota failure here
         // would otherwise reload the page into a save that's silently
         // missing the season/tournament progress the file actually had.
+        // Write apexSeason/apexTournament FIRST — they're by far the
+        // largest keys in a save (full league tables, fixtures, and match
+        // reports), so if this browser's storage quota runs out partway
+        // through, it should be a small, incidental key that fails to
+        // restore — never the season or tournament progress itself, which
+        // is exactly what was going missing before this ordering existed.
+        const priorityKeys = ['apexSeason', 'apexTournament'];
+        const orderedKeys = [
+          ...priorityKeys.filter(k => validKeys.indexOf(k) !== -1),
+          ...validKeys.filter(k => priorityKeys.indexOf(k) === -1)
+        ];
         const failedKeys = [];
-        validKeys.forEach(k => { if (!safeSetItem(k, data[k])) failedKeys.push(k); });
+        orderedKeys.forEach(k => { if (!safeSetItem(k, data[k])) failedKeys.push(k); });
         if (failedKeys.length) {
           alert('Import partially failed — this browser\'s storage is full, so ' +
             failedKeys.length + ' item(s) from the file (' + failedKeys.join(', ') +
@@ -6210,6 +6221,12 @@ var App = (() => {
     withLoading('Simulating round…', function() {
       _simTournamentRoundWork();
       refreshTournamentStatsUI();
+      // Some branches of _simTournamentRoundWork (e.g. the group-stage batch
+      // path) mutate tournament state directly without saving it themselves —
+      // persist here unconditionally so a bulk "Simulate Round" always lands
+      // on disk immediately instead of waiting on the next autosave tick.
+      persistAll();
+      saveStats();
     });
   }
 
@@ -6263,6 +6280,12 @@ var App = (() => {
     if (!tournament) return;
     withLoading('Simulating full tournament…', function() {
       _simAllTournamentWork();
+      // setChampion()/simPlayoffTie() already persist on the paths that hit
+      // them, but not every branch above does (e.g. group-stage fixtures
+      // simulated directly in the forEach) — persist unconditionally so a
+      // full-tournament bulk sim is always saved immediately.
+      persistAll();
+      saveStats();
     });
   }
 
@@ -6842,10 +6865,15 @@ var App = (() => {
       withLoading('Simulating knockout round…', function() {
         _simKnockoutRoundWork();
         refreshTournamentStatsUI();
+        persistAll();
+        saveStats();
       });
       return true;
     }
-    return _simKnockoutRoundWork();
+    const res = _simKnockoutRoundWork();
+    persistAll();
+    saveStats();
+    return res;
   }
 
   function _simKnockoutRoundWork() {
@@ -8402,14 +8430,17 @@ var App = (() => {
   // of a manually-incremented counter, so it stays correct no matter which
   // route a fixture was played through (live, instant, or bulk simulate) —
   // this is what's shown as "Year N · Matchday W" in the season header.
-  // Matchday W means "every domestic league has completed round W" (a
-  // finished league is treated as having completed all of its rounds), so
-  // the counter only advances once the slowest league catches up — exactly
-  // matching what "Play Now" already shows per league.
+  // Matchday W means "every domestic league AND the Champions League have
+  // completed round W" (a finished competition, or the Champions League
+  // once it has left its league phase for the knockout stage, is treated
+  // as having completed all of its rounds) — so the counter only advances
+  // once the slowest competition catches up. Previously this only looked
+  // at the 5 domestic leagues, so the Matchday label could tick forward
+  // even while the Champions League still had that matchday's fixtures
+  // sitting unplayed — fixed by folding the UCL into the same calculation.
   function computeSeasonWeek(s) {
     if (!s || !s.leagues) return 0;
-    const rounds = SEASON_LEAGUE_DEFS.map(def => {
-      const comp = s.leagues[def.key];
+    const rounds = seasonCompEntries(s).map(({ comp }) => {
       if (!comp) return 0;
       return comp.finished ? comp.rounds.length : comp.currentRound;
     });
@@ -8444,6 +8475,12 @@ var App = (() => {
     if (!season) return;
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
+    if (!seasonCompCanPlayNow(compKey, comp)) {
+      const due = seasonMatchesDue();
+      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
+        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
+      return;
+    }
     const round = comp.rounds[comp.currentRound];
     const f = round && round[idx];
     if (!f || f.played) return;
@@ -8472,6 +8509,12 @@ var App = (() => {
     if (!season) return;
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
+    if (!seasonCompCanPlayNow(compKey, comp)) {
+      const due = seasonMatchesDue();
+      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
+        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
+      return;
+    }
     const round = comp.rounds[comp.currentRound];
     const f = round && round[idx];
     if (!f || f.played) return;
@@ -8514,11 +8557,20 @@ var App = (() => {
   function simulateSeasonWeek() {
     if (!season) return;
     withLoading('Simulating matchday…', function() {
-      SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
-      simulateUCLStep(season.ucl);
+      // Only simulate competitions that are actually still due for THIS
+      // matchday — a competition that's already raced ahead (or, for the
+      // UCL, moved into its knockout stage) is left alone so the day only
+      // turns over once literally everything due has been played.
+      const targetIdx = computeSeasonWeek(season);
+      seasonCompEntries().forEach(({ key, comp }) => {
+        if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+        if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
+      });
       season.week = computeSeasonWeek(season);
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
+      persistAll();
+      saveStats();
     });
   }
 
@@ -8526,14 +8578,24 @@ var App = (() => {
     if (!season) return;
     withLoading('Simulating rest of season…', function() {
       let safety = 0;
-      while (!seasonIsComplete() && safety < 500) {
-        SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
-        simulateUCLStep(season.ucl);
+      while (!seasonIsComplete() && safety < 1000) {
+        const targetIdx = computeSeasonWeek(season);
+        let playedSomething = false;
+        seasonCompEntries().forEach(({ key, comp }) => {
+          if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+          if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
+          playedSomething = true;
+        });
         season.week = computeSeasonWeek(season);
         safety++;
+        // Safety valve: if a pass through every competition made no
+        // progress at all, stop rather than spin forever.
+        if (!playedSomething) break;
       }
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
+      persistAll();
+      saveStats();
     });
   }
 
@@ -8651,6 +8713,21 @@ var App = (() => {
     if (title) title.textContent = 'Year ' + season.year + ' · Matchday ' + season.week;
     const congestionEl = document.getElementById('season-congestion');
     if (congestionEl) congestionEl.innerHTML = renderFixtureCongestionHTML();
+    const dueEl = document.getElementById('season-due-banner');
+    if (dueEl) {
+      const due = seasonMatchesDue();
+      if (due.length) {
+        const byComp = {};
+        due.forEach(d => { (byComp[d.compName] = byComp[d.compName] || []).push(d.home + ' vs ' + d.away); });
+        const lines = Object.keys(byComp).map(name => `<div style="margin-top:2px"><strong>${name}:</strong> ${byComp[name].join(', ')}</div>`).join('');
+        dueEl.innerHTML = `<div class="empty-state" style="text-align:left;padding:10px 14px;margin-top:10px;border:1px solid var(--accent-gold);border-radius:8px">
+          <div style="font-size:0.8rem;color:var(--accent-gold)">⏳ Matchday ${season.week + 1} isn't complete yet — ${due.length} match${due.length === 1 ? '' : 'es'} still due before the day can change:</div>
+          ${lines}
+        </div>`;
+      } else {
+        dueEl.innerHTML = '';
+      }
+    }
     const tabsEl = document.getElementById('season-comp-tabs');
     if (tabsEl) {
       const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }, { key: 'trophies', name: '🏆 Trophy Room' }];
@@ -8819,14 +8896,20 @@ var App = (() => {
     const played = allFixtures.filter(f => f.played).slice(-8).reverse();
     let h = '';
     if (currentUnplayed.length) {
-      h += `<div class="card-title" style="margin-top:12px">Matchday ${comp.currentRound + 1} — Play Now</div>`;
+      const canPlay = seasonCompCanPlayNow(compKey, comp);
+      h += `<div class="card-title" style="margin-top:12px">Matchday ${comp.currentRound + 1} — ${canPlay ? 'Play Now' : 'Waiting on other competitions'}</div>`;
+      if (!canPlay) {
+        h += `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">${comp.name} has finished this matchday already — it can't start the next one until every other competition catches up. See the notice above for what's still due.</div>`;
+      }
       currentUnplayed.forEach(f => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
         const idx = currentRound.indexOf(f);
         h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span>
-          <button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">▶ Play Live</button>
-          <button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button></div>`;
+          ${canPlay
+            ? `<button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">▶ Play Live</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button>`
+            : `<button class="btn btn-secondary btn-sm" disabled>⏳ Not due yet</button>`}</div>`;
       });
     }
     if (laterUnplayed.length) {
