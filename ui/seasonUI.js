@@ -600,12 +600,76 @@
 
 /*@CHUNK:c0568:END*/
 
+/*@CHUNK:cx903:START*/
+
+  // Repeating 5-slot fixture-congestion pattern: Sat league, Tue continental,
+  // Sat league, Tue domestic cup, Sun league — the busy week-to-week rhythm
+  // real top-flight calendars follow. The season's Matchday counter is used
+  // as the cycle position so the strip advances automatically as matchdays
+  // are played. Domestic cup isn't an implemented competition yet, so that
+  // slot is shown greyed-out rather than pretending a cup fixture exists.
+  const FIXTURE_CONGESTION_CYCLE = [
+    { day: 'Sat', comp: 'League' },
+    { day: 'Tue', comp: 'UCL' },
+    { day: 'Sat', comp: 'League' },
+    { day: 'Tue', comp: 'Cup' },
+    { day: 'Sun', comp: 'League' }
+  ];
+
+  function fixtureCongestionSlot(offset) {
+    const cyc = FIXTURE_CONGESTION_CYCLE;
+    const base = (season && typeof season.week === 'number') ? season.week : 0;
+    const idx = ((base + offset) % cyc.length + cyc.length) % cyc.length;
+    return cyc[idx];
+  }
+
+  function renderFixtureCongestionHTML() {
+    if (!season) return '';
+    const uclDone = season.ucl && season.ucl.finished;
+    const items = [0, 1, 2, 3, 4].map(i => {
+      const slot = fixtureCongestionSlot(i);
+      const isCup = slot.comp === 'Cup';
+      const isUcl = slot.comp === 'UCL';
+      const disabled = isCup || (isUcl && uclDone);
+      const label = isCup ? 'Cup' : slot.comp;
+      const sub = isCup ? 'not available' : (isUcl && uclDone) ? 'finished' : '';
+      const cls = 'congestion-slot' + (i === 0 ? ' congestion-now' : '') + (disabled ? ' congestion-disabled' : '');
+      const title = isCup ? 'Domestic cup competition is not available yet' : (slot.day + ' — ' + slot.comp);
+      return `<div class="${cls}" title="${title}">
+        <div class="congestion-day">${slot.day}</div>
+        <div class="congestion-comp">${label}</div>
+        ${sub ? `<div style="font-size:0.62rem;color:var(--text-muted)">${sub}</div>` : ''}
+      </div>`;
+    });
+    const strip = items.join('<div class="congestion-arrow">→</div>');
+    return `<div style="font-size:0.7rem;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;margin-top:14px">📅 Fixture Congestion</div>
+      <div class="congestion-strip">${strip}</div>`;
+  }
+/*@CHUNK:cx903:END*/
+
 /*@CHUNK:c0569:START*/
   function renderSeasonDashboard() {
     if (!season) return;
     seasonReportRegistry = []; // rebuilt fresh each render so onclick indices stay valid
     const title = document.getElementById('season-status-title');
     if (title) title.textContent = 'Year ' + season.year + ' · Matchday ' + season.week;
+    const congestionEl = document.getElementById('season-congestion');
+    if (congestionEl) congestionEl.innerHTML = renderFixtureCongestionHTML();
+    const dueEl = document.getElementById('season-due-banner');
+    if (dueEl) {
+      const due = seasonMatchesDue();
+      if (due.length) {
+        const byComp = {};
+        due.forEach(d => { (byComp[d.compName] = byComp[d.compName] || []).push(d.home + ' vs ' + d.away); });
+        const lines = Object.keys(byComp).map(name => `<div style="margin-top:2px"><strong>${name}:</strong> ${byComp[name].join(', ')}</div>`).join('');
+        dueEl.innerHTML = `<div class="empty-state" style="text-align:left;padding:10px 14px;margin-top:10px;border:1px solid var(--accent-gold);border-radius:8px">
+          <div style="font-size:0.8rem;color:var(--accent-gold)">⏳ Matchday ${season.week + 1} isn't complete yet — ${due.length} match${due.length === 1 ? '' : 'es'} still due before the day can change:</div>
+          ${lines}
+        </div>`;
+      } else {
+        dueEl.innerHTML = '';
+      }
+    }
     const tabsEl = document.getElementById('season-comp-tabs');
     if (tabsEl) {
       const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }, { key: 'trophies', name: '🏆 Trophy Room' }];
@@ -712,14 +776,20 @@
     const played = allFixtures.filter(f => f.played).slice(-8).reverse();
     let h = '';
     if (currentUnplayed.length) {
-      h += `<div class="card-title" style="margin-top:12px">Matchday ${comp.currentRound + 1} — Play Now</div>`;
+      const canPlay = seasonCompCanPlayNow(compKey, comp);
+      h += `<div class="card-title" style="margin-top:12px">Matchday ${comp.currentRound + 1} — ${canPlay ? 'Play Now' : 'Waiting on other competitions'}</div>`;
+      if (!canPlay) {
+        h += `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">${comp.name} has finished this matchday already — it can't start the next one until every other competition catches up. See the notice above for what's still due.</div>`;
+      }
       currentUnplayed.forEach(f => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
         const idx = currentRound.indexOf(f);
         h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span>
-          <button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">▶ Play Live</button>
-          <button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button></div>`;
+          ${canPlay
+            ? `<button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">▶ Play Live</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button>`
+            : `<button class="btn btn-secondary btn-sm" disabled>⏳ Not due yet</button>`}</div>`;
       });
     }
     if (laterUnplayed.length) {

@@ -347,6 +347,43 @@
   }
 /*@CHUNK:c0158:END*/
 
+/*@CHUNK:cx904:START*/
+
+  // Renders the full Attack / Passing / Defense / Physical / Goalkeeping
+  // stat breakdown as a series of small side-by-side tables, using
+  // whatever the two teams' stats objects carry (deriveExtendedMatchStats
+  // in engine/matchEngine.js fills these in for every match at full time).
+  function renderCategorizedTeamStatsHTML(h, a) {
+    const hs = h.stats || {}, as_ = a.stats || {};
+    const row = (label, key, suffix) =>
+      `<tr><td>${label}</td><td>${hs[key] !== undefined ? hs[key] : 0}${suffix || ''}</td><td>${as_[key] !== undefined ? as_[key] : 0}${suffix || ''}</td></tr>`;
+    const section = (title, rowsHtml) =>
+      `<div class="card-title" style="margin-top:14px">${title}</div><div class="table-scroll"><table class="lb-table" style="margin-bottom:6px"><thead><tr><th></th><th>${h.short}</th><th>${a.short}</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+
+    const attack = row('Shots', 'shots') + row('On Target', 'shotsOn') + row('Big Chances', 'bigChances') + row('Big Chances Missed', 'bigChancesMissed')
+      + row('Touches', 'touches') + row('Touches In Box', 'touchesInBox') + row('Progressive Carries', 'progressiveCarries') + row('Carries', 'carries')
+      + row('Dribbles', 'dribbles') + row('Successful Dribbles', 'successfulDribbles') + row('Offsides', 'offsides');
+
+    const passAcc = (v) => v ? Math.round(100 * (v.passesCompleted || 0) / v.passes) + '%' : '—';
+    const passing = row('Passes', 'passes') + row('Completed', 'passesCompleted')
+      + `<tr><td>Pass Accuracy</td><td>${hs.passes ? passAcc(hs) : '—'}</td><td>${as_.passes ? passAcc(as_) : '—'}</td></tr>`
+      + row('Progressive Passes', 'progressivePasses') + row('Key Passes', 'keyPasses') + row('Through Balls', 'throughBalls')
+      + row('Crosses', 'crosses') + row('Switches', 'switches') + row('Long Balls', 'longBalls') + row('Final-Third Passes', 'finalThirdPasses');
+
+    const defense = row('Tackles', 'tackles') + row('Interceptions', 'interceptions') + row('Blocks', 'blocks') + row('Clearances', 'clearances')
+      + row('Headed Clearances', 'headedClearances') + row('Defensive Errors', 'defensiveErrors') + row('Recoveries', 'recoveries')
+      + row('Pressures', 'pressures') + row('Aerial Duels', 'aerialDuels');
+
+    const physical = row('Distance (km)', 'distance') + row('Sprints', 'sprints') + row('High-Speed Runs', 'highSpeedRuns')
+      + row('Accelerations', 'accelerations') + row('Decelerations', 'decelerations');
+
+    const gk = row('Saves', 'saves') + row('Punches', 'punches') + row('Claims', 'claims') + row('Crosses Stopped', 'crossesStopped')
+      + row('Goals Prevented', 'goalsPrevented') + row('PSxG', 'psxg') + row('Distribution', 'distribution', '%');
+
+    return section('⚔️ Attack', attack) + section('🎯 Passing', passing) + section('🛡️ Defense', defense) + section('🏃 Physical', physical) + section('🧤 Goalkeeping', gk);
+  }
+/*@CHUNK:cx904:END*/
+
 /*@CHUNK:c0159:START*/
 
   let _reportLegsCtx = null; // { legs: [{label, report}], activeIdx, aggText }
@@ -417,7 +454,8 @@
         <tr><td>Saves</td><td>${(h.stats&&h.stats.saves)||0}</td><td>${(a.stats&&a.stats.saves)||0}</td></tr>
         <tr><td>Yellow / Red</td><td>${(h.stats&&h.stats.yellows)||0} / ${(h.stats&&h.stats.reds)||0}</td><td>${(a.stats&&a.stats.yellows)||0} / ${(a.stats&&a.stats.reds)||0}</td></tr>
       </tbody></table></div>
-      <div class="card-title">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
+      ${renderCategorizedTeamStatsHTML(h, a)}
+      <div class="card-title" style="margin-top:14px">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
       <div style="max-height:280px;overflow-y:auto">
         <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${teamMark(h, 18)} ${h.name}</div>
         ${homeRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}

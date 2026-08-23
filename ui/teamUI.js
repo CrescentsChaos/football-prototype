@@ -24,18 +24,67 @@
 /*@CHUNK:c0097:END*/
 
 /*@CHUNK:c0098:START*/
-  function buildSquad(team, formationKey) {
+  // How hard the "recently started" rotation penalty bites, and how
+  // protected a squad's core spine is from it, depending on the
+  // competition. League football sees the heaviest week-to-week rotation
+  // (fixture congestion managed domestically); "group tournament" football
+  // (Champions League league phase, World Cup/standalone tournament groups
+  // and knockouts) sees managers overwhelmingly send out their strongest
+  // XI; a domestic cup (once available) would see the heaviest rotation of
+  // all, giving fringe players and squad depth their minutes first.
+  const ROTATION_PROFILES = {
+    league: { decay: 0.2,  penalty: 3.5, rand: 2.5, coreProtect: 0.55 },
+    ucl:    { decay: 0.35, penalty: 1.0, rand: 1.0, coreProtect: 0.9 },
+    cup:    { decay: 0.15, penalty: 5.5, rand: 3.5, coreProtect: 0.15 }
+  };
+
+  // Infers which rotation profile applies to whatever match is about to be
+  // built, from the global sim context, so most call sites don't need to
+  // know or pass it explicitly. A standalone tournament (World Cup /
+  // Champions League tournament mode) is always "group tournament"
+  // football; inside a Season, only the Champions League competition
+  // counts as one — every domestic league fixture rotates on the heavier
+  // "league" profile.
+  function inferRotationProfile() {
+    if (typeof tournament !== 'undefined' && tournament) return 'ucl';
+    if (typeof currentSeasonComp !== 'undefined' && currentSeasonComp && currentSeasonComp.key === 'ucl') return 'ucl';
+    return 'league';
+  }
+
+  // The tactical "core" of a squad — the first-choice keeper plus the
+  // highest-OVR outfield players, a rough proxy for the spine a manager
+  // builds their team around (first-choice centre-back pairing, defensive
+  // mid, main striker, etc). Core players are much less affected by the
+  // rotation penalty below regardless of competition, and are almost never
+  // rotated out for important "group tournament" fixtures.
+  function computeCoreIds(allPlayers) {
+    const core = new Set();
+    const gks = allPlayers.filter(p => (p.pos || [])[0] === 'GK').sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    if (gks[0]) core.add(gks[0].id);
+    const outfield = allPlayers.filter(p => (p.pos || [])[0] !== 'GK').sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    outfield.slice(0, 6).forEach(p => core.add(p.id));
+    return core;
+  }
+
+  function buildSquad(team, formationKey, rotationProfile) {
     const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
     const allPlayers = team.players || [];
+    const prof = ROTATION_PROFILES[rotationProfile || inferRotationProfile()] || ROTATION_PROFILES.league;
+    const coreIds = computeCoreIds(allPlayers);
 
     // Soft squad rotation: every player carries a small "recently started"
     // counter that decays a bit each match. Selection score below docks
     // players who've started often lately, so the exact same XI doesn't
     // take the pitch match after match — while still keeping OVR as the
     // dominant factor, so rotation favors genuinely close alternatives
-    // rather than randomly benching your best player.
-    allPlayers.forEach(p => { p._recentStarts = Math.max(0, (p._recentStarts || 0) - 0.2); });
-    const score = (p) => (p.ovr || 70) - (p._recentStarts || 0) * 3.5 + (seededRandom() * 2.5 - 1.25);
+    // rather than randomly benching your best player. How hard that bites,
+    // and how protected the squad's core is from it, depends on the
+    // competition (see ROTATION_PROFILES above).
+    allPlayers.forEach(p => { p._recentStarts = Math.max(0, (p._recentStarts || 0) - prof.decay); });
+    const score = (p) => {
+      const protect = coreIds.has(p.id) ? prof.coreProtect : 1;
+      return (p.ovr || 70) - (p._recentStarts || 0) * prof.penalty * protect + (seededRandom() * prof.rand - prof.rand / 2);
+    };
 
     let players = shuffleArray(allPlayers.filter(p => !isPlayerInjured(p.id) && !isPlayerSuspended(p.id)));
     if (players.length < 11) {
@@ -118,7 +167,7 @@
     for (const p of starting) { if (_seen.has(p.id)) continue; _seen.add(p.id); _st.push(p); }
     const _su = [];
     for (const p of subs) { if (_seen.has(p.id)) continue; _seen.add(p.id); _su.push(p); }
-    return { starting: _st, subs: _su, formation: formationKey, all: [..._st, ..._su] };
+    return { starting: _st, subs: _su, formation: formationKey, all: [..._st, ..._su], rotationProfile: rotationProfile || inferRotationProfile() };
   }
 /*@CHUNK:c0098:END*/
 
