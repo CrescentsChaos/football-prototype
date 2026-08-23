@@ -935,6 +935,25 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .rating-high { background: #22c55e; color: #052e16; }
 .rating-mid { background: #f59e0b; color: #1c1000; }
 .rating-low { background: #ef4444; color: #fff; }
+/* Badge shown next to OVR for players whose stats come from the expanded
+   player-attributes.json sheet instead of teams.json's base numbers. */
+.attr-boost-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  padding: 2px 7px; border-radius: 10px; margin-left: 6px;
+  background: rgba(240,193,75,0.14); border: 1px solid var(--gold-dim); color: var(--gold);
+  vertical-align: middle;
+}
+.playstyle-tag {
+  display: inline-flex; align-items: center;
+  font-size: 0.72rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px; margin: 2px 4px 2px 0;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text-2);
+}
+.playstyle-tag.affinity-match {
+  background: rgba(240,193,75,0.14); border-color: var(--gold-dim); color: var(--gold);
+}
 .pm-player {
   display: flex; align-items: center; gap: 8px; padding: 8px;
   border-radius: 8px; font-size: 0.85rem; margin-bottom: 2px;

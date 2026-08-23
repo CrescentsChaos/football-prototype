@@ -38,6 +38,13 @@ var App = (() => {
     "Simone Inzaghi": "inzaghi.png"
   };
   let managerPortraits = { ...MANAGER_PORTRAITS_DATA };
+  // player-attributes.json (optional): { playerId: { pos, playstyle, off_awr,
+  // ball_con, ... , gk_awr, ... } } — a richer, position/role-detailed
+  // attribute sheet for specific players. When a player's id has an entry
+  // here, it takes over that player's gameplay attributes entirely (att/def/
+  // pac/phy/tec/ovr as read from teams.json for that player are ignored —
+  // see applyExpandedPlayerAttributes()).
+  let playerAttributesData = {};
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
@@ -198,6 +205,375 @@ var App = (() => {
     return PLAYSTYLE_MODS[getManagerPlaystyle(team)] || PLAYSTYLE_MODS['Possession'];
   }
 
+  // ========== EXPANDED PLAYER ATTRIBUTES (player-attributes.json) ==========
+  // Optional, per-player override: when player-attributes.json has an entry
+  // for a player's id, that entry's much more detailed attribute sheet (25+
+  // individual ratings, a set of individual playstyle tags, GK-specific
+  // ratings, etc.) is used to derive that player's five gameplay stats
+  // (att/def/pac/phy/tec) and overall — completely replacing whatever
+  // teams.json had for that player. Everyone else is untouched.
+
+  // Position group -> how much each of the 5 gameplay stats counts toward
+  // that group's overall, weights sum to 1 per row. Mirrors a standard
+  // FIFA/eFootball-style positional overall calc.
+  const ATTR_POS_WEIGHTS = {
+    GK:       { def: 0.55, tec: 0.20, phy: 0.15, pac: 0.05, att: 0.05 },
+    CB:       { def: 0.45, phy: 0.25, tec: 0.15, pac: 0.10, att: 0.05 },
+    FB:       { def: 0.28, pac: 0.27, tec: 0.20, phy: 0.15, att: 0.10 },
+    CDM:      { def: 0.35, tec: 0.25, phy: 0.20, pac: 0.10, att: 0.10 },
+    CM:       { tec: 0.30, def: 0.20, phy: 0.20, pac: 0.15, att: 0.15 },
+    CAM:      { tec: 0.30, att: 0.30, pac: 0.20, phy: 0.10, def: 0.10 },
+    WIDE_MID: { pac: 0.28, tec: 0.25, att: 0.25, phy: 0.12, def: 0.10 },
+    WINGER:   { pac: 0.30, att: 0.28, tec: 0.25, phy: 0.10, def: 0.07 },
+    FWD:      { att: 0.45, pac: 0.20, tec: 0.20, phy: 0.15, def: 0.00 }
+  };
+  function attrPosGroup(posArr) {
+    const p = (posArr && posArr[0]) || 'CM';
+    if (p === 'GK') return 'GK';
+    if (p === 'CB') return 'CB';
+    if (['RB', 'LB', 'RWB', 'LWB'].includes(p)) return 'FB';
+    if (p === 'CDM') return 'CDM';
+    if (p === 'CM') return 'CM';
+    if (p === 'CAM') return 'CAM';
+    if (['RM', 'LM'].includes(p)) return 'WIDE_MID';
+    if (['RW', 'LW', 'LWF', 'RWF'].includes(p)) return 'WINGER';
+    if (['ST', 'CF', 'SS'].includes(p)) return 'FWD';
+    return 'CM';
+  }
+
+  // The full set of individual (eFootball-style) player playstyle tags
+  // usable in player-attributes.json, with the human-readable description
+  // shown as a tooltip wherever a playstyle tag is rendered in the UI.
+  const PLAYSTYLE_DESCRIPTIONS = {
+    'Goal Poacher':          'A striker who constantly looks to run behind the defensive line and attack scoring positions.',
+    'Fox in the Box':        'A penalty-box specialist who focuses on finding space and finishing chances inside the area.',
+    'Target Man':            'A striker who uses strength and positioning to receive the ball and bring teammates into play.',
+    'Deep-Lying Forward':    'Drops deeper to receive the ball and create opportunities rather than constantly staying on the defensive line.',
+    'Dummy Runner':          'Makes decoy runs to drag defenders away and create space for teammates.',
+    'Creative Playmaker':    'Moves intelligently to receive the ball, create chances, and link attacks.',
+    'Hole Player':           'Makes aggressive late runs into the box to exploit spaces and score.',
+    'Classic No. 10':        'A traditional playmaker who stays relatively central and focuses on passing and creativity.',
+    'Prolific Winger':       'Stays wide, attacks the flank, and frequently cuts inside or delivers crosses.',
+    'Cross Specialist':      'Positions himself wide and prioritizes delivering accurate crosses into the box.',
+    'Roaming Flank':         'Frequently leaves the wing and moves into central areas to participate in attacks.',
+    'Inside Forward':        'Starts from a wide position but aggressively cuts inside toward goal.',
+    'Box-to-Box':            'Constantly contributes at both ends of the pitch, covering large areas throughout the match.',
+    'Destroyer':             'Aggressively presses, tackles, and challenges opponents to win possession.',
+    'Anchor Man':            'Holds his defensive position in front of the back line and provides defensive stability.',
+    'Orchestrator':          'Controls the tempo from deeper areas through intelligent positioning and passing.',
+    'Build Up':              'A defender who drops into good positions and helps initiate attacks from the back.',
+    'Extra Frontman':        'A defender who frequently moves forward and joins the attack when opportunities arise.',
+    'Offensive Full-back':   'A full-back who aggressively pushes forward to support attacks and provide width.',
+    'Full-back Finisher':    'A full-back who makes attacking runs into dangerous areas and can arrive in scoring positions.',
+    'Offensive Goalkeeper':  'Proactively comes off his line to sweep up through balls and support a high defensive line.',
+    'Defensive Goalkeeper':  'Stays closer to his goal and prioritizes traditional shot-stopping and positioning.'
+  };
+
+  // Individual eFootball-style playstyle tag -> which team manager
+  // playstyles (see PLAYSTYLES above) it's naturally suited to. Used for
+  // the "manager affinity" overall bonus below — a role player who
+  // genuinely fits the way their manager sets the team up plays a little
+  // better than the raw numbers alone would suggest.
+  const PLAYSTYLE_AFFINITY = {
+    'Goal Poacher':          ['Quick Counter', 'Long Ball Counter'],
+    'Fox in the Box':        ['Overload', 'Quick Counter'],
+    'Target Man':            ['Long Ball', 'Long Ball Counter'],
+    'Deep-Lying Forward':    ['Possession'],
+    'Dummy Runner':          ['Overload', 'Quick Counter'],
+    'Creative Playmaker':    ['Possession', 'Overload'],
+    'Hole Player':           ['Overload', 'Possession'],
+    'Classic No. 10':        ['Possession'],
+    'Prolific Winger':       ['Out Wide', 'Overload'],
+    'Cross Specialist':      ['Out Wide'],
+    'Roaming Flank':         ['Out Wide', 'Overload'],
+    'Inside Forward':        ['Out Wide', 'Quick Counter'],
+    'Box-to-Box':            ['Overload', 'Quick Counter'],
+    'Destroyer':             ['Long Ball Counter', 'Quick Counter'],
+    'Anchor Man':            ['Possession', 'Long Ball Counter'],
+    'Orchestrator':          ['Possession'],
+    'Build Up':              ['Possession'],
+    'Extra Frontman':        ['Overload', 'Long Ball'],
+    'Offensive Full-back':   ['Overload', 'Out Wide'],
+    'Full-back Finisher':    ['Overload', 'Out Wide'],
+    'Offensive Goalkeeper':  ['Possession', 'Overload'],
+    'Defensive Goalkeeper':  ['Long Ball Counter', 'Quick Counter']
+  };
+
+  // Flat nudges applied to a player's derived att/def/pac/phy/tec once
+  // their raw ratings have been averaged (see deriveStatsFromAttributes
+  // below) — this is what stops every player who plays the same position
+  // from converging on the same generic profile. Each playstyle pulls the
+  // final 5-stat blend in a distinct direction (small, deliberately modest
+  // nudges, summed across every tag a player has, then clamped 1-99).
+  const PLAYSTYLE_STAT_MODS = {
+    'Goal Poacher':          { att: 3,  pac: 2,  def: -2 },
+    'Fox in the Box':        { att: 3,  tec: 1,  pac: -1 },
+    'Target Man':            { phy: 3,  att: 1,  pac: -2 },
+    'Deep-Lying Forward':    { tec: 3,  att: -1 },
+    'Dummy Runner':          { pac: 2,  phy: 1,  att: -1 },
+    'Creative Playmaker':    { tec: 3,  att: 1,  phy: -1 },
+    'Hole Player':           { att: 2,  pac: 2,  def: -1 },
+    'Classic No. 10':        { tec: 3,  def: -1 },
+    'Prolific Winger':       { pac: 2,  att: 2,  def: -1 },
+    'Cross Specialist':      { tec: 2,  pac: 1,  def: -1 },
+    'Roaming Flank':         { tec: 2,  pac: 1 },
+    'Inside Forward':        { att: 3,  pac: 1,  def: -1 },
+    'Box-to-Box':            { phy: 2,  tec: 1,  def: 1 },
+    'Destroyer':             { def: 3,  phy: 1,  tec: -1 },
+    'Anchor Man':            { def: 3,  tec: 1,  pac: -1 },
+    'Orchestrator':          { tec: 3,  def: 1,  pac: -1 },
+    'Build Up':              { tec: 2,  def: 1 },
+    'Extra Frontman':        { att: 2,  phy: 1,  def: -1 },
+    'Offensive Full-back':   { pac: 2,  att: 1,  def: -1 },
+    'Full-back Finisher':    { att: 3,  pac: 1,  def: -1 },
+    'Offensive Goalkeeper':  { pac: 2,  tec: 2,  def: -1 },
+    'Defensive Goalkeeper':  { def: 3,  phy: 1 }
+  };
+
+  // True if a player's expanded sheet carries the given individual
+  // playstyle tag. Used throughout the match-engine "edge" functions below
+  // so specific styles diversify in-match behaviour, not just derived stats.
+  function hasStyle(p, styleName) {
+    return !!(p && p.expandedAttrs && (p.expandedAttrs.playstyle || []).includes(styleName));
+  }
+
+  // Derives the 5 gameplay stats from a player-attributes.json entry.
+  // Goalkeepers draw def/tec from their GK-specific ratings (shot-stopping,
+  // handling, distribution) instead of the outfield ones.
+  function deriveStatsFromAttributes(attr, posArr) {
+    const isGK = ((posArr && posArr[0]) || attr.pos && attr.pos[0]) === 'GK';
+    const avg = (...vals) => {
+      const nums = vals.filter(v => typeof v === 'number');
+      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 60;
+    };
+    const pac = avg(attr.spd, attr.accel);
+    const phy = isGK
+      ? avg(attr.phy_con, attr.jmp, attr.bal, attr.stam)
+      : avg(attr.phy_con, attr.jmp, attr.bal, attr.stam, attr.aggr);
+    const tec = isGK
+      ? avg(attr.gk_catch, attr.low_pass, attr.lofted_pass, attr.ball_con)
+      : avg(attr.ball_con, attr.dribb, attr.low_pass, attr.lofted_pass, attr.curl, attr.tight_pos);
+    const att = isGK
+      ? avg(attr.off_awr, attr.kick_pwr, attr.place_kick)
+      : avg(attr.fin, attr.off_awr, attr.head, attr.place_kick, attr.kick_pwr);
+    const def = isGK
+      ? avg(attr.gk_awr, attr.gk_parry, attr.gk_reflex, attr.gk_reach, attr.gk_catch)
+      : avg(attr.def_awr, attr.def_eng, attr.tack, attr.aggr);
+    const clamp = (v) => Math.max(1, Math.min(99, Math.round(v)));
+    // Apply each of the player's individual playstyle tags as a small flat
+    // nudge to the raw averages above — this is what keeps two players in
+    // the same position from converging on an identical 5-stat profile;
+    // a Target Man and a Goal Poacher playing the same ST slot come out
+    // with a visibly different att/phy/pac balance.
+    let pacAdj = pac, phyAdj = phy, tecAdj = tec, attAdj = att, defAdj = def;
+    (attr.playstyle || []).forEach((style) => {
+      const mod = PLAYSTYLE_STAT_MODS[style];
+      if (!mod) return;
+      if (mod.pac) pacAdj += mod.pac;
+      if (mod.phy) phyAdj += mod.phy;
+      if (mod.tec) tecAdj += mod.tec;
+      if (mod.att) attAdj += mod.att;
+      if (mod.def) defAdj += mod.def;
+    });
+    return { pac: clamp(pacAdj), phy: clamp(phyAdj), tec: clamp(tecAdj), att: clamp(attAdj), def: clamp(defAdj) };
+  }
+
+  function weightedOverall(derived, posArr) {
+    const w = ATTR_POS_WEIGHTS[attrPosGroup(posArr)] || ATTR_POS_WEIGHTS.CM;
+    return Math.round(derived.att * w.att + derived.def * w.def + derived.pac * w.pac +
+      derived.phy * w.phy + derived.tec * w.tec);
+  }
+
+  // +2 if one of the player's individual playstyles suits the team's
+  // current manager playstyle, +3 if two or more do, else 0.
+  function managerAffinityBonus(playerStyles, teamStyle) {
+    if (!playerStyles || !playerStyles.length || !teamStyle) return 0;
+    let matches = 0;
+    playerStyles.forEach((s) => {
+      const suited = PLAYSTYLE_AFFINITY[s];
+      if (suited && suited.includes(teamStyle)) matches++;
+    });
+    if (matches >= 2) return 3;
+    if (matches === 1) return 2;
+    return 0;
+  }
+
+  // Applies player-attributes.json to every matching player on every team.
+  // Runs once at startup, after restorePlayerForms() so it can safely
+  // overwrite this player's persisted baseOvr with the freshly-derived
+  // (and manager-affinity-boosted) baseline while still preserving their
+  // accumulated form delta on top of it — see the form system's comment
+  // near applyPlayerForm() for how baseOvr/form/ovr relate.
+  function applyExpandedPlayerAttributes() {
+    if (!playerAttributesData || !Object.keys(playerAttributesData).length) return;
+    allTeams.forEach((team) => {
+      (team.players || []).forEach((p) => {
+        const attr = playerAttributesData[p.id];
+        if (!attr) return;
+        const posArr = (attr.pos && attr.pos.length) ? attr.pos : (p.pos || ['CM']);
+        const derived = deriveStatsFromAttributes(attr, posArr);
+        p.att = derived.att; p.def = derived.def; p.pac = derived.pac;
+        p.phy = derived.phy; p.tec = derived.tec;
+        // The expanded sheet's position list is more detailed (multiple
+        // valid roles) — prefer it over teams.json's when present.
+        if (attr.pos && attr.pos.length) p.pos = attr.pos.slice();
+        const teamStyle = getManagerPlaystyle(team);
+        const affinity = managerAffinityBonus(attr.playstyle, teamStyle);
+        const base = weightedOverall(derived, posArr);
+        const boostedBase = Math.max(40, Math.min(99, base + affinity));
+        p.baseOvr = boostedBase;
+        p.ovr = Math.max(40, Math.min(99, Math.round(boostedBase + (p.form || 0))));
+        p.expandedAttrs = attr;
+        p.attrBoosted = true;
+        p.affinityBonus = affinity;
+        p.affinityStyle = teamStyle;
+      });
+    });
+  }
+
+  // ===== Expanded-attribute gameplay hooks =====
+  // The functions below are what stop a boosted player's expanded sheet from
+  // "fading into" the same generic att/def/pac/phy/tec/ovr numbers everyone
+  // else uses. Each one reads specific raw ratings/skills straight off
+  // p.expandedAttrs (only set for player-attributes.json matches) and nudges
+  // a specific in-match probability — who wins a header, how a penalty or
+  // free kick goes, how a tackle resolves, how injury-prone someone is —
+  // beyond what the 5 compact stats alone would produce. Every one of them
+  // returns a neutral value (0 bonus, or a multiplier that reduces to the
+  // pre-existing behaviour) when a player has no expanded sheet, so nothing
+  // about the old system changes for anyone else.
+  function hasSkill(p, skillName) {
+    return !!(p && p.expandedAttrs && (p.expandedAttrs.skills || []).includes(skillName));
+  }
+  function xattr(p, key, fallback) {
+    const v = p && p.expandedAttrs && p.expandedAttrs[key];
+    return typeof v === 'number' ? v : fallback;
+  }
+  // Extra shot-quality nudge (roughly ±0.15) from finishing-specific traits
+  // a flat att/tec/ovr blend can't see on its own.
+  function finishingEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'fin', 70) - 70) / 100) * 0.5;
+    if (hasSkill(p, 'Phenomenal Finishing')) edge += 0.06;
+    if (hasSkill(p, 'First-time Shot') || hasSkill(p, 'First-time Shor')) edge += 0.02;
+    // Box-focused playstyles get a distinct finishing edge on top of raw
+    // finishing rating, so their identity shows up beyond the stat sheet.
+    if (hasStyle(p, 'Fox in the Box')) edge += 0.04;
+    if (hasStyle(p, 'Goal Poacher')) edge += 0.03;
+    if (hasStyle(p, 'Inside Forward')) edge += 0.025;
+    if (hasStyle(p, 'Hole Player')) edge += 0.02;
+    if (hasStyle(p, 'Full-back Finisher') || hasStyle(p, 'Extra Frontman')) edge += 0.015;
+    return edge;
+  }
+  // Aerial ability, 0.05-0.98 — used both to weight who wins headed chances
+  // and to nudge conversion once they do. Defaults to a neutral 0.5 (so
+  // multiplying by 2 elsewhere reduces to "no change") for non-expanded players.
+  function aerialSkill(p) {
+    if (!p || !p.expandedAttrs) return 0.5;
+    let v = xattr(p, 'head', 60) / 100;
+    if (hasSkill(p, 'Aerial Superiority') || hasSkill(p, 'Heading')) v += 0.12;
+    // A Target Man's whole game is built around winning the aerial duel;
+    // defensively-anchored styles also read the flight of a long ball well.
+    if (hasStyle(p, 'Target Man')) v += 0.1;
+    if (hasStyle(p, 'Anchor Man') || hasStyle(p, 'Destroyer')) v += 0.05;
+    return Math.max(0.05, Math.min(0.98, v));
+  }
+  // GK shot-stopping edge beyond the generic def/ovr/tec blend.
+  function gkReflexEdge(gk) {
+    if (!gk || !gk.expandedAttrs) return 0;
+    let edge = ((xattr(gk, 'gk_reflex', 75) - 75) / 100) * 0.5;
+    if (hasSkill(gk, 'Acrobatic Clear')) edge += 0.05;
+    return edge;
+  }
+  // Penalty-kick edges: taker's placement + specialist skill; keeper's
+  // penalty-specific awareness + save skill.
+  function penTakerEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'place_kick', 70) - 70) / 100) * 0.35;
+    if (hasSkill(p, 'Penalty Specialist')) edge += 0.08;
+    if (hasStyle(p, 'Fox in the Box') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
+    return edge;
+  }
+  function penGkEdge(gk) {
+    if (!gk || !gk.expandedAttrs) return 0;
+    let edge = ((xattr(gk, 'gk_awr', 75) - 75) / 100) * 0.15;
+    if (hasSkill(gk, 'GK Penalty Saver')) edge += 0.10;
+    return edge;
+  }
+  // Free-kick taker edge — curl/placement plus specialist skills.
+  function fkTakerEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'curl', 70) - 70) / 200) + ((xattr(p, 'place_kick', 70) - 70) / 300);
+    if (hasSkill(p, 'Long Range Curler') || hasSkill(p, 'Long-range Curler')) edge += 0.05;
+    if (hasSkill(p, 'Knuckle Shot')) edge += 0.04;
+    if (hasSkill(p, 'Dipping Shot')) edge += 0.03;
+    if (hasStyle(p, 'Creative Playmaker') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
+    if (hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Orchestrator')) edge += 0.02;
+    return edge;
+  }
+  // Dribble/skill-move success edge — dribbling ability plus specific moves.
+  function dribbleSuccessEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'dribb', 70) - 70) / 100) * 0.4;
+    const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero'];
+    if (skillMoves.some((s) => hasSkill(p, s))) edge += 0.08;
+    if (hasStyle(p, 'Prolific Winger') || hasStyle(p, 'Inside Forward')) edge += 0.04;
+    if (hasStyle(p, 'Roaming Flank') || hasStyle(p, 'Dummy Runner')) edge += 0.03;
+    if (hasStyle(p, 'Creative Playmaker')) edge += 0.02;
+    return edge;
+  }
+  // Defensive-action edges — specific tackling/interception skills beyond
+  // the generic def-based chance already used for the base roll.
+  function defActionEdge(p) {
+    if (!p || !p.expandedAttrs) return { chance: 0, interceptBias: 0 };
+    let chance = ((xattr(p, 'tack', 70) - 70) / 100) * 0.03;
+    let interceptBias = 0;
+    if (hasSkill(p, 'Sliding Tackle')) chance += 0.01;
+    if (hasSkill(p, 'Interception')) { chance += 0.006; interceptBias += 0.15; }
+    if (hasSkill(p, 'Man Marking')) chance += 0.006;
+    if (hasSkill(p, 'Blocker')) chance += 0.006;
+    // Destroyer/Anchor Man actively hunt the ball; Build Up and Box-to-Box
+    // read the game well enough to time a challenge, but less aggressively.
+    if (hasStyle(p, 'Destroyer')) { chance += 0.012; interceptBias += 0.05; }
+    if (hasStyle(p, 'Anchor Man')) { chance += 0.008; interceptBias += 0.1; }
+    if (hasStyle(p, 'Box-to-Box') || hasStyle(p, 'Build Up')) chance += 0.005;
+    return { chance, interceptBias };
+  }
+  // Injury-proneness multiplier for the "who gets injured" weighted pick.
+  function injuryWeightMult(p) {
+    if (!p || !p.expandedAttrs) return 1;
+    const res = p.expandedAttrs.injurey_res;
+    let mult = 1;
+    if (res === 'Low') mult = 1.5;
+    else if (res === 'High') mult = 0.6;
+    // Aggressive, duel-heavy styles pick up more knocks than a positionally
+    // disciplined one, independent of their base injury resistance rating.
+    if (hasStyle(p, 'Destroyer') || hasStyle(p, 'Box-to-Box')) mult *= 1.15;
+    if (hasStyle(p, 'Anchor Man') || hasStyle(p, 'Orchestrator')) mult *= 0.9;
+    return mult;
+  }
+  // Like pickPlayer, but the caller supplies the weighting function directly
+  // instead of the fixed ovr/att/tec composite — used where an expanded
+  // trait (aerial ability, etc.) should drive selection instead.
+  function pickPlayerCustomWeighted(side, preferredPos, weightFn, excludeId) {
+    if (!currentMatch || !side) return null;
+    const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    let pool = (side.squad.all || []).filter((p) => ids.includes(p.id) && p.id !== excludeId);
+    if (preferredPos && preferredPos.length) {
+      const preferred = pool.filter((p) => (p.pos || []).some((pos) => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
+      if (preferred.length) pool = preferred;
+    }
+    if (!pool.length) return null;
+    const weights = pool.map((p) => Math.max(0.05, weightFn(p)));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }
+
   async function init() {
     try {
       let loaded = null;
@@ -319,9 +695,29 @@ var App = (() => {
         }
       } catch (e) { console.warn('managers.json fetch skipped, using embedded portraits', e); }
 
+      // Load player-attributes.json (playerId -> expanded attribute sheet).
+      // Optional — the app works exactly as before for any player not
+      // listed here. Fetched the same way as the other optional JSON files
+      // above so it also works when this file is later edited without a
+      // rebuild.
+      try {
+        const paUrls = isHosted
+          ? ['player-attributes.json?v=' + Date.now() + '&r=' + Math.random().toString(36).slice(2), './player-attributes.json?v=' + Date.now(), 'player-attributes.json']
+          : ['player-attributes.json?v=' + Date.now()];
+        for (const url of paUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { playerAttributesData = data; console.log('Loaded expanded player attributes from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('player-attributes.json not loaded', e); }
+
       loadStats();
       loadPersistedGameState();
       restorePlayerForms();
+      applyExpandedPlayerAttributes();
       populateTeamSelects();
       populateFormations();
       bindNav();
@@ -1177,7 +1573,9 @@ var App = (() => {
   function takePenaltyKick(m, side, takers, kickIndex, st) {
     if (!takers.length) return;
     const taker = takers[kickIndex % takers.length];
-    const out = pickPenOutcome();
+    const oppSide = side === 'home' ? 'away' : 'home';
+    const gk = ((m[oppSide].squad && m[oppSide].squad.all) || []).find(p => (p.pos || [])[0] === 'GK');
+    const out = pickPenOutcome(taker, gk);
     const teamShort = m[side].team.short;
     if (out.scored) {
       st[side === 'home' ? 'homePens' : 'awayPens']++;
@@ -1472,9 +1870,29 @@ var App = (() => {
     const spectacular = methods.filter(m => m.puskas);
     const normal = methods.filter(m => !m.puskas);
     const tec = shooter.tec || 70;
-    if (tec > 88 && Math.random() < 0.42) return spectacular[Math.floor(Math.random() * spectacular.length)];
-    if (tec > 82 && Math.random() < 0.28) return spectacular[Math.floor(Math.random() * spectacular.length)];
-    return Math.random() < 0.18 ? spectacular[Math.floor(Math.random()*spectacular.length)] : normal[Math.floor(Math.random()*normal.length)];
+    // Weighted pick within a pool: a boosted player's specific traits (a great
+    // header, a genuine long-range/curl specialist) skew which finish type
+    // they're likely to have scored with, instead of every method in the pool
+    // being equally likely regardless of who's shooting.
+    const weightedPick = (pool) => {
+      if (!shooter.expandedAttrs) return pool[Math.floor(Math.random() * pool.length)];
+      const longKeys = ['screamer', 'dipping', 'rising', 'knuckleball', 'curler', 'curled'];
+      const weights = pool.map((m) => {
+        const d = m.desc.toLowerCase();
+        let w = 1;
+        if (d.includes('header')) w *= aerialSkill(shooter) * 2;
+        else if (longKeys.some(k => d.includes(k))) w *= Math.max(0.2, 1 + fkTakerEdge(shooter) * 3);
+        else if (d.includes('tap-in') || d.includes('poacher') || d.includes('toe-poke') || d.includes('rebound')) w *= Math.max(0.2, 1 + finishingEdge(shooter));
+        return Math.max(0.05, w);
+      });
+      const total = weights.reduce((a, b) => a + b, 0);
+      let r = Math.random() * total;
+      for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r <= 0) return pool[i]; }
+      return pool[pool.length - 1];
+    };
+    if (tec > 88 && Math.random() < 0.42) return weightedPick(spectacular);
+    if (tec > 82 && Math.random() < 0.28) return weightedPick(spectacular);
+    return Math.random() < 0.18 ? weightedPick(spectacular) : weightedPick(normal);
   }
 
   function pickMissDesc(shooter) {
@@ -1543,7 +1961,7 @@ var App = (() => {
     return `<span class="player">${player.name}</span> ${ends[Math.floor(Math.random() * ends.length)]}`;
   }
 
-  function pickPenOutcome() {
+  function pickPenOutcome(taker, gk) {
     // precise outcomes for pens
     const outcomes = [
       { scored: true, text: 'sends the keeper the wrong way — bottom left' },
@@ -1557,14 +1975,18 @@ var App = (() => {
       { scored: false, text: 'skewed wide of the left post' },
       { scored: false, text: 'keeper tips it onto the upright — rebound cleared' }
     ];
-    // ~72% score rate
+    // ~72% base score rate, nudged by the taker's placement/specialist edge
+    // and the keeper's penalty-specific edge — so a real penalty specialist
+    // genuinely converts more often than a fringe outfield taker, and a
+    // shot-stopper with "GK Penalty Saver" genuinely saves more.
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
-    if (Math.random() < 0.72) return scoredOnes[Math.floor(Math.random() * scoredOnes.length)];
+    const scoreProb = Math.max(0.35, Math.min(0.95, 0.72 + penTakerEdge(taker) - penGkEdge(gk)));
+    if (Math.random() < scoreProb) return scoredOnes[Math.floor(Math.random() * scoredOnes.length)];
     return missedOnes[Math.floor(Math.random() * missedOnes.length)];
   }
 
-  function pickFkOutcome() {
+  function pickFkOutcome(taker, gk) {
     const outcomes = [
       { scored: true, text: 'whipped curler over the wall into the top corner' },
       { scored: true, text: 'knuckleball that dips late under the bar' },
@@ -1578,7 +2000,8 @@ var App = (() => {
     ];
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
-    if (Math.random() < 0.22) return scoredOnes[Math.floor(Math.random() * scoredOnes.length)];
+    const scoreProb = Math.max(0.06, Math.min(0.55, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4));
+    if (Math.random() < scoreProb) return scoredOnes[Math.floor(Math.random() * scoredOnes.length)];
     return missedOnes[Math.floor(Math.random() * missedOnes.length)];
   }
 
@@ -1955,12 +2378,17 @@ var App = (() => {
         if (!base) return;
         const defSkill = p.def != null ? p.def : (p.ovr || 70);
         const skillMult = 0.72 + (defSkill / 100) * 0.6;
-        const chance = Math.min(0.2, base * skillMult * pressureMult);
+        // Specific tackling/interception traits (Sliding Tackle, Interception,
+        // Man Marking, Blocker) add on top of the generic def-based chance,
+        // and interceptBias skews *which* kind of action a specialist gets.
+        const actionEdge = defActionEdge(p);
+        const chance = Math.min(0.24, base * skillMult * pressureMult + actionEdge.chance);
         if (Math.random() >= chance) return;
         if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
         const ps = m.playerMatchStats[p.id];
         const roll = Math.random();
-        if (roll < 0.5) {
+        const interceptCut = Math.min(0.75, 0.5 + actionEdge.interceptBias);
+        if (roll < interceptCut) {
           ps.interceptions = (ps.interceptions || 0) + 1;
           ps.tackles = (ps.tackles || 0) + 1;
           team.stats.interceptions = (team.stats.interceptions || 0) + 1;
@@ -2164,13 +2592,13 @@ var App = (() => {
         if (!m.playerMatchStats) m.playerMatchStats = {};
         if (!m.playerMatchStats[cShooter.id]) m.playerMatchStats[cShooter.id] = blankPlayerMatchStats(cShooter);
         m.playerMatchStats[cShooter.id].shots++;
-        const cQuality = ((cShooter.att || 70) * 0.45 + (cShooter.tec || 70) * 0.35 + (cShooter.ovr || 75) * 0.2) / 100;
+        const cQuality = Math.max(0.05, Math.min(0.98, ((cShooter.att || 70) * 0.45 + (cShooter.tec || 70) * 0.35 + (cShooter.ovr || 75) * 0.2) / 100 + finishingEdge(cShooter)));
         const cDefAvg = counterOppStr.def / 100;
         const cOnTarget = Math.min(0.65, Math.max(0.06, 0.12 + cQuality * 0.40 - cDefAvg * 0.24));
         if (Math.random() < cOnTarget) {
           counterTeam.stats.shotsOn++;
           const cGk = pickPlayer(counterOppTeam, ['GK']);
-          const cGkSkill = cGk ? ((cGk.def || 70) * 0.5 + (cGk.ovr || 75) * 0.3 + (cGk.tec || 70) * 0.2) / 100 : 0.7;
+          const cGkSkill = Math.max(0.05, Math.min(0.98, (cGk ? ((cGk.def || 70) * 0.5 + (cGk.ovr || 75) * 0.3 + (cGk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(cGk)));
           const cSaveChance = Math.min(0.92, Math.max(0.30, 0.46 + cGkSkill * 0.40 - cQuality * 0.26));
           if (Math.random() < cSaveChance) {
             if (cGk) {
@@ -2200,7 +2628,7 @@ var App = (() => {
       if (!shooter) return;
       attTeam.stats.shots++;
       // Attributes matter: att/tec/ovr vs defence
-      const shotQuality = ((shooter.att || 70) * 0.45 + (shooter.tec || 70) * 0.35 + (shooter.ovr || 75) * 0.2) / 100;
+      const shotQuality = Math.max(0.05, Math.min(0.98, ((shooter.att || 70) * 0.45 + (shooter.tec || 70) * 0.35 + (shooter.ovr || 75) * 0.2) / 100 + finishingEdge(shooter)));
       const defAvg = calcTeamStrength(defTeam).def / 100;
       // Wider clamp + stronger quality/defence weighting so a genuine class gap
       // (a clinical attack vs a shaky back line, or vice versa) actually shows
@@ -2212,7 +2640,7 @@ var App = (() => {
         if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
         m.playerMatchStats[shooter.id].shots++;
         const gk = pickPlayer(defTeam, ['GK']);
-        const gkSkill = gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7;
+        const gkSkill = Math.max(0.05, Math.min(0.98, (gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(gk)));
         const saveChance = Math.min(0.92, Math.max(0.30, 0.44 + gkSkill * 0.42 - shotQuality * 0.26));
         if (Math.random() < saveChance) {
           if (gk) {
@@ -2254,7 +2682,7 @@ var App = (() => {
       attTeam.stats.corners++;
       addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short}`, attackingSide);
       if (Math.random() < 0.03) {
-        const scorer = pickPlayer(attTeam, ['ST','CB','CM','CAM']);
+        const scorer = pickPlayerCustomWeighted(attTeam, ['ST','CB','CM','CAM'], (p) => aerialSkill(p) * 2);
         if (scorer) {
           attTeam.stats.shots++;
           attTeam.stats.shotsOn++;
@@ -2330,7 +2758,8 @@ var App = (() => {
       const taker = pickPlayer(attTeam, ['CAM','CM','ST','RW','LW']);
       if (taker && Math.random() < 0.18) {
         attTeam.stats.shots++;
-        const fk = pickFkOutcome();
+        const fkGk = pickPlayer(defTeam, ['GK']);
+        const fk = pickFkOutcome(taker, fkGk);
         addEvent(m.minute, 'shot', `<span class="player">${taker.name}</span> stands over the free-kick...`, attackingSide);
         if (fk.scored) {
           attTeam.stats.shotsOn++;
@@ -2399,9 +2828,11 @@ var App = (() => {
         addEvent(m.minute, 'miss', `Big chance missed by <span class="player">${p.name}</span>!`, attackingSide);
       }
     } else if (r < 0.85) {
-      // Skill move / dribble
+      // Skill move / dribble — a genuine dribbler (high `dribb`, or specific
+      // skill moves like Flip Flap/Marseille Turn) beats their man more
+      // often than the flat 50/50 everyone used to share.
       const p = pickPlayer(attTeam, ['RW','LW','CAM','ST','RM','LM']);
-      if (p && Math.random() < 0.5) {
+      if (p && Math.random() < Math.max(0.15, Math.min(0.9, 0.5 + dribbleSuccessEdge(p)))) {
         addEvent(m.minute, 'skill', `✨ Skill move by <span class="player">${p.name}</span>! Beats the defender`, attackingSide);
       }
     } else if (r < 0.9) {
@@ -2418,7 +2849,8 @@ var App = (() => {
             if (!m.playerMatchStats) m.playerMatchStats = {};
             if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
             m.playerMatchStats[taker.id].shots++;
-            const po = pickPenOutcome();
+            const penGk = pickPlayer(defTeam, ['GK']);
+            const po = pickPenOutcome(taker, penGk);
             if (po.scored) {
               attTeam.stats.shotsOn++;
               attTeam.score++;
@@ -2428,7 +2860,7 @@ var App = (() => {
               pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
               addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
             } else {
-              const gk = pickPlayer(defTeam, ['GK']);
+              const gk = penGk;
               if (po.text.includes('saved') || po.text.includes('palms') || po.text.includes('hand')) {
                 attTeam.stats.shotsOn++;
                 if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
@@ -2465,7 +2897,8 @@ var App = (() => {
             if (!m.playerMatchStats) m.playerMatchStats = {};
             if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
             m.playerMatchStats[taker.id].shots++;
-            const po = pickPenOutcome();
+            const varPenGk = pickPlayer(defTeam, ['GK']);
+            const po = pickPenOutcome(taker, varPenGk);
             if (po.scored) {
               attTeam.stats.shotsOn++;
               attTeam.score++;
@@ -2475,7 +2908,7 @@ var App = (() => {
               pushGoal(varSide, taker, m.minute, 'penalty — ' + po.text);
               addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, varSide, true);
             } else {
-              const gk = pickPlayer(defTeam, ['GK']);
+              const gk = varPenGk;
               if (po.text.includes('saved') || po.text.includes('palms') || po.text.includes('hand')) {
                 attTeam.stats.shotsOn++;
                 if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
@@ -2841,7 +3274,17 @@ var App = (() => {
     const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
     const pool = (sideData.squad.all || []).filter(p => onPitchIds.includes(p.id) && (p.pos || [])[0] !== 'GK' && !isPlayerInjured(p.id));
     if (!pool.length) return;
-    const injured = pool[Math.floor(Math.random() * pool.length)];
+    // Weighted by injury resistance (Low/Medium/High from the expanded
+    // attribute sheet) instead of a flat uniform pick — a fragile player is
+    // genuinely more likely to be the one who goes down.
+    const injWeights = pool.map(p => injuryWeightMult(p));
+    const injTotal = injWeights.reduce((a, b) => a + b, 0);
+    let injR = Math.random() * injTotal;
+    let injured = pool[pool.length - 1];
+    for (let i = 0; i < pool.length; i++) {
+      injR -= injWeights[i];
+      if (injR <= 0) { injured = pool[i]; break; }
+    }
     const injuryTypes = [
       { type: 'Ankle sprain', min: 1, max: 3 },
       { type: 'Hamstring strain', min: 2, max: 5 },
@@ -6041,13 +6484,29 @@ var App = (() => {
           <div class="profile-stat"><div class="val">${ms.yellow ? 'Y' : '—'} ${ms.red ? 'R' : ''}</div><div class="lbl">Cards</div></div>
         </div>`;
     }
+    const boosted = !!player.attrBoosted;
+    const boostBadge = boosted
+      ? `<span class="attr-boost-badge" title="Overall derived from expanded attribute data, position, and manager-tactic affinity">★ Enhanced</span>`
+      : '';
+    const affinityNote = (boosted && player.affinityBonus > 0)
+      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.affinityBonus} OVR — fits ${team ? team.name + "'s" : "the"} ${player.affinityStyle} setup</div>`
+      : '';
+    const playstyleTagsHTML = (boosted && player.expandedAttrs && (player.expandedAttrs.playstyle || []).length)
+      ? `<div style="margin-top:6px">${player.expandedAttrs.playstyle.map(s => {
+          const suited = (PLAYSTYLE_AFFINITY[s] || []).includes(player.affinityStyle);
+          const desc = PLAYSTYLE_DESCRIPTIONS[s] || '';
+          return `<span class="playstyle-tag${suited ? ' affinity-match' : ''}" title="${desc}">${s}</span>`;
+        }).join('')}</div>`
+      : '';
     content.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
         <div>
           <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
-          <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span></div>
+          <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
+          ${affinityNote}
+          ${playstyleTagsHTML}
         </div>
       </div>
       ${matchBlock}
