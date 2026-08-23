@@ -263,10 +263,8 @@
 /*@CHUNK:c0481:START*/
   function showPlayerProfile(playerId) {
     let player = null, team = null;
-    for (const t of allTeams) {
-      const p = (t.players || []).find(x => x.id === playerId);
-      if (p) { player = p; team = t; break; }
-    }
+    const found = findPlayerAndTeam(playerId);
+    if (found) { player = found.player; team = found.team; }
     // Fallback from current match stats object
     if (!player && currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) {
       const ms = currentMatch.playerMatchStats[playerId];
@@ -354,6 +352,7 @@
         <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
         <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
       </div>
+      ${renderPlayerMatchLogHTML(player.id)}
       <div style="margin-top:8px">
         ${boosted && player.expandedAttrs
           ? expandedAttrRowsHTML(player)

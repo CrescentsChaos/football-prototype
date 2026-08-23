@@ -205,6 +205,7 @@
     if (view === 'awards') showAwards('overview');
     if (view === 'history') showHistory(historyActiveTab || 'team');
     if (view === 'teams') renderTeamsList();
+    if (view === 'players') renderPlayersList(false);
     if (view === 'season') goToSeason();
   }
 /*@CHUNK:c0055:END*/
@@ -1098,7 +1099,9 @@
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
     showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
-    simSeasonFixture, playSeasonFixture
+    simSeasonFixture, playSeasonFixture,
+    searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
+    togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare
   };
 })();
 
