@@ -228,6 +228,7 @@
       ok = safeSetItem('apexInjuryBook', JSON.stringify(injuryBook)) && ok;
       ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
+      ok = safeSetItem('apexPlayerMatchLog', JSON.stringify(playerMatchLog)) && ok;
     } catch(e) { ok = false; }
     return ok;
   }
@@ -247,6 +248,8 @@
       if (sb) suspensionBook = JSON.parse(sb);
       const md = localStorage.getItem('apexMatchDay');
       if (md) globalMatchDay = parseInt(md, 10) || 1;
+      const pml = localStorage.getItem('apexPlayerMatchLog');
+      if (pml) playerMatchLog = JSON.parse(pml);
     } catch(e) {}
   }
 /*@CHUNK:c0326:END*/
@@ -460,6 +463,7 @@
       data.apexSuspensionBook = JSON.stringify(suspensionBook);
       data.apexMatchDay = String(globalMatchDay);
       data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
+      data.apexPlayerMatchLog = JSON.stringify(playerMatchLog);
     } catch (e) {}
     return data;
   }
