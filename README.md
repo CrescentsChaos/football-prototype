@@ -1,107 +1,68 @@
-# APEX SIM — Football Simulator
+# Apex Football Simulator — project structure
 
-**APEX SIM** is a feature-rich, browser-based football simulation platform built with vanilla HTML, CSS, and JavaScript. It provides a comprehensive football management and simulation experience, featuring a live 2D match engine, domestic league seasons, major international and club tournaments, career stat tracking, individual awards, and squad building.
+## What changed
 
----
+1. **Deterministic randomness.** Every `Math.random()` call (148 call sites)
+   was replaced with `seededRandom()`, backed by a small `mulberry32` PRNG in
+   `js/rng.js`. Given the same seed, a match/season/tournament now plays out
+   identically every time.
+   - The seed persists in `localStorage` across reloads by default.
+   - Call `App.setRngSeed(seedOrString)` (e.g. in the browser console, or
+     wire it to a UI control) to lock in a specific seed, and
+     `App.getRngSeed()` to read the current one back — handy for reproducing
+     or sharing an interesting match.
 
-## 🌟 Key Features
+2. **Split into modules.** The old single 8,661-line `app.js` is now organized
+   under `js/`, `engine/`, `simulation/`, `ai/`, `data/`, `ui/` as requested.
 
-### 🏟️ Live Match Engine & Kick Off
-* **Live Simulation:** Real-time match commentary feed, animated pitch visualizer, live statistics, and player match ratings.
-* **Flexible Speeds:** Adjust simulation speed (Slow, Normal, Fast, Turbo) or perform an **Instant Result / Quick Sim**.
-* **Custom Tactical Setup:** Choose formations, extra time, and penalty shootout rules, or randomly match up historic national or club teams.
-* **Squad Builder:** Custom-assign starting slots and bench selections for any team with auto-fill options.
+## Why there's a build step
 
-### 🏆 Tournaments
-* **World Cup:** National teams compete through group stages and knockout brackets, tracking goals, assists, clean sheets, and player ratings throughout the tournament.
-* **Champions League:** Top European club competition featuring league/group phase play and multi-legged knockout rounds leading to a single final.
-
-### 📅 Multi-League Season Mode
-* **Domestic Leagues:** Full double round-robin seasons across La Liga, Premier League, Serie A, Bundesliga, and Ligue 1.
-* **European Qualification:** Top 4 clubs from each domestic league qualify for the following season's Champions League.
-* **Multi-Year Progression:** Progress through multiple consecutive years with updated rosters, title winners, and qualification spots.
-
-### 📊 Global Leaderboards & Individual Awards
-* **Career & Global Stats:** Tracks all-time goals, assists, saves, clean sheets, interceptions, yellow/red cards, average ratings, and Man of the Match (MOTM) honors.
-* **Prestigious Awards:** Automatic calculation and crowning of individual honors including:
-  * **Ballon d'Or** & **Golden Boot**
-  * **Puskás Award** & **Gerd Müller Award**
-  * **Yashin Trophy** & **Defenders' Award**
-  * **Manager of the Year**
-
-### 📜 Roll of Honor & History
-* Permanent history log keeping track of past team champions and individual award winners across all played seasons and tournaments, surviving season resets.
-
-### 🔍 Team Database
-* Browse comprehensive squad lists, player attributes, positions, overall ratings (OVR), kit colors, home stadiums, and manager details.
-
-### 💾 Save Data Management
-* Automatic LocalStorage saving with manual save option.
-* **Export / Import:** Easily export your entire game save state as a `.json` file to backup or transfer your progress across devices.
-
----
-
-## 📁 Repository Structure
+The whole app is one shared JS closure (`var App = (() => { ... })()`) —
+that's how all these functions read and mutate the same in-memory game state
+without a framework. A browser can't literally resume an unclosed function
+body in a second `<script>` file, so — the same way webpack/rollup would in
+a normal project — `build.js` concatenates the split files back into one
+runnable script:
 
 ```
-.
-├── index.html              # Main HTML markup and UI view definitions
-├── styles.css              # Custom styling, dark theme, pitch layout & responsive UI
-├── app.js                  # Main application logic, match engine, state & view controllers
-├── teams.json              # Team database (national & club rosters, player stats, managers)
-├── leagues.json            # Mapping of clubs to domestic leagues
-├── player-attributes.json # Extended eFootball-style attributes, skills, and playstyles
-├── managers.json           # Manager portrait mappings
-├── players.json            # Player portrait mappings
-├── trophies.json           # Trophy image mappings
-└── assets/                 # Image assets
-    ├── logos/              # Club and national team logos
-    ├── portraits/          # Player portrait images
-    ├── mportraits/         # Manager portrait images
-    └── trophies/           # Trophy and award images
+node build.js
 ```
 
----
+This regenerates `dist/app.js`, which is what `index.html` actually loads.
+**Run this after editing any source file** — editing `dist/app.js` directly
+will get overwritten on the next build.
 
-## 🎮 Getting Started
+`build.js` has zero dependencies (plain Node, no npm install needed) and
+uses `manifest.json`, which records the exact original ordering of every
+code chunk so the rebuilt file is behaviorally identical to the original
+(verified byte-for-byte against the original `app.js`, aside from the RNG
+change described above).
 
-APEX SIM requires no build steps or heavy dependencies. It runs directly in any modern web browser.
+## Folder guide
 
-### Running Locally
+```
+js/           rng.js (seeded PRNG), state.js (shared game state + embedded
+               data), main.js (bootstrap/public API glue)
+engine/        the live match simulation: matchEngine, possession, passing,
+               shooting, defending, goalkeeper, tactics, transitions,
+               referee, injuries
+simulation/    season & tournament progression: seasonEngine,
+               tournamentEngine, worldEngine
+ai/            managerAI (playstyle/tactics modelling)
+data/          playerDatabase (attribute derivation), teamDatabase
+ui/            rendering & DOM wiring: matchUI, seasonUI, playerUI, teamUI,
+               statisticsUI
+```
 
-1. **Clone or download the repository:**
-   ```bash
-   git clone https://github.com/your-username/football-prototype.git
-   cd football-prototype
-   ```
+A few requested files — `simulation/transferEngine.js`,
+`simulation/developmentEngine.js`, `ai/clubAI.js`, `ai/transferAI.js`,
+`ai/scoutingAI.js`, `data/competitions.js` — are left as empty placeholders
+with a comment explaining why: the original app doesn't have a transfer
+market, club-negotiation AI, or scouting subsystem, so there was no existing
+code to move into them. They're there so the folder layout matches what you
+asked for and are ready to build into.
 
-2. **Serve using a local HTTP server** (recommended to allow proper loading of JSON assets):
-   * **Node.js (npx):**
-     ```bash
-     npx serve .
-     ```
-   * **Python 3:**
-     ```bash
-     python3 -m http.server 8000
-     ```
-   * **VS Code:** Use the [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) extension.
-
-3. Open `http://localhost:8000` (or the provided local URL) in your browser.
-
-> *Note:* APEX SIM includes embedded fallback data in `app.js` so core functionality works even if launched via `file://`, though serving over HTTP/HTTPS is recommended for full asset loading.
-
----
-
-## 🛠️ Customization & Data Schema
-
-You can extend APEX SIM by adding new teams, players, or leagues through the JSON data files:
-
-* **Adding Teams (`teams.json`):** Add entries under `"national"` or `"club"` arrays with player positions (`GK`, `CB`, `CM`, `ST`, etc.), rating attributes (`ovr`, `att`, `def`, `phy`, `pac`, `tec`), and manager stats.
-* **Configuring Leagues (`leagues.json`):** Map team names directly to league titles (`Premier League`, `La Liga`, etc.).
-* **Expanded Player Attributes (`player-attributes.json`):** Provide detailed playstyles, weak foot usage, injury resistance, and granular skill traits per player ID.
-
----
-
-## 📄 License
-
-This project is open-source and available for prototyping, modification, and personal use.
+Some categorization is a judgment call rather than a hard boundary (e.g. a
+few render-heavy functions sit in `ui/` even though they're triggered from
+deep inside a simulation flow) — grep for a function name if it's not where
+you expect; `manifest.json` records exactly where every original line went.
