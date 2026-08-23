@@ -294,6 +294,7 @@ var App = (() => {
     'Build Up':              ['Possession'],
     'Extra Frontman':        ['Overload', 'Long Ball'],
     'Offensive Full-back':   ['Overload', 'Out Wide'],
+    'Defensive Full-back': ['Overload','Long Ball Counter'],
     'Full-back Finisher':    ['Overload', 'Out Wide'],
     'Offensive Goalkeeper':  ['Possession', 'Overload'],
     'Defensive Goalkeeper':  ['Long Ball Counter', 'Quick Counter']
@@ -325,6 +326,7 @@ var App = (() => {
     'Build Up':              { tec: 2,  def: 1 },
     'Extra Frontman':        { att: 2,  phy: 1,  def: -1 },
     'Offensive Full-back':   { pac: 2,  att: 1,  def: -1 },
+    'Defensive Full-back':  { pac: 2,  att: -1,  def: 1 },
     'Full-back Finisher':    { att: 3,  pac: 1,  def: -1 },
     'Offensive Goalkeeper':  { pac: 2,  tec: 2,  def: -1 },
     'Defensive Goalkeeper':  { def: 3,  phy: 1 }
@@ -360,6 +362,7 @@ var App = (() => {
     'Build Up':              ['def_awr', 'ball_con', 'low_pass', 'lofted_pass', 'tight_pos', 'phy_con'],
     'Extra Frontman':        ['def_awr', 'off_awr', 'def_eng', 'tack', 'aggr', 'fin', 'stam'],
     'Offensive Full-back':   ['off_awr', 'spd', 'accel', 'stam', 'low_pass', 'lofted_pass'],
+    'Defensive Full-back':   ['def_awr', 'spd', 'accel', 'stam', 'def_eng', 'phy_con'],
     'Full-back Finisher':    ['off_awr', 'fin', 'spd', 'accel', 'dribb', 'ball_con', 'stam'],
     'Offensive Goalkeeper':  ['gk_awr', 'gk_reflex', 'gk_reach', 'gk_parry', 'spd', 'accel', 'ball_con'],
     'Defensive Goalkeeper':  ['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach', 'jmp', 'phy_con']
