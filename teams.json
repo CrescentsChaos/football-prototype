@@ -1246,8 +1246,8 @@
   }
 }, {
   "id": "nigeria1996",
-  "name": "Nigeria Olympic Squad 1996",
-  "short": "NGA",
+  "name": "Nigeria 1996",
+  "short": "NGA96",
   "flag": "🇳🇬",
   "color": "#008751",
   "secondary": "#FFFFFF",
@@ -21835,7 +21835,7 @@
     {"id":"aja96_7","name":"Finidi George","pos":["RW","RM"],"ovr":86,"att":85,"def":50,"phy":78,"pac":88,"tec":85,"num":7},
     {"id":"aja96_9","name":"Patrick Kluivert","pos":["ST"],"ovr":88,"att":89,"def":42,"phy":82,"pac":84,"tec":86,"num":9},
     {"id":"aja96_11","name":"Marc Overmars","pos":["LW","LM"],"ovr":88,"att":87,"def":40,"phy":68,"pac":95,"tec":88,"num":11},
-    {"id":"aja96_15","name":"NWankwo Kanu","pos":["ST","CF"],"ovr":82,"att":83,"def":38,"phy":72,"pac":72,"tec":88,"num":15},
+    {"id":"aja96_15","name":"Nwankwo Kanu","pos":["ST","CF"],"ovr":82,"att":83,"def":38,"phy":72,"pac":72,"tec":88,"num":15},
     {"id":"aja96_17","name":"Peter Hoekstra","pos":["LW","LM"],"ovr":76,"att":76,"def":42,"phy":66,"pac":80,"tec":78,"num":17},
     {"id":"aja96_19","name":"Nordin Wooter","pos":["RW"],"ovr":74,"att":74,"def":38,"phy":66,"pac":84,"tec":76,"num":19}
   ],
