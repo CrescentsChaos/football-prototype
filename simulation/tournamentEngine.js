@@ -273,6 +273,12 @@
     withLoading('Simulating round…', function() {
       _simTournamentRoundWork();
       refreshTournamentStatsUI();
+      // Some branches of _simTournamentRoundWork (e.g. the group-stage batch
+      // path) mutate tournament state directly without saving it themselves —
+      // persist here unconditionally so a bulk "Simulate Round" always lands
+      // on disk immediately instead of waiting on the next autosave tick.
+      persistAll();
+      saveStats();
     });
   }
 /*@CHUNK:c0385:END*/
@@ -338,6 +344,12 @@
     if (!tournament) return;
     withLoading('Simulating full tournament…', function() {
       _simAllTournamentWork();
+      // setChampion()/simPlayoffTie() already persist on the paths that hit
+      // them, but not every branch above does (e.g. group-stage fixtures
+      // simulated directly in the forEach) — persist unconditionally so a
+      // full-tournament bulk sim is always saved immediately.
+      persistAll();
+      saveStats();
     });
   }
 /*@CHUNK:c0389:END*/
@@ -965,10 +977,15 @@
       withLoading('Simulating knockout round…', function() {
         _simKnockoutRoundWork();
         refreshTournamentStatsUI();
+        persistAll();
+        saveStats();
       });
       return true;
     }
-    return _simKnockoutRoundWork();
+    const res = _simKnockoutRoundWork();
+    persistAll();
+    saveStats();
+    return res;
   }
 /*@CHUNK:c0418:END*/
 

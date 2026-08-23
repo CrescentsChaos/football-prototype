@@ -556,8 +556,19 @@
         // Track failures instead of swallowing them — a quota failure here
         // would otherwise reload the page into a save that's silently
         // missing the season/tournament progress the file actually had.
+        // Write apexSeason/apexTournament FIRST — they're by far the
+        // largest keys in a save (full league tables, fixtures, and match
+        // reports), so if this browser's storage quota runs out partway
+        // through, it should be a small, incidental key that fails to
+        // restore — never the season or tournament progress itself, which
+        // is exactly what was going missing before this ordering existed.
+        const priorityKeys = ['apexSeason', 'apexTournament'];
+        const orderedKeys = [
+          ...priorityKeys.filter(k => validKeys.indexOf(k) !== -1),
+          ...validKeys.filter(k => priorityKeys.indexOf(k) === -1)
+        ];
         const failedKeys = [];
-        validKeys.forEach(k => { if (!safeSetItem(k, data[k])) failedKeys.push(k); });
+        orderedKeys.forEach(k => { if (!safeSetItem(k, data[k])) failedKeys.push(k); });
         if (failedKeys.length) {
           alert('Import partially failed — this browser\'s storage is full, so ' +
             failedKeys.length + ' item(s) from the file (' + failedKeys.join(', ') +
@@ -1042,23 +1053,98 @@
   // of a manually-incremented counter, so it stays correct no matter which
   // route a fixture was played through (live, instant, or bulk simulate) —
   // this is what's shown as "Year N · Matchday W" in the season header.
-  // Matchday W means "every domestic league has completed round W" (a
-  // finished league is treated as having completed all of its rounds), so
-  // the counter only advances once the slowest league catches up — exactly
-  // matching what "Play Now" already shows per league.
+  // Matchday W means "every domestic league AND the Champions League have
+  // completed round W" (a finished competition, or the Champions League
+  // once it has left its league phase for the knockout stage, is treated
+  // as having completed all of its rounds) — so the counter only advances
+  // once the slowest competition catches up. Previously this only looked
+  // at the 5 domestic leagues, so the Matchday label could tick forward
+  // even while the Champions League still had that matchday's fixtures
+  // sitting unplayed — fixed by folding the UCL into the same calculation.
 /*@CHUNK:c0546:END*/
 
 /*@CHUNK:c0547:START*/
   function computeSeasonWeek(s) {
     if (!s || !s.leagues) return 0;
-    const rounds = SEASON_LEAGUE_DEFS.map(def => {
-      const comp = s.leagues[def.key];
+    const rounds = seasonCompEntries(s).map(({ comp }) => {
       if (!comp) return 0;
       return comp.finished ? comp.rounds.length : comp.currentRound;
     });
     return rounds.length ? Math.min(...rounds) : 0;
   }
 /*@CHUNK:c0547:END*/
+
+/*@CHUNK:c0547b:START*/
+
+  // ========== STRICT MATCHDAY GATING ==========
+  // Every competition that makes up a season (the 5 domestic leagues plus
+  // the Champions League) advances matchday-by-matchday in lockstep: none
+  // of them may start playing their NEXT round's fixtures until every
+  // competition has finished the CURRENT one. This is what makes "Matchday
+  // W" a single, meaningful, season-wide number instead of each league
+  // silently racing ahead at its own pace while the header still claims
+  // an earlier, incomplete matchday.
+  //
+  // The Champions League knockout stage (quarterfinals onward) is the one
+  // exception: those ties aren't part of the regular per-matchday cadence
+  // (they're the season's coverage of one-off knockout weeks), so once the
+  // UCL has left its league phase it's always treated as "due" rather than
+  // being held back waiting on the domestic leagues.
+  function seasonCompEntries(s) {
+    s = s || season;
+    if (!s || !s.leagues) return [];
+    const entries = SEASON_LEAGUE_DEFS.map(def => ({ key: def.key, comp: s.leagues[def.key] }));
+    entries.push({ key: 'ucl', comp: s.ucl });
+    return entries;
+  }
+/*@CHUNK:c0547b:END*/
+
+/*@CHUNK:c0547c:START*/
+  // True once `comp` has nothing left to play for the CURRENT global
+  // matchday (either finished outright, or — UCL knockout only — past the
+  // point where "matchday number" applies at all).
+  function seasonCompDoneWithMatchday(key, comp, targetIdx) {
+    if (!comp || comp.finished) return true;
+    if (key === 'ucl' && comp.stage !== 'league') return true;
+    return comp.currentRound > targetIdx;
+  }
+/*@CHUNK:c0547c:END*/
+
+/*@CHUNK:c0547d:START*/
+  // Whether `comp` is allowed to simulate/play a fixture right now — false
+  // if it has already completed the current global matchday and is simply
+  // waiting on slower competitions to catch up before the day can turn over.
+  function seasonCompCanPlayNow(key, comp) {
+    if (!season || !comp || comp.finished) return false;
+    if (key === 'ucl' && comp.stage !== 'league') return true;
+    return comp.currentRound <= computeSeasonWeek(season);
+  }
+/*@CHUNK:c0547d:END*/
+
+/*@CHUNK:c0547e:START*/
+  // Every still-unplayed fixture blocking the season from advancing past
+  // its current matchday — i.e. every fixture, across every competition,
+  // that belongs to the matchday the header is currently showing. Used to
+  // tell the person exactly which matches are still due before the day
+  // can change.
+  function seasonMatchesDue() {
+    if (!season) return [];
+    const targetIdx = computeSeasonWeek(season);
+    const due = [];
+    seasonCompEntries().forEach(({ key, comp }) => {
+      if (!comp || comp.finished) return;
+      if (key === 'ucl' && comp.stage !== 'league') return;
+      if (comp.currentRound !== targetIdx) return;
+      const round = comp.rounds[comp.currentRound] || [];
+      round.forEach(f => {
+        if (f.played) return;
+        const home = getTeam(f.home), away = getTeam(f.away);
+        due.push({ compName: comp.name, compKey: key, home: home ? home.short : '?', away: away ? away.short : '?' });
+      });
+    });
+    return due;
+  }
+/*@CHUNK:c0547e:END*/
 
 /*@CHUNK:c0548:START*/
 
@@ -1099,6 +1185,12 @@
     if (!season) return;
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
+    if (!seasonCompCanPlayNow(compKey, comp)) {
+      const due = seasonMatchesDue();
+      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
+        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
+      return;
+    }
     const round = comp.rounds[comp.currentRound];
     const f = round && round[idx];
     if (!f || f.played) return;
@@ -1133,6 +1225,12 @@
     if (!season) return;
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
+    if (!seasonCompCanPlayNow(compKey, comp)) {
+      const due = seasonMatchesDue();
+      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
+        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
+      return;
+    }
     const round = comp.rounds[comp.currentRound];
     const f = round && round[idx];
     if (!f || f.played) return;
@@ -1187,11 +1285,20 @@
   function simulateSeasonWeek() {
     if (!season) return;
     withLoading('Simulating matchday…', function() {
-      SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
-      simulateUCLStep(season.ucl);
+      // Only simulate competitions that are actually still due for THIS
+      // matchday — a competition that's already raced ahead (or, for the
+      // UCL, moved into its knockout stage) is left alone so the day only
+      // turns over once literally everything due has been played.
+      const targetIdx = computeSeasonWeek(season);
+      seasonCompEntries().forEach(({ key, comp }) => {
+        if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+        if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
+      });
       season.week = computeSeasonWeek(season);
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
+      persistAll();
+      saveStats();
     });
   }
 /*@CHUNK:c0557:END*/
@@ -1205,14 +1312,24 @@
     if (!season) return;
     withLoading('Simulating rest of season…', function() {
       let safety = 0;
-      while (!seasonIsComplete() && safety < 500) {
-        SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
-        simulateUCLStep(season.ucl);
+      while (!seasonIsComplete() && safety < 1000) {
+        const targetIdx = computeSeasonWeek(season);
+        let playedSomething = false;
+        seasonCompEntries().forEach(({ key, comp }) => {
+          if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+          if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
+          playedSomething = true;
+        });
         season.week = computeSeasonWeek(season);
         safety++;
+        // Safety valve: if a pass through every competition made no
+        // progress at all, stop rather than spin forever.
+        if (!playedSomething) break;
       }
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
+      persistAll();
+      saveStats();
     });
   }
 /*@CHUNK:c0559:END*/
