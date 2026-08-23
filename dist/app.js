@@ -1,0 +1,8717 @@
+  // ========== DETERMINISTIC RANDOMNESS (seeded PRNG) ==========
+  // Replaces seededRandom() everywhere in the simulation so that, given the
+  // same seed, every match/season/tournament plays out identically. This is
+  // a mulberry32 generator: fast, tiny, and good enough statistical quality
+  // for gameplay purposes (not cryptographic).
+  const RNG_STORAGE_KEY = 'apex_rng_seed';
+
+  function _hashSeed(str) {
+    // Turns any string (or number) into a 32-bit unsigned int seed.
+    let h = 1779033703 ^ String(str).length;
+    for (let i = 0; i < String(str).length; i++) {
+      h = Math.imul(h ^ String(str).charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return (h >>> 0) || 1;
+  }
+
+  function _defaultSeed() {
+    try {
+      const stored = localStorage.getItem(RNG_STORAGE_KEY);
+      if (stored) return _hashSeed(stored);
+    } catch (e) { /* localStorage unavailable (e.g. file://) — fall through */ }
+    return 0x2f6e2b1;
+  }
+
+  let _rngSeed = _defaultSeed();
+
+  function _mulberry32(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  let _rngFn = _mulberry32(_rngSeed);
+
+  // Drop-in replacement for seededRandom() used throughout the simulation.
+  function seededRandom() {
+    return _rngFn();
+  }
+
+  // Re-seeds the generator. Accepts a number or a string (hashed to a number).
+  // Call this before starting a match/season/tournament to reproduce it later.
+  function setRngSeed(seed) {
+    _rngSeed = typeof seed === 'number' ? (seed >>> 0) : _hashSeed(seed);
+    _rngFn = _mulberry32(_rngSeed);
+    try { localStorage.setItem(RNG_STORAGE_KEY, String(_rngSeed)); } catch (e) {}
+    return _rngSeed;
+  }
+
+  function getRngSeed() {
+    return _rngSeed;
+  }
+/* Apex Football Simulator - Fixed (no external fetch) */
+var App = (() => {
+  // ========== EMBEDDED TEAMS DATA ==========
+  const TEAMS_DATA = {};
+
+
+  let teamsData = { national: [], club: [] };
+  let allTeams = [];
+  // leagues.json: { "La Liga": ["Real Madrid 2026-27", ...], ... } — defines which
+  // clubs belong to which domestic league, independent of teams.json.
+  let leaguesData = {};
+  // players.json: { "Player Full Name": "portrait-file.jpg", ... } — portrait file
+  // names are resolved against assets/portraits/. Optional; falls back to the
+  // player's shirt number when no portrait is found for their name.
+  let playerPortraits = {};
+  // trophies.json: { "Trophy or competition name": "trophy-file.png", ... } —
+  // image file names are resolved against assets/trophies/. Optional; falls
+  // back to the 🏆 emoji when no image is found for a given trophy name.
+  let trophyImages = {};
+  // managers.json: { "Manager Full Name": "portrait-file.png", ... } — portrait
+  // file names are resolved against assets/mportraits/. Optional; falls back to
+  // assets/mportraits/none.png, and further to a 🧑‍💼 badge if that also fails.
+  // Embedded below (MANAGER_PORTRAITS_DATA) so it works immediately even when
+  // index.html is opened directly (file://), where fetch() of local JSON is
+  // blocked by the browser. If the app IS served over http(s), a fresh fetch
+  // of managers.json (root dir, alongside index.html — NOT inside assets/)
+  // is layered on top, so editing managers.json still works without rebuilding.
+  const MANAGER_PORTRAITS_DATA = {
+    "Carlo Ancelotti": "ancelotti.png",
+    "Pep Guardiola": "guardiola.png",
+    "Jurgen Klopp": "klopp.png",
+    "Diego Simeone": "simeone.png",
+    "Xabi Alonso": "alonso.png",
+    "Mikel Arteta": "arteta.png",
+    "Hansi Flick": "flick.png",
+    "Luis Enrique": "enrique.png",
+    "Thomas Tuchel": "tuchel.png",
+    "Simone Inzaghi": "inzaghi.png"
+  };
+  let managerPortraits = { ...MANAGER_PORTRAITS_DATA };
+  // player-attributes.json (optional): { playerId: { pos, playstyle, off_awr,
+  // ball_con, ... , gk_awr, ... } } — a richer, position/role-detailed
+  // attribute sheet for specific players. When a player's id has an entry
+  // here, it takes over that player's gameplay attributes entirely (att/def/
+  // pac/phy/tec/ovr as read from teams.json for that player are ignored —
+  // see applyExpandedPlayerAttributes()).
+  let playerAttributesData = {};
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+  // Which season competition (a league, or the UCL) is currently being simulated —
+  // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
+  // can also tally into that competition's own stat bucket (comp.stats), giving each
+  // league/competition its own top scorers, assists, cards, awards, etc.
+  let currentSeasonComp = null;
+  // playerId -> { type, matchesLeft, teamName, playerName } — counts down once per
+  // this player's team's match played while they're sidelined
+  let injuryBook = {};
+  let suspensionBook = {}; // playerId -> { matchesLeft, teamName, playerName } — 1-match ban after a red card
+  let globalMatchDay = 1;
+  // {name, team, type, date, category:'season'|'season-global'|'tournament', year, player, run}
+  // name    — matches a key in trophies.json so trophyMark() can resolve an image
+  // team    — winning club/nation (team trophies) or the winning player's team (individual awards)
+  // player  — winning player's name, only set for individual awards (feeds the Teams-tab trophy cabinet)
+  // year    — season year (season/season-global trophies)
+  // run     — shared id for every trophy awarded out of the same standalone tournament run
+  let trophies = [];
+  let currentMatch = null;
+  let simInterval = null;
+  let simSpeed = 400;
+  let isPlaying = false;
+  let tournament = null;
+  let tournamentType = 'worldcup';
+
+  // ========== SEASON CALENDAR ==========
+  // "name" must match a key in leagues.json exactly so team pools can be
+  // looked up automatically instead of picked by hand.
+  const SEASON_LEAGUE_DEFS = [
+    { key: 'epl', name: 'Premier League' },
+    { key: 'laliga', name: 'La Liga' },
+    { key: 'seriea', name: 'Serie A' },
+    { key: 'bundesliga', name: 'Bundesliga' },
+    { key: 'ligue1', name: 'Ligue 1' }
+  ];
+  // How many table-toppers from each domestic league qualify as Champions
+  // League candidates the following season (real-life style qualification).
+  const UCL_QUALIFY_PER_LEAGUE = 4;
+  let season = null; // active season object, or null if not started
+  let seasonSetup = {
+    selections: { epl: new Set(), laliga: new Set(), seriea: new Set(), bundesliga: new Set(), ligue1: new Set() },
+    search: { epl: '', laliga: '', seriea: '', bundesliga: '', ligue1: '' }
+  };
+  let seasonActiveTab = 'epl';
+  let seasonActiveSubTab = 'table'; // 'table' | 'stats' | 'awards' — sub-view within a league/UCL tab
+  let seasonReportRegistry = []; // flat list of match reports referenced by index from season fixture cards
+  let historyActiveTab = 'team'; // 'team' | 'individual' — which History sub-tab is showing
+
+  const FORMATIONS = {
+    '4-3-3': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
+    '4-4-2': { name: '4-4-2', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','ST','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,50],[42,50],[18,48],[58,20],[42,20]] },
+    '4-2-3-1': { name: '4-2-3-1', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[78,30],[22,30],[50,16]] },
+    '3-5-2': { name: '3-5-2', slots: ['GK','CB','CB','CB','RWB','CM','CM','CM','LWB','ST','ST'],
+      coords: [[50,92],[68,75],[50,78],[32,75],[88,55],[62,48],[50,50],[38,48],[12,55],[58,20],[42,20]] },
+    '4-5-1': { name: '4-5-1', slots: ['GK','RB','CB','CB','LB','RM','CM','CDM','CM','LM','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,45],[62,48],[50,55],[38,48],[18,45],[50,18]] },
+    '3-4-3': { name: '3-4-3', slots: ['GK','CB','CB','CB','RM','CM','CM','LM','RW','ST','LW'],
+      coords: [[50,92],[68,75],[50,78],[32,75],[82,50],[58,48],[42,48],[18,50],[78,25],[50,16],[22,25]] },
+    '5-3-2': { name: '5-3-2', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','ST'],
+      coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[62,48],[50,50],[38,48],[58,20],[42,20]] },
+    '4-1-4-1': { name: '4-1-4-1', slots: ['GK','RB','CB','CB','LB','CDM','RM','CM','CM','LM','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[82,42],[58,45],[42,45],[18,42],[50,16]] },
+    '4-3-2-1': { name: '4-3-2-1', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','CAM','CAM','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[62,32],[38,32],[50,16]] },
+    '3-4-2-1': { name: '3-4-2-1', slots: ['GK','CB','CB','CB','RM','CM','CM','LM','CAM','CAM','ST'],
+      coords: [[50,92],[68,75],[50,78],[32,75],[85,50],[58,52],[42,52],[15,50],[62,30],[38,30],[50,14]] },
+    '4-4-1-1': { name: '4-4-1-1', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','CAM','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,52],[42,52],[18,48],[50,32],[50,16]] },
+    '5-4-1': { name: '5-4-1', slots: ['GK','RWB','CB','CB','CB','LWB','RM','CM','CM','LM','ST'],
+      coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[80,45],[58,50],[42,50],[20,45],[50,18]] },
+    '4-1-2-1-2': { name: '4-1-2-1-2 (Diamond)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','CAM','ST','ST'],
+      coords: [[50,92],[80,72],[62,75],[38,75],[20,72],[50,60],[66,46],[34,46],[50,32],[58,16],[42,16]] },
+    '4-2-2-2': { name: '4-2-2-2', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','CAM','ST','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[60,55],[40,55],[70,35],[30,35],[58,16],[42,16]] },
+    '3-1-4-2': { name: '3-1-4-2', slots: ['GK','CB','CB','CB','CDM','RM','CM','CM','LM','ST','ST'],
+      coords: [[50,92],[68,75],[50,78],[32,75],[50,58],[82,42],[60,44],[40,44],[18,42],[58,18],[42,18]] },
+    '4-1-3-2': { name: '4-1-3-2', slots: ['GK','RB','CB','CB','LB','CDM','RM','CAM','LM','ST','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[78,42],[50,40],[22,42],[58,18],[42,18]] },
+    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[75,22],[50,34],[25,22]] },
+    '4-3-3-cdm': { name: '4-3-3 (Holding)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,55],[64,45],[36,45],[78,28],[50,16],[22,28]] },
+    '4-3-3-cam': { name: '4-3-3 (Attack)', slots: ['GK','RB','CB','CB','LB','CM','CM','CAM','RW','ST','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[38,52],[50,38],[78,22],[50,14],[22,22]] },
+    '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[66,26],[34,26],[50,16]] },
+    '5-3-2-attack': { name: '5-3-2 (Attack)', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','ST'],
+      coords: [[50,92],[88,62],[68,72],[50,75],[32,72],[12,62],[62,45],[50,48],[38,45],[58,18],[42,18]] }
+  };
+
+  const POS_COMPAT = {
+    GK: ['GK'], CB: ['CB','RB','LB'], RB: ['RB','CB','RWB','RM'], LB: ['LB','CB','LWB','LM'],
+    RWB: ['RWB','RB','RM'], LWB: ['LWB','LB','LM'], CDM: ['CDM','CM','CB'], CM: ['CM','CDM','CAM'],
+    CAM: ['CAM','CM','RW','LW','ST'], RM: ['RM','RW','RWB','CM'], LM: ['LM','LW','LWB','CM'],
+    RW: ['RW','RM','ST','CAM'], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
+  };
+
+  // Broad position "line" for a player, used to keep substitutions tactically
+  // sensible — like-for-like where possible, and to spot when a red card has
+  // left a hole specifically in defence.
+  const POS_LINE = {
+    GK: 'GK',
+    CB: 'DEF', RB: 'DEF', LB: 'DEF', RWB: 'DEF', LWB: 'DEF',
+    CDM: 'MID', CM: 'MID', CAM: 'MID', RM: 'MID', LM: 'MID',
+    RW: 'FWD', LW: 'FWD', ST: 'FWD', CF: 'FWD'
+  };
+  // ---- Formation shape: how many defensive/midfield/attacking "bodies" a
+  // formation actually puts on the pitch, weighted by how central/committed
+  // each slot is to that job (a wing-back counts partly for both defence and
+  // attack; a CDM counts mostly defensive-minded, a CAM mostly attacking).
+  // This is what lets picking e.g. 3-4-3 over 5-4-1 genuinely open a team up
+  // going forward (and expose it at the back) in the match engine itself,
+  // not just via which individual players happen to be selected.
+  const SHAPE_DEF_WEIGHT = { CB: 1, RB: 0.8, LB: 0.8, RWB: 0.55, LWB: 0.55, CDM: 0.35 };
+  const SHAPE_FWD_WEIGHT = { ST: 1, CF: 1, RW: 0.75, LW: 0.75, CAM: 0.4, RM: 0.3, LM: 0.3, RWB: 0.15, LWB: 0.15 };
+  const SHAPE_MID_WEIGHT = { CM: 1, CDM: 0.65, CAM: 0.6, RM: 0.7, LM: 0.7, RWB: 0.3, LWB: 0.3 };
+  // Baseline reference is 4-3-3 (RB,CB,CB,LB,CM,CM,CM,RW,ST,LW) — every other
+  // formation's bonus/penalty is measured as a delta off this neutral shape.
+  const SHAPE_BASELINE = { def: 3.6, fwd: 2.5, mid: 3.0 };
+  const formationShapeCache = {};
+  function formationShape(formationKey) {
+    const key = formationKey || '4-3-3';
+    if (formationShapeCache[key]) return formationShapeCache[key];
+    const formation = FORMATIONS[key] || FORMATIONS['4-3-3'];
+    let def = 0, fwd = 0, mid = 0;
+    formation.slots.forEach(s => {
+      if (s === 'GK') return;
+      def += SHAPE_DEF_WEIGHT[s] || 0;
+      fwd += SHAPE_FWD_WEIGHT[s] || 0;
+      mid += SHAPE_MID_WEIGHT[s] || 0;
+    });
+    const shape = { def, fwd, mid };
+    formationShapeCache[key] = shape;
+    return shape;
+  }
+  // How many natural wide bodies (wing-backs / wide mids / wingers) a
+  // formation puts on the pitch — used alongside formationShape() to match
+  // a formation to a manager's style preference (Out Wide/Overload want
+  // width; narrower diamonds/back-threes-without-wing-backs don't offer it).
+  function formationWideCount(formationKey) {
+    const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
+    return formation.slots.filter(s => WIDE_SLOTS.has(s)).length;
+  }
+
+  function lineOf(p) {
+    if (!p) return 'MID';
+    const slot = p.slot || (p.pos || [])[0] || 'CM';
+    return POS_LINE[slot] || 'MID';
+  }
+
+
+  // ========== MANAGER PLAYSTYLES ==========
+  // If a team's manager has "playstyle" set in teams.json (and it's one of the
+  // names below) that's used as-is; otherwise a random one is assigned once
+  // when team data loads and cached onto team.manager.playstyle so it stays
+  // consistent for the rest of the session.
+  const PLAYSTYLES = ['Long Ball', 'Possession', 'Long Ball Counter', 'Overload', 'Quick Counter', 'Out Wide'];
+
+  // Gameplay effect of each playstyle. These are deliberately modest nudges —
+  // enough to give each style a distinct identity over 90 minutes/a season
+  // without letting any one style dominate results outright.
+  //   attBonus/defBonus   — flat nudge to calcTeamStrength() att/def
+  //   passVolMult         — multiplies a team's per-minute pass volume
+  //   passAccDelta        — flat nudge to individual pass success rate
+  //   possBias            — pts nudge toward/away from more of the ball
+  //   wingBiasMult        — multiplies wide players' (RB/LB/RWB/LWB/RM/LM/RW/LW) share of passing/attacking involvement
+  //   counterBonus        — nudge to attacking-creation strength that rewards this team when they're defending, i.e. breaking quickly
+  const PLAYSTYLE_MODS = {
+    'Long Ball':          { attBonus: 1.5,  defBonus: -0.5, passVolMult: 0.82, passAccDelta: -0.045, possBias: -4, wingBiasMult: 1.0,  counterBonus: 0.4 },
+    'Possession':         { attBonus: -0.5, defBonus: 1.0,  passVolMult: 1.20, passAccDelta: 0.035,  possBias: 6,  wingBiasMult: 1.0,  counterBonus: -0.6 },
+    'Long Ball Counter':  { attBonus: 0.5,  defBonus: 0.5,  passVolMult: 0.80, passAccDelta: -0.03,  possBias: -5, wingBiasMult: 1.0,  counterBonus: 1.4 },
+    'Overload':           { attBonus: 1.0,  defBonus: -0.8, passVolMult: 1.05, passAccDelta: 0.0,    possBias: 2,  wingBiasMult: 1.35, counterBonus: 0.1 },
+    'Quick Counter':      { attBonus: 0.8,  defBonus: 0.2,  passVolMult: 0.94, passAccDelta: -0.01,  possBias: -2, wingBiasMult: 1.1,  counterBonus: 1.6 },
+    'Out Wide':           { attBonus: 0.5,  defBonus: -0.2, passVolMult: 1.0,  passAccDelta: 0.0,    possBias: 1,  wingBiasMult: 1.4,  counterBonus: 0.2 }
+  };
+  const WIDE_SLOTS = new Set(['RB','LB','RWB','LWB','RM','LM','RW','LW']);
+
+  // Which formation "shape" each manager identity gravitates toward, used by
+  // pickTeamFormation() below so a Long Ball manager's team actually lines up
+  // differently from a Possession side's, instead of formation being a pure
+  // cosmetic hash of the team name.
+  //   fwd/def  — how much this style values a formation weighted toward
+  //              attacking vs defensive bodies (see formationShape())
+  //   wide     — how much it values natural width (wing-backs/wide mids)
+  //   mid      — how much it values a numbers-up central midfield
+  const PLAYSTYLE_FORM_PREF = {
+    'Long Ball':          { fwd: 0.5, def: 1.1, wide: 0.3, mid: 0.3 },
+    'Long Ball Counter':  { fwd: 0.6, def: 1.0, wide: 0.4, mid: 0.3 },
+    'Quick Counter':      { fwd: 0.7, def: 0.9, wide: 0.5, mid: 0.4 },
+    'Possession':         { fwd: 0.5, def: 0.7, wide: 0.3, mid: 1.1 },
+    'Overload':           { fwd: 0.9, def: 0.4, wide: 1.3, mid: 0.5 },
+    'Out Wide':           { fwd: 0.7, def: 0.5, wide: 1.4, mid: 0.4 }
+  };
+
+
+  // Resolves (and caches) a team's manager playstyle. If teams.json already
+  // set a valid manager.playstyle it's kept as-is; otherwise a random one is
+  // picked once and stored on the manager object so every part of the UI
+  // that reads team.manager.playstyle agrees for the rest of the session.
+  function getManagerPlaystyle(team) {
+    if (!team) return PLAYSTYLES[0];
+    if (!team.manager) team.manager = {};
+    if (!PLAYSTYLES.includes(team.manager.playstyle)) {
+      team.manager.playstyle = PLAYSTYLES[Math.floor(seededRandom() * PLAYSTYLES.length)];
+    }
+    return team.manager.playstyle;
+  }
+
+  function getPlaystyleMods(team) {
+    return PLAYSTYLE_MODS[getManagerPlaystyle(team)] || PLAYSTYLE_MODS['Possession'];
+  }
+
+  // ========== EXPANDED PLAYER ATTRIBUTES (player-attributes.json) ==========
+  // Optional, per-player override: when player-attributes.json has an entry
+  // for a player's id, that entry's much more detailed attribute sheet (25+
+  // individual ratings, a set of individual playstyle tags, GK-specific
+  // ratings, etc.) is used to derive that player's five gameplay stats
+  // (att/def/pac/phy/tec) and overall — completely replacing whatever
+  // teams.json had for that player. Everyone else is untouched.
+
+  // Position group -> how much each of the 5 gameplay stats counts toward
+  // that group's overall, weights sum to 1 per row. Mirrors a standard
+  // FIFA/eFootball-style positional overall calc.
+  const ATTR_POS_WEIGHTS = {
+    GK:       { def: 0.55, tec: 0.20, phy: 0.15, pac: 0.05, att: 0.05 },
+    CB:       { def: 0.45, phy: 0.25, tec: 0.15, pac: 0.10, att: 0.05 },
+    FB:       { def: 0.28, pac: 0.27, tec: 0.20, phy: 0.15, att: 0.10 },
+    CDM:      { def: 0.35, tec: 0.25, phy: 0.20, pac: 0.10, att: 0.10 },
+    CM:       { tec: 0.30, def: 0.20, phy: 0.20, pac: 0.15, att: 0.15 },
+    CAM:      { tec: 0.30, att: 0.30, pac: 0.20, phy: 0.10, def: 0.10 },
+    WIDE_MID: { pac: 0.28, tec: 0.25, att: 0.25, phy: 0.12, def: 0.10 },
+    WINGER:   { pac: 0.30, att: 0.28, tec: 0.25, phy: 0.10, def: 0.07 },
+    FWD:      { att: 0.45, pac: 0.20, tec: 0.20, phy: 0.15, def: 0.00 }
+  };
+  function attrPosGroup(posArr) {
+    const p = (posArr && posArr[0]) || 'CM';
+    if (p === 'GK') return 'GK';
+    if (p === 'CB') return 'CB';
+    if (['RB', 'LB', 'RWB', 'LWB'].includes(p)) return 'FB';
+    if (p === 'CDM') return 'CDM';
+    if (p === 'CM') return 'CM';
+    if (p === 'CAM') return 'CAM';
+    if (['RM', 'LM'].includes(p)) return 'WIDE_MID';
+    if (['RW', 'LW', 'LWF', 'RWF'].includes(p)) return 'WINGER';
+    if (['ST', 'CF', 'SS'].includes(p)) return 'FWD';
+    return 'CM';
+  }
+
+  // The full set of individual (eFootball-style) player playstyle tags
+  // usable in player-attributes.json, with the human-readable description
+  // shown as a tooltip wherever a playstyle tag is rendered in the UI.
+  const PLAYSTYLE_DESCRIPTIONS = {
+    'Goal Poacher':          'A striker who constantly looks to run behind the defensive line and attack scoring positions.',
+    'Fox in the Box':        'A penalty-box specialist who focuses on finding space and finishing chances inside the area.',
+    'Target Man':            'A striker who uses strength and positioning to receive the ball and bring teammates into play.',
+    'Deep-Lying Forward':    'Drops deeper to receive the ball and create opportunities rather than constantly staying on the defensive line.',
+    'Dummy Runner':          'Makes decoy runs to drag defenders away and create space for teammates.',
+    'Creative Playmaker':    'Moves intelligently to receive the ball, create chances, and link attacks.',
+    'Hole Player':           'Makes aggressive late runs into the box to exploit spaces and score.',
+    'Classic No. 10':        'A traditional playmaker who stays relatively central and focuses on passing and creativity.',
+    'Prolific Winger':       'Stays wide, attacks the flank, and frequently cuts inside or delivers crosses.',
+    'Cross Specialist':      'Positions himself wide and prioritizes delivering accurate crosses into the box.',
+    'Roaming Flank':         'Frequently leaves the wing and moves into central areas to participate in attacks.',
+    'Inside Forward':        'Starts from a wide position but aggressively cuts inside toward goal.',
+    'Box-to-Box':            'Constantly contributes at both ends of the pitch, covering large areas throughout the match.',
+    'Destroyer':             'Aggressively presses, tackles, and challenges opponents to win possession.',
+    'Anchor Man':            'Holds his defensive position in front of the back line and provides defensive stability.',
+    'Orchestrator':          'Controls the tempo from deeper areas through intelligent positioning and passing.',
+    'Build Up':              'A defender who drops into good positions and helps initiate attacks from the back.',
+    'Extra Frontman':        'A defender who frequently moves forward and joins the attack when opportunities arise.',
+    'Offensive Full-back':   'A full-back who aggressively pushes forward to support attacks and provide width.',
+    'Full-back Finisher':    'A full-back who makes attacking runs into dangerous areas and can arrive in scoring positions.',
+    'Offensive Goalkeeper':  'Proactively comes off his line to sweep up through balls and support a high defensive line.',
+    'Defensive Goalkeeper':  'Stays closer to his goal and prioritizes traditional shot-stopping and positioning.'
+  };
+
+  // Individual eFootball-style playstyle tag -> which team manager
+  // playstyles (see PLAYSTYLES above) it's naturally suited to. Used for
+  // the "manager affinity" overall bonus below — a role player who
+  // genuinely fits the way their manager sets the team up plays a little
+  // better than the raw numbers alone would suggest.
+  const PLAYSTYLE_AFFINITY = {
+    'Goal Poacher':          ['Quick Counter', 'Long Ball Counter'],
+    'Fox in the Box':        ['Overload', 'Quick Counter'],
+    'Target Man':            ['Long Ball', 'Long Ball Counter'],
+    'Deep-Lying Forward':    ['Possession'],
+    'Dummy Runner':          ['Overload', 'Quick Counter'],
+    'Creative Playmaker':    ['Possession', 'Overload'],
+    'Hole Player':           ['Overload', 'Possession'],
+    'Classic No. 10':        ['Possession'],
+    'Prolific Winger':       ['Out Wide', 'Overload'],
+    'Cross Specialist':      ['Out Wide'],
+    'Roaming Flank':         ['Out Wide', 'Overload'],
+    'Inside Forward':        ['Out Wide', 'Quick Counter'],
+    'Box-to-Box':            ['Overload', 'Quick Counter'],
+    'Destroyer':             ['Long Ball Counter', 'Quick Counter'],
+    'Anchor Man':            ['Possession', 'Long Ball Counter'],
+    'Orchestrator':          ['Possession'],
+    'Build Up':              ['Possession','Long Ball Counter'],
+    'Extra Frontman':        ['Overload', 'Long Ball'],
+    'Offensive Full-back':   ['Overload', 'Out Wide'],
+    'Defensive Full-back': ['Overload','Long Ball Counter'],
+    'Full-back Finisher':    ['Overload', 'Out Wide'],
+    'Offensive Goalkeeper':  ['Possession', 'Overload'],
+    'Defensive Goalkeeper':  ['Long Ball Counter', 'Quick Counter']
+  };
+
+  // Flat nudges applied to a player's derived att/def/pac/phy/tec once
+  // their raw ratings have been averaged (see deriveStatsFromAttributes
+  // below) — this is what stops every player who plays the same position
+  // from converging on the same generic profile. Each playstyle pulls the
+  // final 5-stat blend in a distinct direction (small, deliberately modest
+  // nudges, summed across every tag a player has, then clamped 1-99).
+  const PLAYSTYLE_STAT_MODS = {
+    'Goal Poacher':          { att: 3,  pac: 2,  def: -2 },
+    'Fox in the Box':        { att: 3,  tec: 1,  pac: -1 },
+    'Target Man':            { phy: 3,  att: 1,  pac: -2 },
+    'Deep-Lying Forward':    { tec: 3,  att: -1 },
+    'Dummy Runner':          { pac: 2,  phy: 1,  att: -1 },
+    'Creative Playmaker':    { tec: 3,  att: 1,  phy: -1 },
+    'Hole Player':           { att: 2,  pac: 2,  def: -1 },
+    'Classic No. 10':        { tec: 3,  def: -1 },
+    'Prolific Winger':       { pac: 2,  att: 2,  def: -1 },
+    'Cross Specialist':      { tec: 2,  pac: 1,  def: -1 },
+    'Roaming Flank':         { tec: 2,  pac: 1 },
+    'Inside Forward':        { att: 3,  pac: 1,  def: -1 },
+    'Box-to-Box':            { phy: 2,  tec: 1,  def: 1 },
+    'Destroyer':             { def: 3,  phy: 1,  tec: -1 },
+    'Anchor Man':            { def: 3,  tec: 1,  pac: -1 },
+    'Orchestrator':          { tec: 3,  def: 1,  pac: -1 },
+    'Build Up':              { tec: 2,  def: 1 },
+    'Extra Frontman':        { att: 2,  phy: 1,  def: -1 },
+    'Offensive Full-back':   { pac: 2,  att: 1,  def: -1 },
+    'Defensive Full-back':  { pac: 2,  att: -1,  def: 1 },
+    'Full-back Finisher':    { att: 3,  pac: 1,  def: -1 },
+    'Offensive Goalkeeper':  { pac: 2,  tec: 2,  def: -1 },
+    'Defensive Goalkeeper':  { def: 3,  phy: 1 }
+  };
+
+  // Which raw expanded-attribute ratings define each individual playstyle's
+  // "signature" traits. Used two ways:
+  //  1) Overall calc: a player whose signature attributes for their own
+  //     playstyle(s) run hotter than their attribute sheet on average gets
+  //     a much bigger push toward their overall than a generic 5-stat blend
+  //     would give them — see styleSignatureBonus() below.
+  //  2) Manager attribute boost: when a player's playstyle fits their
+  //     manager's tactic, the manager boost is applied directly to these
+  //     specific raw ratings (not just a flat overall number) — see
+  //     applyManagerAttributeBoost() below.
+  const PLAYSTYLE_KEY_ATTRS = {
+    'Goal Poacher':          ['off_awr', 'ball_con', 'tight_pos', 'fin', 'spd', 'accel', 'bal'],
+    'Fox in the Box':        ['off_awr', 'tight_pos', 'fin', 'ball_con', 'head', 'bal', 'accel'],
+    'Target Man':            ['off_awr', 'tight_pos', 'fin', 'head', 'phy_con', 'bal', 'ball_con'],
+    'Deep-Lying Forward':    ['off_awr', 'ball_con', 'tight_pos', 'low_pass', 'fin', 'place_kick', 'phy_con'],
+    'Dummy Runner':          ['off_awr', 'spd', 'accel', 'stam', 'bal', 'tight_pos'],
+    'Creative Playmaker':    ['ball_con', 'dribb', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl'],
+    'Hole Player':           ['off_awr', 'tight_pos', 'fin', 'spd', 'accel', 'stam', 'bal'],
+    'Classic No. 10':        ['ball_con', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl', 'fin'],
+    'Prolific Winger':       ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'spd', 'accel', 'curl'],
+    'Cross Specialist':      ['off_awr', 'ball_con', 'low_pass', 'lofted_pass', 'curl', 'spd', 'stam'],
+    'Roaming Flank':         ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'low_pass', 'spd', 'stam'],
+    'Inside Forward':        ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'fin', 'spd', 'accel'],
+    'Box-to-Box':            ['off_awr', 'def_awr', 'def_eng', 'stam', 'spd', 'accel', 'bal', 'phy_con'],
+    'Destroyer':             ['def_awr', 'def_eng', 'tack', 'aggr', 'phy_con', 'spd', 'stam'],
+    'Anchor Man':            ['def_awr', 'def_eng', 'tack', 'aggr', 'phy_con', 'ball_con', 'low_pass'],
+    'Orchestrator':          ['ball_con', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl', 'stam'],
+    'Build Up':              ['def_awr', 'ball_con', 'low_pass', 'lofted_pass', 'tight_pos', 'phy_con'],
+    'Extra Frontman':        ['def_awr', 'off_awr', 'def_eng', 'tack', 'aggr', 'fin', 'stam'],
+    'Offensive Full-back':   ['off_awr', 'spd', 'accel', 'stam', 'low_pass', 'lofted_pass'],
+    'Defensive Full-back':   ['def_awr', 'spd', 'accel', 'stam', 'def_eng', 'phy_con'],
+    'Full-back Finisher':    ['off_awr', 'fin', 'spd', 'accel', 'dribb', 'ball_con', 'stam'],
+    'Offensive Goalkeeper':  ['gk_awr', 'gk_reflex', 'gk_reach', 'gk_parry', 'spd', 'accel', 'ball_con'],
+    'Defensive Goalkeeper':  ['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach', 'jmp', 'phy_con']
+  };
+  // Every raw numeric rating that can appear on an expanded attribute
+  // sheet, in display order, grouped for the player-profile UI. GK ratings
+  // only render for goalkeepers; outfield ratings only render for outfield
+  // players (see expandedAttrRowsHTML below).
+  const EXPANDED_ATTR_GROUPS = [
+    { label: 'Offense', keys: [
+      ['off_awr', 'Off. Awareness'], ['fin', 'Finishing'], ['head', 'Heading'],
+      ['place_kick', 'Place Kicking'], ['kick_pwr', 'Kicking Power']
+    ] },
+    { label: 'Ball Skills', keys: [
+      ['ball_con', 'Ball Control'], ['dribb', 'Dribbling'], ['tight_pos', 'Tight Poss.'],
+      ['low_pass', 'Low Pass'], ['lofted_pass', 'Lofted Pass'], ['curl', 'Curl']
+    ] },
+    { label: 'Physical', keys: [
+      ['spd', 'Speed'], ['accel', 'Acceleration'], ['stam', 'Stamina'],
+      ['phy_con', 'Physical Contact'], ['bal', 'Balance'], ['jmp', 'Jump']
+    ] },
+    { label: 'Defense', keys: [
+      ['def_awr', 'Def. Awareness'], ['def_eng', 'Def. Engagement'], ['tack', 'Tackling'], ['aggr', 'Aggression']
+    ] },
+    { label: 'Goalkeeping', keys: [
+      ['gk_awr', 'GK Awareness'], ['gk_catch', 'GK Catch'], ['gk_parry', 'GK Parry'],
+      ['gk_reflex', 'GK Reflexes'], ['gk_reach', 'GK Reach']
+    ] }
+  ];
+  // Average of every numeric raw rating a player's sheet actually has
+  // (GK ratings only count for keepers, so a keeper's sheet isn't dragged
+  // down by outfield-only zeros and vice versa) — the baseline that a
+  // playstyle's signature attributes are compared against.
+  function attrSheetAverage(attr, isGK) {
+    const outfieldKeys = ['off_awr','ball_con','tight_pos','fin','spd','accel','bal','head','phy_con',
+      'low_pass','place_kick','stam','dribb','lofted_pass','curl','def_awr','def_eng','tack','aggr','jmp','kick_pwr'];
+    const gkKeys = ['gk_awr','gk_catch','gk_parry','gk_reflex','gk_reach','spd','accel','bal','phy_con','stam','jmp'];
+    const keys = isGK ? gkKeys : outfieldKeys;
+    const nums = keys.map(k => attr[k]).filter(v => typeof v === 'number');
+    return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 65;
+  }
+  // The core "signature attributes push overall up" rule: for each
+  // playstyle tag a player has, compare the average of that style's key
+  // attributes against the player's own sheet average. Only positive gaps
+  // count (a style whose key attributes are actually average or below
+  // gives no bonus) and each style's contribution is amplified well beyond
+  // the flat +1..+3 PLAYSTYLE_STAT_MODS nudge, so a player built around
+  // their style's signature attributes reads as meaningfully better than
+  // a same-position player with a flatter, generic spread — even at the
+  // same rough attribute total. Multiple matching styles stack, capped so
+  // it stays a strong-but-bounded identity bonus rather than unbounded.
+  function styleSignatureBonus(attr, styles, isGK) {
+    if (!styles || !styles.length) return 0;
+    const sheetAvg = attrSheetAverage(attr, isGK);
+    let bonus = 0;
+    styles.forEach((style) => {
+      const keys = PLAYSTYLE_KEY_ATTRS[style];
+      if (!keys || !keys.length) return;
+      const vals = keys.map(k => attr[k]).filter(v => typeof v === 'number');
+      if (!vals.length) return;
+      const keyAvg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const gap = keyAvg - sheetAvg;
+      if (gap > 0) bonus += gap * 0.55;
+    });
+    return Math.max(0, Math.min(14, Math.round(bonus)));
+  }
+  // Manager boost to *inner* attributes, not just the final overall number.
+  // When a player's individual playstyle fits the way their manager sets
+  // the team up (see PLAYSTYLE_AFFINITY), the manager's coaching visibly
+  // sharpens that style's specific signature ratings on the player's own
+  // attribute sheet — returns a shallow-cloned, boosted copy of attr so the
+  // original playerAttributesData source is never mutated.
+  function applyManagerAttributeBoost(attr, styles, teamStyle) {
+    if (!styles || !styles.length || !teamStyle) return attr;
+    const boosted = { ...attr };
+    let touched = false;
+    styles.forEach((style) => {
+      const suited = PLAYSTYLE_AFFINITY[style];
+      if (!suited || !suited.includes(teamStyle)) return;
+      const keys = PLAYSTYLE_KEY_ATTRS[style];
+      if (!keys) return;
+      keys.forEach((k) => {
+        if (typeof boosted[k] === 'number') {
+          boosted[k] = Math.max(1, Math.min(99, Math.round(boosted[k] + 2)));
+          touched = true;
+        }
+      });
+    });
+    boosted.managerBoosted = touched;
+    return boosted;
+  }
+
+  // True if a player's expanded sheet carries the given individual
+  // playstyle tag. Used throughout the match-engine "edge" functions below
+  // so specific styles diversify in-match behaviour, not just derived stats.
+  function hasStyle(p, styleName) {
+    return !!(p && p.expandedAttrs && (p.expandedAttrs.playstyle || []).includes(styleName));
+  }
+
+  // Returns one random flavor line from the first of the player's playstyle
+  // tags that has an entry in the given map, or null if none match. This is
+  // how playstyles diversify match commentary itself — not just numbers —
+  // every context below (dribbles, through balls, tackles, off-the-ball
+  // movement, goals) picks its wording partly from *which* style the player
+  // on the ball actually has.
+  function styleFlavor(p, map) {
+    if (!p || !p.expandedAttrs) return null;
+    const styles = p.expandedAttrs.playstyle || [];
+    for (let i = 0; i < styles.length; i++) {
+      const bank = map[styles[i]];
+      if (bank && bank.length) return bank[Math.floor(seededRandom() * bank.length)];
+    }
+    return null;
+  }
+
+  // What a player does immediately *after* beating their man with a skill
+  // move — this is where individual playstyle turns a generic "dribbles
+  // past" into a distinct passage of play per role.
+  const DRIBBLE_FOLLOWUP = {
+    'Prolific Winger':      ['then whips a cross in first time', 'before floating a ball across the six-yard box'],
+    'Cross Specialist':     ['and immediately looks up for a cross', 'before whipping one into the danger area'],
+    'Inside Forward':       ['then cuts inside onto his favoured foot', 'and drives infield looking for the shot'],
+    'Roaming Flank':        ['before drifting inside to keep the move going', 'then picks out a pass through the middle'],
+    'Goal Poacher':         ['then bursts into the box for the return', 'and darts across his marker looking for space'],
+    'Fox in the Box':       ['and spins into the six-yard box', 'before checking his run at the near post'],
+    'Hole Player':          ['before arriving late into the box', 'and times a run beyond the last defender'],
+    'Creative Playmaker':   ['before threading a pass through the lines', 'and picks out a teammate with the outside of the boot'],
+    'Classic No. 10':       ['before slipping a clever ball through', 'and takes a touch to pick his pass'],
+    'Dummy Runner':         ['before checking away to drag a marker with him', 'and peels off to open a passing lane'],
+    'Box-to-Box':           ['before driving forward with the ball', 'and carries it thirty yards up the pitch'],
+    'Deep-Lying Forward':   ['before laying it off and continuing the move', 'and drops deep again looking for the next pass'],
+    'Orchestrator':         ['before recycling it and resetting the attack', 'and slows the tempo back down'],
+    'Offensive Full-back':  ['before overlapping down the line', 'and gets to the byline looking for a cutback'],
+    'Full-back Finisher':   ['before arriving late into the box himself', 'and keeps running into a scoring position']
+  };
+  // Through-ball / defence-splitting pass flavor by the passer's playstyle.
+  const THROUGH_BALL_FLAVOR = {
+    'Creative Playmaker':   ['reads the game a yard ahead of everyone and threads a defence-splitting ball into the channel'],
+    'Classic No. 10':       ['waits, then slides a perfectly weighted ball through the lines'],
+    'Orchestrator':         ['dictates the tempo before releasing a pass through the channel'],
+    'Deep-Lying Forward':   ['drops deep to collect, then spins a first-time pass in behind'],
+    'Dummy Runner':         ['drags a marker away before slipping the ball into the space he vacated']
+  };
+  // Tackle-and-win flavor by the defender's playstyle.
+  const TACKLE_FLAVOR = {
+    'Destroyer':            ['throws himself into a crunching challenge and comes away with the ball'],
+    'Anchor Man':           ['reads the danger early and snuffs it out with a perfectly timed tackle'],
+    'Box-to-Box':           ['recovers back at full sprint to make a vital tackle on the edge of the box'],
+    'Build Up':             ['steps in calmly to win the ball back before it becomes a problem']
+  };
+  // Interception flavor by the defender's playstyle.
+  const INTERCEPTION_FLAVOR = {
+    'Destroyer':            ['pounces to intercept, snapping into the passing lane'],
+    'Anchor Man':           ['reads the pass superbly and steps in front of his man to intercept'],
+    'Orchestrator':         ['anticipates the pass and cuts it out before it develops'],
+    'Build Up':             ['calmly intercepts and immediately looks to start a move of his own']
+  };
+  // "Keeps possession ticking over" flavor by the on-ball player's playstyle.
+  const POSSESSION_FLAVOR = {
+    'Orchestrator':         ['controls the tempo from deep, in no hurry to give the ball away'],
+    'Classic No. 10':       ['pulls the strings from a pocket of space'],
+    'Creative Playmaker':   ['probes for an opening, constantly on the move to stay available'],
+    'Build Up':             ['brings the ball out from the back under no real pressure'],
+    'Deep-Lying Forward':   ['drops off the front line to link the play']
+  };
+  // Off-the-ball movement flavor for a missed big chance, describing *how*
+  // the player got into the position in the first place.
+  const BIG_CHANCE_FLAVOR = {
+    'Goal Poacher':         ['times a run in behind the last defender'],
+    'Fox in the Box':       ['reacts quickest to a loose ball in the six-yard box'],
+    'Hole Player':          ['arrives late and unmarked at the back post'],
+    'Dummy Runner':         ["ghosts into the space a decoy run opened up"],
+    'Inside Forward':       ['cuts in from the flank onto his favoured foot']
+  };
+  // Extra descriptive clause appended to a goal's method text based on the
+  // scorer's playstyle, so the same "tap-in" reads differently for a Fox in
+  // the Box than for a Full-back Finisher arriving from deep.
+  const GOAL_FLAVOR_SUFFIX = {
+    'Goal Poacher':         ['after peeling off the last defender'],
+    'Fox in the Box':       ['pouncing first on a loose ball in the six-yard box'],
+    'Target Man':           ['rising above his marker'],
+    'Hole Player':          ['arriving late and completely unmarked'],
+    'Inside Forward':       ['cutting in from the flank onto his stronger foot'],
+    'Full-back Finisher':   ['arriving from deep, well beyond his usual position'],
+    'Extra Frontman':       ['pushing forward from the back to get on the end of it'],
+    'Deep-Lying Forward':   ['picking up the pieces after dropping deep to link play']
+  };
+
+  // Derives the 5 gameplay stats from a player-attributes.json entry.
+  // Goalkeepers draw def/tec from their GK-specific ratings (shot-stopping,
+  // handling, distribution) instead of the outfield ones.
+  function deriveStatsFromAttributes(attr, posArr) {
+    const isGK = ((posArr && posArr[0]) || attr.pos && attr.pos[0]) === 'GK';
+    const avg = (...vals) => {
+      const nums = vals.filter(v => typeof v === 'number');
+      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 60;
+    };
+    const pac = avg(attr.spd, attr.accel);
+    const phy = isGK
+      ? avg(attr.phy_con, attr.jmp, attr.bal, attr.stam)
+      : avg(attr.phy_con, attr.jmp, attr.bal, attr.stam, attr.aggr);
+    const tec = isGK
+      ? avg(attr.gk_catch, attr.low_pass, attr.lofted_pass, attr.ball_con)
+      : avg(attr.ball_con, attr.dribb, attr.low_pass, attr.lofted_pass, attr.curl, attr.tight_pos);
+    const att = isGK
+      ? avg(attr.off_awr, attr.kick_pwr, attr.place_kick)
+      : avg(attr.fin, attr.off_awr, attr.head, attr.place_kick, attr.kick_pwr);
+    const def = isGK
+      ? avg(attr.gk_awr, attr.gk_parry, attr.gk_reflex, attr.gk_reach, attr.gk_catch)
+      : avg(attr.def_awr, attr.def_eng, attr.tack, attr.aggr);
+    const clamp = (v) => Math.max(1, Math.min(99, Math.round(v)));
+    // Apply each of the player's individual playstyle tags as a small flat
+    // nudge to the raw averages above — this is what keeps two players in
+    // the same position from converging on an identical 5-stat profile;
+    // a Target Man and a Goal Poacher playing the same ST slot come out
+    // with a visibly different att/phy/pac balance.
+    let pacAdj = pac, phyAdj = phy, tecAdj = tec, attAdj = att, defAdj = def;
+    (attr.playstyle || []).forEach((style) => {
+      const mod = PLAYSTYLE_STAT_MODS[style];
+      if (!mod) return;
+      if (mod.pac) pacAdj += mod.pac;
+      if (mod.phy) phyAdj += mod.phy;
+      if (mod.tec) tecAdj += mod.tec;
+      if (mod.att) attAdj += mod.att;
+      if (mod.def) defAdj += mod.def;
+    });
+    return { pac: clamp(pacAdj), phy: clamp(phyAdj), tec: clamp(tecAdj), att: clamp(attAdj), def: clamp(defAdj) };
+  }
+
+  function weightedOverall(derived, posArr) {
+    const w = ATTR_POS_WEIGHTS[attrPosGroup(posArr)] || ATTR_POS_WEIGHTS.CM;
+    return Math.round(derived.att * w.att + derived.def * w.def + derived.pac * w.pac +
+      derived.phy * w.phy + derived.tec * w.tec);
+  }
+
+  // +2 if one of the player's individual playstyles suits the team's
+  // current manager playstyle, +3 if two or more do, else 0.
+  function managerAffinityBonus(playerStyles, teamStyle) {
+    if (!playerStyles || !playerStyles.length || !teamStyle) return 0;
+    let matches = 0;
+    playerStyles.forEach((s) => {
+      const suited = PLAYSTYLE_AFFINITY[s];
+      if (suited && suited.includes(teamStyle)) matches++;
+    });
+    if (matches >= 2) return 3;
+    if (matches === 1) return 2;
+    return 0;
+  }
+
+  // Applies player-attributes.json to every matching player on every team.
+  // Runs once at startup, after restorePlayerForms() so it can safely
+  // overwrite this player's persisted baseOvr with the freshly-derived
+  // (and manager-affinity-boosted) baseline while still preserving their
+  // accumulated form delta on top of it — see the form system's comment
+  // near applyPlayerForm() for how baseOvr/form/ovr relate.
+  function applyExpandedPlayerAttributes() {
+    if (!playerAttributesData || !Object.keys(playerAttributesData).length) return;
+    allTeams.forEach((team) => {
+      (team.players || []).forEach((p) => {
+        const rawAttr = playerAttributesData[p.id];
+        if (!rawAttr) return;
+        const posArr = (rawAttr.pos && rawAttr.pos.length) ? rawAttr.pos : (p.pos || ['CM']);
+        const isGK = posArr[0] === 'GK';
+        const teamStyle = getManagerPlaystyle(team);
+        // Manager coaching sharpens the specific raw ratings behind a
+        // player's playstyle when it suits the team's tactic — this feeds
+        // into everything downstream (derived stats, overall, and the
+        // expanded sheet the profile UI displays), not just a flat OVR add.
+        const attr = applyManagerAttributeBoost(rawAttr, rawAttr.playstyle, teamStyle);
+        const derived = deriveStatsFromAttributes(attr, posArr);
+        p.att = derived.att; p.def = derived.def; p.pac = derived.pac;
+        p.phy = derived.phy; p.tec = derived.tec;
+        // The expanded sheet's position list is more detailed (multiple
+        // valid roles) — prefer it over teams.json's when present.
+        if (attr.pos && attr.pos.length) p.pos = attr.pos.slice();
+        const affinity = managerAffinityBonus(attr.playstyle, teamStyle);
+        // A player whose signature attributes for their own playstyle(s)
+        // run well above their sheet average gets a much bigger push
+        // toward their overall here than the generic 5-stat blend alone
+        // would give them.
+        const signatureBonus = styleSignatureBonus(attr, attr.playstyle, isGK);
+        const base = weightedOverall(derived, posArr) + signatureBonus;
+        const boostedBase = Math.max(40, Math.min(99, base + affinity));
+        p.baseOvr = boostedBase;
+        p.ovr = Math.max(40, Math.min(99, Math.round(boostedBase + (p.form || 0))));
+        p.expandedAttrs = attr;
+        p.attrBoosted = true;
+        p.affinityBonus = affinity;
+        p.affinityStyle = teamStyle;
+        p.signatureBonus = signatureBonus;
+        p.managerAttrBoosted = !!attr.managerBoosted;
+      });
+    });
+  }
+
+  // ===== Expanded-attribute gameplay hooks =====
+  // The functions below are what stop a boosted player's expanded sheet from
+  // "fading into" the same generic att/def/pac/phy/tec/ovr numbers everyone
+  // else uses. Each one reads specific raw ratings/skills straight off
+  // p.expandedAttrs (only set for player-attributes.json matches) and nudges
+  // a specific in-match probability — who wins a header, how a penalty or
+  // free kick goes, how a tackle resolves, how injury-prone someone is —
+  // beyond what the 5 compact stats alone would produce. Every one of them
+  // returns a neutral value (0 bonus, or a multiplier that reduces to the
+  // pre-existing behaviour) when a player has no expanded sheet, so nothing
+  // about the old system changes for anyone else.
+  function hasSkill(p, skillName) {
+    return !!(p && p.expandedAttrs && (p.expandedAttrs.skills || []).includes(skillName));
+  }
+  function xattr(p, key, fallback) {
+    const v = p && p.expandedAttrs && p.expandedAttrs[key];
+    return typeof v === 'number' ? v : fallback;
+  }
+  // Extra shot-quality nudge (roughly ±0.15) from finishing-specific traits
+  // a flat att/tec/ovr blend can't see on its own.
+  function finishingEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'fin', 70) - 70) / 100) * 0.5;
+    if (hasSkill(p, 'Phenomenal Finishing')) edge += 0.06;
+    if (hasSkill(p, 'First-time Shot') || hasSkill(p, 'First-time Shor')) edge += 0.02;
+    // Box-focused playstyles get a distinct finishing edge on top of raw
+    // finishing rating, so their identity shows up beyond the stat sheet.
+    if (hasStyle(p, 'Fox in the Box')) edge += 0.04;
+    if (hasStyle(p, 'Goal Poacher')) edge += 0.03;
+    if (hasStyle(p, 'Inside Forward')) edge += 0.025;
+    if (hasStyle(p, 'Hole Player')) edge += 0.02;
+    if (hasStyle(p, 'Full-back Finisher') || hasStyle(p, 'Extra Frontman')) edge += 0.015;
+    return edge;
+  }
+  // Aerial ability, 0.05-0.98 — used both to weight who wins headed chances
+  // and to nudge conversion once they do. Defaults to a neutral 0.5 (so
+  // multiplying by 2 elsewhere reduces to "no change") for non-expanded players.
+  function aerialSkill(p) {
+    if (!p || !p.expandedAttrs) return 0.5;
+    let v = xattr(p, 'head', 60) / 100;
+    if (hasSkill(p, 'Aerial Superiority') || hasSkill(p, 'Heading')) v += 0.12;
+    // A Target Man's whole game is built around winning the aerial duel;
+    // defensively-anchored styles also read the flight of a long ball well.
+    if (hasStyle(p, 'Target Man')) v += 0.1;
+    if (hasStyle(p, 'Anchor Man') || hasStyle(p, 'Destroyer')) v += 0.05;
+    return Math.max(0.05, Math.min(0.98, v));
+  }
+  // GK shot-stopping edge beyond the generic def/ovr/tec blend.
+  function gkReflexEdge(gk) {
+    if (!gk || !gk.expandedAttrs) return 0;
+    let edge = ((xattr(gk, 'gk_reflex', 75) - 75) / 100) * 0.5;
+    if (hasSkill(gk, 'Acrobatic Clear')) edge += 0.05;
+    return edge;
+  }
+  // Penalty-kick edges: taker's placement + specialist skill; keeper's
+  // penalty-specific awareness + save skill.
+  function penTakerEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'place_kick', 70) - 70) / 100) * 0.35;
+    if (hasSkill(p, 'Penalty Specialist')) edge += 0.08;
+    if (hasStyle(p, 'Fox in the Box') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
+    return edge;
+  }
+  function penGkEdge(gk) {
+    if (!gk || !gk.expandedAttrs) return 0;
+    let edge = ((xattr(gk, 'gk_awr', 75) - 75) / 100) * 0.15;
+    if (hasSkill(gk, 'GK Penalty Saver')) edge += 0.10;
+    return edge;
+  }
+  // Free-kick taker edge — curl/placement plus specialist skills.
+  function fkTakerEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'curl', 70) - 70) / 200) + ((xattr(p, 'place_kick', 70) - 70) / 300);
+    if (hasSkill(p, 'Long Range Curler') || hasSkill(p, 'Long-range Curler')) edge += 0.05;
+    if (hasSkill(p, 'Knuckle Shot')) edge += 0.04;
+    if (hasSkill(p, 'Dipping Shot')) edge += 0.03;
+    if (hasStyle(p, 'Creative Playmaker') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
+    if (hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Orchestrator')) edge += 0.02;
+    return edge;
+  }
+  // Dribble/skill-move success edge — dribbling ability plus specific moves.
+  function dribbleSuccessEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    let edge = ((xattr(p, 'dribb', 70) - 70) / 100) * 0.4;
+    const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero'];
+    if (skillMoves.some((s) => hasSkill(p, s))) edge += 0.08;
+    if (hasStyle(p, 'Prolific Winger') || hasStyle(p, 'Inside Forward')) edge += 0.04;
+    if (hasStyle(p, 'Roaming Flank') || hasStyle(p, 'Dummy Runner')) edge += 0.03;
+    if (hasStyle(p, 'Creative Playmaker')) edge += 0.02;
+    return edge;
+  }
+  // Defensive-action edges — specific tackling/interception skills beyond
+  // the generic def-based chance already used for the base roll.
+  function defActionEdge(p) {
+    if (!p || !p.expandedAttrs) return { chance: 0, interceptBias: 0 };
+    let chance = ((xattr(p, 'tack', 70) - 70) / 100) * 0.03;
+    let interceptBias = 0;
+    if (hasSkill(p, 'Sliding Tackle')) chance += 0.01;
+    if (hasSkill(p, 'Interception')) { chance += 0.006; interceptBias += 0.15; }
+    if (hasSkill(p, 'Man Marking')) chance += 0.006;
+    if (hasSkill(p, 'Blocker')) chance += 0.006;
+    // Destroyer/Anchor Man actively hunt the ball; Build Up and Box-to-Box
+    // read the game well enough to time a challenge, but less aggressively.
+    if (hasStyle(p, 'Destroyer')) { chance += 0.012; interceptBias += 0.05; }
+    if (hasStyle(p, 'Anchor Man')) { chance += 0.008; interceptBias += 0.1; }
+    if (hasStyle(p, 'Box-to-Box') || hasStyle(p, 'Build Up')) chance += 0.005;
+    return { chance, interceptBias };
+  }
+  // Injury-proneness multiplier for the "who gets injured" weighted pick.
+  function injuryWeightMult(p) {
+    if (!p || !p.expandedAttrs) return 1;
+    const res = p.expandedAttrs.injurey_res;
+    let mult = 1;
+    if (res === 'Low') mult = 1.5;
+    else if (res === 'High') mult = 0.6;
+    // Aggressive, duel-heavy styles pick up more knocks than a positionally
+    // disciplined one, independent of their base injury resistance rating.
+    if (hasStyle(p, 'Destroyer') || hasStyle(p, 'Box-to-Box')) mult *= 1.15;
+    if (hasStyle(p, 'Anchor Man') || hasStyle(p, 'Orchestrator')) mult *= 0.9;
+    return mult;
+  }
+  // Like pickPlayer, but the caller supplies the weighting function directly
+  // instead of the fixed ovr/att/tec composite — used where an expanded
+  // trait (aerial ability, etc.) should drive selection instead.
+  function pickPlayerCustomWeighted(side, preferredPos, weightFn, excludeId) {
+    if (!currentMatch || !side) return null;
+    const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    let pool = (side.squad.all || []).filter((p) => ids.includes(p.id) && p.id !== excludeId);
+    if (preferredPos && preferredPos.length) {
+      const preferred = pool.filter((p) => (p.pos || []).some((pos) => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
+      if (preferred.length) pool = preferred;
+    }
+    if (!pool.length) return null;
+    const weights = pool.map((p) => Math.max(0.05, weightFn(p)));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = seededRandom() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }
+
+  async function init() {
+    try {
+      let loaded = null;
+      let source = 'embedded';
+      const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
+      if (isHosted) {
+        const urls = [
+          'teams.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2),
+          './teams.json?v=' + Date.now(),
+          'teams.json'
+        ];
+        for (const url of urls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && ((data.national && data.national.length) || (data.club && data.club.length))) {
+              loaded = data;
+              source = 'teams.json';
+              console.log('Loaded teams from', url);
+              break;
+            }
+          } catch (err) {
+            console.warn('Fetch failed', url, err);
+          }
+        }
+      } else {
+        try {
+          const res = await fetch('teams.json?v=' + Date.now(), { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && (data.national || data.club)) { loaded = data; source = 'teams.json'; }
+          }
+        } catch (e) {}
+      }
+      teamsData = loaded || TEAMS_DATA;
+      if (!loaded) {
+        source = 'embedded';
+        console.warn('Using EMBEDDED team data — teams.json was NOT loaded from server');
+      }
+      allTeams = [...(teamsData.national || []), ...(teamsData.club || [])];
+      if (!allTeams.length) throw new Error('No teams found');
+      // Resolve every team's manager playstyle now (teams.json "playstyle" if
+      // set, otherwise a random one) so it's stable for the rest of the session.
+      allTeams.forEach(getManagerPlaystyle);
+
+      // Load leagues.json (which clubs belong to which domestic league).
+      // Optional — the app still works without it, it just falls back to
+      // manual club selection in Season Setup.
+      try {
+        const lUrls = isHosted
+          ? ['leagues.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './leagues.json?v=' + Date.now(), 'leagues.json']
+          : ['leagues.json?v=' + Date.now()];
+        for (const url of lUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { leaguesData = data; console.log('Loaded leagues from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('leagues.json not loaded', e); }
+
+      // Load players.json (player name -> portrait filename). Optional — the
+      // app still works without it, players just show their shirt number.
+      try {
+        const pUrls = isHosted
+          ? ['players.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './players.json?v=' + Date.now(), 'players.json']
+          : ['players.json?v=' + Date.now()];
+        for (const url of pUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { playerPortraits = data; console.log('Loaded player portraits from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('players.json not loaded', e); }
+
+      // Load trophies.json (trophy/competition name -> image filename). Optional —
+      // the app still works without it, trophies just show the 🏆 emoji instead.
+      try {
+        const tpUrls = isHosted
+          ? ['trophies.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './trophies.json?v=' + Date.now(), 'trophies.json']
+          : ['trophies.json?v=' + Date.now()];
+        for (const url of tpUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { trophyImages = data; console.log('Loaded trophy images from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('trophies.json not loaded', e); }
+
+      // Load managers.json (manager name -> portrait filename), resolved
+      // against assets/mportraits/ — managers.json itself lives in the main
+      // project dir, NOT inside assets/. managerPortraits already starts out
+      // populated from the embedded MANAGER_PORTRAITS_DATA above (so this
+      // works even opened straight from disk); a successful fetch here just
+      // layers any newer/edited entries from the on-disk managers.json on top.
+      try {
+        const mgUrls = isHosted
+          ? ['managers.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './managers.json?v=' + Date.now(), 'managers.json']
+          : ['managers.json?v=' + Date.now()];
+        for (const url of mgUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') {
+              const clean = { ...data };
+              delete clean._comment;
+              managerPortraits = { ...MANAGER_PORTRAITS_DATA, ...clean };
+              console.log('Loaded manager portraits from', url);
+              break;
+            }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('managers.json fetch skipped, using embedded portraits', e); }
+
+      // Load player-attributes.json (playerId -> expanded attribute sheet).
+      // Optional — the app works exactly as before for any player not
+      // listed here. Fetched the same way as the other optional JSON files
+      // above so it also works when this file is later edited without a
+      // rebuild.
+      try {
+        const paUrls = isHosted
+          ? ['player-attributes.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './player-attributes.json?v=' + Date.now(), 'player-attributes.json']
+          : ['player-attributes.json?v=' + Date.now()];
+        for (const url of paUrls) {
+          try {
+            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data === 'object') { playerAttributesData = data; console.log('Loaded expanded player attributes from', url); break; }
+          } catch (err) { console.warn('Fetch failed', url, err); }
+        }
+      } catch (e) { console.warn('player-attributes.json not loaded', e); }
+
+      loadStats();
+      loadPersistedGameState();
+      restorePlayerForms();
+      applyExpandedPlayerAttributes();
+      populateTeamSelects();
+      populateFormations();
+      bindNav();
+      renderTeamsList();
+      restoreTournamentUI();
+      restoreSeasonUI();
+      const savedView = (function () { try { return localStorage.getItem('apexActiveView'); } catch (e) { return null; } })();
+      if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
+      setupAutoSave();
+      try {
+        if (sessionStorage.getItem('apexJustReset') === '1') {
+          sessionStorage.removeItem('apexJustReset');
+          setTimeout(() => toast('All data reset — fresh start'), 300);
+        }
+        if (sessionStorage.getItem('apexJustImported') === '1') {
+          sessionStorage.removeItem('apexJustImported');
+          setTimeout(() => toast('Save imported — progress restored'), 300);
+        }
+      } catch (e) {}
+      console.log('Apex Sim ready:', allTeams.length, 'teams | source:', source);
+      window.__APEX_DATA_SOURCE = source;
+    } catch (e) {
+      console.error(e);
+      alert('Error loading game: ' + e.message);
+    }
+  }
+
+  function bindNav() {
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const view = tab.dataset.view;
+        if (view) switchView(view);
+      });
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+      }
+    });
+  }
+
+  function switchView(view) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => { t.classList.remove('active'); t.removeAttribute('aria-current'); });
+    const viewEl = document.getElementById('view-' + view);
+    if (viewEl) viewEl.classList.add('active');
+    const tabEl = document.querySelector(`.nav-tab[data-view="${view}"]`);
+    if (tabEl) { tabEl.classList.add('active'); tabEl.setAttribute('aria-current', 'page'); }
+    if (view === 'leaderboard') showLeaderboard('goals');
+    if (view === 'awards') showAwards('overview');
+    if (view === 'history') showHistory(historyActiveTab || 'team');
+    if (view === 'teams') renderTeamsList();
+    if (view === 'season') goToSeason();
+  }
+
+  function randomMatch(category) {
+    // category: 'national' | 'club' | 'all'
+    let pool = allTeams;
+    if (category === 'national') pool = teamsData.national || [];
+    if (category === 'club') pool = teamsData.club || [];
+    if (pool.length < 2) { toast('Need at least 2 teams'); return; }
+    const shuffled = shuffleArray([...pool]);
+    const home = shuffled[0], away = shuffled[1];
+    goToMatch();
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = home.id;
+    if (awaySel) awaySel.value = away.id;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    // Formations reflect each team's set formation (from teams.json) if any,
+    // otherwise a per-team default that spreads teams across the pool.
+    const hf = document.getElementById('home-formation');
+    const af = document.getElementById('away-formation');
+    if (hf) hf.value = pickTeamFormation(home);
+    if (af) af.value = pickTeamFormation(away);
+    toast(`${home.flag||''} ${home.name} vs ${away.flag||''} ${away.name}`);
+  }
+
+  function goToMatch() {
+    switchView('match');
+    const setup = document.getElementById('match-setup');
+    const live = document.getElementById('match-live');
+    if (setup) setup.style.display = 'block';
+    if (live) live.style.display = 'none';
+    // Plain Kick Off from Home — not linked to any tournament or season fixture
+    window._tourFixtureIdx = null;
+    window._uclFixtureIdx = null;
+    window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._fromTournament = false;
+    window._seasonFixture = null;
+    window._backTarget = null;
+    currentSeasonComp = null;
+  }
+
+  function goToTournament(type) {
+    tournamentType = type || 'worldcup';
+    switchView('tournament');
+    const setup = document.getElementById('tournament-setup');
+    const live = document.getElementById('tournament-live');
+    if (setup) setup.style.display = 'block';
+    if (live) live.style.display = 'none';
+    const isWC = tournamentType === 'worldcup';
+    const title = document.getElementById('tournament-title');
+    const desc = document.getElementById('tournament-desc');
+    if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
+    if (desc) desc.textContent = isWC
+      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
+      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
+    renderTournamentTeamSelect();
+  }
+
+  function populateTeamSelects() {
+    const home = document.getElementById('home-team');
+    const away = document.getElementById('away-team');
+    if (!home || !away) return;
+    home.innerHTML = ''; away.innerHTML = '';
+    const groups = [
+      { label: 'National Teams', teams: teamsData.national || [] },
+      { label: 'Club Teams', teams: teamsData.club || [] }
+    ];
+    groups.forEach(g => {
+      if (!g.teams.length) return;
+      const og1 = document.createElement('optgroup'); og1.label = g.label;
+      const og2 = document.createElement('optgroup'); og2.label = g.label;
+      g.teams.forEach(t => {
+        og1.appendChild(new Option((t.flag || '') + ' ' + t.name, t.id));
+        og2.appendChild(new Option((t.flag || '') + ' ' + t.name, t.id));
+      });
+      home.appendChild(og1); away.appendChild(og2);
+    });
+    if ((teamsData.national || []).length > 1) {
+      home.value = teamsData.national[0].id;
+      away.value = teamsData.national[1].id;
+    } else if (allTeams.length > 1) {
+      home.value = allTeams[0].id;
+      away.value = allTeams[1].id;
+    }
+    updateTeamPreview('home');
+    updateTeamPreview('away');
+  }
+
+  function populateFormations() {
+    ['home-formation', 'away-formation'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      sel.innerHTML = '';
+      Object.keys(FORMATIONS).forEach(k => sel.appendChild(new Option(FORMATIONS[k].name, k)));
+      sel.value = '4-3-3';
+    });
+  }
+
+  function getTeam(id) { return allTeams.find(t => t.id === id); }
+
+  // Every match is played at the home team's stadium. Falls back to Wembley
+  // Stadium whenever a team in teams.json doesn't define its own "stadium".
+  function getStadium(team) { return (team && team.stadium) ? team.stadium : 'Wembley Stadium'; }
+
+  // ========== TEAM LOGOS / PLAYER PORTRAITS ==========
+  // Renders a team's logo (from assets/logos/<team.logo>, set via the "logo"
+  // field in teams.json) as a small inline mark, falling back to the flag
+  // emoji if no logo is set or the image fails to load.
+  function teamMark(team, size) {
+    size = size || 22;
+    const flag = (team && team.flag) || '⚽';
+    if (team && team.logo) {
+      const src = 'assets/logos/' + team.logo;
+      return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px"><img src="${src}" alt="" loading="lazy" onerror="this.parentElement.textContent='${flag}'"></span>`;
+    }
+    return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px">${flag}</span>`;
+  }
+
+  // Larger circular version for profile-avatar style containers (fills the
+  // whole circle). Falls back to the flag emoji on missing/broken image.
+  function teamAvatarMark(team) {
+    const flag = (team && team.flag) || '⚽';
+    if (team && team.logo) {
+      const src = 'assets/logos/' + team.logo;
+      return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain;border-radius:50%" onerror="this.outerHTML='${flag}'">`;
+    }
+    return flag;
+  }
+
+  // Looks up a player's portrait filename in players.json. Supports both
+  // keying conventions: by player id (e.g. "rma26_7") or by exact player
+  // name (e.g. "Vinicius Junior") — id is checked first since it's the
+  // more specific, collision-proof key. Returns null if neither is found.
+  function resolvePlayerPortrait(player) {
+    if (!player) return null;
+    if (player.id != null && playerPortraits[player.id]) return playerPortraits[player.id];
+    if (player.name && playerPortraits[player.name]) return playerPortraits[player.name];
+    return null;
+  }
+
+  // Renders a player's portrait (from assets/portraits/<file>, looked up by
+  // id or name in players.json) filling a circular avatar container. Falls
+  // back to assets/portraits/none.png when no entry exists in players.json,
+  // and further falls back to the player's shirt number if even none.png
+  // fails to load.
+  function playerAvatarMark(player) {
+    const num = (player && player.num != null) ? player.num : '?';
+    const file = resolvePlayerPortrait(player);
+    const src = 'assets/portraits/' + (file || 'none.png');
+    return `<img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.outerHTML='${num}'">`;
+  }
+
+  // Shortens a full name to "F. Lastname" for tight spaces like formation
+  // dots — e.g. "Alessandro Nesta" -> "A. Nesta". Only abbreviates when the
+  // surname is longer than 2 characters; short surnames (and single-word
+  // names, which have nothing to abbreviate) are left as-is.
+  function abbreviateName(fullName) {
+    const trimmed = (fullName || '').trim();
+    const spaceIdx = trimmed.indexOf(' ');
+    if (spaceIdx === -1) return trimmed;
+    const first = trimmed.slice(0, spaceIdx);
+    const last = trimmed.slice(spaceIdx + 1).trim();
+    if (last.length > 2 && first.length) return first[0] + '. ' + last;
+    return trimmed;
+  }
+
+  // Renders a small circular portrait for leaderboard/award rows, looked up
+  // by id or name in players.json (same source as playerAvatarMark). Falls
+  // back to assets/portraits/none.png when no portrait is found, and
+  // further falls back to the player's initials on a coloured circle if
+  // even none.png fails to load — this keeps two different players who
+  // happen to share a name from silently displaying as visually identical
+  // avatars, since initials are still derived per-row from that row's own
+  // name/id, never borrowed from another row.
+  function initialsOf(name) {
+    return (name || '?').trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
+  }
+  function lbAvatar(p, size) {
+    size = size || 34;
+    const initials = initialsOf(p && p.name);
+    const file = resolvePlayerPortrait(p);
+    const src = 'assets/portraits/' + (file || 'none.png');
+    return `<span class="lb-avatar" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('lb-avatar-fallback');this.outerHTML='${initials}'"></span>`;
+  }
+  // Player name + portrait, for use inside a leaderboard/award table cell.
+  function lbPlayerCell(p, size) {
+    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${p.name}</span></div>`;
+  }
+  // Rank badge for position i (0-indexed): medal for top 3, plain number after.
+  function rankBadge(i) {
+    const n = i + 1;
+    if (n === 1) return `<span class="lb-rank-badge rank-1">🥇</span>`;
+    if (n === 2) return `<span class="lb-rank-badge rank-2">🥈</span>`;
+    if (n === 3) return `<span class="lb-rank-badge rank-3">🥉</span>`;
+    return `<span class="lb-rank-badge">${n}</span>`;
+  }
+
+  // Renders a trophy image (from assets/trophies/<file>, looked up by exact
+  // trophy/competition name in trophies.json) inside a rounded container,
+  // falling back to the 🏆 emoji when no image is mapped for that name.
+  function trophyMark(name, size) {
+    size = size || 40;
+    const file = name && trophyImages[name];
+    if (file) {
+      const src = 'assets/trophies/' + file;
+      return `<span class="trophy-mark" style="width:${size}px;height:${size}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.outerHTML='<span class=&quot;trophy-mark trophy-mark-fallback&quot; style=&quot;width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px&quot;>🏆</span>'"></span>`;
+    }
+    return `<span class="trophy-mark trophy-mark-fallback" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px">🏆</span>`;
+  }
+
+  // Looks up a manager's portrait filename in managers.json. Tries an exact
+  // name match first, then falls back to a trimmed/case-insensitive match so
+  // small formatting differences between teams.json and managers.json (extra
+  // whitespace, different casing) don't silently drop a portrait that exists.
+  function resolveManagerPortrait(manager) {
+    if (!manager || !manager.name) return null;
+    if (managerPortraits[manager.name]) return managerPortraits[manager.name];
+    const target = manager.name.trim().toLowerCase();
+    for (const key in managerPortraits) {
+      if (key.trim().toLowerCase() === target) return managerPortraits[key];
+    }
+    return null;
+  }
+
+  // Renders a manager's portrait (from assets/mportraits/<file>, looked up by
+  // name in managers.json) inside a circular avatar. Falls back to
+  // assets/mportraits/none.png when no entry exists in managers.json, and
+  // further falls back to a suit-and-tie badge if even none.png fails to load.
+  // Used anywhere a manager appears: match setup preview, live scoreboard,
+  // formation pitch label, Teams tab list, and the full Team profile modal.
+  function managerAvatarMark(manager, size) {
+    size = size || 32;
+    const file = resolveManagerPortrait(manager);
+    const src = 'assets/mportraits/' + (file || 'none.png');
+    return `<span class="mgr-avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.55)}px"><img src="${src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.classList.add('mgr-avatar-fallback');this.innerHTML='🧑\u200d💼'"></span>`;
+  }
+
+  function updateTeamPreview(side) {
+    const sel = document.getElementById(side + '-team');
+    const el = document.getElementById(side + '-preview');
+    if (!sel || !el) return;
+    const team = getTeam(sel.value);
+    if (!team) { el.innerHTML = ''; return; }
+    const mgr = team.manager ? team.manager.name : '';
+    const style = getManagerPlaystyle(team);
+    const venueLine = side === 'home' ? `<div style="font-size:0.8rem;color:var(--text-muted)">🏟️ ${getStadium(team)}</div>` : '';
+    const mgrLine = mgr ? `<div class="manager-name">${managerAvatarMark(team.manager, 20)} Manager: ${mgr}${style ? ' <span class="playstyle-tag">· ' + style + '</span>' : ''}</div>` : '';
+    el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div>${mgrLine}<div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
+    const formSel = document.getElementById(side + '-formation');
+    if (formSel) formSel.value = pickTeamFormation(team);
+  }
+
+  // Picks a formation for a team. If the team has a "formation" key set in
+  // teams.json (matching a valid FORMATIONS entry) that formation is used
+  // strictly as the team's default starting shape — though it can still be
+  // changed mid-match via the live tactics panel. Otherwise a formation is
+  // deterministically derived from the team's id/name so the same team
+  // tends to line up the same way match to match, while different teams
+  // spread out across the available formation pool instead of everyone
+  // randomly converging on the same one or two shapes.
+  function pickTeamFormation(team) {
+    if (team && team.formation && FORMATIONS[team.formation]) return team.formation;
+    if (team && team._aiFormation && FORMATIONS[team._aiFormation]) return team._aiFormation;
+    // Formation choice now follows from the manager's identity instead of a
+    // flat hash of the team name — a Long Ball/defensive-minded manager's
+    // team gravitates toward compact, defense-heavy shapes; a Possession
+    // manager toward a numbers-up midfield; Overload/Out Wide toward shapes
+    // with genuine width. Still deterministic per team for the session (so
+    // it doesn't re-roll every match) via a stable hash, but the hash now
+    // only picks among the handful of formations that actually fit the
+    // manager's style, not all twenty regardless of identity.
+    const style = getManagerPlaystyle(team);
+    const pref = PLAYSTYLE_FORM_PREF[style] || { fwd: 0.6, def: 0.6, wide: 0.6, mid: 0.6 };
+    const keys = Object.keys(FORMATIONS);
+    const idKey = (team && (team.id || team.name)) || '';
+    let hash = 0;
+    for (let i = 0; i < idKey.length; i++) hash = (hash * 31 + idKey.charCodeAt(i)) >>> 0;
+    const scored = keys.map(k => {
+      const shape = formationShape(k);
+      const wide = formationWideCount(k);
+      const score = shape.fwd * pref.fwd + shape.def * pref.def + shape.mid * (pref.mid || 0.6) + wide * (pref.wide || 0.6);
+      return { k, score };
+    }).sort((a, b) => b.score - a.score);
+    const poolSize = Math.min(5, scored.length);
+    const pick = scored[hash % poolSize].k;
+    if (team) team._aiFormation = pick;
+    return pick;
+  }
+
+  function buildSquad(team, formationKey) {
+    const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
+    const allPlayers = team.players || [];
+
+    // Soft squad rotation: every player carries a small "recently started"
+    // counter that decays a bit each match. Selection score below docks
+    // players who've started often lately, so the exact same XI doesn't
+    // take the pitch match after match — while still keeping OVR as the
+    // dominant factor, so rotation favors genuinely close alternatives
+    // rather than randomly benching your best player.
+    allPlayers.forEach(p => { p._recentStarts = Math.max(0, (p._recentStarts || 0) - 0.2); });
+    const score = (p) => (p.ovr || 70) - (p._recentStarts || 0) * 3.5 + (seededRandom() * 2.5 - 1.25);
+
+    let players = shuffleArray(allPlayers.filter(p => !isPlayerInjured(p.id) && !isPlayerSuspended(p.id)));
+    if (players.length < 11) {
+      // Emergency: allow injured/suspended if roster too thin
+      players = players.concat(shuffleArray(allPlayers.filter(p => isPlayerInjured(p.id) || isPlayerSuspended(p.id))));
+    }
+
+    const used = new Set();
+    const slotOf = new Map(); // slot index -> player
+
+    // Pass 1 — a player's FIRST-listed position is their real position and
+    // always gets first claim on a matching slot, ahead of anyone who's
+    // merely compatible with it. This stops, e.g., a CB who's also listed
+    // as RB-compatible from being slotted in at CB ahead of a natural RB
+    // just because formation slots happen to be processed in that order.
+    formation.slots.forEach((slot, i) => {
+      const candidates = players.filter(p => !used.has(p.id) && (p.pos || [])[0] === slot)
+        .sort((a, b) => score(b) - score(a));
+      if (candidates.length) {
+        used.add(candidates[0].id);
+        slotOf.set(i, candidates[0]);
+      }
+    });
+
+    // Pass 2 — only for slots still empty after pass 1 (this formation has
+    // no natural fit available). Fill from compatible secondary positions,
+    // preferring whoever's closest to a natural fit (lower index in their
+    // own pos list) before falling back to plain selection score. A player
+    // whose primary position never got a slot in pass 1, and who isn't
+    // needed here either, simply stays unused — i.e., benched — rather
+    // than being forced out of position to make up the numbers.
+    formation.slots.forEach((slot, i) => {
+      if (slotOf.has(i)) return;
+      const candidates = players.filter(p => !used.has(p.id) && canPlay(p, slot))
+        .sort((a, b) => {
+          const aIdx = (a.pos || []).indexOf(slot);
+          const bIdx = (b.pos || []).indexOf(slot);
+          const aRank = aIdx === -1 ? 99 : aIdx;
+          const bRank = bIdx === -1 ? 99 : bIdx;
+          if (aRank !== bRank) return aRank - bRank;
+          return score(b) - score(a);
+        });
+      if (candidates.length) {
+        used.add(candidates[0].id);
+        slotOf.set(i, candidates[0]);
+      }
+    });
+
+    const starting = [];
+    formation.slots.forEach((slot, i) => {
+      const p = slotOf.get(i);
+      if (p) starting.push({ ...p, slot, isStarter: true });
+    });
+
+    // Fallback fill if the squad is too thin to fill every slot even via
+    // pass 2 — field whoever's left regardless of position, so we always
+    // put out 11 players.
+    while (starting.length < 11) {
+      const leftover = players.find(p => !used.has(p.id));
+      if (!leftover) break;
+      used.add(leftover.id);
+      starting.push({ ...leftover, slot: (leftover.pos || ['CM'])[0], isStarter: true });
+    }
+
+    const remaining = players.filter(p => !used.has(p.id)).sort((a, b) => score(b) - score(a));
+    const subs = [];
+    for (let i = 0; i < remaining.length && (starting.length + subs.length) < 25; i++) {
+      subs.push({ ...remaining[i], slot: (remaining[i].pos || ['CM'])[0], isStarter: false });
+    }
+
+    // Whoever actually started is now less likely to start again straight
+    // away next match (see rotation decay/score above).
+    starting.forEach(sp => {
+      const orig = allPlayers.find(x => x.id === sp.id);
+      if (orig) orig._recentStarts = (orig._recentStarts || 0) + 1;
+    });
+
+    const _seen = new Set();
+    const _st = [];
+    for (const p of starting) { if (_seen.has(p.id)) continue; _seen.add(p.id); _st.push(p); }
+    const _su = [];
+    for (const p of subs) { if (_seen.has(p.id)) continue; _seen.add(p.id); _su.push(p); }
+    return { starting: _st, subs: _su, formation: formationKey, all: [..._st, ..._su] };
+  }
+
+  function canPlay(player, slot) {
+    const positions = player.pos || [];
+    return positions.some(p => (POS_COMPAT[slot] || [slot]).includes(p) || p === slot);
+  }
+
+  function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(seededRandom() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+
+  let customLineups = { home: null, away: null };
+  let sbSide = null;
+  let sbDraft = null;
+
+  function onFormationChange(side) {
+    if (customLineups[side]) customLineups[side] = null;
+  }
+
+  function openSquadBuilder(side) {
+    try {
+    sbSide = side;
+    const teamSel = document.getElementById(side + '-team');
+    const formSel = document.getElementById(side + '-formation');
+    const teamId = teamSel && teamSel.value;
+    const formKey = (formSel && formSel.value) || '4-3-3';
+    const team = getTeam(teamId);
+    if (!team) { toast('Select a team first'); return; }
+    const panel = document.getElementById('squad-builder-panel');
+    if (!panel) { toast('Squad builder UI missing — re-upload index.html'); return; }
+
+    const formation = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
+    const players = [];
+    const seenP = new Set();
+    (team.players || []).forEach(p => {
+      if (p && p.id && !seenP.has(p.id)) { seenP.add(p.id); players.push(p); }
+    });
+    let slots = {};
+    let bench = new Set();
+    if (customLineups[side] && customLineups[side].formation === formKey) {
+      customLineups[side].starting.forEach((p, i) => { slots[i] = p.id; });
+      (customLineups[side].subs || []).forEach(p => bench.add(p.id));
+    } else {
+      const auto = buildSquad(team, formKey);
+      auto.starting.forEach((p, i) => { slots[i] = p.id; });
+      (auto.subs || []).slice(0, 9).forEach(p => bench.add(p.id));
+    }
+    sbDraft = { team: team, formation: formKey, slots: slots, bench: bench, players: players };
+    document.getElementById('sb-title').textContent = (side === 'home' ? 'HOME' : 'AWAY') + ' · ' + team.name + ' · ' + formKey;
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    renderSquadBuilderUI();
+    } catch (err) {
+      console.error(err);
+      toast('Squad builder error: ' + (err && err.message ? err.message : err));
+    }
+  }
+
+  function getUsedInDraft() {
+    const used = new Set(Object.values(sbDraft.slots).filter(Boolean));
+    sbDraft.bench.forEach(function(id) { used.add(id); });
+    return used;
+  }
+
+  function renderSquadBuilderUI() {
+    if (!sbDraft) return;
+    const slotsEl = document.getElementById('sb-slots');
+    const benchEl = document.getElementById('sb-bench');
+    if (!slotsEl || !benchEl) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const used = getUsedInDraft();
+
+    slotsEl.innerHTML = formation.slots.map(function(slot, i) {
+      const selectedId = sbDraft.slots[i] || '';
+      const selectedP = sbDraft.players.find(function(p) { return p.id === selectedId; });
+      const label = selectedP
+        ? (selectedP.num || '?') + ' · ' + selectedP.name + ' · ' + selectedP.ovr
+        : 'Tap to pick ' + slot;
+      return '<div class="sb-slot' + (selectedId ? ' filled' : '') + '">' +
+        '<label>' + slot + '</label>' +
+        '<button type="button" class="sb-pick-btn" onclick="App.openSlotPicker(' + i + ')">' + label + '</button>' +
+        (selectedId ? '<button type="button" class="sb-clear-btn" onclick="App.setSquadSlot(' + i + ',\'\')">✕</button>' : '') +
+        '</div>';
+    }).join('');
+
+    // Picker panel
+    let picker = document.getElementById('sb-picker');
+    if (!picker) {
+      picker = document.createElement('div');
+      picker.id = 'sb-picker';
+      picker.className = 'sb-picker';
+      picker.style.display = 'none';
+      slotsEl.parentNode.insertBefore(picker, slotsEl.nextSibling);
+    }
+
+    const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
+    const benchPool = sbDraft.players.filter(function(p) { return !starterIds.has(p.id); });
+    benchEl.innerHTML = benchPool.map(function(p) {
+      const checked = sbDraft.bench.has(p.id);
+      return '<label class="sb-bench-item' + (checked ? ' on' : '') + '">' +
+        '<input type="checkbox"' + (checked ? ' checked' : '') +
+        ' onchange="App.toggleBench(\'' + p.id + '\', this.checked)">' +
+        '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
+        '<span class="sb-bench-name">' + p.name + '</span>' +
+        '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span></label>';
+    }).join('') || '<p style="color:var(--text-3)">No remaining players</p>';
+  }
+
+  function openSlotPicker(index) {
+    if (!sbDraft) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const slot = formation.slots[index];
+    const used = getUsedInDraft();
+    const selected = sbDraft.slots[index] || '';
+    const list = sbDraft.players
+      .filter(function(p) { return !used.has(p.id) || p.id === selected; })
+      .sort(function(a, b) {
+        const aFit = (a.pos || []).includes(slot) ? 1 : 0;
+        const bFit = (b.pos || []).includes(slot) ? 1 : 0;
+        if (bFit !== aFit) return bFit - aFit;
+        return (b.ovr || 70) - (a.ovr || 70);
+      });
+    let picker = document.getElementById('sb-picker');
+    if (!picker) return;
+    picker.style.display = 'block';
+    picker.innerHTML = '<div class="sb-picker-head"><strong>Select ' + slot + '</strong>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="App.closeSlotPicker()">Close</button></div>' +
+      '<div class="sb-picker-list">' + list.map(function(p) {
+        const fit = (p.pos || []).includes(slot);
+        return '<button type="button" class="sb-picker-item' + (p.id === selected ? ' selected' : '') + '" onclick="App.setSquadSlot(' + index + ',\'' + p.id + '\');App.closeSlotPicker()">' +
+          '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
+          '<span class="sb-bench-name">' + p.name + '</span>' +
+          '<span class="sb-bench-meta">' + (p.pos || []).join('/') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
+      }).join('') + '</div>';
+    picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function closeSlotPicker() {
+    const picker = document.getElementById('sb-picker');
+    if (picker) { picker.style.display = 'none'; picker.innerHTML = ''; }
+  }
+
+
+  function setSquadSlot(index, playerId) {
+    if (!sbDraft) return;
+    if (!playerId) {
+      delete sbDraft.slots[index];
+    } else {
+      Object.keys(sbDraft.slots).forEach(function(k) {
+        if (+k !== index && sbDraft.slots[k] === playerId) delete sbDraft.slots[k];
+      });
+      sbDraft.bench.delete(playerId);
+      sbDraft.slots[index] = playerId;
+    }
+    renderSquadBuilderUI();
+  }
+
+  function toggleBench(playerId, on) {
+    if (!sbDraft) return;
+    if (on) {
+      if (Object.values(sbDraft.slots).indexOf(playerId) >= 0) return;
+      if (sbDraft.bench.size >= 14) { toast('Max 14 substitutes'); renderSquadBuilderUI(); return; }
+      sbDraft.bench.add(playerId);
+    } else {
+      sbDraft.bench.delete(playerId);
+    }
+    renderSquadBuilderUI();
+  }
+
+  function autoFillSquadBuilder() {
+    if (!sbDraft) return;
+    const auto = buildSquad(sbDraft.team, sbDraft.formation);
+    sbDraft.slots = {};
+    auto.starting.forEach(function(p, i) { sbDraft.slots[i] = p.id; });
+    sbDraft.bench = new Set(auto.subs.slice(0, 9).map(function(p) { return p.id; }));
+    renderSquadBuilderUI();
+    toast('Best XI auto-filled');
+  }
+
+  function saveSquadBuilder() {
+    if (!sbDraft || !sbSide) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const starting = [];
+    const used = new Set();
+    for (let i = 0; i < formation.slots.length; i++) {
+      const id = sbDraft.slots[i];
+      if (!id || used.has(id)) { toast('Fill every starting slot with unique players'); return; }
+      const p = sbDraft.players.find(function(x) { return x.id === id; });
+      if (!p) continue;
+      used.add(id);
+      starting.push(Object.assign({}, p, { slot: formation.slots[i], isStarter: true }));
+    }
+    if (starting.length < 11) { toast('Need 11 unique starters'); return; }
+    const subs = [];
+    sbDraft.bench.forEach(function(id) {
+      if (used.has(id)) return;
+      const p = sbDraft.players.find(function(x) { return x.id === id; });
+      if (p) {
+        used.add(id);
+        subs.push(Object.assign({}, p, { slot: (p.pos || ['CM'])[0], isStarter: false }));
+      }
+    });
+    customLineups[sbSide] = {
+      starting: starting, subs: subs, formation: sbDraft.formation,
+      all: starting.concat(subs), _teamId: sbDraft.team.id
+    };
+    toast((sbSide === 'home' ? 'Home' : 'Away') + ' lineup saved (' + starting.length + '+' + subs.length + ')');
+    closeSquadBuilder();
+    updateTeamPreview(sbSide);
+  }
+
+  function closeSquadBuilder() {
+    const panel = document.getElementById('squad-builder-panel');
+    if (panel) panel.style.display = 'none';
+    sbDraft = null;
+  }
+
+  function dedupeSquad(sq) {
+    const seen = new Set();
+    const starting = [];
+    (sq.starting || []).forEach(function(p) {
+      if (!p || !p.id || seen.has(p.id)) return;
+      seen.add(p.id); starting.push(p);
+    });
+    const subs = [];
+    (sq.subs || []).forEach(function(p) {
+      if (!p || !p.id || seen.has(p.id)) return;
+      seen.add(p.id); subs.push(p);
+    });
+    return Object.assign({}, sq, { starting: starting, subs: subs, all: starting.concat(subs) });
+  }
+
+  function startMatch() {
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (!homeSel || !awaySel) return;
+    const homeId = homeSel.value;
+    const awayId = awaySel.value;
+    if (!homeId || !awayId || homeId === awayId) { toast('Select two different teams'); return; }
+    const homeTeam = getTeam(homeId);
+    const awayTeam = getTeam(awayId);
+    if (!homeTeam || !awayTeam) { toast('Team not found'); return; }
+    const homeForm = (document.getElementById('home-formation') || {}).value || '4-3-3';
+    const awayForm = (document.getElementById('away-formation') || {}).value || '4-3-3';
+    let homeSquad = (customLineups.home && customLineups.home.formation === homeForm && customLineups.home._teamId === homeTeam.id)
+      ? customLineups.home : buildSquad(homeTeam, homeForm);
+    let awaySquad = (customLineups.away && customLineups.away.formation === awayForm && customLineups.away._teamId === awayTeam.id)
+      ? customLineups.away : buildSquad(awayTeam, awayForm);
+    homeSquad = dedupeSquad(homeSquad);
+    awaySquad = dedupeSquad(awaySquad);
+
+    currentMatch = {
+      home: { team: homeTeam, squad: homeSquad, score: 0, stats: blankStats() },
+      away: { team: awayTeam, squad: awaySquad, score: 0, stats: blankStats() },
+      minute: 0, events: [], status: '1st Half', finished: false,
+      homeOnPitch: homeSquad.starting.map(p => p.id),
+      awayOnPitch: awaySquad.starting.map(p => p.id),
+      homeSubsUsed: 0, awaySubsUsed: 0, maxSubs: 5,
+      injuries: [], cards: { home: {}, away: {} }, possession: 50,
+      subLog: { home: {}, away: {} }, // playerId -> { outMin, inMin, replaced, replacedBy }
+      leftPitch: { home: [], away: [] }, // playerIds who have left the pitch (sub'd off, sent off, or injured off) — can never return
+      tactics: { home: 'balanced', away: 'balanced' },
+      playerMatchStats: {},
+      goalList: []
+    };
+    // Opening tactical instructions now come from the matchup, not a flat
+    // "balanced" default every time: a clear underdog tends to sit in and
+    // be harder to break down, a clear favourite tends to push on, and a
+    // counter-minded manager identity nudges an otherwise even matchup
+    // toward pressing higher up — so kickoff already feels shaped by who's
+    // actually playing before a single ball is kicked.
+    const openStrHome = calcTeamStrength(currentMatch.home);
+    const openStrAway = calcTeamStrength(currentMatch.away);
+    currentMatch.tactics.home = decideOpeningTactic(openStrHome, openStrAway, getManagerPlaystyle(homeTeam));
+    currentMatch.tactics.away = decideOpeningTactic(openStrAway, openStrHome, getManagerPlaystyle(awayTeam));
+
+    const setup = document.getElementById('match-setup');
+    const live = document.getElementById('match-live');
+    if (setup) setup.style.display = 'none';
+    if (live) live.style.display = 'block';
+    const pm = document.getElementById('post-match-ratings');
+    if (pm) { pm.style.display = 'none'; pm.innerHTML = ''; }
+    const backBtn = document.getElementById('back-to-tournament');
+    if (backBtn) { backBtn.style.display = 'none'; backBtn.classList.remove('show'); }
+    updateScoreboard();
+    renderLineups();
+    const feed = document.getElementById('events-feed');
+    if (feed) feed.innerHTML = '';
+    // Clear previous match stats UI
+    ['live-home-score','live-away-score'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = '0'; });
+    const minEl = document.getElementById('live-minute'); if (minEl) minEl.textContent = "0'";
+    const stEl = document.getElementById('live-status'); if (stEl) stEl.textContent = '1st Half';
+    const hg = document.getElementById('home-goal-scorers'); if (hg) hg.innerHTML = '';
+    const ag = document.getElementById('away-goal-scorers'); if (ag) ag.innerHTML = '';
+    const statsEl = document.getElementById('match-stats'); if (statsEl) statsEl.innerHTML = '';
+    const pm2 = document.getElementById('post-match-ratings'); if (pm2) { pm2.style.display = 'none'; pm2.innerHTML = ''; }
+    const kickMsgs = [
+      'Kick off! The referee starts the contest.',
+      "And we're underway!",
+      'The match is live — kick-off taken.',
+      'Here we go! First whistle blown.'
+    ];
+    addEvent(0, 'whistle', kickMsgs[Math.floor(seededRandom()*kickMsgs.length)], null);
+    currentMatch.countForLeaderboard = !!(tournament || window._tourFixtureIdx != null || window._koRoundIdx != null || window._seasonFixture != null);
+    currentMatch.allowET = !!(document.getElementById('opt-et') && document.getElementById('opt-et').checked);
+    currentMatch.allowPens = !!(document.getElementById('opt-pens') && document.getElementById('opt-pens').checked);
+    const gt = document.getElementById('goal-timeline');
+    if (gt) gt.innerHTML = '';
+    isPlaying = false;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '▶ Play';
+  }
+
+  function blankStats() {
+    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0 };
+  }
+
+  
+  
+  
+  function showETPrompt(drawn, pensOnly) {
+    let el = document.getElementById('et-prompt');
+    if (!el) {
+      const live = document.getElementById('match-live');
+      if (!live) return;
+      el = document.createElement('div');
+      el.id = 'et-prompt';
+      el.className = 'et-prompt';
+      live.insertBefore(el, live.firstChild.nextSibling);
+    }
+    if (pensOnly) {
+      el.innerHTML = `<p>Still level after extra time. Take the penalty shootout?</p>
+        <button class="btn btn-primary btn-sm" onclick="App.continueToPens()">⚽ Penalties</button>
+        <button class="btn btn-secondary btn-sm" onclick="App.skipETAndEnd()">End as draw</button>`;
+    } else {
+      el.innerHTML = `<p>Full time and the scores are level.</p>
+        ${currentMatch.allowET ? '<button class="btn btn-primary btn-sm" onclick="App.continueToET()">⏱ Extra Time</button>' : ''}
+        ${currentMatch.allowPens ? '<button class="btn btn-primary btn-sm" onclick="App.continueToPens()">⚽ Penalties</button>' : ''}
+        <button class="btn btn-secondary btn-sm" onclick="App.skipETAndEnd()">End as draw</button>`;
+    }
+    el.classList.add('show');
+  }
+
+  function hideETPrompt() {
+    const el = document.getElementById('et-prompt');
+    if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+  }
+
+  function continueToET() {
+    const m = currentMatch;
+    if (!m) return;
+    hideETPrompt();
+    m._awaitingET = false;
+    m.inET = true;
+    m.etStart = m.minute;
+    m.status = 'Extra Time';
+    addEvent(m.minute, 'et', 'Extra time begins — two periods of 15 minutes', null);
+    updateScoreboard();
+    isPlaying = true;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '⏸ Pause';
+    const speed = parseInt((document.getElementById('sim-speed') || {}).value || '400', 10);
+    clearInterval(simInterval);
+    simInterval = setInterval(() => tick(false), speed);
+  }
+
+  function continueToPens() {
+    const m = currentMatch;
+    if (!m) return;
+    hideETPrompt();
+    m._awaitingET = false;
+    m._awaitingPens = false;
+    runPenaltyShootout();
+  }
+
+  function skipETAndEnd() {
+    hideETPrompt();
+    if (currentMatch) {
+      currentMatch._awaitingET = false;
+      currentMatch._awaitingPens = false;
+    }
+    endMatch();
+  }
+
+
+  function runPenaltyShootout() {
+    const m = currentMatch;
+    if (!m || m.inPens) return;
+    m.inPens = true;
+    m.status = 'Penalties';
+    addEvent(m.minute, 'pen', '⚽ Penalty shootout!', null);
+    updateScoreboard();
+
+    // Order the takers list so recognised penalty takers (strikers/wingers, then
+    // attacking mids) step up before defenders/holding mids, same as real teams do.
+    const penOrderScore = (p) => (p.att || 0) + (PEN_TAKER_ROLE_WEIGHT[p.slot || (p.pos||[])[0]] || 0.4) * 12;
+    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
+    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
+
+    // Silent/bulk sims (quick-sim, tournament auto-play) still resolve instantly —
+    // only a real, on-screen live match animates the shootout kick by kick.
+    if (m.silentDeep) {
+      const st = { homePens: 0, awayPens: 0, round: 0, phase: 'regular', sudden: 0 };
+      for (let i = 0; i < 5; i++) {
+        st.round = i;
+        takePenaltyKick(m, 'home', homeTakers, i, st);
+        takePenaltyKick(m, 'away', awayTakers, i, st);
+        const left = 4 - i;
+        if (st.homePens > st.awayPens + left || st.awayPens > st.homePens + left) break;
+      }
+      let sd = 0;
+      while (st.homePens === st.awayPens && sd < 20) {
+        st.phase = 'sudden'; st.sudden = sd;
+        takePenaltyKick(m, 'home', homeTakers, 5 + sd, st);
+        takePenaltyKick(m, 'away', awayTakers, 5 + sd, st);
+        sd++;
+      }
+      m.home.penScore = st.homePens;
+      m.away.penScore = st.awayPens;
+      addEvent(m.minute, 'whistle', `Penalties: ${m.home.team.short} ${st.homePens} - ${st.awayPens} ${m.away.team.short}`, null);
+      endMatch();
+      return;
+    }
+
+    clearInterval(simInterval);
+    isPlaying = false;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '▶ Play';
+
+    m._pensState = { homePens: 0, awayPens: 0, round: 0, sudden: 0, turn: 'home', phase: 'regular' };
+    const stepDelay = Math.max(700, Math.min(1400, simSpeed * 2.5));
+    // First kick fires right away so it doesn't feel like a stall, then one kick per interval tick.
+    stepPenaltyShootout(homeTakers, awayTakers);
+    simInterval = setInterval(() => stepPenaltyShootout(homeTakers, awayTakers), stepDelay);
+  }
+
+  // Resolves a single penalty kick and updates score/events. Shared by the instant
+  // (silentDeep) and animated (live) shootout paths so outcomes are computed the same way.
+  function takePenaltyKick(m, side, takers, kickIndex, st) {
+    if (!takers.length) return;
+    const taker = takers[kickIndex % takers.length];
+    const oppSide = side === 'home' ? 'away' : 'home';
+    const gk = ((m[oppSide].squad && m[oppSide].squad.all) || []).find(p => (p.pos || [])[0] === 'GK');
+    const out = pickPenOutcome(taker, gk);
+    const teamShort = m[side].team.short;
+    if (out.scored) {
+      st[side === 'home' ? 'homePens' : 'awayPens']++;
+      addEvent(m.minute, 'pen', `⚽ ${taker.name} (${teamShort}) ${out.text} [${st.homePens}-${st.awayPens}]`, side);
+    } else {
+      addEvent(m.minute, 'pen', `❌ ${taker.name} (${teamShort}) — ${out.text} [${st.homePens}-${st.awayPens}]`, side);
+    }
+  }
+
+  // Advances the live penalty shootout by exactly one kick, alternating home/away,
+  // so the person watching sees each penalty land before the next one is taken.
+  function stepPenaltyShootout(homeTakers, awayTakers) {
+    const m = currentMatch;
+    if (!m || !m._pensState) { clearInterval(simInterval); return; }
+    const st = m._pensState;
+    const side = st.turn;
+    const takers = side === 'home' ? homeTakers : awayTakers;
+    const kickIndex = st.phase === 'regular' ? st.round : (5 + st.sudden);
+    takePenaltyKick(m, side, takers, kickIndex, st);
+    m.home.penScore = st.homePens;
+    m.away.penScore = st.awayPens;
+    updateScoreboard();
+
+    if (st.turn === 'home') {
+      st.turn = 'away';
+      return; // wait for the next tick to take away's kick in the same round
+    }
+    // Away just kicked — the round is complete, decide what happens next.
+    st.turn = 'home';
+    if (st.phase === 'regular') {
+      const left = 4 - st.round;
+      if (st.homePens > st.awayPens + left || st.awayPens > st.homePens + left) {
+        finishPenaltyShootout();
+        return;
+      }
+      st.round++;
+      if (st.round >= 5) {
+        if (st.homePens === st.awayPens) { st.phase = 'sudden'; st.sudden = 0; }
+        else { finishPenaltyShootout(); return; }
+      }
+    } else {
+      if (st.homePens !== st.awayPens) { finishPenaltyShootout(); return; }
+      st.sudden++;
+    }
+  }
+
+  function finishPenaltyShootout() {
+    const m = currentMatch;
+    if (!m) return;
+    clearInterval(simInterval);
+    const st = m._pensState || { homePens: m.home.penScore || 0, awayPens: m.away.penScore || 0 };
+    m.home.penScore = st.homePens;
+    m.away.penScore = st.awayPens;
+    addEvent(m.minute, 'whistle', `Penalties: ${m.home.team.short} ${st.homePens} - ${st.awayPens} ${m.away.team.short}`, null);
+    endMatch();
+  }
+
+  function maybeOffsideDisallow(side, scorer, minute) {
+    const m = currentMatch;
+    if (!m || seededRandom() > 0.16) return false; // ~16% of goals get a check
+    const team = m[side];
+    addEvent(minute, 'var', `📺 VAR checking possible offside in the build-up to ${team.team.short}'s goal...`, side);
+    // Pace of attacker vs defence line slightly affects
+    const defLine = calcTeamStrength(m[side === 'home' ? 'away' : 'home']);
+    const offsideLikely = 0.35 + Math.max(0, (defLine.pac || 70) - (scorer.pac || 70)) / 200;
+    if (seededRandom() < offsideLikely) {
+      team.score = Math.max(0, team.score - 1);
+      // remove last goal from list for this side/scorer
+      if (m.goalList && m.goalList.length) {
+        for (let i = m.goalList.length - 1; i >= 0; i--) {
+          if (m.goalList[i].side === side && m.goalList[i].player === scorer.name) {
+            m.goalList.splice(i, 1);
+            break;
+          }
+        }
+      }
+      // undo goal stat (best effort)
+      if (stats.goals && stats.goals[scorer.id]) stats.goals[scorer.id].count = Math.max(0, stats.goals[scorer.id].count - 1);
+      if (tournament && tournamentStats.goals && tournamentStats.goals[scorer.id]) {
+        tournamentStats.goals[scorer.id].count = Math.max(0, tournamentStats.goals[scorer.id].count - 1);
+      }
+      if (m.playerMatchStats && m.playerMatchStats[scorer.id]) {
+        m.playerMatchStats[scorer.id].goals = Math.max(0, (m.playerMatchStats[scorer.id].goals || 1) - 1);
+      }
+      addEvent(minute, 'var', `VAR: Goal disallowed — <span class="player">${scorer.name}</span> was offside`, side);
+      renderGoalTimeline();
+      return true;
+    }
+    addEvent(minute, 'var', `VAR: Goal stands — onside`, side);
+    return false;
+  }
+
+  function pushGoal(side, player, minute, methodDesc) {
+    if (!currentMatch) return;
+    if (!currentMatch.goalList) currentMatch.goalList = [];
+    const isPen = /^penalty/i.test(methodDesc || '');
+    currentMatch.goalList.push({ side, player: player.name, num: player.num, minute, method: methodDesc || '', pen: isPen });
+    renderGoalTimeline();
+  }
+
+  function renderGoalTimeline() {
+    const homeEl = document.getElementById('home-goal-scorers');
+    const awayEl = document.getElementById('away-goal-scorers');
+    if (!currentMatch) {
+      if (homeEl) homeEl.innerHTML = '';
+      if (awayEl) awayEl.innerHTML = '';
+      return;
+    }
+    const goals = currentMatch.goalList || [];
+    const fmt = (arr) => arr.map(g => {
+      return `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.pen ? ' <span class="pen-tag">[Penalty]</span>' : ''}${g.num != null && g.num !== '' ? ' · '+g.num : ''}</div>`;
+    }).join('');
+    if (homeEl) homeEl.innerHTML = fmt(goals.filter(g => g.side === 'home'));
+    if (awayEl) awayEl.innerHTML = fmt(goals.filter(g => g.side === 'away'));
+  }
+
+  function buildMatchReport(m) {
+    if (!m) return null;
+    const allStats = m.playerMatchStats ? JSON.parse(JSON.stringify(m.playerMatchStats)) : {};
+    const homeIds = new Set((m.home.squad && m.home.squad.all || []).map(p => p.id));
+    const homeRatings = [], awayRatings = [];
+    Object.values(allStats).forEach(ps => {
+      (homeIds.has(ps.id) ? homeRatings : awayRatings).push(ps);
+    });
+    const byRating = (x, y) => (y.rating || 0) - (x.rating || 0);
+    homeRatings.sort(byRating);
+    awayRatings.sort(byRating);
+    return {
+      venue: getStadium(m.home.team),
+      home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, logo: m.home.team.logo, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation, ratings: homeRatings },
+      away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, logo: m.away.team.logo, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation, ratings: awayRatings },
+      events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
+      goals: JSON.parse(JSON.stringify(m.goalList || [])),
+      ratings: allStats,
+      finished: true
+    };
+  }
+
+  // Shared row renderer so a tournament/season match report and the live
+  // post-match panel render a player's rating line identically.
+  function renderRatingRow(p) {
+    const rc = (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+    const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals, 3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists, 2)) : '');
+    return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
+        <span class="player-num">${p.num || ''}</span>
+        <span style="flex:1;font-weight:600">${p.name}</span>
+        <span>${icons}</span>
+        <span class="xg">xG ${(p.xg || 0).toFixed(2)} · xA ${(p.xa || 0).toFixed(2)}</span>
+        <span class="rating-badge ${rc}">${(p.rating || 0).toFixed(1)}</span>
+      </div>`;
+  }
+
+  let _reportLegsCtx = null; // { legs: [{label, report}], activeIdx, aggText }
+
+  function showMatchReport(report, legsCtx) {
+    _reportLegsCtx = legsCtx || null;
+    const ctx = _reportLegsCtx;
+    if (!report) { toast('No match details available'); return; }
+    const modal = document.getElementById('match-report-modal');
+    const content = document.getElementById('match-report-content');
+    if (!modal || !content) return;
+    const h = report.home, a = report.away;
+    const scoreLine = (h.penScore != null)
+      ? `${h.score} (${h.penScore}) - (${a.penScore}) ${a.score}`
+      : `${h.score} - ${a.score}`;
+    const goalsH = (report.goals || []).filter(g => g.side === 'home');
+    const goalsA = (report.goals || []).filter(g => g.side === 'away');
+    const fmtG = (arr) => arr.map(g => `${g.minute}' ${g.player}${g.pen || /^penalty/i.test(g.method || '') ? ' <span class="pen-tag">[Penalty]</span>' : ''}`).join('<br>') || '—';
+    // Prefer the home/away-split ratings captured by buildMatchReport; fall back
+    // to the old flat map for any legacy report objects saved before this split existed.
+    const homeRatings = h.ratings || Object.values(report.ratings || {});
+    const awayRatings = a.ratings || [];
+    let eventsHtml = (report.events || []).filter(e => e.type !== 'pressure' || seededRandom() < 0.3).slice(-80).map(e => {
+      const t = (e.text || '').replace(/<[^>]+>/g, '');
+      return `<div class="report-event"><span class="re-min">${e.minute}'</span> <span class="re-type">${e.type}</span> ${t}</div>`;
+    }).join('');
+    // show important events only for cleaner view
+    eventsHtml = (report.events || []).filter(e => ['goal','yellow','red','injury','sub','pen','var','motm','whistle','save','miss'].includes(e.type)).map(e => {
+      const t = (e.text || '').replace(/<[^>]+>/g, '');
+      return `<div class="report-event"><span class="re-min">${e.minute}'</span> ${t}</div>`;
+    }).join('');
+    const legTabsHtml = (ctx && ctx.legs && ctx.legs.length > 1)
+      ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap">
+          ${ctx.legs.map((leg, i) => `<button class="btn btn-sm ${i === ctx.activeIdx ? 'btn-primary' : 'btn-secondary'}" onclick="App.showMatchReportLeg(${i})">${leg.label}</button>`).join('')}
+        </div>
+        ${ctx.aggText ? `<div style="text-align:center;font-size:0.8rem;color:var(--accent-gold);margin-bottom:8px">${ctx.aggText}</div>` : ''}`
+      : '';
+    content.innerHTML = `
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:0.85rem;color:var(--text-muted)">Match Report</div>
+        ${legTabsHtml}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px">
+          <div style="flex:1;text-align:left"><div style="font-size:1.4rem">${teamMark(h, 28)}</div><strong>${h.name}</strong><div class="goal-scorers">${fmtG(goalsH)}</div></div>
+          <div style="font-size:1.6rem;font-weight:800;color:var(--accent-gold)">${scoreLine}</div>
+          <div style="flex:1;text-align:right"><div style="font-size:1.4rem">${teamMark(a, 28)}</div><strong>${a.name}</strong><div class="goal-scorers away-scorers">${fmtG(goalsA)}</div></div>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">${h.formation||''} vs ${a.formation||''}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">🏟️ ${report.venue || 'Wembley Stadium'}</div>
+      </div>
+      <div class="card-title">Key Events</div>
+      <div style="max-height:220px;overflow-y:auto;margin-bottom:12px">${eventsHtml || '<span style="color:var(--text-muted)">No events logged</span>'}</div>
+      <div class="card-title">Team Stats</div>
+      <div class="table-scroll"><table class="lb-table" style="margin-bottom:12px"><thead><tr><th></th><th>${h.short}</th><th>${a.short}</th></tr></thead>
+      <tbody>
+        <tr><td>Shots</td><td>${(h.stats&&h.stats.shots)||0}</td><td>${(a.stats&&a.stats.shots)||0}</td></tr>
+        <tr><td>On Target</td><td>${(h.stats&&h.stats.shotsOn)||0}</td><td>${(a.stats&&a.stats.shotsOn)||0}</td></tr>
+        <tr><td>Possession</td><td>${(h.stats&&h.stats.possession)||50}%</td><td>${(a.stats&&a.stats.possession)||50}%</td></tr>
+        <tr><td>Passes</td><td>${(h.stats&&h.stats.passes)||0}</td><td>${(a.stats&&a.stats.passes)||0}</td></tr>
+        <tr><td>Passes completed</td><td>${(h.stats&&h.stats.passesCompleted)||0}</td><td>${(a.stats&&a.stats.passesCompleted)||0}</td></tr>
+        <tr><td>Pass accuracy</td><td>${(h.stats&&h.stats.passes)?Math.round(100*(h.stats.passesCompleted||0)/h.stats.passes)+'%':'—'}</td><td>${(a.stats&&a.stats.passes)?Math.round(100*(a.stats.passesCompleted||0)/a.stats.passes)+'%':'—'}</td></tr>
+        <tr><td>Interceptions</td><td>${(h.stats&&h.stats.interceptions)||0}</td><td>${(a.stats&&a.stats.interceptions)||0}</td></tr>
+        <tr><td>Blocks</td><td>${(h.stats&&h.stats.blocks)||0}</td><td>${(a.stats&&a.stats.blocks)||0}</td></tr>
+        <tr><td>Corners</td><td>${(h.stats&&h.stats.corners)||0}</td><td>${(a.stats&&a.stats.corners)||0}</td></tr>
+        <tr><td>Fouls</td><td>${(h.stats&&h.stats.fouls)||0}</td><td>${(a.stats&&a.stats.fouls)||0}</td></tr>
+        <tr><td>Saves</td><td>${(h.stats&&h.stats.saves)||0}</td><td>${(a.stats&&a.stats.saves)||0}</td></tr>
+        <tr><td>Yellow / Red</td><td>${(h.stats&&h.stats.yellows)||0} / ${(h.stats&&h.stats.reds)||0}</td><td>${(a.stats&&a.stats.yellows)||0} / ${(a.stats&&a.stats.reds)||0}</td></tr>
+      </tbody></table></div>
+      <div class="card-title">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
+      <div style="max-height:280px;overflow-y:auto">
+        <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${teamMark(h, 18)} ${h.name}</div>
+        ${homeRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
+        <div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${teamMark(a, 18)} ${a.name}</div>
+        ${awayRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
+      </div>
+      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
+    modal.classList.add('active');
+  }
+
+  // Switch the currently-open match report modal to a different leg (two-leg ties only).
+  function showMatchReportLeg(idx) {
+    if (!_reportLegsCtx || !_reportLegsCtx.legs || !_reportLegsCtx.legs[idx]) return;
+    _reportLegsCtx.activeIdx = idx;
+    showMatchReport(_reportLegsCtx.legs[idx].report, _reportLegsCtx);
+  }
+
+  function viewFixtureReport(idx) {
+    if (!tournament || !tournament.fixtures[idx] || !tournament.fixtures[idx].report) {
+      toast('No detailed report for this match');
+      return;
+    }
+    showMatchReport(tournament.fixtures[idx].report, null);
+  }
+
+  function viewKnockoutReport(ri, mi) {
+    const m = tournament && tournament.knockout[ri] && tournament.knockout[ri].matches[mi];
+    if (!m) { toast('No detailed report for this match'); return; }
+    if (m.twoLeg !== false && m.leg1 && m.leg2 && m.leg1.report && m.leg2.report) {
+      const aggText = (m.aggHome != null) ? `Aggregate: ${m.home.short} ${m.aggHome} - ${m.aggAway} ${m.away.short}${m.penalties ? ' (on penalties)' : ''}` : '';
+      const legs = [
+        { label: `Leg 1 · ${m.leg1.report.home.short} home`, report: m.leg1.report },
+        { label: `Leg 2 · ${m.leg2.report.home.short} home`, report: m.leg2.report }
+      ];
+      showMatchReport(legs[1].report, { legs, activeIdx: 1, aggText });
+      return;
+    }
+    if (!m.report) { toast('No detailed report for this match'); return; }
+    showMatchReport(m.report, null);
+  }
+
+
+  function blankPlayerMatchStats(p) {
+    return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
+  }
+
+  function pickGoalMethod(shooter) {
+    const methods = [
+      { desc: 'low driven finish across the keeper', xg: 0.38, puskas: false },
+      { desc: 'side-footed placement into the far corner', xg: 0.36, puskas: false },
+      { desc: 'powerful right-footed strike', xg: 0.33, puskas: false },
+      { desc: 'left-footed drive', xg: 0.32, puskas: false },
+      { desc: 'towering header', xg: 0.30, puskas: false },
+      { desc: 'glancing near-post header', xg: 0.28, puskas: false },
+      { desc: 'tap-in from close range', xg: 0.58, puskas: false },
+      { desc: 'poacher\'s finish at the far post', xg: 0.48, puskas: false },
+      { desc: 'deflected effort that wrong-foots the keeper', xg: 0.22, puskas: false },
+      { desc: 'low screamer into the bottom corner', xg: 0.16, puskas: true },
+      { desc: 'dipping shot from outside the box', xg: 0.14, puskas: true },
+      { desc: 'rising drive that flies into the roof of the net', xg: 0.13, puskas: true },
+      { desc: 'knuckleball strike that swerves late', xg: 0.12, puskas: true },
+      { desc: 'blitz curler into the top corner', xg: 0.15, puskas: true },
+      { desc: 'inch-perfect curled finish around the wall', xg: 0.17, puskas: true },
+      { desc: 'chip over the advancing keeper', xg: 0.20, puskas: true },
+      { desc: 'first-time volley on the half-turn', xg: 0.18, puskas: true },
+      { desc: 'overhead kick', xg: 0.10, puskas: true },
+      { desc: 'bicycle kick', xg: 0.09, puskas: true },
+      { desc: 'rabona finish', xg: 0.08, puskas: true },
+      { desc: 'solo run from halfway, then cool finish', xg: 0.19, puskas: true },
+      { desc: 'cut inside and arrowed shot near post', xg: 0.24, puskas: false },
+      { desc: 'rebound smashed home', xg: 0.42, puskas: false },
+      { desc: 'toe-poke under the keeper', xg: 0.40, puskas: false }
+    ];
+    const spectacular = methods.filter(m => m.puskas);
+    const normal = methods.filter(m => !m.puskas);
+    const tec = shooter.tec || 70;
+    // Weighted pick within a pool: a boosted player's specific traits (a great
+    // header, a genuine long-range/curl specialist) skew which finish type
+    // they're likely to have scored with, instead of every method in the pool
+    // being equally likely regardless of who's shooting.
+    const weightedPick = (pool) => {
+      if (!shooter.expandedAttrs) return pool[Math.floor(seededRandom() * pool.length)];
+      const longKeys = ['screamer', 'dipping', 'rising', 'knuckleball', 'curler', 'curled'];
+      const weights = pool.map((m) => {
+        const d = m.desc.toLowerCase();
+        let w = 1;
+        if (d.includes('header')) w *= aerialSkill(shooter) * 2;
+        else if (longKeys.some(k => d.includes(k))) w *= Math.max(0.2, 1 + fkTakerEdge(shooter) * 3);
+        else if (d.includes('tap-in') || d.includes('poacher') || d.includes('toe-poke') || d.includes('rebound')) w *= Math.max(0.2, 1 + finishingEdge(shooter));
+        return Math.max(0.05, w);
+      });
+      const total = weights.reduce((a, b) => a + b, 0);
+      let r = seededRandom() * total;
+      for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r <= 0) return pool[i]; }
+      return pool[pool.length - 1];
+    };
+    const chosen = (tec > 88 && seededRandom() < 0.42) ? weightedPick(spectacular)
+      : (tec > 82 && seededRandom() < 0.28) ? weightedPick(spectacular)
+      : (seededRandom() < 0.18 ? weightedPick(spectacular) : weightedPick(normal));
+    // Roughly a third of the time, tack on a playstyle-specific clause
+    // describing *how* the scorer got there — the same "tap-in" reads
+    // differently for a Fox in the Box than for a Full-back Finisher.
+    const flavor = seededRandom() < 0.35 ? styleFlavor(shooter, GOAL_FLAVOR_SUFFIX) : null;
+    return flavor ? { ...chosen, desc: `${chosen.desc}, ${flavor}` } : chosen;
+  }
+
+  function pickMissDesc(shooter) {
+    const foot = seededRandom() < 0.55 ? 'right footed' : 'left footed';
+    const areas = [
+      foot + ' shot from outside the box misses to the left',
+      foot + ' shot from outside the box is too high',
+      foot + ' shot from the centre of the box misses to the right',
+      foot + ' shot from the right side of the box is close, but misses to the left',
+      foot + ' shot from the left side of the box misses to the right',
+      'header from the centre of the box misses to the left',
+      'header from the centre of the box is too high',
+      foot + ' shot from outside the box is blocked',
+      foot + ' shot from the centre of the box is blocked',
+      foot + ' shot from a difficult angle on the right misses to the left',
+      'first-time ' + foot + ' shot from outside the box is high and wide to the left',
+      foot + ' volley from the centre of the box is too high'
+    ];
+    return areas[Math.floor(seededRandom() * areas.length)];
+  }
+
+  function sofascoreMiss(shooter, team) {
+    return 'Attempt missed. <span class="player">' + shooter.name + '</span> (' + (team.short || team.name) + ') ' + pickMissDesc(shooter) + '.';
+  }
+
+  function sofascoreSave(gk, shooter, team, defTeam) {
+    const foot = seededRandom() < 0.55 ? 'right footed' : 'left footed';
+    const lines = [
+      'Attempt saved. <span class="player">' + shooter.name + '</span> (' + (team.short||'') + ') ' + foot + ' shot from the centre of the box is saved in the centre of the goal by <span class="player">' + gk.name + '</span> (' + (defTeam.short||'') + ').',
+      'Attempt saved. <span class="player">' + shooter.name + '</span> (' + (team.short||'') + ') ' + foot + ' shot from outside the box is saved in the bottom left corner by <span class="player">' + gk.name + '</span>.',
+      'Attempt saved. <span class="player">' + shooter.name + '</span> (' + (team.short||'') + ') header from the centre of the box is saved in the top centre of the goal by <span class="player">' + gk.name + '</span>.',
+      '<span class="player">' + gk.name + '</span> (' + (defTeam.short||'') + ') saves a ' + foot + ' shot from <span class="player">' + shooter.name + '</span> at full stretch.'
+    ];
+    return lines[Math.floor(seededRandom() * lines.length)];
+  }
+
+
+  function pickSaveDesc(gk, shooter) {
+    const list = [
+      `strong hands from <span class="player">${gk.name}</span> to push away a fierce drive`,
+      `<span class="player">${gk.name}</span> dives full length to tip a curler around the post`,
+      `reflex save — <span class="player">${gk.name}</span> blocks from point-blank range`,
+      `<span class="player">${gk.name}</span> gets down quickly to hold a low shot`,
+      `spectacular tip over from <span class="player">${gk.name}</span> as a rising shot threatens the top corner`,
+      `<span class="player">${gk.name}</span> parries a knuckleball, then gathers at the second attempt`,
+      `brave claim by <span class="player">${gk.name}</span> under pressure from the striker`
+    ];
+    return list[Math.floor(seededRandom() * list.length)];
+  }
+
+  // A real move name (from player-attributes.json's skills list) -> a bank
+  // of specific descriptions for it. Two players who both have "Flip Flap"
+  // will still see varied wording match to match, but the move named is
+  // always the one actually on their sheet — not a random unrelated skill.
+  const SKILL_MOVE_TEXT = {
+    'Chop Turn': [
+      (a, o) => `${a} drags the ball back with a sharp chop turn, spinning away from ${o}`,
+      (a, o) => `${a} chops the ball inside off one touch, leaving ${o} facing the wrong way`
+    ],
+    'Cut Behind & Turn': [
+      (a, o) => `${a} shields the ball, cuts it behind his standing leg and spins ${o} clean out of the contest`,
+      (a, o) => `${a} rolls it behind his heel and turns away from ${o} in one motion`
+    ],
+    'Double Touch': [
+      (a, o) => `${a} sends ${o} the wrong way with a lightning double touch`,
+      (a, o) => `${a} touches it one way then the other — ${o} is left grasping at thin air`
+    ],
+    'Flip Flap': [
+      (a, o) => `${a} pulls out an audacious flip flap and ${o} simply isn't there anymore`,
+      (a, o) => `${a} rocks ${o} with a flip flap and glides past`
+    ],
+    'Marseille Turn': [
+      (a, o) => `${a} spins out of a tight spot with a Marseille turn, leaving ${o} chasing shadows`,
+      (a, o) => `${a} rolls through a full 360 to shake off ${o}`
+    ],
+    'Scissors Feint': [
+      (a, o) => `${a} scissors his feet over the ball and ${o} bites on the fake`,
+      (a, o) => `${a} sends ${o} the wrong way with a scissors feint before accelerating away`
+    ],
+    'Sole Control': [
+      (a, o) => `${a} drags the ball back under his sole, wrong-footing ${o} completely`,
+      (a, o) => `${a} rolls it under his foot and ${o} lunges into empty space`
+    ],
+    'Sombrero': [
+      (a, o) => `${a} flicks it up and over ${o}'s head with an outrageous sombrero`,
+      (a, o) => `${a} lobs the ball over ${o} with a sombrero flick and collects it on the other side`
+    ]
+  };
+  const GENERIC_MOVE_NAMES = ['elastico', 'roulette', 'step-over', 'body feint', 'shoulder drop', 'stop-and-go', 'drag-back'];
+
+  function pickSkillDesc(player, opponent) {
+    const opp = opponent ? opponent.name : 'the defender';
+    const nameTag = `<span class="player">${player.name}</span>`;
+    // Prefer whatever real skill moves are actually on this player's sheet
+    // (player-attributes.json), so the commentary names the move he
+    // genuinely has rather than a random generic one.
+    const ownMoves = ((player && player.expandedAttrs && player.expandedAttrs.skills) || [])
+      .filter((s) => SKILL_MOVE_TEXT[s]);
+    let base;
+    if (ownMoves.length) {
+      const move = ownMoves[Math.floor(seededRandom() * ownMoves.length)];
+      const templates = SKILL_MOVE_TEXT[move];
+      base = templates[Math.floor(seededRandom() * templates.length)](nameTag, opp);
+    } else {
+      const move = GENERIC_MOVE_NAMES[Math.floor(seededRandom() * GENERIC_MOVE_NAMES.length)];
+      const ends = [
+        `beats ${opp} with a ${move}`,
+        `uses a ${move} to leave ${opp} on the ground`,
+        `sells ${opp} with a sharp ${move}`,
+        `skins ${opp} using a ${move} and accelerates clear`,
+        `bamboozles ${opp} with a ${move} on the touchline`
+      ];
+      base = `${nameTag} ${ends[Math.floor(seededRandom() * ends.length)]}`;
+    }
+    // Layer on a playstyle-specific follow-up, so what happens right after
+    // beating the man differs by role, not just the move that beat him.
+    const follow = styleFlavor(player, DRIBBLE_FOLLOWUP);
+    return follow ? `${base}, ${follow}` : base;
+  }
+
+  function pickPenOutcome(taker, gk) {
+    // precise outcomes for pens
+    const outcomes = [
+      { scored: true, text: 'sends the keeper the wrong way — bottom left' },
+      { scored: true, text: 'smashes high into the top-right corner' },
+      { scored: true, text: 'cool finish down the middle as the keeper dives early' },
+      { scored: true, text: 'low and hard to the keeper\'s right' },
+      { scored: true, text: 'panenka chip that floats under the bar' },
+      { scored: false, saved: true, text: 'saved — the keeper guesses correctly and palms it away to his left' },
+      { scored: false, saved: true, text: 'saved low to the right — strong hand from the goalkeeper' },
+      { scored: false, saved: false, text: 'crashes against the crossbar and stays out' },
+      { scored: false, saved: false, text: 'skewed wide of the left post' },
+      { scored: false, saved: true, text: 'keeper tips it onto the upright — rebound cleared' }
+    ];
+    // ~72% base score rate, nudged by the taker's placement/specialist edge
+    // and the keeper's penalty-specific edge — so a real penalty specialist
+    // genuinely converts more often than a fringe outfield taker, and a
+    // shot-stopper with "GK Penalty Saver" genuinely saves more.
+    const scoredOnes = outcomes.filter(o => o.scored);
+    const missedOnes = outcomes.filter(o => !o.scored);
+    const scoreProb = Math.max(0.35, Math.min(0.95, 0.72 + penTakerEdge(taker) - penGkEdge(gk)));
+    if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
+    return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
+  }
+
+  function pickFkOutcome(taker, gk) {
+    const outcomes = [
+      { scored: true, text: 'whipped curler over the wall into the top corner' },
+      { scored: true, text: 'knuckleball that dips late under the bar' },
+      { scored: true, text: 'low drive that skids under the jumping wall' },
+      { scored: true, text: 'rising shot into the far top corner' },
+      { scored: false, saved: false, text: 'cleared off the line after the keeper was beaten' },
+      { scored: false, saved: true, text: 'kept out — the keeper tips a curling effort over the bar' },
+      { scored: false, saved: false, wall: true, text: 'struck into the wall and spun away for a corner' },
+      { scored: false, saved: false, text: 'inches over the crossbar' },
+      { scored: false, saved: false, text: 'curls wide of the far post' }
+    ];
+    const scoredOnes = outcomes.filter(o => o.scored);
+    const missedOnes = outcomes.filter(o => !o.scored);
+    const scoreProb = Math.max(0.06, Math.min(0.55, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4));
+    if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
+    return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
+  }
+
+
+  function calcPlayerRating(ps) {
+    // Position-aware, activity-based, no random noise
+    if (!ps) return 6.0;
+    const goals = ps.goals || 0;
+    const assists = ps.assists || 0;
+    const shots = ps.shots || 0;
+    const saves = ps.saves || 0;
+    const tackles = ps.tackles || 0;
+    const passes = ps.passes || 0;
+    const xg = ps.xg || 0;
+    const xa = ps.xa || 0;
+    const pos = (ps.pos || ps.slot || '').toString().toUpperCase();
+    const isGK = pos === 'GK' || (ps.posArr || []).includes('GK');
+    const isDef = ['CB','RB','LB','RWB','LWB','DEF'].some(x => pos.includes(x)) || (ps.posArr || []).some(p => ['CB','RB','LB','RWB','LWB'].includes(p));
+    const isMid = ['CM','CDM','CAM','RM','LM','DM','AM'].some(x => pos.includes(x)) || (ps.posArr || []).some(p => ['CM','CDM','CAM','RM','LM'].includes(p));
+
+    let r = 6.0;
+
+    const passesC = ps.passesCompleted || 0;
+    const ints = ps.interceptions || 0;
+    const blocks = ps.blocks || 0;
+    // Goals conceded by the player's team this match — set by the caller
+    // (endMatch / renderLineups) from the live/final scoreline. A back line
+    // and keeper shipping a hatful of goals should be dragged down for it,
+    // even if they racked up passes/tackles along the way; conceding 0-1 is
+    // normal and isn't penalized.
+    const conceded = ps.goalsConceded || 0;
+    if (isGK) {
+      r += Math.min(saves * 0.35, 2.4);
+      if (saves >= 4) r += 0.25;
+      if (saves >= 7) r += 0.35;
+      if (ps.cleanSheet) r += 0.6;
+      if (goals > 0) r += 1.5;
+      r += Math.min(passes * 0.01, 0.25);
+      r += Math.min(passesC * 0.015, 0.2);
+      if (conceded >= 2) r -= Math.min((conceded - 1) * 0.45, 3.2);
+      if (ps.yellow) r -= 0.35;
+      if (ps.red) r -= 2.0;
+    } else if (isDef) {
+      // Defensive actions and pass volume used to be capped *separately*
+      // (tackles up to +1.6, interceptions +1.2, blocks +0.9, passes +0.45,
+      // completed passes +0.4 — up to +4.55 combined). Since the match sim
+      // gives every CB/full-back realistic tackle counts and heavy pass
+      // volume most matches just by playing 90 minutes, that let defenders
+      // stack those caps and sit near the rating ceiling on a routine game
+      // with zero goal involvement, crowding out attackers for MOTM. Now
+      // defensive actions and passing each have one combined cap instead,
+      // so an ordinary solid game lands in the 7s and genuine standout
+      // contributions (or a goal/assist) are what push a defender higher.
+      r += Math.min(tackles * 0.18 + ints * 0.2 + blocks * 0.15, 1.3);
+      r += Math.min(passes * 0.008 + passesC * 0.012, 0.35);
+      r += assists * 0.7;
+      r += goals * 1.1;
+      r += Math.min(shots * 0.08, 0.3);
+      if (tackles + ints >= 6) r += 0.2;
+      if (conceded >= 2) r -= Math.min((conceded - 1) * 0.35, 2.6);
+      if (ps.yellow) r -= 0.4;
+      if (ps.red) r -= 1.8;
+    } else if (isMid) {
+      // Same fix as defenders above: passing and defensive-action credit
+      // are combined caps now instead of stacking separately (previously up
+      // to +1.2 passing and +1.5 defensive actions before any goal/assist).
+      r += assists * 0.95;
+      r += goals * 1.15;
+      r += Math.min(passes * 0.012 + passesC * 0.016, 0.55);
+      r += Math.min(tackles * 0.1 + ints * 0.12, 0.5);
+      r += Math.min(shots * 0.1, 0.45);
+      r += Math.min(xa * 0.2, 0.4);
+      r += Math.min(xg * 0.15, 0.3);
+      if (passesC >= 30) r += 0.2;
+      if (assists >= 2) r += 0.3;
+      if (conceded >= 3) r -= Math.min((conceded - 2) * 0.15, 1.0);
+      if (ps.yellow) r -= 0.35;
+      if (ps.red) r -= 1.8;
+    } else {
+      r += goals * 1.25;
+      r += assists * 0.85;
+      r += Math.min(shots * 0.12, 0.6);
+      if (shots > 0 && goals > 0) r += Math.min(goals / shots, 1) * 0.35;
+      r += Math.min(xg * 0.25, 0.5);
+      r += Math.min(xa * 0.15, 0.35);
+      r += Math.min(passes * 0.01, 0.25);
+      r += Math.min(passesC * 0.015, 0.2);
+      r += Math.min(tackles * 0.1, 0.3);
+      if (goals >= 2) r += 0.35;
+      if (goals >= 3) r += 0.4;
+      if (ps.yellow) r -= 0.35;
+      if (ps.red) r -= 1.7;
+    }
+
+    // Passing success rate matters, not just volume — reward crisp, reliable passers
+    // and dock players who give the ball away a lot, once they've had enough passes
+    // for the sample to mean something.
+    if (passes >= 8) {
+      const acc = passesC / passes;
+      const accDelta = (acc - 0.78) * (isGK ? 0.5 : isDef ? 0.9 : isMid ? 1.1 : 0.6);
+      r += Math.max(-0.4, Math.min(0.35, accDelta));
+    }
+
+    // Shared involvement floor — but a heavy defeat still drags this down;
+    // doing nothing notable in a 7-1 loss isn't a neutral 6.0 game.
+    const actions = goals + assists + shots + saves + tackles + Math.floor(passes / 5);
+    const concededFloorPenalty = (isGK || isDef) ? Math.min(Math.max(conceded - 1, 0) * 0.4, 3.0)
+      : isMid ? Math.min(Math.max(conceded - 2, 0) * 0.15, 1.0) : 0;
+    if (actions === 0) r = 6.0 - concededFloorPenalty;
+    else if (actions === 1 && !isGK) r = Math.max(r, 6.2 - concededFloorPenalty);
+
+    r += Math.max(-0.12, Math.min(0.18, ((ps.ovr || 75) - 75) * 0.008));
+
+    // Small organic variance so two players with an identical stat-line don't
+    // always come out with the exact same rating — mirrors the "eye test"
+    // component of a real match rating without swinging results wildly.
+    r += (seededRandom() - 0.5) * 0.22;
+
+    // Keep ratings realistic: a good, solid game should land in the high 7s/8s.
+    // Only a genuine breakout performance — a hat-trick, a brace-plus-assist, a big
+    // multi-goal contribution, or a standout shutout for a GK/defender — should be
+    // able to push into the 9.9-10.0 territory. Non-breakout games get a *soft*,
+    // slightly randomized ceiling each time (not a fixed 9.2 wall every match) so
+    // ratings feel more dynamic while still rarely maxing out without a big game.
+    const isBreakout = isGK
+      ? (saves >= 7 && (ps.cleanSheet || goals === 0) && !ps.red)
+      : isDef
+        ? ((goals >= 1 && ps.cleanSheet) || (goals + assists >= 3) || (goals >= 2 && assists >= 1)) && !ps.red
+        : (goals >= 3 || (goals >= 2 && assists >= 1) || assists >= 3 || goals + assists >= 4) && !ps.red;
+    const cap = isBreakout ? 10.0 : 8.7 + seededRandom() * 0.9; // ~8.7-9.6, varies match to match
+    return Math.max(2.5, Math.min(cap, Math.round(r * 10) / 10));
+  }
+
+
+  function quickSimMatch() { startMatch(); if (currentMatch) simToEnd(); }
+
+  function toggleSim() {
+    if (!currentMatch || currentMatch.finished) return;
+    isPlaying = !isPlaying;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = isPlaying ? '⏸ Pause' : '▶ Play';
+    if (isPlaying) {
+      simInterval = setInterval(() => {
+        if (!currentMatch || currentMatch.finished) {
+          clearInterval(simInterval); isPlaying = false;
+          if (btn) btn.textContent = '▶ Play';
+          return;
+        }
+        tick();
+      }, simSpeed);
+    } else {
+      clearInterval(simInterval);
+    }
+  }
+
+  function setSpeed(val) {
+    simSpeed = parseInt(val) || 400;
+    const labels = { 800: 'Slow', 400: 'Normal', 150: 'Fast', 40: 'Turbo' };
+    const lbl = document.getElementById('sim-speed-label');
+    if (lbl) lbl.textContent = 'Speed: ' + (labels[val] || 'Custom');
+    if (isPlaying) {
+      clearInterval(simInterval);
+      simInterval = setInterval(() => {
+        if (!currentMatch || currentMatch.finished) { clearInterval(simInterval); isPlaying = false; return; }
+        tick();
+      }, simSpeed);
+    }
+  }
+
+  function simToEnd() {
+    if (!currentMatch || currentMatch.finished) return;
+    clearInterval(simInterval); isPlaying = false;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '▶ Play';
+    // Instant Result has no one to click the ET/pens prompt, so resolve draws
+    // straight through instead of stalling at m._awaitingET — that stall was
+    // what let the minute counter run past 90 and climb well past 200 while
+    // safety just kept ticking without ever finishing. quietSim additionally
+    // suppresses all live-view rendering, which is correct here since this is
+    // used for the "Instant Result" button, not a fast-forward of a match the
+    // user is actively watching (see finishMatch() for that).
+    currentMatch.silentDeep = true;
+    currentMatch.quietSim = true;
+    let safety = 0;
+    while (currentMatch && !currentMatch.finished && safety < 200) {
+      tick(true);
+      safety++;
+    }
+  }
+
+  // "Finish Match" — unlike Instant Result, this is used mid-live-match, so it
+  // should visibly race through the remaining minutes (scoreboard/events feed
+  // still updating) rather than silently jumping straight to a final result.
+  // It reuses silentDeep so any ET/pens decision auto-resolves instead of
+  // stalling on a prompt (same reasoning as Instant Result), but leaves
+  // quietSim off so every tick still renders — it's a fast Play, not a
+  // silent one.
+  function finishMatch() {
+    if (!currentMatch || currentMatch.finished) return;
+    clearInterval(simInterval);
+    isPlaying = true;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '⏩ Fast-forwarding…';
+    currentMatch.silentDeep = true;
+    currentMatch.quietSim = false;
+    const FF_MS = 18; // fast enough to feel like a fast-forward, not a jump-cut
+    simInterval = setInterval(() => {
+      if (!currentMatch) { clearInterval(simInterval); isPlaying = false; return; }
+      if (currentMatch.finished) {
+        clearInterval(simInterval); isPlaying = false;
+        if (btn) btn.textContent = '▶ Play';
+        return;
+      }
+      // silent=true on the tick call so it doesn't stop for the normal
+      // half-time pause (which is separate from the silentDeep/ET handling
+      // above) — Finish Match should never stall waiting for another click.
+      tick(true);
+      updateStatsPanel();
+    }, FF_MS);
+  }
+
+  function resetMatch() {
+    clearInterval(simInterval); isPlaying = false; currentMatch = null;
+    const setup = document.getElementById('match-setup');
+    const live = document.getElementById('match-live');
+    if (setup) setup.style.display = 'block';
+    if (live) live.style.display = 'none';
+  }
+
+  function tick(silent) {
+    if (!currentMatch || currentMatch.finished) return;
+    const m = currentMatch;
+    m.minute++;
+    if (m.minute === 45) {
+      m.status = 'Half Time';
+      addEvent(45, 'whistle', '—— HALF TIME ——', null);
+      addEvent(45, 'whistle', 'Tap Play to start 2nd half', null);
+      updateScoreboard();
+      // Pause at half time (unless turbo finish)
+      if (!silent) {
+        clearInterval(simInterval);
+        isPlaying = false;
+        const btn = document.getElementById('btn-play');
+        if (btn) btn.textContent = '▶ 2nd Half';
+        return;
+      }
+    }
+    if (m.minute === 46) {
+      m.status = '2nd Half';
+      addEvent(46, 'whistle', 'Second half begins', null);
+    }
+    if (m.minute >= 90 && !m.inET && !m.inPens && !m._awaitingET) {
+      if (!m._stoppage) m._stoppage = 1 + Math.floor(seededRandom() * 5);
+      if (m.minute >= 90 + m._stoppage) {
+        const drawn = m.home.score === m.away.score;
+        if (drawn && (m.allowET || m.allowPens)) {
+          // Instant/bulk sims have no one to click the prompt, so resolve immediately
+          // instead of stalling — this is what was causing 200+ minute "matches".
+          if (m.silentDeep) {
+            addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
+            if (m.allowET) {
+              m.inET = true;
+              m.etStart = m.minute;
+              m.status = 'Extra Time';
+              addEvent(m.minute, 'et', 'Extra time begins — two periods of 15 minutes', null);
+            } else {
+              runPenaltyShootout();
+            }
+            return;
+          }
+          // Pause — user chooses to continue to ET / pens
+          m._awaitingET = true;
+          m.status = 'Full Time';
+          addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
+          clearInterval(simInterval); isPlaying = false;
+          const btn = document.getElementById('btn-play');
+          if (btn) btn.textContent = '▶ Play';
+          updateScoreboard();
+          showETPrompt(drawn);
+          return;
+        }
+        endMatch();
+        return;
+      }
+      m.status = 'Stoppage ' + (m.minute - 90) + "'";
+    }
+    // Extra time running
+    if (m.inET && !m.inPens) {
+      const etMin = m.minute - (m.etStart || 90);
+      if (etMin >= 30) {
+        if (m.home.score === m.away.score && m.allowPens) {
+          if (m.silentDeep) {
+            addEvent(m.minute, 'et', 'Extra time finished — still level. Straight to penalties.', null);
+            runPenaltyShootout();
+            return;
+          }
+          m._awaitingPens = true;
+          m.status = 'ET Full Time';
+          addEvent(m.minute, 'et', 'Extra time finished — still level. Penalty shootout?', null);
+          clearInterval(simInterval); isPlaying = false;
+          const btn = document.getElementById('btn-play');
+          if (btn) btn.textContent = '▶ Play';
+          updateScoreboard();
+          showETPrompt(true, true);
+          return;
+        }
+        endMatch();
+        return;
+      }
+      if (etMin === 15) {
+        addEvent(m.minute, 'et', 'End of the first period of extra time', null);
+      }
+      m.status = 'ET ' + Math.min(etMin, 30) + "'";
+      if (seededRandom() < 0.0025) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
+    }
+    generateEvents();
+    runTacticalAI();
+    // Substitutions: aim for at least 3 per team (max 5)
+    if (m.minute >= 55 && m.minute <= 88 && !m.inET) {
+      const homeDiff = (m.home.score || 0) - (m.away.score || 0);
+      const awayDiff = -homeDiff;
+      const needHome = (m.homeSubsUsed || 0) < 3;
+      const needAway = (m.awaySubsUsed || 0) < 3;
+      const windowLeft = Math.max(1, 88 - m.minute);
+      // Higher urgency if still below 3
+      let pHome = needHome ? Math.min(0.55, 0.12 + (3 - m.homeSubsUsed) * 0.12 / windowLeft * 8) : 0.06;
+      let pAway = needAway ? Math.min(0.55, 0.12 + (3 - m.awaySubsUsed) * 0.12 / windowLeft * 8) : 0.06;
+      if (m.minute >= 70) { pHome *= 1.3; pAway *= 1.3; }
+      // A team chasing the game brings changes on earlier and more urgently;
+      // one comfortably ahead can afford to take its time — so subs stop
+      // landing on a flat, identical clock every match.
+      if (homeDiff <= -1) pHome *= (homeDiff <= -2 ? 1.6 : 1.3);
+      else if (homeDiff >= 2) pHome *= 0.75;
+      if (awayDiff <= -1) pAway *= (awayDiff <= -2 ? 1.6 : 1.3);
+      else if (awayDiff >= 2) pAway *= 0.75;
+      if (seededRandom() < pHome) trySubstitution('home');
+      if (seededRandom() < pAway) trySubstitution('away');
+    }
+    // Late forced catch-up so each side reaches 3 if possible
+    if (m.minute === 80 || m.minute === 84 || m.minute === 87) {
+      if ((m.homeSubsUsed || 0) < 3) trySubstitution('home');
+      if ((m.awaySubsUsed || 0) < 3) trySubstitution('away');
+    }
+    if (seededRandom() < 0.0015) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
+    updateScoreboard();
+    if (!silent) updateStatsPanel();
+  }
+
+  // Position-based share of a team's passing volume. Higher = touches the ball more often.
+  const PASS_POS_WEIGHT = {
+    GK: 0.55, CB: 1.75, RB: 1.3, LB: 1.3, RWB: 1.3, LWB: 1.3,
+    CDM: 1.95, CM: 1.85, CAM: 1.45, RM: 1.2, LM: 1.2, RW: 1.0, LW: 1.0, ST: 0.7
+  };
+
+  // Per-minute base chance of a defensive action (tackle/interception/block) for
+  // each position, independent of the main event roll above — this is what makes
+  // defenders (and holding mids) consistently active across 90 minutes rather than
+  // only picking up stats on the rare minutes the main event chain lands on them.
+  const DEF_ACTION_BASE = {
+    CB: 0.075, RB: 0.08, LB: 0.08, RWB: 0.085, LWB: 0.085, CDM: 0.09,
+    CM: 0.05, RM: 0.025, LM: 0.025, RW: 0.018, LW: 0.018, CAM: 0.022, ST: 0.012, GK: 0
+  };
+
+  // Gives every defender (and holding mid) on the pitch an independent per-minute
+  // roll for a tackle/interception/block, weighted by their defensive ability and
+  // the pressure they're under from the opposing attack. Runs every minute
+  // (including "quiet" minutes) so defensive stats build up naturally over 90
+  // minutes instead of relying on the endMatch floor to backfill them.
+  function simulateDefensiveActions() {
+    const m = currentMatch;
+    if (!m) return;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    ['home', 'away'].forEach(side => {
+      const team = m[side];
+      const ids = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const onPitch = (team.squad.all || []).filter(p => ids.includes(p.id));
+      if (!onPitch.length) return;
+      const oppSide = side === 'home' ? m.away : m.home;
+      const oppStr = calcTeamStrength(oppSide);
+      const pressureMult = 0.85 + Math.max(0, (oppStr.att || 70) - 68) / 90;
+      onPitch.forEach(p => {
+        const slot = p.slot || (p.pos || [])[0] || 'CM';
+        const base = DEF_ACTION_BASE[slot];
+        if (!base) return;
+        const defSkill = p.def != null ? p.def : (p.ovr || 70);
+        const skillMult = 0.72 + (defSkill / 100) * 0.6;
+        // Specific tackling/interception traits (Sliding Tackle, Interception,
+        // Man Marking, Blocker) add on top of the generic def-based chance,
+        // and interceptBias skews *which* kind of action a specialist gets.
+        const actionEdge = defActionEdge(p);
+        const chance = Math.min(0.24, base * skillMult * pressureMult + actionEdge.chance);
+        if (seededRandom() >= chance) return;
+        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+        const ps = m.playerMatchStats[p.id];
+        const roll = seededRandom();
+        const interceptCut = Math.min(0.75, 0.5 + actionEdge.interceptBias);
+        if (roll < interceptCut) {
+          ps.interceptions = (ps.interceptions || 0) + 1;
+          ps.tackles = (ps.tackles || 0) + 1;
+          team.stats.interceptions = (team.stats.interceptions || 0) + 1;
+        } else if (roll < 0.85) {
+          ps.tackles = (ps.tackles || 0) + 1;
+        } else {
+          ps.blocks = (ps.blocks || 0) + 1;
+          team.stats.blocks = (team.stats.blocks || 0) + 1;
+        }
+      });
+    });
+  }
+
+  // Simulates one minute of team passing for both sides: builds up real per-match
+  // pass volume (300-1000+ per team), splits it across on-pitch players by role,
+  // and gives each player their own completion (success) rate based on ability.
+  function simulateMinutePassing() {
+    const m = currentMatch;
+    if (!m) return;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    let homeCompletedMin = 0, awayCompletedMin = 0;
+    // Ball-control quality — technical ability, overall, and manager combine into
+    // how much a team naturally dictates tempo. This (not just pass accuracy) now
+    // drives raw pass *volume*, so a clearly superior side genuinely racks up more
+    // attempted passes from minute one instead of the two sides staying
+    // symmetric-random and drifting back to an even split by full time.
+    const homeStr = calcTeamStrength(m.home);
+    const awayStr = calcTeamStrength(m.away);
+    const ctrl = (s) => s.tec * 0.55 + s.ovr * 0.25 + (s.mgr != null ? s.mgr : 75) * 0.20;
+    const ctrlDiff = Math.max(-24, Math.min(24, ctrl(homeStr) - ctrl(awayStr)));
+    const ctrlShift = ctrlDiff / 24 * 0.4; // up to +/-40% volume swing from raw quality gap
+    ['home', 'away'].forEach(side => {
+      const team = m[side];
+      const oppTeam = side === 'home' ? m.away : m.home;
+      const ids = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const onPitch = (team.squad.all || []).filter(p => ids.includes(p.id));
+      if (!onPitch.length) return;
+      const tac = (m.tactics && m.tactics[side]) || 'balanced';
+      const pmods = getPlaystyleMods(team.team);
+      // Recent possession share still feeds back a little into how much of the ball
+      // this team gets — clamped so it can't spiral away from realistic bounds.
+      const possShare = Math.max(0.8, Math.min(1.25, ((team.stats.possession || 50)) / 50));
+      let baseVol = 5.2 + seededRandom() * 2.6; // ~5.2-7.8 team passes per minute baseline
+      if (tac === 'attack') baseVol *= 1.08;
+      if (tac === 'defend') baseVol *= 0.86;
+      if (tac === 'press') baseVol *= 0.78;
+      baseVol *= pmods.passVolMult; // manager playstyle: direct (Long Ball) vs patient (Possession)
+      baseVol *= (side === 'home' ? (1 + ctrlShift) : (1 - ctrlShift)); // raw quality gap
+      // Game state: a team chasing the game commits more men forward and sees more
+      // of the ball late on; one nursing a lead can afford to sit off it.
+      if (m.minute > 60) {
+        const diff = (team.score || 0) - (oppTeam.score || 0);
+        if (diff <= -1) baseVol *= 1 + Math.min(0.18, Math.abs(diff) * 0.08);
+        else if (diff >= 1) baseVol *= 1 - Math.min(0.1, diff * 0.04);
+      }
+      const vol = Math.max(1, baseVol * possShare);
+      const weighted = onPitch.map(p => {
+        const slot = p.slot || (p.pos || [])[0] || 'CM';
+        let w = PASS_POS_WEIGHT[slot] != null ? PASS_POS_WEIGHT[slot] : 1.2;
+        if (WIDE_SLOTS.has(slot)) w *= pmods.wingBiasMult; // Out Wide / Overload lean on wide play
+        return { p, w };
+      });
+      const totalW = weighted.reduce((s, x) => s + x.w, 0) || 1;
+      weighted.forEach(({ p, w }) => {
+        const raw = vol * (w / totalW);
+        const count = Math.floor(raw) + (seededRandom() < (raw - Math.floor(raw)) ? 1 : 0);
+        if (count <= 0) return;
+        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+        const ps = m.playerMatchStats[p.id];
+        // Individual success rate: driven by technical ability + overall, nudged by tactic.
+        const skill = ((p.tec || 70) * 0.55 + (p.ovr || 75) * 0.35 + (p.phy || 70) * 0.1) / 100;
+        let succRate = Math.min(0.97, Math.max(0.52, 0.64 + skill * 0.34));
+        if (tac === 'press') succRate -= 0.03;
+        if (tac === 'attack') succRate -= 0.015;
+        succRate = Math.min(0.97, Math.max(0.4, succRate + pmods.passAccDelta)); // manager playstyle nudge
+        let completed = 0;
+        for (let i = 0; i < count; i++) { if (seededRandom() < succRate) completed++; }
+        ps.passes = (ps.passes || 0) + count;
+        ps.passesCompleted = (ps.passesCompleted || 0) + completed;
+        team.stats.passes = (team.stats.passes || 0) + count;
+        team.stats.passesCompleted = (team.stats.passesCompleted || 0) + completed;
+        if (side === 'home') homeCompletedMin += completed; else awayCompletedMin += completed;
+      });
+    });
+    return { homeCompletedMin, awayCompletedMin };
+  }
+
+  // ===================================================================
+  // ===================== REAL MATCH ENGINE ==========================
+  // ===================================================================
+  // Replaces the old flat "roll one dice, land on an outcome bucket" event
+  // generator with an explicit phase pipeline that mirrors how a real
+  // possession actually develops:
+  //   Possession -> Zones -> Movement -> Passing -> Duels -> Transitions
+  //   -> Chance Creation -> Shots -> GK  (with Tactics/manager playstyle
+  //   modifying probabilities at every stage).
+  // Every stage reads real player attributes — the expanded per-player
+  // sheet when available, otherwise the derived 5-stat blend — so a
+  // sequence's outcome is genuinely shaped by who's on the ball and who's
+  // defending, not a flat percentage roll.
+
+  // ---- Pitch model: 3 thirds x 3 channels, from the POV of the team in
+  // possession (their own defensive third -> midfield -> attacking third).
+  const PITCH_THIRDS = ['DEF', 'MID', 'ATT'];
+  const PITCH_CHANNELS = ['L', 'C', 'R'];
+  // Which positions naturally occupy each zone when their team has the
+  // ball — used to pick a realistic ball-carrier/target for each stage of
+  // a possession sequence instead of a flat "any outfield player" pool.
+  const ZONE_POS_MAP = {
+    DEF_L: ['LB', 'LWB', 'CB'],       DEF_C: ['CB', 'GK', 'CDM'],       DEF_R: ['RB', 'RWB', 'CB'],
+    MID_L: ['LM', 'LW', 'LWB', 'CM'], MID_C: ['CM', 'CDM', 'CAM'],      MID_R: ['RM', 'RW', 'RWB', 'CM'],
+    ATT_L: ['LW', 'LM', 'LWB'],       ATT_C: ['ST', 'CF', 'CAM', 'SS'], ATT_R: ['RW', 'RM', 'RWB']
+  };
+  // The defending team's own zone (mirrored third, same channel) is who's
+  // actually responsible for marking a given attacking zone.
+  function mirrorDefenderPos(zoneKey) {
+    const [third, ch] = zoneKey.split('_');
+    const defThird = third === 'ATT' ? 'DEF' : third === 'DEF' ? 'ATT' : 'MID';
+    return ZONE_POS_MAP[defThird + '_' + ch] || ZONE_POS_MAP.MID_C;
+  }
+
+  // ---- Attribute-driven ability reads (expanded sheet first, generic
+  // derived stat as fallback) that feed every stage of the pipeline below.
+  function passingAbility(p) {
+    if (p && p.expandedAttrs) {
+      const vals = [p.expandedAttrs.low_pass, p.expandedAttrs.lofted_pass, p.expandedAttrs.ball_con, p.expandedAttrs.tight_pos].filter(v => typeof v === 'number');
+      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+    return (p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35;
+  }
+  function defensivePressure(p) {
+    if (p && p.expandedAttrs) {
+      const vals = [p.expandedAttrs.def_awr, p.expandedAttrs.def_eng, p.expandedAttrs.tack, p.expandedAttrs.aggr].filter(v => typeof v === 'number');
+      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+    return (p.def || 70) * 0.7 + (p.ovr || 75) * 0.3;
+  }
+  function carryingAbility(p) {
+    if (p && p.expandedAttrs) {
+      const vals = [p.expandedAttrs.dribb, p.expandedAttrs.ball_con, p.expandedAttrs.bal, p.expandedAttrs.spd].filter(v => typeof v === 'number');
+      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+    return (p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2;
+  }
+
+  // ---- Shot-type profile: how a chance was created shapes its baseline
+  // quality (a through-ball 1-on-1 is a better chance than a hopeful
+  // long-range effort; a header off a cross has a lower ceiling but a
+  // distinct conversion curve of its own).
+  const CHANCE_TYPE_PROFILE = {
+    openplay:    { baseOnTarget: 0.40, baseXg: 0.09, headerWeight: 0 },
+    throughball: { baseOnTarget: 0.50, baseXg: 0.17, headerWeight: 0 },
+    cross:       { baseOnTarget: 0.44, baseXg: 0.13, headerWeight: 0.72 },
+    dribble:     { baseOnTarget: 0.47, baseXg: 0.15, headerWeight: 0 },
+    longshot:    { baseOnTarget: 0.30, baseXg: 0.05, headerWeight: 0 },
+    counter:     { baseOnTarget: 0.49, baseXg: 0.18, headerWeight: 0 }
+  };
+
+  // ===== GK phase (called once a shot is confirmed on target) =====
+  // then folds straight back to Shots for a rebound, small % of the time.
+  function resolveShot(attackingSide, defendingSide, shooter, chanceType, opts) {
+    opts = opts || {};
+    const m = currentMatch;
+    if (!m || !shooter) return;
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    const profile = CHANCE_TYPE_PROFILE[chanceType] || CHANCE_TYPE_PROFILE.openplay;
+    const isHeader = profile.headerWeight > 0 && seededRandom() < profile.headerWeight;
+
+    // ---- Shots phase: shot quality drawn straight from the shooter's own
+    // finishing-relevant attributes and playstyle edges.
+    let shotQuality = isHeader
+      ? aerialSkill(shooter)
+      : Math.max(0.05, Math.min(0.98,
+          ((shooter.att || 70) * 0.42 + (shooter.tec || 70) * 0.33 + (shooter.ovr || 75) * 0.15 + (shooter.pac || 70) * 0.10) / 100
+          + finishingEdge(shooter)
+          + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)));
+    shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
+
+    // A defender in the shot's path can block it before it's even on target.
+    const blocker = pickPlayer(defTeam, ['CB', 'CDM', 'RB', 'LB']);
+    const blockSkill = blocker ? defensivePressure(blocker) / 100 : 0.6;
+    const blockChance = Math.max(0.04, Math.min(0.28, 0.15 + blockSkill * 0.10 - shotQuality * 0.10));
+    if (seededRandom() < blockChance) {
+      defTeam.stats.blocks = (defTeam.stats.blocks || 0) + 1;
+      if (blocker) {
+        if (!m.playerMatchStats[blocker.id]) m.playerMatchStats[blocker.id] = blankPlayerMatchStats(blocker);
+        m.playerMatchStats[blocker.id].blocks = (m.playerMatchStats[blocker.id].blocks || 0) + 1;
+      }
+      m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.4;
+      if (blocker && seededRandom() < 0.4) {
+        addEvent(m.minute, 'shot', `Attempt blocked. Blocked by <span class="player">${blocker.name}</span> (${defTeam.team.short}).`, defendingSide);
+      } else {
+        addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
+      }
+      if (seededRandom() < 0.4) resolveCorner(attackingSide);
+      return;
+    }
+
+    const defAvg = calcTeamStrength(defTeam).def / 100;
+    const onTargetChance = Math.min(0.72, Math.max(0.08, profile.baseOnTarget + shotQuality * 0.42 - defAvg * 0.22 + (opts.onTargetBonus || 0)));
+    if (seededRandom() >= onTargetChance) {
+      m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
+      addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
+      if (chanceType === 'throughball' && seededRandom() < 0.12) {
+        addEvent(m.minute, 'offside', `Offside against <span class="player">${shooter.name}</span>`, attackingSide);
+      }
+      return;
+    }
+
+    attTeam.stats.shotsOn++;
+    // ===== GK phase =====
+    const gk = pickPlayer(defTeam, ['GK']);
+    const gkSkill = Math.max(0.05, Math.min(0.98, (gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(gk)));
+    const saveChance = Math.min(0.92, Math.max(0.28, 0.42 + gkSkill * 0.42 - shotQuality * 0.28 - (isHeader ? 0.03 : 0)));
+    if (seededRandom() < saveChance) {
+      if (gk) {
+        defTeam.stats.saves++;
+        recordStat('saves', gk, defTeam.team);
+        if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+        m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+        addEvent(m.minute, 'save', pickSaveDesc(gk, shooter), attackingSide);
+        if (seededRandom() < 0.08) {
+          const reboundShooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, shooter.id);
+          if (reboundShooter) {
+            attTeam.stats.shots++;
+            addEvent(m.minute, 'shot', `The rebound falls to <span class="player">${reboundShooter.name}</span>!`, attackingSide);
+            resolveShot(attackingSide, defendingSide, reboundShooter, 'openplay', { qualityBonus: 0.16, onTargetBonus: 0.1 });
+          }
+        }
+      }
+      return;
+    }
+
+    // GOAL
+    attTeam.score++;
+    const method = isHeader ? { desc: 'towering header', xg: 0.3, puskas: false } : pickGoalMethod(shooter);
+    recordStat('goals', shooter, attTeam.team);
+    if (method.puskas) recordStat('puskas', shooter, attTeam.team);
+    pushGoal(attackingSide, shooter, m.minute, method.desc);
+    m.playerMatchStats[shooter.id].goals++;
+    m.playerMatchStats[shooter.id].xg += (profile.baseXg + shotQuality * 0.3);
+    const assister = opts.assistCandidate;
+    if (assister && assister.id !== shooter.id && seededRandom() < 0.7) {
+      recordStat('assists', assister, attTeam.team);
+      if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
+      m.playerMatchStats[assister.id].assists++;
+      m.playerMatchStats[assister.id].xa += 0.3 + seededRandom() * 0.4;
+      addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}. Assisted by <span class="player">${assister.name}</span>.`, attackingSide, true);
+    } else {
+      addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}.`, attackingSide, true);
+    }
+    maybeOffsideDisallow(attackingSide, shooter, m.minute);
+  }
+
+  // ===== Corner set piece (reached from a blocked cross/shot) =====
+  function resolveCorner(attackingSide) {
+    const m = currentMatch;
+    if (!m) return;
+    const defendingSide = attackingSide === 'home' ? 'away' : 'home';
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    attTeam.stats.corners = (attTeam.stats.corners || 0) + 1;
+    addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short}`, attackingSide);
+    if (seededRandom() >= 0.05) return;
+    const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CM', 'CAM'], (p) => aerialSkill(p) * 2);
+    if (!scorer) return;
+    attTeam.stats.shots++;
+    attTeam.stats.shotsOn++;
+    attTeam.score++;
+    recordStat('goals', scorer, attTeam.team);
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+    m.playerMatchStats[scorer.id].goals++;
+    m.playerMatchStats[scorer.id].xg += 0.28 + seededRandom() * 0.15;
+    const corTaker = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
+    if (corTaker && seededRandom() < 0.65) {
+      recordStat('assists', corTaker, attTeam.team);
+      if (!m.playerMatchStats[corTaker.id]) m.playerMatchStats[corTaker.id] = blankPlayerMatchStats(corTaker);
+      m.playerMatchStats[corTaker.id].assists++;
+      m.playerMatchStats[corTaker.id].xa += 0.2 + seededRandom() * 0.3;
+    }
+    pushGoal(attackingSide, scorer, m.minute, 'header from corner');
+    addEvent(m.minute, 'goal', `Corner converted. <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);
+    maybeOffsideDisallow(attackingSide, scorer, m.minute);
+  }
+
+  // ===== Chance Creation phase (the sequence has reached the final third) =====
+  // What kind of chance gets created is shaped by the entry channel and the
+  // ball-carrier's/team's playstyle — a wide entry with a Cross Specialist
+  // becomes a cross for an aerial target; an Inside Forward cuts in and
+  // shoots himself; a central entry through a Creative Playmaker becomes a
+  // defence-splitting through ball.
+  function resolveChanceCreation(attackingSide, defendingSide, carrier, channel) {
+    const m = currentMatch;
+    if (!m) return;
+    const attTeam = m[attackingSide];
+    const styles = (carrier.expandedAttrs && carrier.expandedAttrs.playstyle) || [];
+    const wide = channel !== 'C';
+    const crossStyle = styles.some(s => ['Cross Specialist', 'Prolific Winger', 'Roaming Flank', 'Offensive Full-back', 'Full-back Finisher'].includes(s));
+    const cutInStyle = styles.some(s => s === 'Inside Forward');
+    const throughBallStyle = styles.some(s => ['Creative Playmaker', 'Classic No. 10', 'Orchestrator', 'Deep-Lying Forward'].includes(s));
+
+    let chanceType, shooter;
+    if (wide && cutInStyle && seededRandom() < 0.55) {
+      chanceType = 'dribble'; shooter = carrier;
+    } else if (wide && (crossStyle || seededRandom() < 0.55)) {
+      chanceType = 'cross';
+      shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'], (p) => aerialSkill(p) * 2, carrier.id)
+        || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
+    } else if (!wide && throughBallStyle && seededRandom() < 0.5) {
+      chanceType = 'throughball';
+      shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
+    } else if (seededRandom() < 0.16) {
+      chanceType = 'longshot'; shooter = carrier;
+    } else {
+      chanceType = 'openplay';
+      shooter = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id);
+    }
+    if (!shooter) shooter = carrier;
+    attTeam.stats.shots++;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
+    m.playerMatchStats[shooter.id].shots++;
+    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null });
+  }
+
+  // ===== Fouls / cards (reached from a lost duel or lost pass) =====
+  // A challenge that happened as the attack was trying to break into the
+  // final third has a real chance of being a penalty rather than a free-kick.
+  // Every foul is logged here — this is the single source of truth for the
+  // fouls stat, cards, and any resulting penalty, so any event that reads as
+  // "a foul happened" (including a direct free-kick) always has exactly one
+  // matching entry in defTeam.stats.fouls / m.foulCounts behind it.
+  // Returns an outcome tag ('penalty' | 'red' | 'yellow' | 'foul') so callers
+  // can decide what, if anything, can still follow (e.g. a direct free-kick
+  // shouldn't be taken if the fouler just saw red on the same passage of play).
+  function resolveFoul(defendingSide, attackingSide, fouler, victim, nearBox, forcePenalty) {
+    const m = currentMatch;
+    if (!m || !fouler) return { outcome: 'none' };
+    const defTeam = m[defendingSide], attTeam = m[attackingSide];
+    defTeam.stats.fouls++;
+    if (!m.foulCounts) m.foulCounts = { home: {}, away: {} };
+    m.foulCounts[defendingSide][fouler.id] = (m.foulCounts[defendingSide][fouler.id] || 0) + 1;
+    const foulCount = m.foulCounts[defendingSide][fouler.id];
+    const alreadyYellow = (m.cards[defendingSide][fouler.id] || 0) >= 1;
+    const aggression = 1 + Math.max(0, (75 - (fouler.def || 70)) / 80) + Math.max(0, ((fouler.phy || 70) - 80) / 100);
+    const foulText = victim
+      ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
+      : `Foul by <span class="player">${fouler.name}</span>`;
+
+    if (nearBox && (forcePenalty || seededRandom() < 0.09)) {
+      addEvent(m.minute, 'foul', foulText + ' — inside the area!', defendingSide);
+      const taker = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], PEN_TAKER_ROLE_WEIGHT) || victim;
+      if (taker) {
+        addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
+        attTeam.stats.shots++;
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+        m.playerMatchStats[taker.id].shots++;
+        const penGk = pickPlayer(defTeam, ['GK']);
+        const po = pickPenOutcome(taker, penGk);
+        if (po.scored) {
+          attTeam.stats.shotsOn++;
+          attTeam.score++;
+          recordStat('goals', taker, attTeam.team);
+          m.playerMatchStats[taker.id].goals++;
+          m.playerMatchStats[taker.id].xg += 0.76 + seededRandom() * 0.08;
+          pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
+          addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
+          maybeOffsideDisallow(attackingSide, taker, m.minute);
+        } else {
+          if (po.saved) {
+            attTeam.stats.shotsOn++;
+            if (penGk) {
+              defTeam.stats.saves++;
+              recordStat('saves', penGk, defTeam.team);
+              if (!m.playerMatchStats[penGk.id]) m.playerMatchStats[penGk.id] = blankPlayerMatchStats(penGk);
+              m.playerMatchStats[penGk.id].saves = (m.playerMatchStats[penGk.id].saves || 0) + 1;
+            }
+            addEvent(m.minute, 'save', `🧤 Penalty saved! <span class="player">${taker.name}</span>'s effort ${po.text}${penGk ? ` — <span class="player">${penGk.name}</span> denies it` : ''}`, attackingSide);
+          } else {
+            addEvent(m.minute, 'miss', `Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, attackingSide);
+          }
+        }
+      }
+      return { outcome: 'penalty' };
+    }
+
+    let yellowChance = Math.min(0.72, 0.08 * aggression + (foulCount - 1) * 0.14 + (alreadyYellow ? 0.12 : 0) + (foulCount >= 3 ? 0.12 : 0));
+    const straightRedChance = 0.004 * aggression;
+    const roll = seededRandom();
+    if (roll < straightRedChance && !alreadyYellow) {
+      defTeam.stats.reds++;
+      recordStat('cards', fouler, defTeam.team);
+      recordStat('reds', fouler, defTeam.team);
+      if (!m.playerMatchStats) m.playerMatchStats = {};
+      if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
+      m.playerMatchStats[fouler.id].red = true;
+      addEvent(m.minute, 'red', `🟥 Straight red! ${foulText} — reckless challenge`, defendingSide);
+      removeFromPitch(defendingSide, fouler.id);
+      handleRedCardReshuffle(defendingSide, fouler);
+      return { outcome: 'red' };
+    } else if (roll < straightRedChance + yellowChance) {
+      m.cards[defendingSide][fouler.id] = (m.cards[defendingSide][fouler.id] || 0) + 1;
+      defTeam.stats.yellows++;
+      recordStat('cards', fouler, defTeam.team);
+      recordStat('yellows', fouler, defTeam.team);
+      if (!m.playerMatchStats) m.playerMatchStats = {};
+      if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
+      m.playerMatchStats[fouler.id].yellow = true;
+      if (m.cards[defendingSide][fouler.id] >= 2) {
+        defTeam.stats.reds++;
+        recordStat('reds', fouler, defTeam.team);
+        m.playerMatchStats[fouler.id].red = true;
+        addEvent(m.minute, 'red', `🟥 Second yellow → red! ${foulText}`, defendingSide);
+        removeFromPitch(defendingSide, fouler.id);
+        handleRedCardReshuffle(defendingSide, fouler);
+        return { outcome: 'red' };
+      } else {
+        addEvent(m.minute, 'yellow', `🟨 Yellow card — ${foulText}${foulCount > 1 ? ' (repeated fouls)' : ''}`, defendingSide);
+        return { outcome: 'yellow' };
+      }
+    } else {
+      addEvent(m.minute, 'foul', foulText + (foulCount > 1 ? ' — referee has a word' : ''), defendingSide);
+      return { outcome: 'foul' };
+    }
+  }
+
+  // ===== Transitions phase: a fast break for the side that just won the ball =====
+  // Skips the full zone-by-zone grind (the whole point of a counter is that
+  // there isn't time for one) and goes almost straight to a shot, with a
+  // quality/on-target bump reflecting the exposed, unset defence.
+  function runFastBreak(breakingSide, otherSide) {
+    const m = currentMatch;
+    if (!m) return;
+    const breakTeam = m[breakingSide];
+    const shooter = pickPlayerWeighted(breakTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], GOAL_ROLE_WEIGHT);
+    if (!shooter) return;
+    addEvent(m.minute, 'pressure', `${breakTeam.team.short} break at real pace!`, breakingSide);
+    resolveChanceCreation(breakingSide, otherSide, shooter, seededRandom() < 0.5 ? 'L' : (seededRandom() < 0.5 ? 'C' : 'R'));
+  }
+
+  // ===== Duels phase resolution: the ball has been lost (pass cut out, or =====
+  // ===== beaten in a 1v1) — who wins it, and does it spring a transition?
+  function resolveTurnover(attackingSide, defendingSide, contestedPlayer, winner, fromThird, toThird, kind) {
+    const m = currentMatch;
+    if (!m) return;
+    const defTeam = m[defendingSide];
+    const defenderPlayer = winner || pickPlayer(defTeam, mirrorDefenderPos(toThird + '_C'));
+    if (!defenderPlayer) return;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[defenderPlayer.id]) m.playerMatchStats[defenderPlayer.id] = blankPlayerMatchStats(defenderPlayer);
+    const ps = m.playerMatchStats[defenderPlayer.id];
+
+    // A mistimed challenge trying to win the ball back becomes a foul.
+    const aggression = 1 + Math.max(0, (75 - (defenderPlayer.def || 70)) / 80) + Math.max(0, ((defenderPlayer.phy || 70) - 80) / 100);
+    const foulChance = 0.09 * aggression * (kind === 'duel' ? 1.3 : 0.75);
+    if (seededRandom() < foulChance) {
+      resolveFoul(defendingSide, attackingSide, defenderPlayer, contestedPlayer, toThird === 'ATT');
+      return;
+    }
+
+    const roll = seededRandom();
+    if (roll < 0.55) {
+      ps.interceptions = (ps.interceptions || 0) + 1;
+      ps.tackles = (ps.tackles || 0) + 1;
+      defTeam.stats.interceptions = (defTeam.stats.interceptions || 0) + 1;
+      if (seededRandom() < 0.4) {
+        const flavor = styleFlavor(defenderPlayer, INTERCEPTION_FLAVOR);
+        addEvent(m.minute, 'pass', flavor
+          ? `<span class="player">${defenderPlayer.name}</span> (${defTeam.team.short}) ${flavor}.`
+          : `Interception by <span class="player">${defenderPlayer.name}</span> (${defTeam.team.short}).`, defendingSide);
+      }
+    } else {
+      ps.tackles = (ps.tackles || 0) + 1;
+      if (seededRandom() < 0.4) {
+        const flavor = styleFlavor(defenderPlayer, TACKLE_FLAVOR);
+        addEvent(m.minute, 'tackle', flavor
+          ? `<span class="player">${defenderPlayer.name}</span> ${flavor}`
+          : `Strong challenge from <span class="player">${defenderPlayer.name}</span> (${defTeam.team.short}) wins it back.`, defendingSide);
+      }
+    }
+
+    // ===== Transitions phase: does the side that just won it break quickly? =====
+    const defMods = getPlaystyleMods(defTeam.team);
+    const spaceFactor = fromThird === 'ATT' ? 1.3 : fromThird === 'MID' ? 1.0 : 0.55;
+    const counterProb = Math.max(0.03, Math.min(0.55, 0.08 * defMods.counterBonus * spaceFactor + ((defenderPlayer.pac || 70) - 70) / 320));
+    if (seededRandom() < counterProb) runFastBreak(defendingSide, attackingSide);
+  }
+
+  // ===== The core pipeline: Zones -> Movement -> Passing -> Duels, one =====
+  // ===== zone transition at a time, until the ball reaches the final third
+  // (Chance Creation) or is lost along the way (Transitions).
+  function runPossessionSequence(attackingSide) {
+    const m = currentMatch;
+    if (!m) return;
+    const defendingSide = attackingSide === 'home' ? 'away' : 'home';
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    const attMods = getPlaystyleMods(attTeam.team);
+    const tac = (m.tactics && m.tactics[attackingSide]) || 'balanced';
+    const defTac = (m.tactics && m.tactics[defendingSide]) || 'balanced';
+
+    // ===== Zones phase: which channel does this sequence develop through? =====
+    // Out Wide / Overload-minded managers lean wide; Possession/Long Ball
+    // sides are more likely to build centrally.
+    const wideBias = Math.max(0.15, Math.min(0.85, 0.42 * attMods.wingBiasMult));
+    let channel = seededRandom() < wideBias ? (seededRandom() < 0.5 ? 'L' : 'R') : 'C';
+
+    let carrier = pickPlayer(attTeam, ZONE_POS_MAP['DEF_' + channel]) || pickPlayer(attTeam, ['CB', 'GK']);
+    if (!carrier) return;
+
+    for (let i = 0; i < 2; i++) { // DEF->MID, then MID->ATT
+      const fromThird = PITCH_THIRDS[i], toThird = PITCH_THIRDS[i + 1];
+      // Occasional switch of play between thirds.
+      if (seededRandom() < 0.22) channel = PITCH_CHANNELS[Math.floor(seededRandom() * 3)];
+      const targetZone = toThird + '_' + channel;
+
+      // ===== Movement phase: who makes themselves available in that zone? =====
+      const targetPlayer = pickPlayer(attTeam, ZONE_POS_MAP[targetZone], carrier.id) || carrier;
+
+      // ===== Passing phase: can the carrier find them? =====
+      const passerSkill = passingAbility(carrier);
+      const marker = pickPlayer(defTeam, mirrorDefenderPos(targetZone));
+      const pressure = marker ? defensivePressure(marker) : 60;
+      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta;
+      if (tac === 'attack') passChance -= 0.03;
+      if (tac === 'press') passChance -= 0.015;
+      if (defTac === 'press') passChance -= 0.05;
+      if (defTac === 'defend') passChance -= 0.03; // compact shape is harder to pass through
+      passChance = Math.max(0.30, Math.min(0.93, passChance));
+
+      if (seededRandom() >= passChance) {
+        resolveTurnover(attackingSide, defendingSide, carrier, marker, fromThird, toThird, 'pass');
+        return;
+      }
+
+      // ===== Duels phase: even a completed pass can be won back under =====
+      // ===== immediate pressure (a 1v1 press right as the ball arrives).
+      const duelChance = Math.max(0.35, Math.min(0.95,
+        0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0)));
+      if (seededRandom() >= duelChance) {
+        resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel');
+        return;
+      } else if (seededRandom() < 0.12) {
+        addEvent(m.minute, 'skill', `✨ ${pickSkillDesc(targetPlayer, marker)}`, attackingSide);
+      }
+
+      carrier = targetPlayer;
+    }
+
+    // ===== Chance Creation phase (reached the final third) =====
+    resolveChanceCreation(attackingSide, defendingSide, carrier, channel);
+  }
+
+  // ===== Secondary match texture: set pieces / handballs / VAR that the =====
+  // ===== headline possession pipeline above doesn't already cover, kept at
+  // a low independent rate so cards/set-pieces still accumulate realistically
+  // without duplicating shots the pipeline already generated this minute.
+  function maybeSecondaryMatchEvent() {
+    const m = currentMatch;
+    if (!m || seededRandom() > 0.22) return;
+    const side = seededRandom() < 0.5 ? 'home' : 'away';
+    const defSide = side === 'home' ? 'away' : 'home';
+    const attTeam = m[side], defTeam = m[defSide];
+    const roll = seededRandom();
+    if (roll < 0.24) {
+      // Direct free-kick — always the consequence of an actual, logged foul
+      // (never conjured out of nowhere). The fouler is picked from the
+      // defending side committing a midfield/wide challenge, resolveFoul
+      // handles the real foul/card bookkeeping, and only if that foul left
+      // the taking side with a genuine dangerous set-piece (and didn't just
+      // end in a red card stopping play) does the free-kick shot follow.
+      const fouler = pickPlayer(defTeam, ['CM', 'CDM', 'CB', 'RB', 'LB', 'RWB', 'LWB']);
+      const victim = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
+      if (fouler) {
+        const result = resolveFoul(defSide, side, fouler, victim, false);
+        if (result && result.outcome !== 'red' && result.outcome !== 'penalty' && seededRandom() < 0.35) {
+          const taker = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
+          if (taker) {
+            attTeam.stats.shots++;
+            if (!m.playerMatchStats) m.playerMatchStats = {};
+            if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+            m.playerMatchStats[taker.id].shots++;
+            const fkGk = pickPlayer(defTeam, ['GK']);
+            const fk = pickFkOutcome(taker, fkGk);
+            addEvent(m.minute, 'shot', `<span class="player">${taker.name}</span> stands over the free-kick...`, side);
+            if (fk.scored) {
+              attTeam.stats.shotsOn++;
+              attTeam.score++;
+              recordStat('goals', taker, attTeam.team);
+              m.playerMatchStats[taker.id].goals++;
+              m.playerMatchStats[taker.id].xg += 0.12 + seededRandom() * 0.1;
+              pushGoal(side, taker, m.minute, fk.text);
+              addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, side, true);
+              if (seededRandom() < 0.55) recordStat('puskas', taker, attTeam.team);
+              maybeOffsideDisallow(side, taker, m.minute);
+            } else {
+              if (fk.saved) {
+                attTeam.stats.shotsOn++;
+                const gk = fkGk || pickPlayer(defTeam, ['GK']);
+                if (gk) {
+                  defTeam.stats.saves++;
+                  recordStat('saves', gk, defTeam.team);
+                  if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+                  m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+                }
+                addEvent(m.minute, 'save', `🧤 Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, side);
+              } else {
+                addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, side);
+                if (fk.wall) resolveCorner(side);
+              }
+            }
+          }
+        }
+      }
+    } else if (roll < 0.42) {
+      // Handball — the vast majority are just a regular foul; only a small
+      // share are actually given as a penalty. The commentary now always
+      // matches what's actually awarded instead of asserting a penalty and
+      // then only sometimes delivering one.
+      const p = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM', 'ST']);
+      if (p) {
+        const nearBox = seededRandom() < 0.45;
+        const givenAsPen = nearBox && seededRandom() < 0.22;
+        if (givenAsPen) {
+          addEvent(m.minute, 'handball', `Handball against <span class="player">${p.name}</span> — referee points to the spot!`, defSide);
+          resolveFoul(defSide, side, p, null, true, true);
+        } else {
+          addEvent(m.minute, 'handball', `Appeal for handball against <span class="player">${p.name}</span>${nearBox ? ' waved away' : ' — referee says ball to hand'}`, defSide);
+          resolveFoul(defSide, side, p, null, false);
+        }
+      }
+    } else if (roll < 0.60) {
+      // VAR — red-card review. A card given after review still traces back
+      // to a real foul/challenge that happened on the pitch, so it counts
+      // toward fouls (and the 'cards' bucket) exactly like any other card.
+      const player = pickPlayer(defTeam, ['CB', 'ST', 'CDM', 'CM']);
+      addEvent(m.minute, 'var', `📺 VAR checking possible red card (${defTeam.team.short})...`, defSide);
+      if (player && seededRandom() < 0.16) {
+        defTeam.stats.fouls++;
+        if (!m.foulCounts) m.foulCounts = { home: {}, away: {} };
+        m.foulCounts[defSide][player.id] = (m.foulCounts[defSide][player.id] || 0) + 1;
+        defTeam.stats.reds++;
+        recordStat('cards', player, defTeam.team);
+        recordStat('reds', player, defTeam.team);
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
+        m.playerMatchStats[player.id].red = true;
+        addEvent(m.minute, 'red', `VAR: Red card! <span class="player">${player.name}</span> (${defTeam.team.short}) sent off`, defSide);
+        removeFromPitch(defSide, player.id);
+        handleRedCardReshuffle(defSide, player);
+      } else {
+        const noRedLines = [
+          `VAR: No red card — challenge by ${player ? player.name : 'the defender'} was mistimed but not violent conduct`,
+          `VAR: Yellow card only — ${player ? player.name : 'player'} caught the man, not excessive force`,
+          `VAR: On-field decision stands — no red card for ${player ? player.name : 'the defender'}`
+        ];
+        addEvent(m.minute, 'var', noRedLines[Math.floor(seededRandom() * noRedLines.length)], defSide);
+        if (player && seededRandom() < 0.5 && (m.cards[defSide][player.id] || 0) < 1) {
+          m.cards[defSide][player.id] = (m.cards[defSide][player.id] || 0) + 1;
+          defTeam.stats.yellows++;
+          recordStat('yellows', player, defTeam.team);
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
+          m.playerMatchStats[player.id].yellow = true;
+          addEvent(m.minute, 'yellow', `🟨 Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
+        }
+      }
+    } else if (roll < 0.72) {
+      const att = pickPlayer(attTeam, ['ST', 'CAM', 'RW', 'LW', 'CM']);
+      const def = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM']);
+      const rare = seededRandom();
+      if (rare < 0.2) {
+        addEvent(m.minute, 'whistle', `Rain starts to lash the pitch — footing becomes tricky`, null);
+      } else if (rare < 0.4 && def) {
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[def.id]) m.playerMatchStats[def.id] = blankPlayerMatchStats(def);
+        m.playerMatchStats[def.id].tackles = (m.playerMatchStats[def.id].tackles || 0) + 1;
+        const tackleFlavor = styleFlavor(def, TACKLE_FLAVOR) || 'times a sliding tackle to perfection on the edge of the box';
+        addEvent(m.minute, 'tackle', `<span class="player">${def.name}</span> ${tackleFlavor}`, defSide);
+      } else if (rare < 0.6 && att) {
+        const passFlavor = styleFlavor(att, THROUGH_BALL_FLAVOR) || 'threads a defence-splitting ball into the channel';
+        addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> ${passFlavor}`, side);
+      } else if (rare < 0.8) {
+        const gk = pickPlayer(defTeam, ['GK']);
+        if (gk) {
+          defTeam.stats.saves++;
+          recordStat('saves', gk, defTeam.team);
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+          m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+          addEvent(m.minute, 'save', `<span class="player">${gk.name}</span> rushes off the line to smother a through ball`, defSide);
+        }
+      } else {
+        addEvent(m.minute, 'whistle', `The crowd sense a goal — noise levels rise as ${attTeam.team.short} advance`, null);
+      }
+    } else {
+      const lines = [
+        `${attTeam.team.short} recycle possession in the final third`,
+        `${attTeam.team.short} work an opening down the flank`,
+        `Patient build-up from ${attTeam.team.short}`,
+        `${defTeam.team.short} hold a high line under pressure`,
+        `Cross claimed comfortably — ${defTeam.team.short} clear`
+      ];
+      addEvent(m.minute, 'pressure', lines[Math.floor(seededRandom() * lines.length)], side);
+    }
+  }
+
+  // ===== Top-level per-minute orchestrator: Possession phase decides who =====
+  // ===== gets this minute's headline sequence, then hands off to the
+  // Zones->Movement->Passing->Duels->Transitions->Chance->Shots->GK pipeline.
+  function generateEvents() {
+    const m = currentMatch;
+    if (!m) return;
+
+    // ---- Background per-minute stat accumulation (pass volume + off-ball
+    // defensive activity), independent of which side wins the headline
+    // sequence below — this is what keeps every outfield player's pass/
+    // tackle counts building up realistically across 90 minutes.
+    simulateMinutePassing();
+    simulateDefensiveActions();
+
+    const homeStr = calcTeamStrength(m.home);
+    const awayStr = calcTeamStrength(m.away);
+    const homeMods = getPlaystyleMods(m.home.team);
+    const awayMods = getPlaystyleMods(m.away.team);
+
+    // ===== Possession phase: which side's build-up is this minute's =====
+    // ===== headline sequence? Driven by attacking quality vs the opponent's
+    // defensive quality, run through a logistic curve so a genuine quality
+    // gap (a title contender's front line vs a relegation-battler's back
+    // line) shows up clearly over 90 minutes/a season, while a small home
+    // nudge and a soft floor/ceiling keep upsets possible.
+    const mgrEdge = (homeStr.mgr - awayStr.mgr) * 0.15;
+    let homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10;
+    let awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10;
+    // Game-state realism: a team chasing the game late pushes players forward
+    // and creates more (higher risk, higher reward); one nursing a lead sits in.
+    if (m.minute > 55) {
+      const diff = (m.home.score || 0) - (m.away.score || 0);
+      const urgency = Math.min(1, (m.minute - 55) / 35);
+      if (diff <= -1) homeCreate += Math.min(10, Math.abs(diff) * 4) * urgency;
+      else if (diff >= 1) homeCreate -= Math.min(6, diff * 2.5) * urgency;
+      if (diff >= 1) awayCreate += Math.min(10, diff * 4) * urgency;
+      else if (diff <= -1) awayCreate -= Math.min(6, Math.abs(diff) * 2.5) * urgency;
+    }
+    const HOME_ADV = 4.0;
+    const jitter = (seededRandom() - 0.5) * 7; // real ebb-and-flow, not a static edge all 90 minutes
+    const qualityGap = (homeCreate - awayCreate) + HOME_ADV + mgrEdge + jitter;
+    let homeChance = 1 / (1 + Math.exp(-qualityGap / 13));
+    homeChance = Math.min(0.90, Math.max(0.10, homeChance));
+
+    // Possession % derived from actual completed-pass share (like real match
+    // data providers compute it), tugged toward the side with the real
+    // ball-control edge and smoothed minute to minute.
+    const hp = m.home.stats.passes || 0, ap = m.away.stats.passes || 0;
+    const passShareTarget = (hp + ap) > 0 ? 100 * hp / (hp + ap) : 50;
+    const ctrlBias = Math.max(-14, Math.min(14, (((homeStr.tec * 0.55 + homeStr.ovr * 0.25 + (homeStr.mgr || 75) * 0.20)
+      - (awayStr.tec * 0.55 + awayStr.ovr * 0.25 + (awayStr.mgr || 75) * 0.20)) * 0.9) + 1.5));
+    const styleBias = Math.max(-8, Math.min(8, (homeMods.possBias - awayMods.possBias) * 0.5));
+    const target = Math.max(20, Math.min(80, passShareTarget * 0.62 + (50 + ctrlBias + styleBias) * 0.38));
+    m.possession = m.possession + (target - m.possession) * 0.16 + (seededRandom() - 0.5) * 1.2;
+    m.possession = Math.max(18, Math.min(82, m.possession));
+    m.home.stats.possession = Math.round(m.possession);
+    m.away.stats.possession = 100 - m.home.stats.possession;
+
+    // Stronger teams create more moments — some minutes are just quiet.
+    const intensity = 0.42 + (homeStr.ovr + awayStr.ovr) / 500;
+    if (seededRandom() > intensity) {
+      if (seededRandom() < 0.08) {
+        const side = seededRandom() < 0.5 ? m.home : m.away;
+        const p = pickPlayer(side, ['CM', 'CDM', 'CAM', 'CB']);
+        if (p) {
+          const quiet = [
+            `<span class="player">${p.name}</span> recycles possession calmly`,
+            `<span class="player">${p.name}</span> breaks up the play and resets`,
+            `<span class="player">${p.name}</span> switches the point of attack`,
+            `<span class="player">${p.name}</span> finds a teammate under no pressure`,
+            `Spell of possession — <span class="player">${p.name}</span> dictates the tempo`
+          ];
+          addEvent(m.minute, 'pass', quiet[Math.floor(seededRandom() * quiet.length)], side === m.home ? 'home' : 'away');
+        }
+      }
+      maybeSecondaryMatchEvent();
+      return;
+    }
+
+    // ===== Hand off to the phase pipeline: Zones -> Movement -> Passing -> =====
+    // ===== Duels -> Transitions -> Chance Creation -> Shots -> GK, all
+    // shaped by real player attributes and each side's tactics/playstyle.
+    const attackingSide = seededRandom() < homeChance ? 'home' : 'away';
+    runPossessionSequence(attackingSide);
+
+    // Occasional independent texture (set pieces / cards / VAR) at a low
+    // rate so the match keeps its color beyond just the headline sequence.
+    maybeSecondaryMatchEvent();
+  }
+
+  // ---- Opening-instructions AI: what a manager sets up with at kickoff,
+  // driven by the actual quality gap between the two sides plus identity —
+  // not a flat "balanced" default that made every kickoff feel the same.
+  function decideOpeningTactic(selfStr, oppStr, style) {
+    const gap = (selfStr.ovr || 75) - (oppStr.ovr || 75);
+    const counterMinded = ['Quick Counter', 'Long Ball Counter', 'Long Ball'].includes(style);
+    const possessionMinded = style === 'Possession';
+    if (gap <= -4) return seededRandom() < 0.6 ? 'defend' : 'balanced';
+    if (gap >= 5) return seededRandom() < (possessionMinded ? 0.65 : 0.5) ? (possessionMinded ? 'press' : 'attack') : 'balanced';
+    if (counterMinded && gap < 2) return seededRandom() < 0.35 ? 'defend' : 'balanced';
+    if (possessionMinded) return seededRandom() < 0.4 ? 'press' : 'balanced';
+    return 'balanced';
+  }
+
+  function calcTeamStrength(side) {
+    if (!currentMatch || !side) return { att: 50, def: 50, tec: 50 };
+    const isHome = side === currentMatch.home;
+    const ids = isHome ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    const onPitch = (side.squad.all || []).filter(p => ids.includes(p.id));
+    if (!onPitch.length) return { att: 50, def: 50, tec: 50 };
+    const mgr = (side.team.manager && side.team.manager.ovr) || 75;
+    const pmods = getPlaystyleMods(side.team);
+    const avg = (key, fallback) => onPitch.reduce((s, p) => s + (p[key] != null ? p[key] : fallback), 0) / onPitch.length;
+    // Small, realistic home-field boost — crowd support and matchday familiarity
+    // lift a side's sharpness a touch, on both ends of the pitch.
+    const homeBoostAtt = isHome ? 1.2 : 0;
+    const homeBoostDef = isHome ? 1.0 : 0;
+    // ---- Formation shape now feeds directly into team strength: an
+    // attack-heavy formation (extra forwards/wide bodies) lifts att at the
+    // cost of def, a defensive shape (extra CBs/wing-backs, fewer forwards)
+    // does the reverse, and a midfield-heavy shape nudges control (tec).
+    const shape = formationShape(side.squad && side.squad.formation);
+    const attShape = (shape.fwd - SHAPE_BASELINE.fwd) * 1.6 + (shape.mid - SHAPE_BASELINE.mid) * 0.25;
+    const defShape = (shape.def - SHAPE_BASELINE.def) * 1.7 - (shape.fwd - SHAPE_BASELINE.fwd) * 0.35 + (shape.mid - SHAPE_BASELINE.mid) * 0.15;
+    const midShape = (shape.mid - SHAPE_BASELINE.mid) * 0.4;
+    return {
+      // Manager overall now carries real weight: a top tactician visibly lifts
+      // both ends of the pitch, a poor one visibly drags them down.
+      att: avg('att', 70) + (mgr - 75) * 0.18 + pmods.attBonus + homeBoostAtt + attShape,
+      def: avg('def', 70) + (mgr - 75) * 0.16 + pmods.defBonus + homeBoostDef + defShape,
+      tec: avg('tec', 70) + midShape,
+      ovr: avg('ovr', 75),
+      phy: avg('phy', 70),
+      pac: avg('pac', 70),
+      mgr: mgr,
+      shape: shape
+    };
+  }
+
+  function pickPlayer(side, preferredPos, excludeId) {
+    if (!currentMatch || !side) return null;
+    const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    let pool = (side.squad.all || []).filter(p => ids.includes(p.id) && p.id !== excludeId);
+    if (preferredPos && preferredPos.length) {
+      const preferred = pool.filter(p => (p.pos || []).some(pos => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
+      if (preferred.length) pool = preferred;
+    }
+    if (!pool.length) return null;
+    // Weight selection toward higher ovr / relevant attrs (mild curve — this
+    // path covers secondary events like corners/fouls, so quality should
+    // nudge things without dominating the way it does for the main
+    // goal/assist picker above).
+    const weights = pool.map(p => {
+      const composite = (p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2;
+      let w = Math.pow(Math.max(composite, 40) / 92, 1.4) * 92;
+      return Math.max(5, w);
+    });
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = seededRandom() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }
+
+  // Realistic role tendencies: strikers/wingers get on the scoresheet far more
+  // than they create, while attacking mids/central mids are the primary creators.
+  // Defenders/holding mids chip in occasionally (set pieces, late runs) but rarely lead scoring.
+  // NOTE: these weights combine multiplicatively with each player's own attributes
+  // (att/ovr/tec) in pickPlayerWeighted, and strikers/wingers already carry higher
+  // 'att' ratings than midfielders. A wide spread here compounds with that and makes
+  // strikers score far more than real-world scoring share (~ST 35-40%, wide/CAM
+  // ~35-40%, CM/deep ~15-20%, defenders ~5-8%). Keep the spread modest.
+  const GOAL_ROLE_WEIGHT = { ST: 1.9, CF: 1.9, RW: 1.7, LW: 1.7, CAM: 1.4, RM: 1.25, LM: 1.25, CM: 0.85, CDM: 0.45, RWB: 0.35, LWB: 0.35, RB: 0.3, LB: 0.3, CB: 0.2, GK: 0.01 };
+  const ASSIST_ROLE_WEIGHT = { CAM: 2.0, CM: 1.75, RW: 1.65, LW: 1.65, RM: 1.4, LM: 1.4, ST: 1.0, CF: 1.0, CDM: 0.85, RWB: 0.8, LWB: 0.8, RB: 0.8, LB: 0.8, CB: 0.25, GK: 0.02 };
+  // Penalty duty in real football overwhelmingly goes to strikers/wingers, with the
+  // occasional attacking mid; deep midfielders almost never take them.
+  const PEN_TAKER_ROLE_WEIGHT = { ST: 3.3, CF: 3.3, RW: 2.5, LW: 2.5, CAM: 1.0, RM: 0.7, LM: 0.7, CM: 0.3, CDM: 0.1, CB: 0.05 };
+
+  // Like pickPlayer, but multiplies selection weight by a role-tendency table so
+  // (for example) strikers/wingers are picked as goalscorers far more often than
+  // central/defensive midfielders, matching real-world scoring distributions.
+  function pickPlayerWeighted(side, preferredPos, roleWeights, excludeId) {
+    if (!currentMatch || !side) return null;
+    const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    let pool = (side.squad.all || []).filter(p => ids.includes(p.id) && p.id !== excludeId);
+    if (preferredPos && preferredPos.length) {
+      const preferred = pool.filter(p => (p.pos || []).some(pos => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
+      if (preferred.length) pool = preferred;
+    }
+    if (!pool.length) return null;
+    const weights = pool.map(p => {
+      const slot = p.slot || (p.pos || [])[0] || 'CM';
+      const roleW = (roleWeights && roleWeights[slot] != null) ? roleWeights[slot] : 1;
+      // Composite quality (0-100ish scale). Raised to a modest power so real
+      // separation in ability (a Mbappe/Haaland-tier ovr/att/tec vs a squad
+      // fill-in) compounds into a clearly higher share of goals/assists over
+      // a season — like real-world Golden Boot races — without ever reducing
+      // a lesser player's chance to zero on any single kick. This is
+      // symmetric for every player regardless of club, so it favors quality,
+      // not any particular team.
+      const composite = (p.ovr || 70) * 0.5 + (p.att || 70) * 0.35 + (p.tec || 70) * 0.15;
+      const w = Math.pow(Math.max(composite, 30) / 70, 2.2) * 100 * roleW;
+      return Math.max(1, w);
+    });
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = seededRandom() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }
+
+
+  function trySubstitution(side) {
+    const m = currentMatch;
+    if (!m) return;
+    const sideData = m[side];
+    const otherSide = side === 'home' ? 'away' : 'home';
+    const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+    if (used >= (m.maxSubs || 5)) return;
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
+    const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    // Game-state context: is this side chasing the game or protecting a
+    // lead late on? Drives which line gets sacrificed and what comes on,
+    // so a losing side's subs read as "throwing men forward" and a
+    // winning side's subs read as genuine game management — not the same
+    // like-for-like swap regardless of the scoreline.
+    const diff = (sideData.score || 0) - ((m[otherSide] || {}).score || 0);
+    const chasing = diff <= -1 && m.minute >= 60;
+    const protectingLead = diff >= 1 && m.minute >= 72;
+    // Anyone currently on pitch (starter or previous sub)
+    const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
+    // Prefer lower rated / tired-looking out. Exclude GKs, and — normally —
+    // exclude players who already came on as a substitute themselves, since a
+    // manager doesn't typically sub off a sub they just brought on. Fall back
+    // to including them only if there's genuinely no other outfield option.
+    const alreadySubbedIn = (p) => !!(m.subLog[side] && m.subLog[side][p.id] && m.subLog[side][p.id].inMin != null);
+    let outfieldPool = onPitch.filter(p => (p.slot || (p.pos||[])[0]) !== 'GK');
+    let freshPool = outfieldPool.filter(p => !alreadySubbedIn(p));
+    let pool = freshPool.length ? freshPool : outfieldPool;
+    // Chasing the game: the sacrifice comes from the back/deep midfield to
+    // free up a spot for fresh legs further forward. Protecting a lead: the
+    // sacrifice comes from the front line to bring on defensive cover.
+    if (chasing) {
+      const backPool = pool.filter(p => lineOf(p) === 'DEF' || lineOf(p) === 'MID');
+      if (backPool.length) pool = backPool;
+    } else if (protectingLead) {
+      const frontPool = pool.filter(p => lineOf(p) === 'FWD' || lineOf(p) === 'MID');
+      if (frontPool.length) pool = frontPool;
+    }
+    // Weighted pick, not just "worst half": lower-rated legs are still the
+    // main driver, but forwards/midfielders get tired and rotated far more
+    // often in real football than centre-backs, so weight the line too —
+    // this stops the engine picking a defender to sub off just because a
+    // striker happens to have a marginally higher OVR that match.
+    const LINE_SUB_WEIGHT = chasing ? { FWD: 0.5, MID: 1.1, DEF: 1.4, GK: 0 }
+      : protectingLead ? { FWD: 1.5, MID: 1.1, DEF: 0.3, GK: 0 }
+      : { FWD: 1.3, MID: 1.15, DEF: 0.65, GK: 0 };
+    const weighted = pool.map(p => ({ p, w: Math.max(0.15, (96 - (p.ovr || 70)) * (LINE_SUB_WEIGHT[lineOf(p)] || 1)) }));
+    const totalW = weighted.reduce((s, x) => s + x.w, 0);
+    let outPlayer = null;
+    if (totalW > 0) {
+      let r = seededRandom() * totalW;
+      for (const x of weighted) { r -= x.w; if (r <= 0) { outPlayer = x.p; break; } }
+    }
+    if (!outPlayer) outPlayer = pool[Math.floor(seededRandom() * pool.length)];
+    if (!outPlayer) return;
+
+    // A substitute can only come from the bench, must not already be on the
+    // pitch, and — critically — must never have left the pitch already this
+    // match (whether as a starter subbed off, a substitute subbed off again,
+    // or a player sent off/injured out).
+    const availableSubs = (sideData.squad.subs || []).filter(p =>
+      !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !leftIds.includes(p.id));
+    if (!availableSubs.length) return;
+
+    // Tiered matching so the incoming player is a genuine like-for-like
+    // replacement: exact slot first, then anyone who shares the outgoing
+    // player's position line (defender for defender, forward for forward),
+    // and only loosen to broad position-compatibility or "whoever's left" if
+    // the bench truly has nothing closer. Chasing/protecting a lead can
+    // override this with a deliberate change of line (attacker on for a
+    // defender, or vice versa) when the bench actually offers one.
+    const outSlot = outPlayer.slot || (outPlayer.pos || [])[0] || 'CM';
+    const outLine = lineOf(outPlayer);
+    let candidatesIn = availableSubs.filter(p => (p.slot || (p.pos || [])[0]) === outSlot);
+    let matchedOwnPosition = true;
+    let tacticalChange = false;
+    if (chasing) {
+      const attackers = availableSubs.filter(p => lineOf(p) === 'FWD');
+      if (attackers.length && outLine !== 'FWD') { candidatesIn = attackers; matchedOwnPosition = false; tacticalChange = true; }
+    } else if (protectingLead) {
+      const defenders = availableSubs.filter(p => lineOf(p) === 'DEF' || (lineOf(p) === 'MID' && (p.slot === 'CDM' || (p.pos||[]).includes('CDM'))));
+      if (defenders.length && outLine !== 'DEF') { candidatesIn = defenders; matchedOwnPosition = false; tacticalChange = true; }
+    }
+    if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => lineOf(p) === outLine); tacticalChange = false; }
+    if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => canPlay(p, outSlot)); matchedOwnPosition = false; tacticalChange = false; }
+    if (!candidatesIn.length) { candidatesIn = availableSubs; matchedOwnPosition = false; tacticalChange = false; }
+    candidatesIn.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
+    const top = candidatesIn.slice(0, Math.min(3, candidatesIn.length));
+    const inPlayer = top[Math.floor(seededRandom() * top.length)];
+    const idx = onPitchIds.indexOf(outPlayer.id);
+    if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+    markLeftPitch(m, side, outPlayer.id);
+    if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
+    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
+    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
+    // A substitute plays their own main position, not a borrowed one — only
+    // fall back to the outgoing player's slot when the bench had nobody
+    // positionally close, purely so the pitch shape still makes sense.
+    if (!matchedOwnPosition) inPlayer.slot = tacticalChange ? (inPlayer.pos || [outSlot])[0] : outSlot;
+    else if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CM'])[0];
+    const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
+    addEvent(m.minute, 'sub',
+      `Substitution · ${sideData.team.short}${tag}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
+      side);
+    if (!m.quietSim) { renderLineups(); renderPitch(); }
+  }
+
+  // A manager who's just gone down to 10 men often reshapes rather than just
+  // absorbing the loss — most commonly sacrificing an attacker to bring on a
+  // recognised defender when the sent-off player was part of the back line,
+  // to restore defensive numbers. This is a reaction, not a guarantee: it
+  // only fires for a lost defender, needs a defender left on the bench, and
+  // doesn't happen every single time (some managers/situations just play on).
+  function handleRedCardReshuffle(side, sentOffPlayer) {
+    const m = currentMatch;
+    if (!m || !sentOffPlayer || m.finished) return;
+    if (lineOf(sentOffPlayer) !== 'DEF') return;
+    const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+    if (used >= (m.maxSubs || 5)) return;
+    if (seededRandom() > 0.72) return;
+    const sideData = m[side];
+    const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
+    const availableSubs = (sideData.squad.subs || []).filter(p =>
+      !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !leftIds.includes(p.id));
+    const benchDef = availableSubs.filter(p => lineOf(p) === 'DEF').sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
+    if (!benchDef.length) return; // no defensive cover available on the bench
+    const inPlayer = benchDef[0];
+
+    // Sacrifice the most advanced remaining outfield player to restore
+    // defensive numbers — a forward first, then a midfielder, mirroring how
+    // real managers reshape after going down to 10 men.
+    const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
+    const alreadySubbedIn = (p) => !!(m.subLog[side] && m.subLog[side][p.id] && m.subLog[side][p.id].inMin != null);
+    let candidatesOut = onPitch.filter(p => lineOf(p) === 'FWD' && !alreadySubbedIn(p));
+    if (!candidatesOut.length) candidatesOut = onPitch.filter(p => lineOf(p) === 'FWD');
+    if (!candidatesOut.length) candidatesOut = onPitch.filter(p => lineOf(p) === 'MID' && !alreadySubbedIn(p));
+    if (!candidatesOut.length) candidatesOut = onPitch.filter(p => lineOf(p) === 'MID');
+    if (!candidatesOut.length) return; // nothing sensible to sacrifice — leave it
+    candidatesOut.sort((a, b) => (a.ovr || 70) - (b.ovr || 70));
+    const outPlayer = candidatesOut[0];
+
+    const idx = onPitchIds.indexOf(outPlayer.id);
+    if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+    markLeftPitch(m, side, outPlayer.id);
+    if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
+    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
+    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
+    if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CB'])[0];
+    const newUsed = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+    addEvent(m.minute, 'sub',
+      `Tactical reshuffle · ${sideData.team.short} reorganise after going down to 10 men<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span> <span style="opacity:0.6">(defensive cover)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,
+      side);
+    if (!m.quietSim) { renderLineups(); renderPitch(); }
+  }
+
+  function changeFormationLive(side, formKey) {
+    const m = currentMatch;
+    if (!m || m.finished) return;
+    if (!FORMATIONS[formKey]) return;
+    const sideData = m[side];
+    sideData.squad.formation = formKey;
+    // Reassign slots for on-pitch players by best fit
+    const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const all = [...(sideData.squad.starting||[]), ...(sideData.squad.subs||[])];
+    const onPitch = onIds.map(id => all.find(p => p.id === id)).filter(Boolean);
+    const slots = FORMATIONS[formKey].slots.slice();
+    const used = new Set();
+    const assigned = [];
+    slots.forEach(slot => {
+      const cand = onPitch.filter(p => !used.has(p.id) && canPlay(p, slot))
+        .sort((a,b) => ((b.pos||[]).includes(slot)?1:0) - ((a.pos||[]).includes(slot)?1:0) || (b.ovr||0)-(a.ovr||0));
+      if (cand[0]) { used.add(cand[0].id); cand[0].slot = slot; assigned.push(cand[0]); }
+    });
+    onPitch.filter(p => !used.has(p.id)).forEach((p, i) => {
+      p.slot = slots[assigned.length + i] || (p.pos||['CM'])[0];
+    });
+    addEvent(m.minute, 'whistle', `📐 ${sideData.team.short} switch shape to ${formKey}`, side);
+    if (!m.quietSim) { renderLineups(); updateScoreboard(); }
+    toast(sideData.team.short + ' → ' + formKey);
+  }
+
+  function setTacticsLive(side, tactic) {
+    const m = currentMatch;
+    if (!m || m.finished) return;
+    if (!m.tactics) m.tactics = { home: 'balanced', away: 'balanced' };
+    m.tactics[side] = tactic;
+    const labels = { attack: 'all-out attack', balanced: 'balanced approach', defend: 'defensive block', press: 'high press' };
+    addEvent(m.minute, 'whistle', `📋 ${m[side].team.short} go ${labels[tactic] || tactic}`, side);
+    toast(m[side].team.short + ': ' + (labels[tactic] || tactic));
+  }
+
+  // Picks a formation clearly more attacking in shape than the current one
+  // (most forward-weighted bodies among the alternatives), for the AI's
+  // late-game "throw men forward" reshape.
+  function pickMoreAttackingFormation(curKey) {
+    const keys = Object.keys(FORMATIONS).filter(k => k !== curKey);
+    keys.sort((a, b) => formationShape(b).fwd - formationShape(a).fwd);
+    return keys[0];
+  }
+  // Picks a formation clearly more defensive in shape than the current one,
+  // for the AI's late-game "shut up shop" reshape.
+  function pickMoreDefensiveFormation(curKey) {
+    const keys = Object.keys(FORMATIONS).filter(k => k !== curKey);
+    keys.sort((a, b) => formationShape(b).def - formationShape(a).def);
+    return keys[0];
+  }
+
+  // ===================================================================
+  // ===================== IN-MATCH TACTICAL AI =======================
+  // ===================================================================
+  // Runs every simulated minute and reacts to the actual game state —
+  // scoreline, time remaining, and the manager's identity — so a team
+  // chasing a goal genuinely presses higher / throws men forward / goes
+  // to a more attacking shape, and a team protecting a lead genuinely
+  // drops off / tightens up / brings on a defensive body late on. Each
+  // side gets at most one instruction change per cooldown window and at
+  // most one AI-driven formation reshape per match, so it reads as a
+  // deliberate, occasional managerial decision rather than constant noise.
+  function runTacticalAI() {
+    const m = currentMatch;
+    if (!m || m.finished || m.inET || m.inPens || m._awaitingET) return;
+    evaluateTacticalAI('home', 'away');
+    evaluateTacticalAI('away', 'home');
+  }
+
+  function evaluateTacticalAI(side, otherSide) {
+    const m = currentMatch;
+    if (!m) return;
+    const sideData = m[side], oppData = m[otherSide];
+    if (!sideData || !oppData) return;
+    if (!m.tacticalAI) m.tacticalAI = { home: { lastChange: -999 }, away: { lastChange: -999 } };
+    const ai = m.tacticalAI[side];
+    const minute = m.minute;
+    const diff = (sideData.score || 0) - (oppData.score || 0);
+    const style = getManagerPlaystyle(sideData.team);
+    const aggressive = ['Overload', 'Quick Counter', 'Long Ball Counter'].includes(style);
+    const currentTac = (m.tactics && m.tactics[side]) || 'balanced';
+    let targetTac = currentTac;
+
+    if (diff <= -1 && minute >= 60) {
+      // Chasing the game: press higher, and once it's later and/or a two-
+      // goal gap, go all out.
+      targetTac = (diff <= -2 && minute >= 72) || minute >= 82 ? 'attack' : 'press';
+    } else if (diff >= 1 && minute >= 70) {
+      // Protecting a lead: ease off first, then properly shut up shop
+      // as full time approaches.
+      targetTac = minute >= 83 ? 'defend' : 'balanced';
+    } else if (diff === 0 && minute >= 65 && aggressive) {
+      // Level game, aggressive manager identity — more likely to gamble
+      // on pressing for a winner than a patient/counter-minded one.
+      targetTac = seededRandom() < 0.35 ? 'press' : currentTac;
+    } else if (diff === 0 && minute < 60 && currentTac !== 'balanced' && seededRandom() < 0.1) {
+      // Early-game overreactions settle back down if the game's still level.
+      targetTac = 'balanced';
+    }
+
+    if (targetTac !== currentTac && minute - ai.lastChange >= 12) {
+      setTacticsLive(side, targetTac);
+      ai.lastChange = minute;
+    }
+
+    // Live formation reshape: reserved for clear, late situations, and only
+    // once per side per match, so it reads as a real "extra attacker" or
+    // "back five to see it out" moment rather than constant reshuffling.
+    if (!m.formationAIUsed) m.formationAIUsed = { home: false, away: false };
+    if (m.formationAIUsed[side]) return;
+    const curForm = sideData.squad.formation;
+    if (!curForm) return;
+    const shape = formationShape(curForm);
+    if (diff <= -1 && minute >= 75 && shape.fwd <= SHAPE_BASELINE.fwd + 0.4) {
+      const target = pickMoreAttackingFormation(curForm);
+      if (target && target !== curForm) {
+        changeFormationLive(side, target);
+        m.formationAIUsed[side] = true;
+      }
+    } else if (diff >= 1 && minute >= 82 && shape.def <= SHAPE_BASELINE.def + 0.4) {
+      const target = pickMoreDefensiveFormation(curForm);
+      if (target && target !== curForm) {
+        changeFormationLive(side, target);
+        m.formationAIUsed[side] = true;
+      }
+    }
+  }
+
+  function isPlayerInjured(playerId) {
+    const rec = injuryBook[playerId];
+    return !!rec && rec.matchesLeft > 0;
+  }
+
+  function isPlayerSuspended(playerId) {
+    const rec = suspensionBook[playerId];
+    return !!rec && rec.matchesLeft > 0;
+  }
+
+  function tryInjury(side) {
+    const m = currentMatch;
+    if (!m) return;
+    const sideData = m[side];
+    const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const pool = (sideData.squad.all || []).filter(p => onPitchIds.includes(p.id) && (p.pos || [])[0] !== 'GK' && !isPlayerInjured(p.id));
+    if (!pool.length) return;
+    // Weighted by injury resistance (Low/Medium/High from the expanded
+    // attribute sheet) instead of a flat uniform pick — a fragile player is
+    // genuinely more likely to be the one who goes down.
+    const injWeights = pool.map(p => injuryWeightMult(p));
+    const injTotal = injWeights.reduce((a, b) => a + b, 0);
+    let injR = seededRandom() * injTotal;
+    let injured = pool[pool.length - 1];
+    for (let i = 0; i < pool.length; i++) {
+      injR -= injWeights[i];
+      if (injR <= 0) { injured = pool[i]; break; }
+    }
+    const injuryTypes = [
+      { type: 'Ankle sprain', min: 1, max: 3 },
+      { type: 'Hamstring strain', min: 2, max: 5 },
+      { type: 'Knee knock', min: 1, max: 2 },
+      { type: 'Calf strain', min: 2, max: 4 },
+      { type: 'Shoulder injury', min: 1, max: 3 },
+      { type: 'Concussion protocol', min: 1, max: 2 },
+      { type: 'Groin strain', min: 2, max: 4 },
+      { type: 'Fractured metatarsal', min: 4, max: 8 },
+      { type: 'ACL concern (precaution)', min: 3, max: 6 },
+      { type: 'Muscle fatigue / cramp', min: 1, max: 1 }
+    ];
+    // Weighted toward minor
+    const roll = seededRandom();
+    let info;
+    if (roll < 0.55) info = injuryTypes[Math.floor(seededRandom() * 3)];
+    else if (roll < 0.85) info = injuryTypes[3 + Math.floor(seededRandom() * 4)];
+    else info = injuryTypes[7 + Math.floor(seededRandom() * 3)];
+    const outMatches = info.min + Math.floor(seededRandom() * (info.max - info.min + 1));
+    injuryBook[injured.id] = {
+      type: info.type,
+      matchesLeft: outMatches,
+      teamName: sideData.team.name,
+      playerName: injured.name
+    };
+    m.injuries.push(injured.id);
+    addEvent(m.minute, 'injury',
+      `🩹 <span class="player">${injured.name}</span> — ${info.type}. Out for ${outMatches} match${outMatches>1?'es':''}`,
+      side);
+    try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
+    const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+    if (used < m.maxSubs) {
+      const availableSubs = (sideData.squad.subs || []).filter(p =>
+        !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !isPlayerInjured(p.id) && !leftIds.includes(p.id));
+      if (availableSubs.length) {
+        let candidates = availableSubs.filter(p => canPlay(p, injured.slot || (injured.pos || ['CM'])[0]));
+        if (!candidates.length) candidates = availableSubs;
+        candidates.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
+        const inPlayer = candidates[Math.floor(seededRandom() * Math.min(3, candidates.length))];
+        const idx = onPitchIds.indexOf(injured.id);
+        if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+        markLeftPitch(m, side, injured.id);
+        if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
+        addEvent(m.minute, 'sub', `Forced sub: <span class="player">${inPlayer.name}</span> replaces injured <span class="player">${injured.name}</span>`, side);
+      } else {
+        removeFromPitch(side, injured.id);
+      }
+    } else {
+      removeFromPitch(side, injured.id);
+    }
+  }
+
+  function removeFromPitch(side, playerId) {
+    if (!currentMatch) return;
+    const arr = side === 'home' ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    const idx = arr.indexOf(playerId);
+    if (idx >= 0) arr.splice(idx, 1);
+    markLeftPitch(currentMatch, side, playerId);
+  }
+
+  // A player who has left the pitch for any reason (substituted off, sent off,
+  // or injured off with no replacement) can never take the field again this
+  // match — whether they were an original starter or an earlier substitute.
+  function markLeftPitch(m, side, playerId) {
+    if (!m) return;
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    if (!m.leftPitch[side]) m.leftPitch[side] = [];
+    if (!m.leftPitch[side].includes(playerId)) m.leftPitch[side].push(playerId);
+  }
+
+  
+  function renderMomentumAndHeat() {
+    const m = currentMatch;
+    if (!m || m.quietSim) return;
+    let wrap = document.getElementById('momentum-heat');
+    if (!wrap) {
+      const live = document.getElementById('match-live');
+      const lineup = document.getElementById('lineup-display');
+      if (!live) return;
+      wrap = document.createElement('div');
+      wrap.id = 'momentum-heat';
+      if (lineup && lineup.parentNode) lineup.parentNode.insertBefore(wrap, lineup);
+      else live.appendChild(wrap);
+    }
+    wrap.innerHTML = `
+      <div class="momentum-wrap"><h4>Match Momentum</h4><canvas id="momentum-canvas" height="80"></canvas></div>
+      <div class="heatmap-wrap"><h4>Activity Heat (zones)</h4><canvas id="heatmap-canvas" height="140"></canvas></div>`;
+    // Momentum: walk events, +1 home goal/shot, -1 away
+    const canvas = document.getElementById('momentum-canvas');
+    if (canvas) {
+      const w = canvas.parentElement.clientWidth || 300;
+      canvas.width = w;
+      const ctx = canvas.getContext('2d');
+      const events = m.events || [];
+      let mom = 0;
+      const pts = [{x:0, y:0}];
+      events.forEach((e, i) => {
+        let d = 0;
+        if (e.type === 'goal') d = e.side === 'home' ? 3 : (e.side === 'away' ? -3 : 0);
+        else if (e.type === 'shot' || e.type === 'miss') d = e.side === 'home' ? 1 : (e.side === 'away' ? -1 : 0);
+        else if (e.type === 'save') d = e.side === 'home' ? -0.8 : (e.side === 'away' ? 0.8 : 0);
+        else if (e.type === 'yellow' || e.type === 'red') d = e.side === 'home' ? -0.5 : (e.side === 'away' ? 0.5 : 0);
+        mom = Math.max(-12, Math.min(12, mom + d));
+        pts.push({ x: (e.minute || i) / Math.max(m.minute, 90), y: mom });
+      });
+      const homeCol = m.home.team.color || '#3d8bfd';
+      const awayCol = m.away.team.color || '#ef4444';
+      ctx.clearRect(0, 0, w, 80);
+      ctx.fillStyle = '#0a1210';
+      ctx.fillRect(0, 0, w, 80);
+      // midline
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath(); ctx.moveTo(0, 40); ctx.lineTo(w, 40); ctx.stroke();
+      // Fill home (above mid = home momentum) and away (below)
+      if (pts.length > 1) {
+        for (let i = 1; i < pts.length; i++) {
+          const x0 = pts[i-1].x * w, x1 = pts[i].x * w;
+          const y0 = 40 - (pts[i-1].y / 12) * 36;
+          const y1 = 40 - (pts[i].y / 12) * 36;
+          const midY = (y0 + y1) / 2;
+          ctx.beginPath();
+          ctx.moveTo(x0, 40); ctx.lineTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1, 40);
+          ctx.closePath();
+          ctx.fillStyle = midY < 40 ? homeCol + '55' : awayCol + '55';
+          ctx.fill();
+        }
+      }
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const x = p.x * w;
+        const y = 40 - (p.y / 12) * 36;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = '#f0c14b';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Legend
+      ctx.fillStyle = homeCol;
+      ctx.fillRect(8, 6, 10, 10);
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(m.home.team.short || 'HOME', 22, 15);
+      ctx.fillStyle = awayCol;
+      ctx.fillRect(w - 70, 6, 10, 10);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(m.away.team.short || 'AWAY', w - 56, 15);
+    }
+    // Heatmap: 3x3 zones from event sides + random based on possession
+    const hc = document.getElementById('heatmap-canvas');
+    if (hc) {
+      const w = hc.parentElement.clientWidth || 300;
+      hc.width = w;
+      const ctx = hc.getContext('2d');
+      const grid = Array.from({length: 3}, () => [0,0,0]);
+      (m.events || []).forEach(e => {
+        const row = e.side === 'home' ? 2 : (e.side === 'away' ? 0 : 1);
+        const col = Math.floor(seededRandom() * 3);
+        let wgt = 1;
+        if (e.type === 'goal') wgt = 4;
+        else if (e.type === 'shot' || e.type === 'miss') wgt = 2;
+        else if (e.type === 'save') wgt = 2;
+        grid[row][col] += wgt;
+      });
+      // blend possession
+      const hp = (m.home.stats && m.home.stats.possession) || 50;
+      for (let c = 0; c < 3; c++) {
+        grid[2][c] += hp / 25;
+        grid[0][c] += (100 - hp) / 25;
+      }
+      let max = 1;
+      grid.forEach(r => r.forEach(v => { if (v > max) max = v; }));
+      const cellW = w / 3, cellH = 140 / 3;
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const t = grid[r][c] / max;
+          ctx.fillStyle = `rgba(34,197,94,${0.1 + t * 0.75})`;
+          ctx.fillRect(c * cellW + 1, r * cellH + 1, cellW - 2, cellH - 2);
+        }
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.strokeRect(0.5, 0.5, w - 1, 139);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(m.away.team.short || 'AWAY', 8, 14);
+      ctx.fillText(m.home.team.short || 'HOME', 8, 134);
+    }
+  }
+
+  function endMatch() {
+    const m = currentMatch;
+    if (!m) return;
+    m.finished = true;
+    if (!m.inET && !m.inPens) { m.status = 'Full Time'; if (m.minute < 90) m.minute = 90; }
+    else if (m.inPens) m.status = 'FT (Pens)';
+    else m.status = 'Full Time (ET)';
+    clearInterval(simInterval); isPlaying = false;
+    const btn = document.getElementById('btn-play');
+    if (btn) btn.textContent = '▶ Play';
+    try { renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI(); } catch(e) {}
+    if (tournament) { try { refreshTournamentStatsUI(); } catch(e) {} }
+    addEvent(m.minute || 90, 'whistle', `Full Time! ${m.home.team.short} ${m.home.score} - ${m.away.score} ${m.away.team.short}`, null);
+    if (m.away.score === 0) {
+      const gk = (m.home.squad.starting || []).find(p => (p.pos || []).includes('GK'));
+      if (gk) recordStat('cleanSheets', gk, m.home.team);
+    }
+    if (m.home.score === 0) {
+      const gk = (m.away.squad.starting || []).find(p => (p.pos || []).includes('GK'));
+      if (gk) recordStat('cleanSheets', gk, m.away.team);
+    }
+    // Compute ratings for everyone who played, then MOTM = highest rating
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    const allOnPitch = [...(m.home.squad.starting||[]), ...(m.away.squad.starting||[])];
+    // Include subs who came on
+    const onIds = new Set([...(m.homeOnPitch||[]), ...(m.awayOnPitch||[])]);
+    const allInvolved = [...(m.home.squad.all||[]), ...(m.away.squad.all||[])].filter(p =>
+      onIds.has(p.id) || allOnPitch.some(s => s.id === p.id) || (m.playerMatchStats[p.id] && (
+        m.playerMatchStats[p.id].goals || m.playerMatchStats[p.id].assists || m.playerMatchStats[p.id].shots || m.playerMatchStats[p.id].saves
+      ))
+    );
+    const pool = allInvolved.length ? allInvolved : allOnPitch;
+    pool.forEach(p => {
+      if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+      const ps = m.playerMatchStats[p.id];
+      // Ensure pos info for rating formula
+      if (!ps.posArr || !ps.posArr.length) ps.posArr = p.pos || [];
+      if (!ps.pos) ps.pos = p.slot || (p.pos||[])[0] || '';
+      if (!ps.slot) ps.slot = p.slot || ps.pos;
+      // Clean sheet flag for GK rating, and goals conceded for GK/DEF/MID
+      // rating penalty (see calcPlayerRating) — both come from the actual
+      // final scoreline, keyed off which side this player was on.
+      const concededSide = (m.home.squad.all||[]).find(x => x.id === p.id) ? 'home' : 'away';
+      ps.goalsConceded = concededSide === 'home' ? m.away.score : m.home.score;
+      if ((ps.pos === 'GK' || (ps.posArr||[]).includes('GK'))) {
+        const side = concededSide;
+        if ((side === 'home' && m.away.score === 0) || (side === 'away' && m.home.score === 0)) ps.cleanSheet = true;
+      }
+      // Rating uses a small activity floor for players who genuinely played
+      // but happened to see very little of the ball (e.g. a sub on for the
+      // last few minutes) so they don't get an unfairly harsh 0-stat rating.
+      // Crucially this floor is applied to a throwaway copy used only for
+      // the rating formula — it never touches the real ps.saves/tackles/
+      // passes fields that the stats panel, match report, and leaderboards
+      // read from, so those always stay exactly in sync with what actually
+      // happened (and was reported) in the match.
+      let ratingInput = ps;
+      if (onIds.has(p.id)) {
+        const pos = (ps.pos || '').toUpperCase();
+        const isGK = pos === 'GK' || (ps.posArr||[]).includes('GK');
+        const isDef = ['CB','RB','LB','RWB','LWB'].some(x => pos.includes(x) || (ps.posArr||[]).includes(x));
+        const isMid = ['CM','CDM','CAM','RM','LM'].some(x => pos.includes(x) || (ps.posArr||[]).includes(x));
+        const floors = isGK ? { saves: ps.saves > 0 ? ps.saves : 1, passes: ps.passes > 0 ? ps.passes : 6, passesCompleted: ps.passes > 0 ? ps.passesCompleted : 5 }
+          : isDef ? { tackles: ps.tackles > 0 ? ps.tackles : 2, passes: ps.passes > 0 ? ps.passes : 12, passesCompleted: ps.passes > 0 ? ps.passesCompleted : 10 }
+          : isMid ? { tackles: ps.tackles > 0 ? ps.tackles : 1, passes: ps.passes > 0 ? ps.passes : 18, passesCompleted: ps.passes > 0 ? ps.passesCompleted : 15 }
+          : { passes: ps.passes > 0 ? ps.passes : 8, passesCompleted: ps.passes > 0 ? ps.passesCompleted : 6 };
+        ratingInput = Object.assign({}, ps, floors);
+      }
+      ps.rating = calcPlayerRating(ratingInput);
+      const teamObj = (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team;
+      recordRating(p, teamObj, ps.rating);
+      // Nudge this player's persistent form (and therefore their effective
+      // OVR) based on how they actually played in this match — the real
+      // roster player, not the shallow per-match squad clone, so it sticks.
+      const realPlayer = (teamObj.players || []).find(x => x.id === p.id);
+      if (realPlayer) updatePlayerForm(realPlayer, ps.rating);
+      // Feed the season-long "Interceptions" leaderboard and Defenders' Award
+      // with this match's accumulated defensive totals.
+      if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
+      if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
+    });
+    let best = null, bestR = -1;
+    Object.values(m.playerMatchStats).forEach(ps => {
+      if (ps.rating > bestR) { bestR = ps.rating; best = ps; }
+    });
+    if (best) {
+      const team = (m.home.squad.all || []).find(p => p.id === best.id) ? m.home.team : m.away.team;
+      const playerObj = [...(m.home.squad.all||[]), ...(m.away.squad.all||[])].find(p => p.id === best.id) || best;
+      recordStat('motm', playerObj, team);
+      addEvent(90, 'motm', `Player of the Match: <span class="player">${best.name}</span> (${best.rating.toFixed(1)})`, null);
+    }
+    /* ratings live in lineup */ renderLineups();
+    globalMatchDay++;
+    // Progress injury/suspension countdowns for both squads. A match only counts
+    // against a ban if the player sat it out entirely (no stats recorded this
+    // match) — a player freshly injured or sent off *during* this match already
+    // has stats here, so their ban starts counting from their team's next match.
+    [m.home.team, m.away.team].forEach(teamObj => {
+      if (!teamObj) return;
+      (teamObj.players || []).forEach(p => {
+        const inj = injuryBook[p.id];
+        if (inj && inj.matchesLeft > 0 && !m.playerMatchStats[p.id]) {
+          inj.matchesLeft--;
+          if (inj.matchesLeft <= 0) delete injuryBook[p.id];
+        }
+        const sus = suspensionBook[p.id];
+        if (sus && sus.matchesLeft > 0 && !m.playerMatchStats[p.id]) {
+          sus.matchesLeft--;
+          if (sus.matchesLeft <= 0) delete suspensionBook[p.id];
+        }
+      });
+    });
+    // Ban anyone sent off this match for their team's next match
+    Object.entries(m.playerMatchStats).forEach(([id, ps]) => {
+      if (!ps.red) return;
+      const onHome = (m.home.squad.all || []).some(p => p.id === id);
+      const teamObj = onHome ? m.home.team : m.away.team;
+      suspensionBook[id] = {
+        matchesLeft: 1,
+        teamName: teamObj ? teamObj.name : '',
+        playerName: ps.name
+      };
+    });
+    try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
+    try { localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook)); } catch(e) {}
+    saveStats();
+    updateScoreboard();
+    updateStatsPanel();
+    if (tournament || window._fromTournament || typeof window._tourFixtureIdx === 'number' || typeof window._koRoundIdx === 'number' || typeof window._uclFixtureIdx === 'number' || window._seasonFixture) {
+      const backBtn = document.getElementById('back-to-tournament');
+      if (backBtn) {
+        backBtn.style.display = 'flex';
+        backBtn.classList.add('show');
+        const backBtnLabel = backBtn.querySelector('button');
+        if (backBtnLabel) backBtnLabel.textContent = window._seasonFixture ? '← Back to Season' : '← Back to Tournament';
+      }
+    }
+    // If this was a tournament match, update fixture
+    
+    // UCL league live result
+    if (typeof window._uclFixtureIdx === 'number' && tournament && tournament.fixtures) {
+      const f = tournament.fixtures[window._uclFixtureIdx];
+      if (f && !f.played && currentMatch) {
+        f.played = true;
+        f.homeScore = currentMatch.home.score;
+        f.awayScore = currentMatch.away.score;
+        f.report = buildMatchReport(currentMatch);
+        applyLeagueResult(f.home, f.away, f.homeScore, f.awayScore);
+        window._uclFixtureIdx = null;
+        if (tournament.fixtures.every(x => x.played)) advanceUCLFromLeague();
+        refreshTournamentStatsUI();
+      }
+    }
+    // Knockout live result
+    if (typeof window._koRoundIdx === 'number' && typeof window._koMatchIdx === 'number' && tournament) {
+      const km = tournament.knockout[window._koRoundIdx] && tournament.knockout[window._koRoundIdx].matches[window._koMatchIdx];
+      if (km && !km.played && currentMatch) {
+        km.played = true;
+        km.homeScore = currentMatch.home.score;
+        km.awayScore = currentMatch.away.score;
+        km.report = buildMatchReport(currentMatch);
+        if (currentMatch.home.penScore != null) {
+          km.penalties = true;
+          // Winner by pens or score
+          if (currentMatch.home.score !== currentMatch.away.score) {
+            km.winner = currentMatch.home.score > currentMatch.away.score ? km.home : km.away;
+          } else {
+            km.winner = (currentMatch.home.penScore > currentMatch.away.penScore) ? km.home : km.away;
+            km.homeScore = currentMatch.home.score;
+            km.awayScore = currentMatch.away.score;
+          }
+        } else if (currentMatch.home.score === currentMatch.away.score) {
+          km.winner = seededRandom() < 0.5 ? km.home : km.away;
+          km.penalties = true;
+        } else {
+          km.winner = currentMatch.home.score > currentMatch.away.score ? km.home : km.away;
+        }
+        const ri = window._koRoundIdx;
+        window._koRoundIdx = null;
+        window._koMatchIdx = null;
+        afterKnockoutMatchPlayed(ri);
+        refreshTournamentStatsUI();
+        toast('Knockout result saved!');
+        const backBtn = document.getElementById('back-to-tournament');
+        if (backBtn) { backBtn.style.display = 'flex'; backBtn.classList.add('show'); }
+        renderBracket();
+        renderTournamentLeaderboard();
+      }
+    }
+    if (typeof window._tourFixtureIdx === 'number' && tournament && tournament.fixtures[window._tourFixtureIdx]) {
+      const f = tournament.fixtures[window._tourFixtureIdx];
+      if (!f.played && currentMatch) {
+        f.played = true;
+        f.homeScore = currentMatch.home.score;
+        f.awayScore = currentMatch.away.score;
+        f.report = buildMatchReport(currentMatch);
+        const g = tournament.groups[f.group];
+        if (g) {
+          const ht = g.teams.find(t => t.team.id === f.home);
+          const at = g.teams.find(t => t.team.id === f.away);
+          if (ht && at) {
+            ht.played++; at.played++;
+            ht.gf += f.homeScore; ht.ga += f.awayScore;
+            at.gf += f.awayScore; at.ga += f.homeScore;
+            if (f.homeScore > f.awayScore) { ht.won++; ht.pts += 3; at.lost++; }
+            else if (f.awayScore > f.homeScore) { at.won++; at.pts += 3; ht.lost++; }
+            else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+          }
+        }
+        window._tourFixtureIdx = null;
+        refreshTournamentStatsUI();
+        toast('Tournament match result saved!');
+      }
+    }
+    // Season Calendar live result — mirrors the tournament fixture handling
+    // above, but writes back into the current league/UCL matchday and league
+    // table, then advances the round once every fixture in it is played.
+    if (window._seasonFixture && season) {
+      const { compKey, idx } = window._seasonFixture;
+      const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+      const round = comp && comp.rounds && comp.rounds[comp.currentRound];
+      const f = round && round[idx];
+      if (f && !f.played && currentMatch) {
+        f.played = true;
+        f.homeScore = currentMatch.home.score;
+        f.awayScore = currentMatch.away.score;
+        f.report = buildMatchReport(currentMatch);
+        applyResultToTable(comp.table, f.home, f.away, f.homeScore, f.awayScore);
+        window._seasonFixture = null;
+        currentSeasonComp = null;
+        advanceSeasonRoundIfComplete(comp, compKey);
+        refreshTournamentStatsUI();
+        toast('Season match result saved!');
+      }
+    }
+    persistAll();
+  }
+
+  function addEvent(minute, type, text, side, isGoal) {
+    if (!currentMatch) return;
+    currentMatch.events.push({ minute, type, text, side });
+    if (currentMatch.quietSim) return;
+    const feed = document.getElementById('events-feed');
+    if (!feed) return;
+    const icons = { goal: '⚽', save: '🧤', yellow: '🟨', red: '🟥', sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', tackle: '🦵', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: '📢', pressure: '🔥', motm: '⭐', var: '📺', pen: '⚽', skill: '✨', handball: '✋', et: '⏱️' };
+    const div = document.createElement('div');
+    div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
+    div.innerHTML = `<span class="event-time">${minute}'</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
+    feed.insertBefore(div, feed.firstChild);
+    if (['goal','sub','yellow','red','injury','pen'].includes(type)) {
+      try { renderLineups(); } catch (e) {}
+    }
+  }
+
+  function updateScoreboard() {
+    if (!currentMatch) return;
+    if (currentMatch.quietSim) return;
+    const m = currentMatch;
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    const setHTML = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
+    setHTML('live-home-flag', teamMark(m.home.team, 26));
+    set('live-home-name', m.home.team.short || m.home.team.name);
+    set('live-home-form', (FORMATIONS[m.home.squad.formation] || {}).name || '');
+    setHTML('live-away-flag', teamMark(m.away.team, 26));
+    set('live-away-name', m.away.team.short || m.away.team.name);
+    set('live-away-form', (FORMATIONS[m.away.squad.formation] || {}).name || '');
+    const hm = document.getElementById('live-home-mgr');
+    const am = document.getElementById('live-away-mgr');
+    const hStyle = getManagerPlaystyle(m.home.team);
+    const aStyle = getManagerPlaystyle(m.away.team);
+    const hMgrName = m.home.team.manager ? m.home.team.manager.name : '';
+    const aMgrName = m.away.team.manager ? m.away.team.manager.name : '';
+    if (hm) hm.innerHTML = hMgrName ? managerAvatarMark(m.home.team.manager, 18) + ' ' + hMgrName + (hStyle ? ' (' + hStyle + ')' : '') : '';
+    if (am) am.innerHTML = aMgrName ? aMgrName + (aStyle ? ' (' + aStyle + ')' : '') + ' ' + managerAvatarMark(m.away.team.manager, 18) : '';
+    const hs = m.home.penScore != null ? `${m.home.score} (${m.home.penScore})` : m.home.score;
+    const as_ = m.away.penScore != null ? `${m.away.score} (${m.away.penScore})` : m.away.score;
+    // Pop the scoreline when it actually changes, so a goal feels like a
+    // goal rather than the number just silently updating.
+    const popIfChanged = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const changed = el.textContent !== String(val) && el.dataset.popped !== undefined;
+      el.textContent = val;
+      el.dataset.popped = '1';
+      if (changed) {
+        el.classList.remove('score-pop');
+        void el.offsetWidth; // restart animation
+        el.classList.add('score-pop');
+      }
+    };
+    popIfChanged('live-home-score', hs);
+    popIfChanged('live-away-score', as_);
+    set('live-minute', m.inPens ? 'Pens' : (m.minute + "'"));
+    set('live-status', m.status);
+    set('live-venue', '🏟️ ' + getStadium(m.home.team));
+    renderGoalTimeline();
+  }
+
+  function updateStatsPanel() {
+    if (!currentMatch) return;
+    if (currentMatch.quietSim) return;
+    const h = currentMatch.home.stats, a = currentMatch.away.stats;
+    const ts = (h.shots + a.shots) || 1, ton = (h.shotsOn + a.shotsOn) || 1;
+    const tc = (h.corners + a.corners) || 1, tf = (h.fouls + a.fouls) || 1, tsv = (h.saves + a.saves) || 1;
+    const el = document.getElementById('live-stats');
+    if (!el) return;
+    const hp = (v, t) => t ? Math.round((v/t)*100) : 50;
+    el.innerHTML = `
+      <div class="stat-row"><span class="stat-val">${h.shots}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shots,ts)}%"></div><div class="stat-bar-away" style="width:${hp(a.shots,ts)}%"></div></div><span class="stat-val">${a.shots}</span></div>
+      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Shots</div>
+      <div class="stat-row"><span class="stat-val">${h.shotsOn}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shotsOn,ton)}%"></div><div class="stat-bar-away" style="width:${hp(a.shotsOn,ton)}%"></div></div><span class="stat-val">${a.shotsOn}</span></div>
+      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">On Target</div>
+      <div class="stat-row"><span class="stat-val">${h.possession}%</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${h.possession}%"></div><div class="stat-bar-away" style="width:${a.possession}%"></div></div><span class="stat-val">${a.possession}%</span></div>
+      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Possession</div>
+      <div class="stat-row"><span class="stat-val">${h.corners}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.corners,tc)}%"></div><div class="stat-bar-away" style="width:${hp(a.corners,tc)}%"></div></div><span class="stat-val">${a.corners}</span></div>
+      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Corners</div>
+      <div class="stat-row"><span class="stat-val">${h.fouls}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.fouls,tf)}%"></div><div class="stat-bar-away" style="width:${hp(a.fouls,tf)}%"></div></div><span class="stat-val">${a.fouls}</span></div>
+      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Fouls</div>
+      <div class="stat-row"><span class="stat-val">${h.saves}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.saves,tsv)}%"></div><div class="stat-bar-away" style="width:${hp(a.saves,tsv)}%"></div></div><span class="stat-val">${a.saves}</span></div>
+      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Saves</div>
+      <div class="stat-row"><span class="stat-val">${h.yellows}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.yellows,h.yellows+a.yellows||1)}%"></div><div class="stat-bar-away" style="width:${hp(a.yellows,h.yellows+a.yellows||1)}%"></div></div><span class="stat-val">${a.yellows}</span></div>
+      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted)">Yellow Cards</div>`;
+  }
+
+
+  function renderPitch() {
+    if (!currentMatch) return;
+    const m = currentMatch;
+    const wrap = document.getElementById('pitch-display');
+    if (!wrap) return;
+
+    const luminance = (c) => {
+      if (!c || c[0] !== '#') return 128;
+      let hex = c.replace('#','');
+      if (hex.length === 3) hex = hex.split('').map(ch => ch+ch).join('');
+      if (hex.length < 6) return 128;
+      const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+      return (r*299 + g*587 + b*114) / 1000;
+    };
+
+    const drawTeam = (side) => {
+      const s = m[side];
+      const form = FORMATIONS[s.squad.formation] || FORMATIONS['4-3-3'];
+      const coords = form.coords || [];
+      const slots = form.slots || [];
+      const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const allPlayers = [...(s.squad.starting || []), ...(s.squad.subs || []), ...(s.squad.all || [])];
+      // Unique by id
+      const byId = {};
+      allPlayers.forEach(p => { if (p && p.id) byId[p.id] = p; });
+      // Map current on-pitch players into formation slots
+      const onPitchPlayers = onPitchIds.map(id => byId[id]).filter(Boolean);
+      const assigned = new Set();
+      const slotPlayers = [];
+      slots.forEach((slot, idx) => {
+        // Prefer player already marked with this slot
+        let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.slot === slot || (p.pos || []).includes(slot)));
+        if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id) && canPlay(p, slot));
+        if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id));
+        if (pick) {
+          assigned.add(pick.id);
+          slotPlayers[idx] = pick;
+        }
+      });
+      // Any remaining on-pitch players fill empty slots
+      onPitchPlayers.forEach(p => {
+        if (assigned.has(p.id)) return;
+        const empty = slots.findIndex((_, i) => !slotPlayers[i]);
+        if (empty >= 0) { slotPlayers[empty] = p; assigned.add(p.id); }
+      });
+
+      let primary = s.team.color || '#1a237e';
+      let secondary = s.team.secondary || '#ffffff';
+      const textCol = luminance(primary) > 160 ? '#0a0e17' : '#ffffff';
+      const used = [];
+      let dots = '';
+      slotPlayers.forEach((p, idx) => {
+        if (!p) return;
+        let c = coords[idx] || [50, 50];
+        let x = c[0], y = c[1];
+        // Collision avoidance: name labels are wider than the dot, so push
+        // apart mostly along x (weighted distance) with a bigger minimum gap
+        // and more iterations than a simple circle-only check. Labels always
+        // sit below the dot (no more flipping above on crowded rows) —
+        // spacing is handled here instead so names don't need to jump around.
+        for (let t = 0; t < 10; t++) {
+          const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 19);
+          if (!hit) break;
+          x += (x >= hit.x ? 1 : -1) * 8 + (t % 2 ? 2 : -2);
+          y += (t % 3 === 0 ? 1 : -1) * 3;
+          x = Math.max(8, Math.min(92, x));
+          y = Math.max(7, Math.min(92, y));
+        }
+        used.push({ x, y });
+
+        const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+          <span class="dot-avatar">${playerAvatarMark(p)}</span>
+          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${abbreviateName(p.name)}</span></span>
+        </div>`;
+      });
+      const mgrTag = s.team.manager && s.team.manager.name
+        ? `<span class="pitch-mgr">${managerAvatarMark(s.team.manager, 16)} ${s.team.manager.name}</span>` : '';
+      return `<div class="mini-pitch team-pitch">
+        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}${mgrTag}</div>
+        ${dots}
+      </div>`;
+    };
+
+    wrap.innerHTML = `<div class="pitch-pair">${drawTeam('home')}${drawTeam('away')}</div>`;
+  }
+
+
+  function playerLineIcons(ps, subInfo, onPitch, inj) {
+    let icons = '';
+    if (ps) {
+      for (let i = 0; i < (ps.goals || 0); i++) icons += '<span class="li-icon" title="Goal">⚽</span>';
+      for (let i = 0; i < (ps.assists || 0); i++) icons += '<span class="li-icon" title="Assist">🅰️</span>';
+      if (ps.yellow) icons += '<span class="li-icon" title="Yellow">🟨</span>';
+      if (ps.red) icons += '<span class="li-icon" title="Red">🟥</span>';
+    }
+    if (inj) icons += '<span class="li-icon" title="Injured">🩹</span>';
+    if (subInfo && subInfo.outMin != null) icons += `<span class="li-sub out" title="Subbed off">🔻${subInfo.outMin}'</span>`;
+    if (subInfo && subInfo.inMin != null) icons += `<span class="li-sub in" title="Subbed on">🔺${subInfo.inMin}'</span>`;
+    return icons;
+  }
+
+  function liveRatingBadge(ps) {
+    if (!ps) return '<span class="rating-badge rating-mid">6.0</span>';
+    const r = calcPlayerRating(ps);
+    ps.rating = r;
+    const cls = r >= 7.5 ? 'rating-high' : r >= 6.5 ? 'rating-mid' : 'rating-low';
+    return `<span class="rating-badge ${cls}">${r.toFixed(1)}</span>`;
+  }
+
+  function renderLineups() {
+    if (!currentMatch) return;
+    const m = currentMatch;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
+
+    const row = (p, side, isSubList) => {
+      const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const on = onPitchIds.includes(p.id);
+      const inj = (m.injuries || []).includes(p.id);
+      if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+      const ps = m.playerMatchStats[p.id];
+      // Keep the live rating badge in sync with the current scoreline too,
+      // not just the final rating computed at full time in endMatch.
+      ps.goalsConceded = side === 'home' ? m.away.score : m.home.score;
+      const subInfo = (m.subLog[side] || {})[p.id];
+      const sentOff = !!ps.red;
+      const icons = playerLineIcons(ps, subInfo, on, inj);
+      const rating = liveRatingBadge(ps);
+      const dim = (!on && !inj && !sentOff && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
+      const pos = p.slot || (p.pos || [''])[0] || '';
+      const passAcc = ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
+      const passInfo = (ps.passes > 0)
+        ? `<span class="player-passes" title="Passes completed / attempted">${ps.passesCompleted || 0}/${ps.passes} <em>(${passAcc}%)</em></span>`
+        : '';
+      return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
+        <span class="player-num">${p.num || ''}</span>
+        <span class="player-pos">${pos}</span>
+        <span class="player-name">${p.name}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
+        ${passInfo}
+        <span class="player-icons">${icons}</span>
+        ${rating}
+      </li>`;
+    };
+
+    const html = (side) => {
+      const s = m[side];
+      const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+      const form = (FORMATIONS[s.squad.formation] || {}).name || s.squad.formation || '';
+      const tac = (m.tactics && m.tactics[side]) || 'balanced';
+      let h = `<div class="lineup-team">
+        <h4>${teamMark(s.team, 18)} ${s.team.short || s.team.name} · ${form}
+          <span class="subs-badge">${used}/${m.maxSubs || 5} subs</span>
+          <span class="tac-badge">${tac}</span>
+        </h4>
+        <ul class="player-list">`;
+      // Starting XI order, including those subbed off
+      (s.squad.starting || []).forEach(p => { h += row(p, side, false); });
+      // Subs: original bench + any who came on already listed? Show all bench pool
+      h += `<li class="bench-label">Substitutes</li>`;
+      (s.squad.subs || []).forEach(p => { h += row(p, side, true); });
+      return h + '</ul></div>';
+    };
+
+    const el = document.getElementById('lineup-display');
+    if (el) el.innerHTML = html('home') + html('away');
+    // Live tactics / formation controls during match
+    let ctrl = document.getElementById('live-tactics-bar');
+    if (!ctrl) {
+      const parent = document.getElementById('lineup-display');
+      if (parent && parent.parentNode) {
+        ctrl = document.createElement('div');
+        ctrl.id = 'live-tactics-bar';
+        parent.parentNode.insertBefore(ctrl, parent);
+      }
+    }
+    if (ctrl && !m.finished && !m.quietSim) {
+      const forms = Object.keys(FORMATIONS).map(f => `<option value="${f}">${f}</option>`).join('');
+      ctrl.innerHTML = `
+        <div class="live-tac-row">
+          <span class="live-tac-label">Home</span>
+          <select id="live-form-home" onchange="App.changeFormationLive('home', this.value)">${forms}</select>
+          <select id="live-tac-home" onchange="App.setTacticsLive('home', this.value)">
+            <option value="balanced">Balanced</option>
+            <option value="attack">Attack</option>
+            <option value="defend">Defend</option>
+            <option value="press">Press</option>
+          </select>
+          <span class="live-tac-label">Away</span>
+          <select id="live-form-away" onchange="App.changeFormationLive('away', this.value)">${forms}</select>
+          <select id="live-tac-away" onchange="App.setTacticsLive('away', this.value)">
+            <option value="balanced">Balanced</option>
+            <option value="attack">Attack</option>
+            <option value="defend">Defend</option>
+            <option value="press">Press</option>
+          </select>
+        </div>`;
+      const fh = document.getElementById('live-form-home');
+      const fa = document.getElementById('live-form-away');
+      const th = document.getElementById('live-tac-home');
+      const ta = document.getElementById('live-tac-away');
+      if (fh) fh.value = m.home.squad.formation || '4-3-3';
+      if (fa) fa.value = m.away.squad.formation || '4-3-3';
+      if (th) th.value = (m.tactics && m.tactics.home) || 'balanced';
+      if (ta) ta.value = (m.tactics && m.tactics.away) || 'balanced';
+    } else if (ctrl && m.finished) {
+      ctrl.innerHTML = '';
+    }
+    renderPitch();
+  }
+
+
+  // Shape used for every per-competition stat bucket: season leagues, the season's
+  // UCL, and (already existing) the global `stats` / `tournamentStats` buckets.
+  function blankCompStats() {
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+  }
+
+  function bumpStatBucket(bucket, type, player, team) {
+    bumpStatBucketBy(bucket, type, player, team, 1);
+  }
+
+  // Like bumpStatBucket, but adds an arbitrary amount in one go — used for
+  // per-match accumulated totals (e.g. interceptions/tackles over 90 minutes)
+  // rather than one-off events like a goal or a card.
+  function bumpStatBucketBy(bucket, type, player, team, amount) {
+    if (!amount) return;
+    if (!bucket[type]) bucket[type] = {};
+    if (!bucket[type][player.id]) {
+      const aff = findPlayerTeams(player.id);
+      bucket[type][player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, national: aff.national, club: aff.club };
+    }
+    bucket[type][player.id].count += amount;
+  }
+
+  function bumpRatingBucket(bucket, player, team, rating) {
+    if (!bucket.ratings) bucket.ratings = {};
+    if (!bucket.ratings[player.id]) {
+      const aff = findPlayerTeams(player.id);
+      bucket.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
+    }
+    const e = bucket.ratings[player.id];
+    e.count++;
+    e.sum += rating;
+    e.avg = Math.round((e.sum / e.count) * 100) / 100;
+  }
+
+  function recordRating(player, team, rating) {
+    if (!player || !team) return;
+    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
+    if (competitive) bumpRatingBucket(stats, player, team, rating);
+    if (tournament) bumpRatingBucket(tournamentStats, player, team, rating);
+    if (currentSeasonComp) {
+      if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+      bumpRatingBucket(currentSeasonComp.stats, player, team, rating);
+    }
+  }
+
+  // ========== DYNAMIC PLAYER FORM ==========
+  // Every player carries a rolling `form` value (-5..+5) that moves after
+  // every match they play based on that match's rating: good performances
+  // push it up, bad ones push it down, and it decays back toward 0 over time
+  // so form always reflects *recent* matches, not a whole career. Form is
+  // then folded straight into the player's `ovr` (clamped to baseOvr ± 5),
+  // which is the single number every other part of the app already reads
+  // for squad strength, squad-builder sorting, and display — so a player who
+  // plays badly for a stretch genuinely gets a lower rating, and a player on
+  // a hot streak genuinely gets a higher one, without a second parallel
+  // "true skill" number anywhere else in the codebase.
+  const FORM_MIN = -5, FORM_MAX = 5;
+  const FORM_DECAY = 0.82;
+  function updatePlayerForm(player, rating) {
+    if (!player) return;
+    if (typeof player.baseOvr !== 'number') player.baseOvr = player.ovr || 70;
+    if (typeof player.form !== 'number') player.form = 0;
+    // Decay first so last match's swing fades before this one is applied.
+    player.form *= FORM_DECAY;
+    if (rating >= 8.2) player.form += 1.6;
+    else if (rating >= 7.4) player.form += 1.0;
+    else if (rating >= 6.7) player.form += 0.45;
+    else if (rating >= 6.1) player.form += 0.1;
+    else if (rating >= 5.5) player.form -= 0.5;
+    else if (rating >= 4.8) player.form -= 1.1;
+    else player.form -= 1.8;
+    player.form = Math.max(FORM_MIN, Math.min(FORM_MAX, Math.round(player.form * 100) / 100));
+    player.ovr = Math.max(40, Math.min(99, Math.round(player.baseOvr + player.form)));
+  }
+
+  // Small ▲/▼/— indicator used next to a player's OVR wherever a squad list
+  // renders one, so a slump or a hot streak is visible at a glance.
+  function formArrow(player) {
+    const f = (player && typeof player.form === 'number') ? player.form : 0;
+    if (f >= 2.2) return '<span class="form-arrow form-hot" title="On fire">🔥</span>';
+    if (f >= 0.6) return '<span class="form-arrow form-up" title="Good form">▲</span>';
+    if (f <= -2.2) return '<span class="form-arrow form-cold" title="Poor form">❄️</span>';
+    if (f <= -0.6) return '<span class="form-arrow form-down" title="Below par">▼</span>';
+    return '<span class="form-arrow form-flat" title="Steady form">—</span>';
+  }
+  // Longer text version used in the player profile modal.
+  function formLabel(player) {
+    const f = (player && typeof player.form === 'number') ? player.form : 0;
+    if (f >= 2.2) return 'On fire 🔥';
+    if (f >= 0.6) return 'Good form ▲';
+    if (f <= -2.2) return 'Poor form ❄️';
+    if (f <= -0.6) return 'Below par ▼';
+    return 'Steady —';
+  }
+
+  // Persist every non-zero form value (+ the baseOvr it's measured against)
+  // so a page refresh doesn't silently reset every player back to neutral.
+  function collectPlayerFormsMap() {
+    const map = {};
+    allTeams.forEach(t => (t.players || []).forEach(p => {
+      if (typeof p.form === 'number' && Math.abs(p.form) > 0.01) {
+        map[p.id] = { form: p.form, baseOvr: p.baseOvr, ovr: p.ovr };
+      }
+    }));
+    return map;
+  }
+  function persistPlayerForms() {
+    try {
+      return safeSetItem('apexPlayerForms', JSON.stringify(collectPlayerFormsMap()));
+    } catch (e) { return false; }
+  }
+  function restorePlayerForms() {
+    try {
+      const raw = localStorage.getItem('apexPlayerForms');
+      if (!raw) return;
+      const map = JSON.parse(raw);
+      allTeams.forEach(t => (t.players || []).forEach(p => {
+        const e = map[p.id];
+        if (e) {
+          p.form = e.form;
+          p.baseOvr = (typeof e.baseOvr === 'number') ? e.baseOvr : p.ovr;
+          p.ovr = e.ovr;
+        }
+      }));
+    } catch (e) {}
+  }
+
+  function findPlayerTeams(playerId) {
+    let national = null, club = null;
+    (teamsData.national || []).forEach(t => {
+      if ((t.players || []).some(p => p.id === playerId)) national = t.name;
+    });
+    (teamsData.club || []).forEach(t => {
+      if ((t.players || []).some(p => p.id === playerId)) club = t.name;
+    });
+    // Same real player may exist as two separate roster entries (club + country)
+    // with different ids — fall back to a name match to link them. Because
+    // different, unrelated players CAN share an identical name, this fallback
+    // only accepts a match when it's unambiguous: exactly one other roster
+    // entry with that name, and its position overlaps the source player's
+    // position. Ambiguous name collisions are left blank rather than risking
+    // attributing one player's country/club to a different, same-named player.
+    if (!national || !club) {
+      let srcPlayer = null;
+      allTeams.forEach(t => {
+        const p = (t.players || []).find(x => x.id === playerId);
+        if (p) srcPlayer = p;
+      });
+      if (srcPlayer && srcPlayer.name) {
+        const pname = srcPlayer.name;
+        const srcPos = (srcPlayer.pos || [])[0];
+        const posMatches = (p) => !srcPos || !p.pos || !p.pos.length || p.pos.includes(srcPos);
+        if (!national) {
+          const matches = [];
+          (teamsData.national || []).forEach(t => {
+            (t.players || []).forEach(p => {
+              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
+            });
+          });
+          const uniqueTeams = [...new Set(matches)];
+          if (uniqueTeams.length === 1) national = uniqueTeams[0];
+        }
+        if (!club) {
+          const matches = [];
+          (teamsData.club || []).forEach(t => {
+            (t.players || []).forEach(p => {
+              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
+            });
+          });
+          const uniqueTeams = [...new Set(matches)];
+          if (uniqueTeams.length === 1) club = uniqueTeams[0];
+        }
+      }
+    }
+    return { national, club };
+  }
+
+  function recordStat(type, player, team) {
+    if (!player || !team) return;
+    // Friendlies do not feed global leaderboard — only competitive (tournament/season) matches
+    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
+    if (competitive) bumpStatBucket(stats, type, player, team);
+    if (tournament) bumpStatBucket(tournamentStats, type, player, team);
+    if (currentSeasonComp) {
+      if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+      bumpStatBucket(currentSeasonComp.stats, type, player, team);
+    }
+  }
+
+  // Like recordStat, but adds an accumulated per-match total (e.g. a
+  // defender's interception/tackle count for the whole match) in one go.
+  function recordStatCount(type, player, team, amount) {
+    if (!player || !team || !amount) return;
+    const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
+    if (competitive) bumpStatBucketBy(stats, type, player, team, amount);
+    if (tournament) bumpStatBucketBy(tournamentStats, type, player, team, amount);
+    if (currentSeasonComp) {
+      if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+      bumpStatBucketBy(currentSeasonComp.stats, type, player, team, amount);
+    }
+  }
+
+  // ========== TROPHY CASE (team trophies + individual awards) ==========
+  // Every entry uses `name` to key into trophies.json (via trophyMark()) so
+  // it always renders with a real trophy/medal image. Individual awards also
+  // set `player` — that's what powers the Teams-tab trophy cabinet and the
+  // History tab's "Individual Awards" list.
+  function saveTrophiesToStorage() {
+    try { return safeSetItem('apexTrophies', JSON.stringify(trophies)); } catch (e) { return false; }
+  }
+  function pushTeamTrophy(name, teamName, type, extra) {
+    const t = Object.assign({ name, team: teamName, type, date: Date.now() }, extra || {});
+    trophies.push(t);
+    saveTrophiesToStorage();
+    return t;
+  }
+  function pushIndividualTrophy(awardName, playerObj, type, extra) {
+    if (!playerObj || !playerObj.name) return null;
+    const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, type, date: Date.now() }, extra || {});
+    trophies.push(t);
+    saveTrophiesToStorage();
+    return t;
+  }
+  // Manager awards live alongside individual player awards in the trophy
+  // case, but key off `manager` (a name) instead of `player` — awarded
+  // whenever their team lifts a trophy (league title, UCL, or a standalone
+  // World Cup/Champions League run), crediting the manager for that
+  // team's success. Shows in Awards > Manager and History > Individual.
+  function pushManagerAward(awardName, team, type, extra) {
+    if (!team || !team.manager || !team.manager.name) return null;
+    const t = Object.assign({ name: awardName, team: team.name, manager: team.manager.name, type, date: Date.now() }, extra || {});
+    trophies.push(t);
+    saveTrophiesToStorage();
+    return t;
+  }
+  // Records the individual awards computed for a tournament/competition's
+  // `.awards` object (already produced by assignTournamentAwards() /
+  // assignCompAwards()) into the trophy case, one entry per winner.
+  function recordIndividualAwardsFromAwardsObject(awardsObj, type, extra) {
+    if (!awardsObj) return;
+    const map = [
+      ['goldenBoot', 'Golden Boot'], ['goldenBall', 'Golden Ball'], ['goldenGlove', 'Golden Glove'],
+      ['goldenClean', 'Clean Sheet King'], ['topAssists', 'Top Assists'], ['mostMotm', 'Most MOTM'],
+      ['bestAvgRating', 'Best Avg Rating']
+    ];
+    map.forEach(([key, awardName]) => {
+      if (awardsObj[key]) pushIndividualTrophy(awardName, awardsObj[key], type, extra);
+    });
+  }
+
+  // Ballon d'Or ranking algorithm, shared by the interactive Awards > Ballon
+  // d'Or tab and the automatic season-end archiving — kept in one place so
+  // both always agree on who the leader is. Pass in a `stats`-shaped object
+  // (global `stats`, a competition's `comp.stats`, etc).
+  const BALLON_MIN_APPS = 3;
+  function computeBallonRanking(statsSource) {
+    const src = statsSource || stats;
+    const MIN_APPS = BALLON_MIN_APPS;
+    const scores = {};
+    const ensure = (p) => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0 };
+      return scores[p.id];
+    };
+    Object.values(src.ratings || {}).forEach(p => {
+      const e = ensure(p);
+      e.apps = p.count || 0;
+      e.avg = p.avg || 0;
+    });
+    Object.values(src.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 4; });
+    Object.values(src.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.5; });
+    Object.values(src.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 5; });
+    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.35; });
+    Object.values(src.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
+    Object.values(src.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
+    Object.values(scores).forEach(e => {
+      if (e.apps >= MIN_APPS && e.avg > 0) {
+        e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
+      } else if (e.apps > 0 && e.apps < MIN_APPS) {
+        e.pts += e.avg * 0.15;
+      }
+    });
+    const awardLeaders = {
+      goldenboot: new Set(Object.values(src.goals || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      assists: new Set(Object.values(src.assists || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      motm: new Set(Object.values(src.motm || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      yashin: new Set(Object.values(src.saves || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
+      puskas: new Set(Object.values(src.puskas || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id))
+    };
+    Object.values(scores).forEach(e => {
+      let noms = 0;
+      Object.values(awardLeaders).forEach(set => { if (set.has(e.id)) noms++; });
+      e.noms = noms;
+      if (noms >= 2) e.pts += (noms - 1) * 1.4;
+    });
+    return Object.values(scores)
+      .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
+      .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
+      .slice(0, 50);
+  }
+
+  // Snapshots the current global leaderboard leaders (Golden Boot, Ballon
+  // d'Or, Golden Glove/Yashin, Top Assists, Most MOTM) into the trophy case
+  // as individual awards for the season that just ended, then wipes `stats`
+  // and `tournamentStats` so the new season's leaderboard & Awards tab start
+  // from zero. Team trophies (league/UCL winners) are left untouched — the
+  // trophy case is a permanent record, only the live leaderboard resets.
+  function archiveAndResetGlobalAwards(year) {
+    const extra = { category: 'season-global', year };
+    const type = 'Season Y' + year + ' (Global)';
+    const topOf = (key) => Object.values(stats[key] || {}).sort((a,b) => b.count - a.count)[0] || null;
+    pushIndividualTrophy('Golden Boot', topOf('goals'), type, extra);
+    pushIndividualTrophy('Top Assists', topOf('assists'), type, extra);
+    pushIndividualTrophy('Most MOTM', topOf('motm'), type, extra);
+    pushIndividualTrophy('Golden Glove', topOf('saves'), type, extra);
+    pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
+    const ballon = computeBallonRanking(stats)[0] || null;
+    pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+    // Only clear tournamentStats if there's no standalone Tournament (World
+    // Cup/UCL, separate from the Season Calendar) currently in progress —
+    // otherwise this would wipe that tournament's own live leaderboard mid-run.
+    if (!tournament || tournament.champion) {
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+    }
+    saveStats();
+  }
+
+  // Called after every season-mutating sim step. Fires exactly once, right
+  // when a season's last matchday completes (all leagues + the Champions
+  // League finished) — archives that season's individual award winners and
+  // resets the global leaderboard/Awards tab for the new season ahead.
+  function finalizeSeasonIfComplete() {
+    if (!season || season.archived) return;
+    if (!seasonIsComplete()) return;
+    season.archived = true;
+    season.completedAt = Date.now();
+    archiveAndResetGlobalAwards(season.year);
+    toast('Season ' + season.year + ' complete! Awards & leaderboard archived to History and reset.');
+  }
+
+  // True once we've warned the person this session that browser storage is
+  // full — avoids re-toasting every 4s from the autosave interval below.
+  let _storageQuotaWarned = false;
+  function isQuotaError(e) {
+    return !!e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 ||
+      e.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+  }
+  // Wraps localStorage.setItem so a full-storage failure is surfaced to the
+  // person (once per session) instead of vanishing into an empty catch.
+  // Silently swallowing a failed write here is exactly how a browser save
+  // could quietly stop matching the matches actually played — the write
+  // looks like it happened (no error shown) but the old, smaller value is
+  // still sitting in localStorage. Returns true on success, false on failure.
+  function safeSetItem(key, value) {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      if (isQuotaError(e) && !_storageQuotaWarned) {
+        _storageQuotaWarned = true;
+        toast('Browser storage is full — use Export Save now to back up your progress to a file');
+      }
+      return false;
+    }
+  }
+
+  function saveStats() {
+    let ok = true;
+    try {
+      ok = safeSetItem('apexSimStats', JSON.stringify(stats)) && ok;
+      ok = safeSetItem('apexInjuryBook', JSON.stringify(injuryBook)) && ok;
+      ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
+      ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
+    } catch(e) { ok = false; }
+    return ok;
+  }
+  function loadStats() {
+    try {
+      const s = localStorage.getItem('apexSimStats');
+      if (s) stats = JSON.parse(s);
+      if (!stats.ratings) stats.ratings = {};
+      const t = localStorage.getItem('apexTrophies');
+      if (t) trophies = JSON.parse(t);
+      const ib = localStorage.getItem('apexInjuryBook');
+      if (ib) injuryBook = JSON.parse(ib);
+      const sb = localStorage.getItem('apexSuspensionBook');
+      if (sb) suspensionBook = JSON.parse(sb);
+      const md = localStorage.getItem('apexMatchDay');
+      if (md) globalMatchDay = parseInt(md, 10) || 1;
+    } catch(e) {}
+  }
+
+  // ========== FULL PROGRESS PERSISTENCE (survive a page refresh) ==========
+  // Stats/trophies/injury/suspension books are already saved above. This
+  // additionally persists the in-progress Season Calendar and standalone
+  // Tournament (World Cup / Champions League) state — plus a couple of small
+  // UI bits (which nav tab and which season sub-tab were open) — so a
+  // refresh (or reopening the app later) drops the person back exactly
+  // where they left off instead of wiping their run.
+  function persistAll() {
+    let ok = true;
+    try {
+      if (season) ok = safeSetItem('apexSeason', JSON.stringify(season)) && ok;
+      else localStorage.removeItem('apexSeason');
+      if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament)) && ok;
+      else localStorage.removeItem('apexTournament');
+      ok = safeSetItem('apexTournamentType', tournamentType) && ok;
+      ok = safeSetItem('apexTournamentStats', JSON.stringify(tournamentStats)) && ok;
+      ok = safeSetItem('apexSeasonActiveTab', seasonActiveTab) && ok;
+      ok = safeSetItem('apexSeasonActiveSubTab', seasonActiveSubTab) && ok;
+      ok = persistPlayerForms() && ok;
+      const activeTab = document.querySelector('.nav-tab.active');
+      if (activeTab && activeTab.dataset.view) safeSetItem('apexActiveView', activeTab.dataset.view);
+    } catch (e) { ok = false; }
+    return ok;
+  }
+
+  function loadPersistedGameState() {
+    try {
+      const s = localStorage.getItem('apexSeason');
+      if (s) season = JSON.parse(s);
+    } catch (e) { season = null; }
+    try {
+      const t = localStorage.getItem('apexTournament');
+      if (t) tournament = JSON.parse(t);
+    } catch (e) { tournament = null; }
+    try {
+      const tt = localStorage.getItem('apexTournamentType');
+      if (tt) tournamentType = tt;
+    } catch (e) {}
+    try {
+      const ts = localStorage.getItem('apexTournamentStats');
+      if (ts) tournamentStats = JSON.parse(ts);
+    } catch (e) {}
+    try {
+      const sat = localStorage.getItem('apexSeasonActiveTab');
+      if (sat) seasonActiveTab = sat;
+      const sst = localStorage.getItem('apexSeasonActiveSubTab');
+      if (sst) seasonActiveSubTab = sst;
+    } catch (e) {}
+  }
+
+  // Re-hydrates the Tournament view's UI from a restored `tournament` object
+  // (called once on load, before the person has clicked back into that tab)
+  // so the setup/live panels and bracket are already correct whenever they do.
+  function restoreTournamentUI() {
+    if (!tournament) return;
+    const setup = document.getElementById('tournament-setup');
+    const live = document.getElementById('tournament-live');
+    if (setup) setup.style.display = 'none';
+    if (live) live.style.display = 'block';
+    const title = document.getElementById('tournament-title');
+    const desc = document.getElementById('tournament-desc');
+    const isWC = tournamentType === 'worldcup';
+    if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
+    if (desc) desc.textContent = isWC
+      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
+      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
+    try {
+      if (tournament.format === 'league') { renderUCLLeague(); renderUCLFixtures(); }
+      else { renderGroups(); }
+      renderBracket();
+      if (tournament.champion) renderTournamentPodium();
+      renderTournamentLeaderboard();
+    } catch (e) {}
+  }
+
+  function restoreSeasonUI() {
+    if (!season) return;
+    try { renderSeasonDashboard(); } catch (e) {}
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = 'none';
+    if (dash) dash.style.display = 'block';
+  }
+
+  // Belt-and-braces autosave: most mutating actions already call persistAll()
+  // directly, but a periodic save plus a save right before the tab is hidden
+  // or closed means nothing is ever more than a couple seconds from being
+  // safely on disk, even from an edge case that isn't explicitly wired up.
+  function setupAutoSave() {
+    setInterval(persistAll, 4000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistAll(); });
+    window.addEventListener('beforeunload', persistAll);
+    window.addEventListener('pagehide', persistAll);
+  }
+
+  // Manual save, triggered by the header Save button. persistAll() already
+  // runs constantly in the background (autosave, mutating actions, tab
+  // hide/close), so this doesn't do anything those don't already cover —
+  // it exists purely so the person can get an explicit, visible confirmation
+  // that their progress is safely written to this browser's storage right now.
+  function manualSave() {
+    const okSeason = persistAll();
+    const okStats = saveStats();
+    const ok = okSeason && okStats;
+    const btn = document.getElementById('manual-save-btn');
+    if (btn) {
+      const label = btn.querySelector('.save-btn-label');
+      const prevLabel = label ? label.textContent : null;
+      btn.classList.add('just-saved');
+      if (label) label.textContent = ok ? 'Saved!' : 'Storage full!';
+      setTimeout(() => {
+        btn.classList.remove('just-saved');
+        if (label && prevLabel !== null) label.textContent = prevLabel;
+      }, 1200);
+    }
+    // safeSetItem() already toasts a one-time "storage is full" warning on
+    // failure, so only toast the happy path here to avoid two conflicting
+    // messages.
+    if (ok) toast('Progress saved');
+  }
+
+  // ========== EXPORT / IMPORT SAVE FILE ==========
+  // Every piece of persisted state this app writes is namespaced under a
+  // localStorage key starting with "apex" (see resetLeaderboard() below,
+  // which relies on the same fact). That makes a full, exact export/import
+  // straightforward: grab every "apex*" key verbatim (already-serialized
+  // JSON strings, numbers-as-strings, etc.) and write them back out exactly
+  // as they were, rather than re-deriving anything from in-memory state.
+  // This is what lets a save survive a browser switch or a full wipe/refresh.
+  // Builds the export payload straight from the live in-memory game state
+  // (season, tournament, stats, trophies, etc.) rather than reading it back
+  // out of localStorage. This matters because localStorage writes can fail
+  // silently under quota pressure (a long season's accumulated match
+  // reports can get large) — if that happens, the localStorage copy can be
+  // an older, smaller snapshot than what's actually on screen, and an
+  // export built from localStorage would quietly ship that stale, earlier
+  // point instead of the matches actually just played. Reading straight
+  // from memory means the export always matches exactly what's currently
+  // showing, independent of whether the last autosave tick succeeded.
+  function collectExportData() {
+    const data = {};
+    // Start from whatever's already in localStorage, so any "apex*" key
+    // this function doesn't special-case below (small UI/session bits)
+    // still makes it into the export.
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('apex') === 0) data[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    // Now overwrite every key that has a live in-memory source of truth,
+    // so these always reflect the exact current point — not a possibly
+    // stale localStorage copy.
+    try {
+      if (season) data.apexSeason = JSON.stringify(season);
+      else delete data.apexSeason;
+      if (tournament) data.apexTournament = JSON.stringify(tournament);
+      else delete data.apexTournament;
+      data.apexTournamentType = tournamentType;
+      data.apexTournamentStats = JSON.stringify(tournamentStats);
+      data.apexSeasonActiveTab = seasonActiveTab;
+      data.apexSeasonActiveSubTab = seasonActiveSubTab;
+      data.apexSimStats = JSON.stringify(stats);
+      data.apexTrophies = JSON.stringify(trophies);
+      data.apexInjuryBook = JSON.stringify(injuryBook);
+      data.apexSuspensionBook = JSON.stringify(suspensionBook);
+      data.apexMatchDay = String(globalMatchDay);
+      data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
+    } catch (e) {}
+    return data;
+  }
+
+  function exportSave() {
+    try {
+      // Best-effort: also try to flush to localStorage so autosave/reload
+      // stay in sync. If this fails (e.g. storage is full), the export
+      // below still succeeds and is still exact — it doesn't depend on
+      // this write having worked.
+      try { persistAll(); saveStats(); } catch (e) {}
+      const data = collectExportData();
+      if (!Object.keys(data).length) {
+        toast('Nothing to export yet — play a bit first');
+        return;
+      }
+      const payload = {
+        app: 'apex-sim',
+        formatVersion: 1,
+        exportedAt: new Date().toISOString(),
+        data
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `apex-sim-save-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast('Save file exported');
+    } catch (e) {
+      console.error('Export failed', e);
+      toast('Export failed — see console for details');
+    }
+  }
+
+  function triggerImportSave() {
+    const input = document.getElementById('import-save-input');
+    if (input) { input.value = ''; input.click(); }
+  }
+
+  function importSaveFile(event) {
+    const input = event && event.target;
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const payload = JSON.parse(reader.result);
+        const data = payload && payload.data && typeof payload.data === 'object' ? payload.data : null;
+        const validKeys = data ? Object.keys(data).filter(k => k.indexOf('apex') === 0) : [];
+        if (!data || !validKeys.length) {
+          toast("That file doesn't look like an APEX SIM save");
+          return;
+        }
+        if (!confirm('Import this save? This will REPLACE all current progress — leaderboard, trophies, history, active season, tournament, everything — with the contents of this file. This cannot be undone.')) {
+          return;
+        }
+        // Clear every existing "apex*" key first so nothing from the
+        // current save (e.g. a key this version writes that an older
+        // export doesn't have) bleeds into the restored state.
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
+        }
+        keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+        // Track failures instead of swallowing them — a quota failure here
+        // would otherwise reload the page into a save that's silently
+        // missing the season/tournament progress the file actually had.
+        const failedKeys = [];
+        validKeys.forEach(k => { if (!safeSetItem(k, data[k])) failedKeys.push(k); });
+        if (failedKeys.length) {
+          alert('Import partially failed — this browser\'s storage is full, so ' +
+            failedKeys.length + ' item(s) from the file (' + failedKeys.join(', ') +
+            ') could not be restored. Free up space (e.g. import in a different browser, ' +
+            'or clear old site data) and try again.');
+        }
+        try { sessionStorage.setItem('apexJustImported', '1'); } catch (e) {}
+        location.reload();
+      } catch (err) {
+        console.error('Import failed', err);
+        toast('Import failed — file is not valid JSON');
+      } finally {
+        if (input) input.value = '';
+      }
+    };
+    reader.onerror = () => { toast('Could not read that file'); if (input) input.value = ''; };
+    reader.readAsText(file);
+  }
+
+  function resetLeaderboard() {
+    if (!confirm('Reset EVERYTHING? This wipes all leaderboard stats, trophies, history, the active season, any tournament in progress, injuries/suspensions, player form and saved settings — every piece of stored data for this app on this device. This cannot be undone.')) return;
+    // Full factory reset: clear every bit of persisted state, not just the
+    // leaderboard tables. We wipe every localStorage key this app owns
+    // (all of them are namespaced with the "apex" prefix) rather than
+    // trying to enumerate and reset every in-memory variable by hand,
+    // then reload so the app boots from a completely clean slate — this
+    // guarantees no stale in-memory state (season, tournament, injury
+    // book, player forms, etc.) can survive the reset.
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+    } catch (e) {}
+    try { sessionStorage.setItem('apexJustReset', '1'); } catch (e) {}
+    location.reload();
+  }
+
+  function showLeaderboard(type) {
+    document.querySelectorAll('.lb-tab').forEach(t => t.classList.toggle('active', t.dataset.lb === type));
+    let data;
+    if (type === 'ratings') {
+      data = Object.values(stats.ratings || {}).filter(x => x.count > 0).sort((a, b) => b.avg - a.avg || b.count - a.count).slice(0, 20);
+    } else {
+      data = Object.values(stats[type] || {}).sort((a, b) => b.count - a.count).slice(0, 20);
+    }
+    const el = document.getElementById('leaderboard-content');
+    if (!el) return;
+    if (!data.length) {
+      el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No ${type} recorded yet. Simulate matches!</p></div>`;
+      return;
+    }
+    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating', interceptions: 'Interceptions' };
+    const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
+    const top3 = data.slice(0, 3);
+    const podium = top3.length ? `<div class="lb-podium">
+      ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1}">
+          <div class="lb-podium-rank">${i===0?'🥇':i===1?'🥈':'🥉'}</div>
+          ${lbAvatar(p, 56)}
+          <div class="lb-podium-name">${p.name}</div>
+          <div class="lb-podium-team">${[p.national, p.club].filter(Boolean).join(' · ') || p.team || ''}</div>
+          <div class="lb-podium-value">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—') : p.count}</div>
+        </div>`).join('')}
+    </div>` : '';
+    el.innerHTML = `${podium}<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th>${appsCol}<th>${labels[type]||type}</th></tr></thead><tbody>
+      ${data.map((p,i) => {
+        const aff = [p.national, p.club].filter(Boolean).join(' · ') || p.team;
+        const apps = (stats.ratings && stats.ratings[p.id]) ? stats.ratings[p.id].count : 0;
+        const appsCell = type === 'ratings' ? '' : `<td>${apps}</td>`;
+        return `<tr class="${i<3?'lb-row-top rank-'+(i+1):''}"><td class="lb-rank">${rankBadge(i)}</td><td class="lb-player">${lbPlayerCell(p)}</td><td class="lb-team">${aff}</td>${appsCell}<td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
+      }).join('')}
+    </tbody></table></div>`;
+  }
+
+  function renderTournamentTeamSelect() {
+    let pool = tournamentType === 'worldcup' ? (teamsData.national || []) : (teamsData.club || []);
+    if (tourTeamsSearch) {
+      pool = pool.filter(t =>
+        (t.name || '').toLowerCase().includes(tourTeamsSearch) ||
+        (t.short || '').toLowerCase().includes(tourTeamsSearch)
+      );
+    }
+    const el = document.getElementById('tournament-teams');
+    if (!el) return;
+    // Preserve existing checks
+    const prevChecked = new Set(
+      [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => cb.value)
+    );
+    const firstRender = prevChecked.size === 0 && !tourTeamsSearch;
+    el.innerHTML = pool.map(t => {
+      const checked = firstRender || prevChecked.has(t.id);
+      return `<label class="team-check ${checked ? 'selected' : ''}" data-id="${t.id}">
+        <input type="checkbox" value="${t.id}" ${checked ? 'checked' : ''}>
+        <span>${teamMark(t, 20)} ${t.name}</span>
+        <span class="player-ovr" style="margin-left:auto">${teamAvgOvr(t).toFixed(0)}</span>
+      </label>`;
+    }).join('') || '<div class="empty-state"><p>No teams found</p></div>';
+    el.querySelectorAll('.team-check').forEach(l => {
+      l.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          const cb = l.querySelector('input');
+          if (cb) cb.checked = !cb.checked;
+        }
+        const cb = l.querySelector('input');
+        l.classList.toggle('selected', cb && cb.checked);
+        updateTournamentSelectedCount();
+      });
+      l.querySelector('input') && l.querySelector('input').addEventListener('change', updateTournamentSelectedCount);
+    });
+    updateTournamentSelectedCount();
+  }
+
+  function updateTournamentSelectedCount() {
+    const n = document.querySelectorAll('#tournament-teams input:checked').length;
+    let el = document.getElementById('tour-selected-count');
+    if (!el) {
+      const setup = document.getElementById('tournament-setup');
+      const grid = document.getElementById('tournament-teams');
+      if (grid && grid.parentNode) {
+        el = document.createElement('div');
+        el.id = 'tour-selected-count';
+        el.className = 'tour-selected-count';
+        grid.parentNode.insertBefore(el, grid);
+      }
+    }
+    if (el) {
+      const need = tournamentType === 'ucl' ? '36 ideal (min 8)' : '4+ (8/16/32/48 ideal)';
+      el.innerHTML = '<strong>' + n + '</strong> teams selected <span style="color:var(--text-3)">· ' + need + '</span>';
+    }
+  }
+
+
+  function selectAllTeams() {
+    setTimeout(updateTournamentSelectedCount, 0);
+    document.querySelectorAll('#tournament-teams input').forEach(cb => {
+      cb.checked = true;
+      const parent = cb.closest('.team-check');
+      if (parent) parent.classList.add('selected');
+    });
+  }
+  function deselectAllTeams() {
+    document.querySelectorAll('#tournament-teams input').forEach(cb => {
+      cb.checked = false;
+      const parent = cb.closest('.team-check');
+      if (parent) parent.classList.remove('selected');
+    });
+  }
+
+  function startTournament() {
+    const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
+    if (selected.length < 4) { toast('Select at least 4 teams'); return; }
+
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+    // Clear previous tournament UI
+    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
+    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const st = document.getElementById('tour-stage-title');
+    if (st) st.textContent = 'Starting…';
+
+    if (tournamentType === 'ucl') {
+      startUCLTournament(selected);
+    } else {
+      startWorldCupTournament(selected);
+    }
+    if (tournament) tournament._runId = Date.now();
+
+    const setup = document.getElementById('tournament-setup');
+    const live = document.getElementById('tournament-live');
+    if (setup) setup.style.display = 'none';
+    if (live) live.style.display = 'block';
+    renderTournamentLeaderboard();
+    persistAll();
+  }
+
+  function startWorldCupTournament(selected) {
+    let teams = shuffleArray([...selected]);
+    const groupSize = 4;
+    let numGroups = Math.floor(teams.length / groupSize);
+    if (numGroups < 1) numGroups = 1;
+    if (numGroups > 12) numGroups = 12;
+    teams = teams.slice(0, numGroups * groupSize);
+    if (teams.length < 4) { toast('Need at least 4 teams for groups'); return; }
+    const groups = [];
+    for (let i = 0; i < numGroups; i++) {
+      groups.push({
+        name: String.fromCharCode(65 + i),
+        teams: teams.slice(i * groupSize, (i + 1) * groupSize).map(t => ({
+          team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
+        }))
+      });
+    }
+    tournament = { type: 'worldcup', format: 'groups', groups, knockout: [], stage: 'groups', fixtures: [], champion: null, playoff: [] };
+    generateGroupFixtures();
+    renderGroups();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = 'Group Stage';
+    const bracket = document.getElementById('bracket');
+    if (bracket) bracket.innerHTML = '<p style="color:var(--text-muted)">Knockout bracket appears after groups.</p>';
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Round';
+  }
+
+  function startUCLTournament(selected) {
+    let teams = shuffleArray([...selected]);
+    // Prefer 36; if fewer, use largest even count >= 8 (scale format)
+    if (teams.length >= 36) teams = teams.slice(0, 36);
+    else if (teams.length % 2 === 1) teams = teams.slice(0, teams.length - 1);
+    if (teams.length < 8) { toast('Champions League needs at least 8 clubs (36 ideal)'); return; }
+
+    const league = teams.map(t => ({
+      team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
+    }));
+
+    const matchesPerTeam = teams.length >= 36 ? 8 : Math.min(8, teams.length - 1);
+    const fixtures = generateUCLLeagueFixtures(teams, matchesPerTeam);
+
+    tournament = {
+      type: 'ucl',
+      format: 'league',
+      stage: 'league',
+      league,
+      fixtures,
+      playoff: [],
+      knockout: [],
+      groups: [],
+      champion: null,
+      matchesPerTeam
+    };
+
+    renderUCLLeague();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = 'League Phase (' + matchesPerTeam + ' matches each)';
+    const bracket = document.getElementById('bracket');
+    if (bracket) bracket.innerHTML = '<p style="color:var(--text-muted)">Playoffs & knockout appear after the league phase.</p>';
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate League Round';
+    toast('UCL league phase: ' + teams.length + ' teams, ' + fixtures.length + ' matches');
+  }
+
+  function generateUCLLeagueFixtures(teams, matchesPerTeam) {
+    const fixtures = [];
+    const opp = {};
+    teams.forEach(t => { opp[t.id] = new Set(); });
+
+    for (let round = 1; round <= matchesPerTeam; round++) {
+      const order = shuffleArray([...teams]);
+      const used = new Set();
+      for (const t of order) {
+        if (used.has(t.id)) continue;
+        if (opp[t.id].size >= matchesPerTeam) continue;
+        const candidate = order.find(o =>
+          o.id !== t.id &&
+          !used.has(o.id) &&
+          !opp[t.id].has(o.id) &&
+          opp[o.id].size < matchesPerTeam
+        );
+        if (!candidate) continue;
+        used.add(t.id);
+        used.add(candidate.id);
+        opp[t.id].add(candidate.id);
+        opp[candidate.id].add(t.id);
+        // Alternate home roughly by round
+        const tHome = (round + t.id.length) % 2 === 0;
+        const home = tHome ? t : candidate;
+        const away = tHome ? candidate : t;
+        fixtures.push({
+          phase: 'league',
+          round,
+          home: home.id,
+          away: away.id,
+          played: false,
+          homeScore: null,
+          awayScore: null,
+          report: null
+        });
+      }
+    }
+    return shuffleArray(fixtures);
+  }
+
+  function blankLeagueRow(team) {
+    return { team, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 };
+  }
+
+  function applyLeagueResult(homeId, awayId, hg, ag) {
+    const ht = tournament.league.find(r => r.team.id === homeId);
+    const at = tournament.league.find(r => r.team.id === awayId);
+    if (!ht || !at) return;
+    ht.played++; at.played++;
+    ht.gf += hg; ht.ga += ag;
+    at.gf += ag; at.ga += hg;
+    if (hg > ag) { ht.won++; ht.pts += 3; at.lost++; }
+    else if (ag > hg) { at.won++; at.pts += 3; ht.lost++; }
+    else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+  }
+
+  function sortedLeague() {
+    return [...(tournament.league || [])].sort((a, b) =>
+      b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf
+    );
+  }
+
+  function renderUCLLeague() {
+    const el = document.getElementById('groups-container');
+    if (!el || !tournament || tournament.format !== 'league') return;
+    const sorted = sortedLeague();
+    let h = '<div class="group-card league-table-wrap" style="grid-column:1/-1"><h4>League Phase Table — all ' + sorted.length + ' teams</h4>';
+    h += '<table class="group-table"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
+    sorted.forEach((r, i) => {
+      const gd = r.gf - r.ga;
+      let mark = '';
+      if (i < 8) mark = ' style="background:rgba(0,200,83,0.12)"';
+      else if (i < 24) mark = ' style="background:rgba(255,171,0,0.1)"';
+      else mark = ' style="background:rgba(255,82,82,0.08)"';
+      h += `<tr${mark}><td>${i+1}</td><td>${teamMark(r.team, 18)} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
+    });
+    h += '</tbody></table>';
+    h += '<p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">Green: Top 8 → R16 direct · Amber: 9–24 playoff · Red: 25–36 eliminated</p></div>';
+    el.innerHTML = h;
+
+    // Fixtures panel
+    const fixEl = document.getElementById('fixtures-list') || el;
+    // Use existing fixtures area inside renderGroups path — append via fixtures in live view
+    const liveFix = document.querySelector('#tournament-live .fixtures-panel') || document.getElementById('fixture-list');
+    renderUCLFixtures();
+  }
+
+  function renderUCLFixtures() {
+    // Find fixtures container used by renderGroups
+    let fixEl = document.getElementById('fixture-list');
+    if (!fixEl) {
+      // inject after groups if missing
+      const gc = document.getElementById('groups-container');
+      if (gc && !document.getElementById('fixture-list')) {
+        const d = document.createElement('div');
+        d.id = 'fixture-list';
+        gc.parentNode.insertBefore(d, gc.nextSibling);
+        fixEl = d;
+      }
+    }
+    if (!fixEl || !tournament) return;
+    const unplayed = (tournament.fixtures || []).filter(f => !f.played).slice(0, 12);
+    const played = (tournament.fixtures || []).filter(f => f.played).slice(-8);
+    let h = '';
+    if (tournament.stage === 'league') {
+      h += '<div class="card-title" style="margin-top:12px">League Fixtures</div>';
+      unplayed.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const idx = tournament.fixtures.indexOf(f);
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
+          <button class="btn btn-primary btn-sm" onclick="App.playUCLFixture(${idx})">▶ Live</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.simUCLFixture(${idx})">⚡ Instant</button></div>`;
+      });
+      if (played.length) {
+        h += '<div class="card-title" style="margin-top:12px">Recent Results</div>';
+        played.reverse().forEach(f => {
+          const home = getTeam(f.home), away = getTeam(f.away);
+          const idx = tournament.fixtures.indexOf(f);
+          h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})">
+            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+            <span style="font-size:0.7rem;color:var(--accent-gold)">Details</span></div>`;
+        });
+      }
+    }
+    if (tournament.stage === 'playoff' || (tournament.playoff && tournament.playoff.length)) {
+      h += '<div class="card-title" style="margin-top:12px">Knockout Playoffs (two legs)</div>';
+      (tournament.playoff || []).forEach((p, i) => {
+        const status = p.played ? (`Agg ${p.aggHome}-${p.aggAway} → ${p.winner ? p.winner.short : ''}`) : (p.leg1 && p.leg1.played ? 'Leg 2' : 'Leg 1');
+        h += `<div class="fixture-item ${p.played?'played':''}">
+          <span class="fixture-teams">${teamMark(p.home,18)} ${p.home.short} vs ${teamMark(p.away,18)} ${p.away.short} <small>(${status})</small></span>`;
+        if (!p.played) {
+          h += `<button class="btn btn-secondary btn-sm" onclick="App.simPlayoffTie(${i})">⚡ Sim Tie</button>`;
+        } else if (p.report || (p.leg2 && p.leg2.report)) {
+          h += `<button class="btn btn-secondary btn-sm" onclick="App.viewPlayoffReport(${i})">Report</button>`;
+        }
+        h += '</div>';
+      });
+    }
+    fixEl.innerHTML = h;
+  }
+
+
+  function generateGroupFixtures() {
+    tournament.fixtures = [];
+    tournament.groups.forEach((g, gi) => {
+      const ts = g.teams;
+      for (let i = 0; i < ts.length; i++)
+        for (let j = i + 1; j < ts.length; j++)
+          tournament.fixtures.push({ group: gi, home: ts[i].team.id, away: ts[j].team.id, played: false });
+    });
+    shuffleArray(tournament.fixtures);
+  }
+
+  function renderGroups() {
+    if (tournament && tournament.format === 'league') {
+      renderUCLLeague();
+      return;
+    }
+    const el = document.getElementById('groups-container');
+    if (!el || !tournament) return;
+    el.innerHTML = tournament.groups.map(g => {
+      const sorted = [...g.teams].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      return `<div class="group-card"><h4>Group ${g.name}</h4><table class="group-table"><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>
+        ${sorted.map(t => `<tr><td>${teamMark(t.team,16)} ${t.team.short}</td><td>${t.played}</td><td>${t.won}</td><td>${t.drawn}</td><td>${t.lost}</td><td>${t.gf - t.ga}</td><td class="pts">${t.pts}</td></tr>`).join('')}
+      </tbody></table></div>`;
+    }).join('');
+    // Fixture list with live play option — only shown during the active group
+    // stage. Once the tournament has moved on to knockouts, this is cleared
+    // (see advanceToKnockout) so no stale "Upcoming Fixtures" option lingers.
+    const fixEl = document.getElementById('fixture-list');
+    if (fixEl && tournament.stage === 'groups') {
+      const unplayed = tournament.fixtures.filter(f => !f.played).slice(0, 8);
+      const played = tournament.fixtures.filter(f => f.played).slice(-6);
+      let h = '';
+      if (unplayed.length) {
+        h += '<div class="card-title" style="margin-top:12px">Upcoming Fixtures</div>';
+        unplayed.forEach((f, i) => {
+          const home = getTeam(f.home), away = getTeam(f.away);
+          if (!home || !away) return;
+          h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
+            <button class="btn btn-primary btn-sm" onclick="App.playTournamentMatch(${tournament.fixtures.indexOf(f)})">▶ Play Live</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.simSingleFixture(${tournament.fixtures.indexOf(f)})">⚡ Instant</button></div>`;
+        });
+      }
+      if (played.length) {
+        h += '<div class="card-title" style="margin-top:12px">Recent Results</div>';
+        played.reverse().forEach(f => {
+          const home = getTeam(f.home), away = getTeam(f.away);
+          if (!home || !away) return;
+          const idx = tournament.fixtures.indexOf(f);
+          h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})" title="View full match report">
+            <span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
+            <span class="fixture-score">${f.homeScore} - ${f.awayScore}</span>
+            <span style="font-size:0.7rem;color:var(--accent-gold);margin-left:6px">Details</span>
+          </div>`;
+        });
+      }
+      fixEl.innerHTML = h;
+    }
+  }
+
+  function simSingleFixture(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    const f = tournament.fixtures[idx];
+    const home = getTeam(f.home), away = getTeam(f.away);
+    const result = simQuickMatch(home, away);
+    f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
+    const g = tournament.groups[f.group];
+    const ht = g.teams.find(t => t.team.id === f.home);
+    const at = g.teams.find(t => t.team.id === f.away);
+    if (ht && at) {
+      ht.played++; at.played++;
+      ht.gf += result.home; ht.ga += result.away;
+      at.gf += result.away; at.ga += result.home;
+      if (result.home > result.away) { ht.won++; ht.pts += 3; at.lost++; }
+      else if (result.away > result.home) { at.won++; at.pts += 3; ht.lost++; }
+      else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+    }
+    renderGroups();
+    renderTournamentLeaderboard();
+    const remaining = tournament.fixtures.filter(x => !x.played).length;
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = remaining ? `Group Stage — ${remaining} matches left` : 'Group Stage Complete';
+    if (!remaining && tournament.stage === 'groups') advanceToKnockout();
+    persistAll();
+  }
+
+  function playTournamentMatch(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    const f = tournament.fixtures[idx];
+    const home = getTeam(f.home), away = getTeam(f.away);
+    if (!home || !away) return;
+    window._tourFixtureIdx = idx;
+    window._uclFixtureIdx = null;
+    window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._fromTournament = true;
+    window._seasonFixture = null;
+    window._backTarget = 'tournament';
+    currentSeasonComp = null;
+    switchView('match');
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = home.id;
+    if (awaySel) awaySel.value = away.id;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    // Clear custom lineups so random formation applies
+    customLineups.home = null;
+    customLineups.away = null;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    startMatch();
+    toast('Tournament match — live · formations randomized');
+  }
+
+
+  function simTournamentRound() {
+    if (!tournament) return;
+    withLoading('Simulating round…', function() {
+      _simTournamentRoundWork();
+      refreshTournamentStatsUI();
+    });
+  }
+
+  function _simTournamentRoundWork() {
+    if (!tournament) return;
+    if (tournament.format === 'league' || tournament.stage === 'league') {
+      const unplayed = (tournament.fixtures || []).filter(f => !f.played);
+      if (!unplayed.length) { advanceUCLFromLeague(); return; }
+      const batch = unplayed.slice(0, Math.max(4, Math.ceil(unplayed.length / 4)));
+      batch.forEach(f => {
+        const idx = tournament.fixtures.indexOf(f);
+        if (idx >= 0) simUCLFixture(idx);
+      });
+      return;
+    }
+    if (tournament.stage === 'playoff') {
+      tournament.playoff.forEach((p, i) => { if (!p.played) simPlayoffTie(i); });
+      return;
+    }
+    if (tournament.stage === 'groups') {
+      const unplayed = tournament.fixtures.filter(f => !f.played);
+      if (!unplayed.length) { advanceToKnockout(); return; }
+      const batch = unplayed.slice(0, Math.max(2, Math.ceil(unplayed.length / 3)));
+      batch.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const result = simQuickMatch(home, away);
+        f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
+        const g = tournament.groups[f.group];
+        const ht = g.teams.find(t => t.team.id === f.home);
+        const at = g.teams.find(t => t.team.id === f.away);
+        if (!ht || !at) return;
+        ht.played++; at.played++;
+        ht.gf += result.home; ht.ga += result.away;
+        at.gf += result.away; at.ga += result.home;
+        if (result.home > result.away) { ht.won++; ht.pts += 3; at.lost++; }
+        else if (result.away > result.home) { at.won++; at.pts += 3; ht.lost++; }
+        else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+      });
+      renderGroups();
+      const remaining = tournament.fixtures.filter(f => !f.played).length;
+      const stageTitle = document.getElementById('tour-stage-title');
+      if (stageTitle) stageTitle.textContent = remaining ? `Group Stage — ${remaining} matches left` : 'Group Stage Complete';
+      if (!remaining && tournament.stage === 'groups') advanceToKnockout();
+    } else if (tournament.stage === 'knockout') {
+      simKnockoutRound();
+    }
+  }
+
+  function simAllTournament() {
+    if (!tournament) return;
+    withLoading('Simulating full tournament…', function() {
+      _simAllTournamentWork();
+    });
+  }
+
+  function _simAllTournamentWork() {
+    if (!tournament) return;
+    const updateLoading = (msg) => {
+      const t = document.getElementById('loading-text');
+      if (t) t.textContent = msg;
+    };
+
+    // ========== UCL / League format ==========
+    if (tournament.format === 'league' || tournament.type === 'ucl') {
+      updateLoading('Simulating league phase…');
+      (tournament.fixtures || []).forEach((f) => {
+        if (f.played) return;
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const result = simQuickMatch(home, away, { countForLeaderboard: true });
+        f.played = true;
+        f.homeScore = result.home;
+        f.awayScore = result.away;
+        f.report = result.report;
+        applyLeagueResult(f.home, f.away, result.home, result.away);
+      });
+
+      if (tournament.stage === 'league' || !tournament.playoff) {
+        try { advanceUCLFromLeague(); } catch (e) { console.warn(e); }
+      }
+
+      updateLoading('Simulating playoffs…');
+      if (tournament.playoff && tournament.playoff.length) {
+        tournament.playoff.forEach((p, i) => {
+          if (!p.played) {
+            try { simPlayoffTie(i); } catch (e) { console.warn(e); }
+          }
+        });
+        if (tournament.stage === 'playoff' || tournament.playoff.every(p => p.played)) {
+          try { finishUCLPlayoffs(); } catch (e) { console.warn(e); }
+        }
+      }
+
+      updateLoading('Simulating knockout rounds…');
+      let guard = 0;
+      while (!tournament.champion && tournament.knockout && tournament.knockout.length && guard < 30) {
+        guard++;
+        const ri = tournament.knockout.length - 1;
+        const round = tournament.knockout[ri];
+        if (!round || !round.matches) break;
+        const isFinal = round.name === 'Final' || round.matches.length === 1;
+
+        round.matches.forEach((m) => {
+          if (m.played || !m.home || !m.away) return;
+          if (isFinal || m.twoLeg === false) simSingleFinal(m);
+          else simTwoLegTie(m);
+        });
+
+        // If any still unplayed, stop this iteration
+        if (round.matches.some(m => !m.played && m.home && m.away)) break;
+
+        const winners = round.matches.map(m => m.winner).filter(Boolean);
+        if (winners.length <= 1) {
+          if (winners[0]) setChampion(winners[0]);
+          break;
+        }
+
+        // Create next round only if we are still on the last round
+        if (ri === tournament.knockout.length - 1) {
+          let list = winners.slice();
+          if (list.length % 2 === 1) list.pop();
+          if (list.length < 2) {
+            setChampion(list[0] || winners[0]);
+            break;
+          }
+          const nextMatches = [];
+          const nextIsFinal = list.length === 2;
+          for (let i = 0; i < list.length; i += 2) {
+            if (nextIsFinal) {
+              nextMatches.push({
+                home: list[i], away: list[i + 1], twoLeg: false, played: false,
+                homeScore: null, awayScore: null, winner: null, report: null
+              });
+            } else {
+              nextMatches.push(typeof makeTwoLegTie === 'function'
+                ? makeTwoLegTie(list[i], list[i + 1])
+                : { home: list[i], away: list[i + 1], twoLeg: true, played: false, homeScore: null, awayScore: null, winner: null });
+            }
+          }
+          tournament.knockout.push({
+            name: getRoundName(list.length),
+            matches: nextMatches,
+            twoLeg: !nextIsFinal
+          });
+        }
+      }
+
+      assignTournamentAwards();
+      try { renderUCLLeague(); } catch (e) {}
+      try { renderBracket(); } catch (e) {}
+      try { refreshTournamentStatsUI(); } catch (e) {}
+      if (tournament.champion) {
+        const stageTitle = document.getElementById('tour-stage-title');
+        if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
+        toast(tournament.champion.name + ' win the Champions League!');
+      } else {
+        toast('Tournament simulation finished');
+      }
+      return;
+    }
+
+    // ========== World Cup path ==========
+    updateLoading('Simulating group stage…');
+    (tournament.fixtures || []).forEach((f) => {
+      if (f.played) return;
+      const home = getTeam(f.home), away = getTeam(f.away);
+      if (!home || !away) return;
+      const result = simQuickMatch(home, away, { countForLeaderboard: true });
+      f.played = true;
+      f.homeScore = result.home;
+      f.awayScore = result.away;
+      f.report = result.report;
+      const g = tournament.groups && tournament.groups[f.group];
+      if (!g) return;
+      const ht = g.teams.find(t => t.team.id === f.home);
+      const at = g.teams.find(t => t.team.id === f.away);
+      if (!ht || !at) return;
+      ht.played++; at.played++;
+      ht.gf += result.home; ht.ga += result.away;
+      at.gf += result.away; at.ga += result.home;
+      if (result.home > result.away) { ht.won++; ht.pts += 3; at.lost++; }
+      else if (result.away > result.home) { at.won++; at.pts += 3; ht.lost++; }
+      else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+    });
+
+    if (!tournament.champion && tournament.stage !== 'knockout' && tournament.stage !== 'complete') {
+      updateLoading('Advancing to knockout…');
+      try { advanceToKnockout(); } catch (e) { console.warn(e); }
+    }
+
+    updateLoading('Simulating knockout rounds…');
+    let safety = 0;
+    while (!tournament.champion && safety < 30) {
+      safety++;
+      if (!tournament.knockout || !tournament.knockout.length) break;
+      const ri = tournament.knockout.length - 1;
+      const round = tournament.knockout[ri];
+      if (!round || !round.matches) break;
+
+      round.matches.forEach((m) => {
+        if (m.played || !m.home || !m.away) return;
+        const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true, countForLeaderboard: true });
+        m.homeScore = result.home;
+        m.awayScore = result.away;
+        m.played = true;
+        m.report = result.report;
+        if (result.pens) {
+          m.penalties = true;
+          m.winner = result.pens.home > result.pens.away ? m.home : m.away;
+        } else if (result.home > result.away) m.winner = m.home;
+        else if (result.away > result.home) m.winner = m.away;
+        else {
+          m.penalties = true;
+          m.winner = seededRandom() < 0.5 ? m.home : m.away;
+        }
+      });
+
+      if (round.matches.some(m => m.home && m.away && !m.played)) break;
+
+      const winners = round.matches.map(m => m.winner).filter(Boolean);
+      if (winners.length <= 1) {
+        if (winners[0]) setChampion(winners[0]);
+        break;
+      }
+
+      if (ri === tournament.knockout.length - 1) {
+        let list = winners.slice();
+        if (list.length % 2 === 1) list.pop();
+        if (list.length < 2) {
+          setChampion(list[0] || winners[0]);
+          break;
+        }
+        const nextMatches = [];
+        for (let i = 0; i < list.length; i += 2) {
+          nextMatches.push({
+            home: list[i], away: list[i + 1],
+            homeScore: null, awayScore: null, winner: null, played: false, report: null
+          });
+        }
+        tournament.knockout.push({
+          name: getRoundName(list.length),
+          matches: nextMatches
+        });
+      }
+    }
+
+    tournament.stage = tournament.champion ? 'complete' : (tournament.knockout && tournament.knockout.length ? 'knockout' : tournament.stage);
+    assignTournamentAwards();
+    try { renderGroups(); } catch (e) {}
+    try { renderBracket(); } catch (e) {}
+    try { refreshTournamentStatsUI(); } catch (e) {}
+    if (tournament.champion) {
+      const stageTitle = document.getElementById('tour-stage-title');
+      if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
+      toast(tournament.champion.name + ' win the tournament!');
+    } else {
+      toast('Tournament simulation finished');
+    }
+  }
+
+
+  function simUCLFixture(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    showLoading('Simulating match…');
+    setTimeout(function() {
+      try { _simUCLFixtureWork(idx); }
+      finally { hideLoading(); refreshTournamentStatsUI(); try { renderUCLLeague(); renderUCLFixtures(); } catch(e) {} persistAll(); }
+    }, 30);
+  }
+  function _simUCLFixtureWork(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    const f = tournament.fixtures[idx];
+    const home = getTeam(f.home), away = getTeam(f.away);
+    const result = simQuickMatch(home, away);
+    f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
+    applyLeagueResult(f.home, f.away, result.home, result.away);
+    renderUCLLeague();
+    renderTournamentLeaderboard();
+    if (tournament.fixtures.every(x => x.played)) {
+      toast('League phase complete');
+      advanceUCLFromLeague();
+    }
+    refreshTournamentStatsUI();
+  }
+
+  function playUCLFixture(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    window._uclFixtureIdx = idx;
+    window._tourFixtureIdx = idx;
+    window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._fromTournament = true;
+    window._seasonFixture = null;
+    window._backTarget = 'tournament';
+    currentSeasonComp = null;
+    const f = tournament.fixtures[idx];
+    switchView('match');
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = f.home;
+    if (awaySel) awaySel.value = f.away;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    // Clear custom lineups so random formation applies
+    customLineups.home = null;
+    customLineups.away = null;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    startMatch();
+    toast('UCL match — live · formations randomized');
+  }
+
+
+  function advanceUCLFromLeague() {
+    if (!tournament || tournament.format !== 'league') return;
+    const sorted = sortedLeague();
+    if (sorted.length < 8) {
+      // Small field: top half direct, rest playoff or direct KO
+      const half = Math.floor(sorted.length / 2);
+      const direct = sorted.slice(0, Math.min(8, half)).map(r => r.team);
+      buildUCLKnockoutFromTeams(direct.length >= 2 ? direct : sorted.slice(0, 4).map(r => r.team), true);
+      return;
+    }
+
+    const direct = sorted.slice(0, 8).map(r => r.team);
+    const playoffTeams = sorted.slice(8, Math.min(24, sorted.length));
+    const eliminated = sorted.slice(24);
+
+    tournament.stage = 'playoff';
+    tournament.playoff = [];
+
+    // Pair 9th vs 24th, 10th vs 23rd, ...
+    const n = playoffTeams.length;
+    for (let i = 0; i < Math.floor(n / 2); i++) {
+      const high = playoffTeams[i];
+      const low = playoffTeams[n - 1 - i];
+      if (!high || !low) continue;
+      tournament.playoff.push({
+        home: high.team, // higher rank hosts 2nd leg
+        away: low.team,
+        seedHigh: i + 9,
+        seedLow: 24 - i,
+        leg1: { played: false, homeScore: null, awayScore: null, report: null },
+        leg2: { played: false, homeScore: null, awayScore: null, report: null },
+        aggHome: 0,
+        aggAway: 0,
+        winner: null,
+        played: false
+      });
+    }
+
+    tournament._uclDirect = direct;
+    renderUCLLeague();
+    renderUCLFixtures();
+    renderBracket();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = 'Knockout Playoffs (9th–24th)';
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Playoffs';
+    toast('Top 8 seeded to R16. Playoffs underway.');
+  }
+
+  function simPlayoffTie(idx) {
+    if (!tournament || !tournament.playoff[idx] || tournament.playoff[idx].played) return;
+    const p = tournament.playoff[idx];
+    // Leg 1: away team (lower seed) at home vs higher seed
+    const leg1Home = p.away, leg1Away = p.home;
+    const r1 = simQuickMatch(leg1Home, leg1Away, { allowET: false, allowPens: false });
+    p.leg1 = { played: true, homeScore: r1.home, awayScore: r1.away, report: r1.report, homeId: leg1Home.id, awayId: leg1Away.id };
+    // Leg 2: higher seed at home
+    const r2 = simQuickMatch(p.home, p.away, { allowET: true, allowPens: true });
+    p.leg2 = { played: true, homeScore: r2.home, awayScore: r2.away, report: r2.report, homeId: p.home.id, awayId: p.away.id };
+    // Aggregate from higher seed perspective: leg1 away goals + leg2 home goals
+    p.aggHome = r1.away + r2.home; // higher seed total
+    p.aggAway = r1.home + r2.away; // lower seed total
+    if (p.aggHome > p.aggAway) p.winner = p.home;
+    else if (p.aggAway > p.aggHome) p.winner = p.away;
+    else {
+      // Pens already may have decided leg2 if scores level after 90 — if still level use pens flag or random
+      if (r2.pens) p.winner = r2.pens.home > r2.pens.away ? p.home : p.away;
+      else p.winner = seededRandom() < 0.5 ? p.home : p.away;
+      p.penalties = true;
+    }
+    p.played = true;
+    renderUCLFixtures();
+    if (tournament.playoff.every(x => x.played)) finishUCLPlayoffs();
+    refreshTournamentStatsUI();
+    persistAll();
+  }
+
+  function finishUCLPlayoffs() {
+    const winners = tournament.playoff.map(p => p.winner).filter(Boolean);
+    const direct = tournament._uclDirect || sortedLeague().slice(0, 8).map(r => r.team);
+    // R16: typically top seeds vs playoff winners — interleave
+    const r16 = [];
+    for (let i = 0; i < 8; i++) {
+      if (direct[i]) r16.push(direct[i]);
+      if (winners[i]) r16.push(winners[i]);
+    }
+    // Ensure 16 teams
+    while (r16.length > 16) r16.pop();
+    while (r16.length < 16 && winners.length) { /* pad */ break; }
+    buildUCLKnockoutFromTeams(r16, false);
+  }
+
+  function buildUCLKnockoutFromTeams(teams, singleLegFinalOnly) {
+    let list = teams.filter(Boolean);
+    while (list.length >= 2 && (list.length & (list.length - 1))) list.pop();
+    if (list.length < 2) { toast('Not enough teams for knockout'); return; }
+    tournament.stage = 'knockout';
+    const matches = [];
+    for (let i = 0; i < list.length; i += 2) {
+      matches.push(makeTwoLegTie(list[i], list[i + 1]));
+    }
+    tournament.knockout = [{ name: getRoundName(list.length), matches, twoLeg: list.length > 2 }];
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = getRoundName(list.length);
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Knockout Round';
+    renderBracket();
+    renderUCLFixtures();
+  }
+
+  function makeTwoLegTie(teamA, teamB) {
+    return {
+      home: teamA,
+      away: teamB,
+      twoLeg: true,
+      leg1: { played: false, homeScore: null, awayScore: null, report: null },
+      leg2: { played: false, homeScore: null, awayScore: null, report: null },
+      homeScore: null,
+      awayScore: null,
+      aggHome: null,
+      aggAway: null,
+      winner: null,
+      played: false,
+      penalties: false,
+      report: null
+    };
+  }
+
+  function simTwoLegTie(m) {
+    // Leg 1 at away stadium (away hosts)
+    const r1 = simQuickMatch(m.away, m.home, { allowET: false, allowPens: false });
+    m.leg1 = { played: true, homeScore: r1.home, awayScore: r1.away, report: r1.report };
+    // Leg 2 at home stadium
+    const r2 = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+    m.leg2 = { played: true, homeScore: r2.home, awayScore: r2.away, report: r2.report };
+    m.aggHome = r1.away + r2.home;
+    m.aggAway = r1.home + r2.away;
+    m.homeScore = m.aggHome;
+    m.awayScore = m.aggAway;
+    if (m.aggHome > m.aggAway) m.winner = m.home;
+    else if (m.aggAway > m.aggHome) m.winner = m.away;
+    else {
+      if (r2.pens) m.winner = r2.pens.home > r2.pens.away ? m.home : m.away;
+      else m.winner = seededRandom() < 0.5 ? m.home : m.away;
+      m.penalties = true;
+    }
+    m.played = true;
+    m.report = r2.report;
+  }
+
+  function simSingleFinal(m) {
+    const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+    m.homeScore = result.home;
+    m.awayScore = result.away;
+    m.played = true;
+    m.report = result.report;
+    m.twoLeg = false;
+    if (result.pens) {
+      m.penalties = true;
+      m.winner = result.pens.home > result.pens.away ? m.home : m.away;
+    } else if (result.home === result.away) {
+      m.penalties = true;
+      m.winner = seededRandom() < 0.5 ? m.home : m.away;
+    } else {
+      m.winner = result.home > result.away ? m.home : m.away;
+    }
+  }
+
+  function viewPlayoffReport(idx) {
+    const p = tournament && tournament.playoff && tournament.playoff[idx];
+    if (!p) return;
+    if (p.leg1 && p.leg2 && p.leg1.report && p.leg2.report) {
+      const aggText = (p.aggHome != null) ? `Aggregate: ${p.home.short} ${p.aggHome} - ${p.aggAway} ${p.away.short}${p.penalties ? ' (on penalties)' : ''}` : '';
+      const legs = [
+        { label: `Leg 1 · ${p.leg1.report.home.short} home`, report: p.leg1.report },
+        { label: `Leg 2 · ${p.leg2.report.home.short} home`, report: p.leg2.report }
+      ];
+      showMatchReport(legs[1].report, { legs, activeIdx: 1, aggText });
+      return;
+    }
+    const rep = (p.leg2 && p.leg2.report) || (p.leg1 && p.leg1.report);
+    if (rep) showMatchReport(rep, null);
+    else toast('Aggregate: ' + p.aggHome + '-' + p.aggAway);
+  }
+
+
+  function advanceToKnockout() {
+    if (!tournament) return;
+    if (tournament.stage === 'knockout' || tournament.stage === 'complete') return;
+    if (tournament.knockout && tournament.knockout.length) return;
+    const qualifiers = [];
+    const thirdPlaces = [];
+    tournament.groups.forEach(g => {
+      const sorted = [...g.teams].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      if (sorted[0]) qualifiers.push(sorted[0].team);
+      if (sorted[1]) qualifiers.push(sorted[1].team);
+      if (sorted[2]) thirdPlaces.push(sorted[2]);
+    });
+    // FIFA-style: if we have 12 groups (24 auto + need 8 thirds → 32)
+    if (tournament.groups.length >= 8 && thirdPlaces.length) {
+      thirdPlaces.sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      const need = 32 - qualifiers.length;
+      if (need > 0) {
+        thirdPlaces.slice(0, need).forEach(t => qualifiers.push(t.team));
+      }
+    }
+    // Always force power of 2 (2,4,8,16,32)
+    while (qualifiers.length >= 2 && (qualifiers.length & (qualifiers.length - 1))) {
+      qualifiers.pop();
+    }
+    if (qualifiers.length < 2) { toast('Not enough qualifiers'); return; }
+    tournament.stage = 'knockout';
+    tournament.knockout = [{ name: getRoundName(qualifiers.length), matches: [] }];
+    for (let i = 0; i < qualifiers.length; i += 2) {
+      tournament.knockout[0].matches.push({
+        home: qualifiers[i], away: qualifiers[i + 1],
+        homeScore: null, awayScore: null, winner: null, played: false
+      });
+    }
+    // Group stage is over — clear the "Upcoming Fixtures" list so it doesn't
+    // linger once the tournament has moved on to the knockout bracket.
+    const fixEl = document.getElementById('fixture-list');
+    if (fixEl) fixEl.innerHTML = '';
+    renderBracket();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = tournament.knockout[0].name;
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Knockout Round';
+  }
+
+  function getRoundName(teamCount) {
+    // teamCount = number of teams still in the competition for this round
+    if (teamCount >= 32) return 'Round of 32';
+    if (teamCount >= 16) return 'Round of 16';
+    if (teamCount >= 8) return 'Quarter-finals';
+    if (teamCount >= 4) return 'Semi-finals';
+    if (teamCount >= 2) return 'Final';
+    return 'Knockout';
+  }
+
+  function simKnockoutRound() {
+    if (!tournament || !tournament.knockout || !tournament.knockout.length) return false;
+    // If called from UI button, show loading
+    if (!currentMatch || !currentMatch.silentDeep) {
+      withLoading('Simulating knockout round…', function() {
+        _simKnockoutRoundWork();
+        refreshTournamentStatsUI();
+      });
+      return true;
+    }
+    return _simKnockoutRoundWork();
+  }
+
+  function _simKnockoutRoundWork() {
+    if (!tournament || !tournament.knockout || !tournament.knockout.length) return false;
+    if (tournament.champion) return false;
+    const current = tournament.knockout[tournament.knockout.length - 1];
+    if (!current || !current.matches.length) return false;
+
+    let unplayed = current.matches.filter(m => !m.played);
+    if (!unplayed.length) {
+      const winners = current.matches.map(m => m.winner).filter(Boolean);
+      if (winners.length === 1) { setChampion(winners[0]); renderBracket(); return false; }
+      if (winners.length >= 2) {
+        createNextKnockoutRound(winners);
+        renderBracket();
+        return true;
+      }
+      return false;
+    }
+
+    unplayed.forEach(m => {
+      if (!m.home || !m.away) return;
+      const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+      m.homeScore = result.home;
+      m.awayScore = result.away;
+      m.played = true;
+      m.report = result.report;
+      if (result.pens) {
+        m.penalties = true;
+        m.winner = result.pens.home > result.pens.away ? m.home : m.away;
+      } else if (result.home === result.away) {
+        m.penalties = true;
+        m.winner = seededRandom() < 0.5 ? m.home : m.away;
+      } else {
+        m.winner = result.home > result.away ? m.home : m.away;
+      }
+    });
+
+    const winners = current.matches.map(m => m.winner).filter(Boolean);
+    if (winners.length === 1) {
+      setChampion(winners[0]);
+    } else if (winners.length >= 2) {
+      createNextKnockoutRound(winners);
+    }
+    renderBracket();
+    renderTournamentLeaderboard();
+    return true;
+  }
+
+
+  function createNextKnockoutRound(winners) {
+    let list = (winners || []).filter(Boolean);
+    if (list.length % 2 === 1) list = list.slice(0, list.length - 1);
+    if (list.length < 2) {
+      if (winners && winners[0]) setChampion(winners[0]);
+      return;
+    }
+    const name = getRoundName(list.length);
+    const last = tournament.knockout[tournament.knockout.length - 1];
+    if (last && last.name === name && !last.matches.every(m => m.played)) return;
+    const nextMatches = [];
+    for (let i = 0; i < list.length; i += 2) {
+      nextMatches.push({
+        home: list[i], away: list[i + 1],
+        homeScore: null, awayScore: null, winner: null, played: false, penalties: false
+      });
+    }
+    tournament.knockout.push({ name, matches: nextMatches });
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = name;
+  }
+
+
+  function setChampion(team) {
+    if (!team || !tournament || tournament.champion) return;
+    tournament.champion = team;
+    tournament.stage = 'complete';
+    // Runners-up: loser of final
+    const finalRound = (tournament.knockout || []).find(r => r.name === 'Final') || (tournament.knockout || [])[(tournament.knockout || []).length - 1];
+    if (finalRound && finalRound.matches && finalRound.matches[0]) {
+      const fm = finalRound.matches[0];
+      tournament.runnersUp = (fm.winner && fm.winner.id === fm.home.id) ? fm.away : fm.home;
+    }
+    // Third place: prefer SF losers if available
+    const sf = (tournament.knockout || []).find(r => r.name === 'Semi-finals');
+    if (sf && sf.matches && sf.matches.length >= 2) {
+      const losers = sf.matches.map(m => {
+        if (!m.winner) return null;
+        return m.winner.id === m.home.id ? m.away : m.home;
+      }).filter(Boolean);
+      tournament.thirdPlace = losers[0] || null;
+      tournament.fourthPlace = losers[1] || null;
+    }
+    assignTournamentAwards();
+    const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    const runExtra = { category: 'tournament', run: tournament._runId || Date.now() };
+    pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
+    pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
+    recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(team, 20) + ' ' + team.name;
+    renderTournamentPodium();
+    persistAll();
+  }
+
+  function renderTournamentPodium() {
+    let el = document.getElementById('tour-podium');
+    if (!el) {
+      const bracket = document.getElementById('bracket');
+      if (bracket) {
+        el = document.createElement('div');
+        el.id = 'tour-podium';
+        bracket.parentNode.insertBefore(el, bracket);
+      }
+    }
+    if (!el || !tournament || !tournament.champion) return;
+    const first = tournament.champion;
+    const second = tournament.runnersUp;
+    const third = tournament.thirdPlace;
+    el.innerHTML = `
+      <div class="card-title">Final Standings</div>
+      <div class="podium">
+        <div class="podium-place">
+          <div class="place-num">2</div>
+          <div class="place-team">${second ? teamMark(second, 20) + ' ' + second.name : '—'}</div>
+          <div class="place-label">Runners-up</div>
+        </div>
+        <div class="podium-place first">
+          <div class="place-num">1</div>
+          <div class="place-team">${teamMark(first, 20)} ${first.name}</div>
+          <div class="place-label">Champions</div>
+        </div>
+        <div class="podium-place">
+          <div class="place-num">3</div>
+          <div class="place-team">${third ? teamMark(third, 20) + ' ' + third.name : '—'}</div>
+          <div class="place-label">Third place</div>
+        </div>
+      </div>`;
+  }
+
+
+  function simQuickMatch(homeTeam, awayTeam, opts) {
+    // Full deep simulation — same engine as live matches (goals, cards, MOTM, injuries, ratings)
+    opts = opts || {};
+    const prevMatch = currentMatch;
+    const prevFixture = window._tourFixtureIdx;
+    const prevKoR = window._koRoundIdx;
+    const prevKoM = window._koMatchIdx;
+    // Prevent live tournament hooks from double-writing during bulk sim
+    window._tourFixtureIdx = undefined;
+    window._koRoundIdx = undefined;
+    window._koMatchIdx = undefined;
+
+    const hf = opts.homeForm || pickTeamFormation(homeTeam);
+    const af = opts.awayForm || pickTeamFormation(awayTeam);
+    const homeSquad = buildSquad(homeTeam, hf);
+    const awaySquad = buildSquad(awayTeam, af);
+
+    currentMatch = {
+      home: { team: homeTeam, squad: homeSquad, score: 0, stats: blankStats(), penScore: null },
+      away: { team: awayTeam, squad: awaySquad, score: 0, stats: blankStats(), penScore: null },
+      minute: 0,
+      status: '1st Half',
+      finished: false,
+      events: [],
+      homeOnPitch: homeSquad.starting.map(p => p.id),
+      awayOnPitch: awaySquad.starting.map(p => p.id),
+      homeSubsUsed: 0,
+      awaySubsUsed: 0,
+      maxSubs: 5,
+      injuries: [],
+      cards: { home: {}, away: {} },
+      // possession must start at 50 here exactly like startMatch() does —
+      // without it, m.possession is undefined the first time generateEvents()
+      // smooths it toward a target, which turns it into NaN. NaN then poisons
+      // qualityGap/homeChance downstream, and `seededRandom() < NaN` is always
+      // false, so the "away" side wins every single attacking-side roll for
+      // the whole match — hence one team racking up 20+ shots while the other
+      // gets 0-5 (and the report showing a flat 50/50 possession is just the
+      // "||50" display fallback masking the NaN, not a real 50/50 game).
+      possession: 50,
+      subLog: { home: {}, away: {} },
+      leftPitch: { home: [], away: [] }, // playerIds who have left the pitch (sub'd off, sent off, or injured off) — can never return
+      playerMatchStats: {},
+      goalList: [],
+      allowET: !!opts.allowET,
+      allowPens: !!opts.allowPens,
+      silentDeep: true,
+      quietSim: true,
+      countForLeaderboard: tournament ? true : !!opts.countForLeaderboard,
+      inET: false,
+      inPens: false
+    };
+
+    let safety = 0;
+    while (currentMatch && !currentMatch.finished && safety < 250) {
+      tick(true);
+      safety++;
+    }
+    // Force finish if somehow stuck
+    if (currentMatch && !currentMatch.finished) {
+      endMatch();
+    }
+
+    const report = currentMatch ? buildMatchReport(currentMatch) : null;
+    const result = {
+      home: currentMatch ? currentMatch.home.score : 0,
+      away: currentMatch ? currentMatch.away.score : 0,
+      pens: currentMatch && currentMatch.home.penScore != null
+        ? { home: currentMatch.home.penScore, away: currentMatch.away.penScore }
+        : null,
+      report
+    };
+
+    currentMatch = prevMatch;
+    window._tourFixtureIdx = prevFixture;
+    window._koRoundIdx = prevKoR;
+    window._koMatchIdx = prevKoM;
+    saveStats();
+    return result;
+  }
+
+  function poisson(lambda) {
+    const L = Math.exp(-Math.max(0.1, lambda));
+    let k = 0, p = 1;
+    do { k++; p *= seededRandom(); } while (p > L && k < 10);
+    return k - 1;
+  }
+
+  
+  function assignTournamentAwards() {
+    if (!tournament) return;
+    const top = (key) => Object.values(tournamentStats[key] || {}).sort((a,b) => b.count - a.count);
+    const goals = top('goals');
+    const assists = top('assists');
+    const saves = top('saves');
+    const motm = top('motm');
+    const cleanSheets = top('cleanSheets');
+    const puskas = top('puskas');
+    const ratingsAny = Object.values(tournamentStats.ratings || {})
+      .filter(x => (x.count || 0) > 0)
+      .sort((a,b) => b.avg - a.avg || b.count - a.count);
+
+    // Golden Ball: a composite of G+A, average rating, MOTM count and "award show"
+    // presence across the other individual categories — not rating alone — so a
+    // quiet-but-consistent passer can't out-rank a genuine standout performer.
+    const goldenScores = {};
+    const ensureG = (p) => {
+      if (!goldenScores[p.id]) goldenScores[p.id] = { id: p.id, name: p.name, team: p.team, count: 0, avg: 0, apps: 0, pts: 0, goals: 0, assists: 0, motm: 0 };
+      return goldenScores[p.id];
+    };
+    goals.forEach(p => { const e = ensureG(p); e.goals = p.count; e.pts += p.count * 4; });
+    assists.forEach(p => { const e = ensureG(p); e.assists = p.count; e.pts += p.count * 2.5; });
+    motm.forEach(p => { const e = ensureG(p); e.motm = p.count; e.pts += p.count * 5; });
+    cleanSheets.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
+    puskas.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
+    Object.values(tournamentStats.ratings || {}).forEach(p => {
+      const e = ensureG(p);
+      e.apps = p.count || 0;
+      e.avg = p.avg || 0;
+      if (e.apps >= 3 && e.avg > 0) e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
+      else if (e.apps > 0) e.pts += e.avg * 0.15;
+    });
+    // Award-show-appearance bonus: nominee across multiple individual tournament awards
+    const topSets = {
+      goldenboot: new Set(goals.slice(0,10).map(p=>p.id)),
+      assists: new Set(assists.slice(0,10).map(p=>p.id)),
+      motm: new Set(motm.slice(0,10).map(p=>p.id)),
+      glove: new Set(saves.slice(0,10).map(p=>p.id)),
+      puskas: new Set(puskas.slice(0,10).map(p=>p.id))
+    };
+    Object.values(goldenScores).forEach(e => {
+      let noms = 0;
+      Object.values(topSets).forEach(set => { if (set.has(e.id)) noms++; });
+      if (noms >= 2) e.pts += (noms - 1) * 1.4;
+      e.count = Math.round(e.pts);
+    });
+    const goldenBallData = Object.values(goldenScores)
+      .filter(e => e.pts > 0 && (e.apps >= 3 || e.goals + e.assists + e.motm >= 3))
+      .sort((a,b) => b.pts - a.pts || b.apps - a.apps);
+
+    tournament.awards = {
+      goldenBoot: goals[0] || null,
+      goldenBall: goldenBallData[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
+      goldenGlove: saves[0] || null,
+      topAssists: assists[0] || null,
+      mostMotm: motm[0] || null
+    };
+  }
+
+  function renderTournamentAwards() {
+    const el = document.getElementById('tour-awards');
+    if (!el || !tournament) return;
+    if (!tournament.awards) assignTournamentAwards();
+    const a = tournament.awards || {};
+    const card = (title, icon, p, extra) => {
+      const titleHtml = `<div class="am-title">${trophyMark(title, 32)} ${title}</div>`;
+      if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
+      return `<div class="award-mini">${titleHtml}
+        ${lbAvatar(p, 44)}
+        <div class="am-name">${p.name}</div>
+        <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
+    };
+    el.innerHTML = `
+      <div class="card-title">Tournament Awards</div>
+      <div class="awards-row">
+        ${card('Golden Boot', '👟', a.goldenBoot, (a.goldenBoot && a.goldenBoot.count) + ' goals')}
+        ${card('Golden Ball', '🏆', a.goldenBall, a.goldenBall && (a.goldenBall.goals != null || a.goldenBall.assists != null)
+          ? ((a.goldenBall.goals||0) + 'G ' + (a.goldenBall.assists||0) + 'A' + (a.goldenBall.avg ? ' · Avg ' + a.goldenBall.avg.toFixed(2) : ''))
+          : (a.goldenBall && a.goldenBall.avg != null ? ('Avg ' + a.goldenBall.avg.toFixed(2)) : ((a.goldenBall && a.goldenBall.count) + ' MOTM')))}
+        ${card('Golden Glove', '🧤', a.goldenGlove, (a.goldenGlove && a.goldenGlove.count) + ' saves')}
+        ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
+      </div>`;
+  }
+
+  function refreshTournamentStatsUI() {
+    if (!tournament) return;
+    try {
+      assignTournamentAwards();
+      renderTournamentAwards();
+      renderTournamentLeaderboard();
+    } catch (e) { console.warn(e); }
+  }
+
+  function renderTournamentLeaderboard() {
+    assignTournamentAwards();
+    renderTournamentAwards();
+    const el = document.getElementById('tour-stats-preview');
+    if (!el) return;
+    const top = (key, n) => Object.values(tournamentStats[key] || {}).sort((a,b)=>b.count-a.count).slice(0, n);
+    const g = top('goals', 10), a = top('assists', 10), m = top('motm', 10);
+    const y = top('yellows', 5), r = top('reds', 5), s = top('saves', 10);
+    const hasAny = g.length || a.length || m.length || y.length || r.length;
+    if (!hasAny) {
+      el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem">Play tournament matches to fill stats (goals, cards, MOTM…).</p>';
+      return;
+    }
+    const col = (title, arr) => `<div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">${title}</div>
+      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${p.name}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        ${col('⚽ Golden Boot', g)}
+        ${col('🎯 Assists', a)}
+        ${col('⭐ MOTM', m)}
+        ${col('🟨 Yellows', y)}
+        ${col('🟥 Reds', r)}
+        ${col('🧤 Saves', s)}
+      </div>
+      <div style="margin-top:10px;font-size:0.75rem;color:var(--text-muted)">Matchday ${globalMatchDay} · Full match engine · Injuries tracked</div>`;
+  }
+
+  function renderBracket() {
+    const el = document.getElementById('bracket');
+    if (!el || !tournament) return;
+    if (!tournament.knockout || !tournament.knockout.length) {
+      el.innerHTML = '<p style="color:var(--text-muted)">No knockout matches yet.</p>';
+      return;
+    }
+    const curIdx = tournament.knockout.length - 1;
+    el.innerHTML = tournament.knockout.map((round, ri) => `
+      <div class="round"><div class="round-title">${round.name}${round.twoLeg ? ' (two legs)' : ''}</div>
+      ${round.matches.map((m, mi) => {
+        const score = m.played
+          ? (m.twoLeg !== false && m.aggHome != null
+              ? `Agg ${m.aggHome}-${m.aggAway}`
+              : `${m.homeScore} - ${m.awayScore}`)
+          : '-';
+        return `<div class="bracket-match ${m.played ? 'played' : ''}">
+          <div class="bracket-team ${m.winner && m.winner.id === m.home.id ? 'winner' : ''}">
+            <span>${teamMark(m.home, 18)} ${m.home.short}</span>
+            <span class="bracket-score">${m.played ? (m.twoLeg !== false && m.aggHome != null ? m.aggHome : m.homeScore) : '-'}</span>
+          </div>
+          <div class="bracket-team ${m.winner && m.winner.id === m.away.id ? 'winner' : ''}">
+            <span>${teamMark(m.away, 18)} ${m.away.short}</span>
+            <span class="bracket-score">${m.played ? (m.twoLeg !== false && m.aggAway != null ? m.aggAway : m.awayScore) : '-'}</span>
+          </div>
+          ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">pens</div>' : ''}
+          ${m.played && m.twoLeg !== false && m.aggHome != null ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + score + '</div>' : ''}
+          ${(!m.played && ri === curIdx && !tournament.champion) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Live</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.simKnockoutMatch(${ri},${mi})">⚡ Instant</button>
+          </div>` : ''}
+          ${m.played ? `<button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%" onclick="App.viewKnockoutReport(${ri},${mi})">Match Report</button>` : ''}
+        </div>`;
+      }).join('')}
+      </div>`).join('');
+  }
+
+
+  function simKnockoutMatch(roundIdx, matchIdx) {
+    if (!tournament || !tournament.knockout[roundIdx]) return;
+    const m = tournament.knockout[roundIdx].matches[matchIdx];
+    if (!m || m.played) return;
+    showLoading('Simulating match…');
+    setTimeout(function() {
+      try { _simKnockoutMatchWork(roundIdx, matchIdx); }
+      finally { hideLoading(); refreshTournamentStatsUI(); }
+    }, 30);
+  }
+  function _simKnockoutMatchWork(roundIdx, matchIdx) {
+    const m = tournament.knockout[roundIdx].matches[matchIdx];
+    if (!m || m.played) return;
+    const round = tournament.knockout[roundIdx];
+    const isFinal = round.name === 'Final' || round.matches.length === 1 || m.twoLeg === false;
+    if (tournament.type === 'ucl' && !isFinal) simTwoLegTie(m);
+    else if (isFinal) simSingleFinal(m);
+    else {
+      const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+      m.homeScore = result.home; m.awayScore = result.away; m.played = true; m.report = result.report;
+      if (result.pens) { m.penalties = true; m.winner = result.pens.home > result.pens.away ? m.home : m.away; }
+      else if (result.home === result.away) { m.penalties = true; m.winner = seededRandom() < 0.5 ? m.home : m.away; }
+      else m.winner = result.home > result.away ? m.home : m.away;
+    }
+    afterKnockoutMatchPlayed(roundIdx);
+    refreshTournamentStatsUI();
+  }
+
+  function playKnockoutMatch(roundIdx, matchIdx) {
+    if (!tournament || !tournament.knockout[roundIdx]) return;
+    const m = tournament.knockout[roundIdx].matches[matchIdx];
+    if (!m || m.played || !m.home || !m.away) return;
+    window._koRoundIdx = roundIdx;
+    window._koMatchIdx = matchIdx;
+    window._tourFixtureIdx = null;
+    window._uclFixtureIdx = null;
+    window._fromTournament = true;
+    window._seasonFixture = null;
+    window._backTarget = 'tournament';
+    currentSeasonComp = null;
+    switchView('match');
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = m.home.id;
+    if (awaySel) awaySel.value = m.away.id;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    // Clear custom lineups so random formation applies
+    customLineups.home = null;
+    customLineups.away = null;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    const et = document.getElementById('opt-et');
+    const pens = document.getElementById('opt-pens');
+    if (et) et.checked = true;
+    if (pens) pens.checked = true;
+    startMatch();
+    toast('Knockout match — live · ET & pens on · formations randomized');
+  }
+
+
+  function afterKnockoutMatchPlayed(roundIdx) {
+    const current = tournament.knockout[roundIdx];
+    if (!current.matches.every(x => x.played)) {
+      renderBracket();
+      renderTournamentLeaderboard();
+      return;
+    }
+    const winners = current.matches.map(m => m.winner).filter(Boolean);
+    if (winners.length === 1) {
+      setChampion(winners[0]);
+      renderBracket();
+      renderTournamentLeaderboard();
+      return;
+    }
+    if (winners.length < 2) { renderBracket(); return; }
+    // Don't add next if already exists beyond this round
+    if (roundIdx < tournament.knockout.length - 1) {
+      renderBracket();
+      return;
+    }
+    let list = winners.slice();
+    if (list.length % 2 === 1) list.pop();
+    const nextIsFinal = list.length === 2;
+    const nextMatches = [];
+    for (let i = 0; i < list.length; i += 2) {
+      if (tournament.type === 'ucl' && !nextIsFinal) {
+        nextMatches.push(makeTwoLegTie(list[i], list[i+1]));
+      } else if (tournament.type === 'ucl' && nextIsFinal) {
+        nextMatches.push({
+          home: list[i], away: list[i+1], twoLeg: false, played: false,
+          homeScore: null, awayScore: null, winner: null, report: null
+        });
+      } else {
+        nextMatches.push({
+          home: list[i], away: list[i+1], homeScore: null, awayScore: null,
+          winner: null, played: false
+        });
+      }
+    }
+    tournament.knockout.push({
+      name: getRoundName(list.length),
+      matches: nextMatches,
+      twoLeg: tournament.type === 'ucl' && !nextIsFinal
+    });
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = getRoundName(list.length);
+    renderBracket();
+    renderTournamentLeaderboard();
+  }
+
+
+  function resetTournament() {
+    tournament = null;
+    const setup = document.getElementById('tournament-setup');
+    const live = document.getElementById('tournament-live');
+    if (setup) setup.style.display = 'block';
+    if (live) live.style.display = 'none';
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Round';
+    // Clear the previous tournament's UI (bracket, podium, groups, fixtures) —
+    // this does NOT touch the persistent `trophies` record, so past champions
+    // still show up in the Trophy Room afterward.
+    const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
+    clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const st = document.getElementById('tour-stage-title');
+    if (st) st.textContent = 'Starting…';
+    persistAll();
+  }
+
+  let teamsFilter = 'all';
+  let teamsSearch = '';
+  let teamsSort = 'name';
+  let tourTeamsSearch = '';
+
+  function teamAvgOvr(t) {
+    const ps = t.players || [];
+    if (!ps.length) return 0;
+    return ps.reduce((s, p) => s + (p.ovr || 70), 0) / ps.length;
+  }
+
+  function filterTeams(type) {
+    teamsFilter = type || 'all';
+    renderTeamsList();
+  }
+
+  function searchTeams(q) {
+    teamsSearch = (q || '').trim().toLowerCase();
+    renderTeamsList();
+  }
+
+  function sortTeams(mode) {
+    teamsSort = mode || 'name';
+    renderTeamsList();
+  }
+
+  function getFilteredTeamsList() {
+    let list = allTeams;
+    if (teamsFilter === 'national') list = teamsData.national || [];
+    if (teamsFilter === 'club') list = teamsData.club || [];
+    if (teamsSearch) {
+      list = list.filter(t =>
+        (t.name || '').toLowerCase().includes(teamsSearch) ||
+        (t.short || '').toLowerCase().includes(teamsSearch) ||
+        ((t.manager && t.manager.name) || '').toLowerCase().includes(teamsSearch)
+      );
+    }
+    list = [...list];
+    if (teamsSort === 'name') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    else if (teamsSort === 'ovr') list.sort((a, b) => teamAvgOvr(b) - teamAvgOvr(a));
+    else if (teamsSort === 'players') list.sort((a, b) => (b.players || []).length - (a.players || []).length);
+    else if (teamsSort === 'flag') list.sort((a, b) => (a.flag || '').localeCompare(b.flag || '') || (a.name || '').localeCompare(b.name || ''));
+    return list;
+  }
+
+  function renderTeamsList() {
+    const list = getFilteredTeamsList();
+    const el = document.getElementById('teams-list');
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>No teams match your search.</p></div>';
+      return;
+    }
+    el.innerHTML = list.map(t => {
+      const ovr = teamAvgOvr(t).toFixed(0);
+      const primary = t.color || '#d4af37';
+      return `<div class="team-check" style="cursor:pointer;border-left:3px solid ${primary}" onclick="App.showTeamProfile('${t.id}')">
+        <div style="display:flex;align-items:center;gap:8px;width:100%">
+          <span style="font-size:1.5rem">${teamMark(t, 32)}</span>
+          <div style="flex:1;min-width:0">
+            <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</strong>
+            <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''}</div>
+            <div style="font-size:0.7rem;color:var(--gold);display:flex;align-items:center;gap:4px">${t.manager && t.manager.name ? managerAvatarMark(t.manager, 16) : ''}${(t.manager && t.manager.name) || ''} · ${getManagerPlaystyle(t)}</div>
+          </div>
+          <span class="player-ovr">${ovr}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function searchTournamentTeams(q) {
+    tourTeamsSearch = (q || '').trim().toLowerCase();
+    renderTournamentTeamSelect();
+  }
+
+
+  function showLoading(msg) {
+    let el = document.getElementById('loading-overlay');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'loading-overlay';
+      el.innerHTML = '<div class="loading-box"><div class="loading-spinner"></div><div class="loading-text" id="loading-text">Simulating…</div><div class="loading-sub" id="loading-sub">Please wait</div></div>';
+      document.body.appendChild(el);
+    }
+    const t = document.getElementById('loading-text');
+    const s = document.getElementById('loading-sub');
+    if (t) t.textContent = msg || 'Simulating…';
+    if (s) s.textContent = 'Please wait — do not close the page';
+    el.classList.add('show');
+  }
+
+  function hideLoading() {
+    const el = document.getElementById('loading-overlay');
+    if (el) el.classList.remove('show');
+  }
+
+  function withLoading(msg, fn) {
+    showLoading(msg || 'Simulating…');
+    // Double rAF so the overlay is painted before heavy sync work
+    return new Promise(function(resolve) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          setTimeout(function() {
+            let result;
+            try {
+              result = fn();
+            } catch (e) {
+              console.error(e);
+              toast('Error: ' + (e && e.message ? e.message : e));
+            } finally {
+              hideLoading();
+              persistAll();
+            }
+            resolve(result);
+          }, 50);
+        });
+      });
+    });
+  }
+
+  function toast(msg) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  
+  function renderPostMatchRatings() {
+    if (!currentMatch || !currentMatch.playerMatchStats) return;
+    if (currentMatch.quietSim) return;
+    const el = document.getElementById('post-match-ratings');
+    if (!el) return;
+    const m = currentMatch;
+    const entries = Object.values(m.playerMatchStats).sort((a,b) => b.rating - a.rating);
+    let h = '<div class="card-title">Post-Match Ratings (' + entries.length + ' players)</div>';
+    // Group by team
+    const homeIds = new Set((m.home.squad.all||[]).map(p=>p.id));
+    const homeP = entries.filter(p => homeIds.has(p.id));
+    const awayP = entries.filter(p => !homeIds.has(p.id));
+    h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${m.home.team.flag||''} ${m.home.team.name}</div>`;
+    h += homeP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${m.away.team.flag||''} ${m.away.team.name}</div>`;
+    h += awayP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    el.innerHTML = h;
+    el.style.display = 'block';
+  }
+
+  function returnToTournament() {
+    const backBtn = document.getElementById('back-to-tournament');
+    if (backBtn) { backBtn.style.display = 'none'; backBtn.classList.remove('show'); }
+    window._fromTournament = false;
+    const target = window._backTarget === 'season' ? 'season' : 'tournament';
+    window._backTarget = null;
+    if (target === 'season') {
+      switchView('season');
+      try { renderSeasonDashboard(); } catch (e) {}
+      toast('Back to season — results updated');
+      return;
+    }
+    switchView('tournament');
+    if (tournament) {
+      try { refreshTournamentStatsUI(); } catch (e) {}
+      try { renderGroups(); } catch (e) {}
+      try { renderBracket(); } catch (e) {}
+      try { if (typeof renderUCLTable === 'function') renderUCLTable(); } catch (e) {}
+      try { renderTournamentAwards(); } catch (e) {}
+    }
+    toast('Back to tournament — results updated');
+  }
+
+
+  // Trophy Cabinet: every individual award a player (matched by exact name,
+  // same convention as playerPortraits/trophyImages) has won, newest first.
+  function playerTrophyCabinetHTML(playerName) {
+    const won = trophies.filter(t => t.player === playerName).sort((a, b) => (b.date || 0) - (a.date || 0));
+    if (!won.length) return '';
+    return `<div class="card-title" style="margin-top:14px">🏆 Trophy Cabinet</div>
+      <div class="trophy-cabinet-grid">
+        ${won.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 56)}<div class="tc-name">${t.name}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
+      </div>`;
+  }
+
+  // Renders the full expanded attribute sheet (grouped, individual raw
+  // ratings) for a player whose stats come from player-attributes.json —
+  // shown instead of the generic merged ATT/DEF/PHY/PAC/TEC bars, since a
+  // player with a detailed sheet should have their actual detailed sheet
+  // visible, not just the 5-stat blend it was compressed into. A rating
+  // that was lifted by the manager's tactic affinity is marked so it's
+  // clear the boost reached the individual attribute, not just the OVR.
+  function expandedAttrRowsHTML(player) {
+    const attr = player.expandedAttrs || {};
+    const boostedKeys = new Set();
+    if (player.managerAttrBoosted && player.affinityStyle) {
+      (attr.playstyle || []).forEach((style) => {
+        const suited = PLAYSTYLE_AFFINITY[style];
+        if (suited && suited.includes(player.affinityStyle)) {
+          (PLAYSTYLE_KEY_ATTRS[style] || []).forEach(k => boostedKeys.add(k));
+        }
+      });
+    }
+    return EXPANDED_ATTR_GROUPS.map((group) => {
+      const rows = group.keys.filter(([k]) => typeof attr[k] === 'number');
+      if (!rows.length) return '';
+      return `<div class="expanded-attr-group">
+        <div class="expanded-attr-group-title">${group.label}</div>
+        ${rows.map(([k, label]) => `
+          <div class="attr-bar-row expanded${boostedKeys.has(k) ? ' mgr-boosted' : ''}">
+            <span class="attr-name">${label}</span>
+            <div class="attr-track"><div class="attr-fill" style="width:${attr[k]}%"></div></div>
+            <span class="attr-val">${attr[k]}</span>
+          </div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  function showPlayerProfile(playerId) {
+    let player = null, team = null;
+    for (const t of allTeams) {
+      const p = (t.players || []).find(x => x.id === playerId);
+      if (p) { player = p; team = t; break; }
+    }
+    // Fallback from current match stats object
+    if (!player && currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) {
+      const ms = currentMatch.playerMatchStats[playerId];
+      player = { id: playerId, name: ms.name, num: ms.num, pos: [ms.pos], ovr: ms.ovr, att: 70, def: 70, phy: 70, pac: 70, tec: 70 };
+      team = (currentMatch.home.squad.all || []).find(p => p.id === playerId) ? currentMatch.home.team
+        : ((currentMatch.away.squad.all || []).find(p => p.id === playerId) ? currentMatch.away.team : { name: '—', flag: '', color: '#d4af37', secondary: '#fff' });
+    }
+    if (!player) { toast('Player not found'); return; }
+    const g = (stats.goals[playerId] || {}).count || 0;
+    const a = (stats.assists[playerId] || {}).count || 0;
+    const s = (stats.saves[playerId] || {}).count || 0;
+    const motm = (stats.motm[playerId] || {}).count || 0;
+    const y = (stats.yellows[playerId] || {}).count || 0;
+    const rd = (stats.reds[playerId] || {}).count || 0;
+    const apps = (stats.ratings[playerId] || {}).count || 0;
+    const primary = (team && team.color) || '#d4af37';
+    const secondary = (team && team.secondary) || '#fff';
+    const ms = (currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) || null;
+    const modal = document.getElementById('player-modal');
+    const content = document.getElementById('player-modal-content');
+    if (!modal || !content) return;
+    let matchBlock = '';
+    if (ms) {
+      const rc = (ms.rating || 0) >= 7.5 ? 'rating-high' : (ms.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+      matchBlock = `
+        <div class="card-title" style="margin-top:8px">This Match</div>
+        <div class="profile-stats-grid">
+          <div class="profile-stat"><div class="val">${ms.goals || 0}</div><div class="lbl">Goals</div></div>
+          <div class="profile-stat"><div class="val">${ms.assists || 0}</div><div class="lbl">Assists</div></div>
+          <div class="profile-stat"><div class="val">${ms.shots || 0}</div><div class="lbl">Shots</div></div>
+          <div class="profile-stat"><div class="val">${ms.saves || 0}</div><div class="lbl">Saves</div></div>
+          <div class="profile-stat"><div class="val">${ms.tackles || 0}</div><div class="lbl">Tackles</div></div>
+          <div class="profile-stat"><div class="val">${ms.passes || 0}</div><div class="lbl">Passes</div></div>
+          <div class="profile-stat"><div class="val">${ms.passesCompleted || 0}</div><div class="lbl">Completed</div></div>
+          <div class="profile-stat"><div class="val">${ms.passes ? Math.round(100 * (ms.passesCompleted || 0) / ms.passes) + '%' : '—'}</div><div class="lbl">Pass Acc.</div></div>
+          <div class="profile-stat"><div class="val">${ms.interceptions || 0}</div><div class="lbl">Interceptions</div></div>
+          <div class="profile-stat"><div class="val">${ms.blocks || 0}</div><div class="lbl">Blocks</div></div>
+          <div class="profile-stat"><div class="val">${(ms.xg || 0).toFixed(2)}</div><div class="lbl">xG</div></div>
+          <div class="profile-stat"><div class="val">${(ms.xa || 0).toFixed(2)}</div><div class="lbl">xA</div></div>
+          <div class="profile-stat"><div class="val"><span class="rating-badge ${rc}">${(ms.rating || 0).toFixed(1)}</span></div><div class="lbl">Rating</div></div>
+          <div class="profile-stat"><div class="val">${ms.yellow ? 'Y' : '—'} ${ms.red ? 'R' : ''}</div><div class="lbl">Cards</div></div>
+        </div>`;
+    }
+    const boosted = !!player.attrBoosted;
+    const boostBadge = boosted
+      ? `<span class="attr-boost-badge" title="Overall derived from expanded attribute data, position, and manager-tactic affinity">★ Enhanced</span>`
+      : '';
+    const affinityNote = (boosted && player.affinityBonus > 0)
+      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.affinityBonus} OVR — fits ${team ? team.name + "'s" : "the"} ${player.affinityStyle} setup</div>`
+      : '';
+    const signatureNote = (boosted && player.signatureBonus > 0)
+      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.signatureBonus} OVR — signature attributes for their playstyle run well above the rest of their sheet</div>`
+      : '';
+    const managerAttrNote = (boosted && player.managerAttrBoosted)
+      ? `<div style="color:var(--gold);font-size:0.75rem;margin-top:2px">⬆ Manager coaching is sharpening this player's playstyle attributes (marked below)</div>`
+      : '';
+    const playstyleTagsHTML = (boosted && player.expandedAttrs && (player.expandedAttrs.playstyle || []).length)
+      ? `<div style="margin-top:6px">${player.expandedAttrs.playstyle.map(s => {
+          const suited = (PLAYSTYLE_AFFINITY[s] || []).includes(player.affinityStyle);
+          const desc = PLAYSTYLE_DESCRIPTIONS[s] || '';
+          return `<span class="playstyle-tag${suited ? ' affinity-match' : ''}" title="${desc}">${s}</span>`;
+        }).join('')}</div>`
+      : '';
+    content.innerHTML = `
+      <div class="profile-header">
+        <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
+        <div>
+          <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
+          <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
+          <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
+          ${affinityNote}
+          ${signatureNote}
+          ${managerAttrNote}
+          ${playstyleTagsHTML}
+        </div>
+      </div>
+      ${matchBlock}
+      <div class="card-title">Career (competitive)</div>
+      <div class="profile-stats-grid">
+        <div class="profile-stat"><div class="val">${apps}</div><div class="lbl">Apps</div></div>
+        <div class="profile-stat"><div class="val">${g}</div><div class="lbl">Goals</div></div>
+        <div class="profile-stat"><div class="val">${a}</div><div class="lbl">Assists</div></div>
+        <div class="profile-stat"><div class="val">${motm}</div><div class="lbl">MOTM</div></div>
+        <div class="profile-stat"><div class="val">${s}</div><div class="lbl">Saves</div></div>
+        <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
+        <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
+      </div>
+      <div style="margin-top:8px">
+        ${boosted && player.expandedAttrs
+          ? expandedAttrRowsHTML(player)
+          : [['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
+              <div class="attr-bar-row"><span class="attr-name">${n}</span>
+                <div class="attr-track"><div class="attr-fill" style="width:${v||50}%"></div></div>
+                <span class="attr-val">${v||'-'}</span></div>`).join('')}
+      </div>
+      ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
+    modal.classList.add('active');
+  }
+
+
+  function showTeamProfile(teamId) {
+    const team = getTeam(teamId);
+    if (!team) { toast('Team not found'); return; }
+    const primary = team.color || '#d4af37';
+    const secondary = team.secondary || '#fff';
+    const mgr = team.manager || {};
+    const mgrStyle = getManagerPlaystyle(team);
+    const mgrAwardCount = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
+    const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
+    const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
+    const modal = document.getElementById('team-modal');
+    const content = document.getElementById('team-modal-content');
+    if (!modal || !content) return;
+    content.innerHTML = `
+      <div class="profile-header" style="border-bottom:2px solid ${primary};padding-bottom:14px">
+        <div class="profile-avatar profile-avatar-logo" style="color:${secondary};font-size:1.6rem">${teamAvatarMark(team)}</div>
+        <div style="flex:1;min-width:0">
+          <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
+          <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
+          <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px">🏟️ ${getStadium(team)}</div>
+        </div>
+      </div>
+      <div class="card-title" style="margin-top:14px">Manager</div>
+      <div class="manager-profile-row">
+        ${managerAvatarMark(mgr, 56)}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700">${mgr.name || '—'}</div>
+          <div style="color:var(--text-2);font-size:0.8rem">${mgr.ovr ? mgr.ovr + ' OVR · ' : ''}<span class="playstyle-tag">${mgrStyle}</span></div>
+          <div style="color:var(--gold);font-size:0.78rem;margin-top:2px">🏅 ${mgrAwardCount} manager award${mgrAwardCount === 1 ? '' : 's'}</div>
+        </div>
+      </div>
+      <div class="card-title" style="margin-top:14px">Squad <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem">(🏆 = trophy cabinet)</span></div>
+      <div class="team-squad-list">
+        ${players.map(p => {
+          const wonCount = trophies.filter(t => t.player === p.name).length;
+          return `
+          <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
+            <span class="tsr-avatar">${playerAvatarMark(p)}</span>
+            <span class="tsr-name">${p.name}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
+            <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
+            ${formArrow(p)}
+            <span class="player-ovr">${p.ovr || ''}</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
+    modal.classList.add('active');
+  }
+
+
+  function showAwards(type) {
+    document.querySelectorAll('.award-tab').forEach(t => t.classList.toggle('active', t.dataset.award === type));
+    const el = document.getElementById('awards-content');
+    if (!el) return;
+    if (type === 'goldenboot') {
+      const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">⚽</div><p>No goals yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Golden Boot', 34) + ' Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        '</tbody></table></div>';
+    } else if (type === 'ballon') {
+      // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
+      const MIN_APPS = BALLON_MIN_APPS;
+      const data = computeBallonRanking(stats);
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Need players with at least ' + MIN_APPS + ' competitive appearances (or strong goal/assist tallies) for Ballon d\'Or.</p></div>';
+        return;
+      }
+      const leader = data[0];
+      el.innerHTML = '<div class="award-card">' + lbAvatar(leader, 64) + '<div class="award-info"><h4>' + trophyMark("Ballon d'Or", 34) + ' Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Noms</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td>'+(p.noms||0)+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table></div>';
+    } else if (type === 'puskas') {
+      // Puskás Award — best/most spectacular individual goal, tallied by nominee count
+      const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Puskás Award', 34) + ' Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Nominated Goals</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
+        '</tbody></table></div>';
+    } else if (type === 'muller') {
+      // Gerd Müller Award — best pure striker: goals heavily weighted, ST/CF preference
+      const scores = {};
+      Object.values(stats.goals || {}).forEach(p => {
+        scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: p.count, assists: 0, pts: p.count * 5 };
+      });
+      Object.values(stats.assists || {}).forEach(p => {
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: 0, assists: 0, pts: 0 };
+        scores[p.id].assists = p.count;
+        scores[p.id].pts += p.count * 0.8;
+      });
+      // Bonus if player is a striker on roster
+      Object.values(scores).forEach(s => {
+        let isST = false;
+        for (const t of allTeams) {
+          const pl = (t.players || []).find(x => x.id === s.id);
+          if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
+        }
+        if (isST) s.pts += 2;
+      });
+      const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Gerd Müller Award', 34) + ' Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table></div>';
+    } else if (type === 'yashin') {
+      // Yashin Award — best goalkeeper: saves + clean sheets
+      const scores = {};
+      Object.values(stats.saves || {}).forEach(p => {
+        scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: p.count, clean: 0, pts: p.count * 1.2 };
+      });
+      Object.values(stats.cleanSheets || {}).forEach(p => {
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: 0, clean: 0, pts: 0 };
+        scores[p.id].clean = p.count;
+        scores[p.id].pts += p.count * 4;
+      });
+      Object.values(stats.motm || {}).forEach(p => {
+        if (scores[p.id]) scores[p.id].pts += p.count * 3;
+      });
+      Object.values(stats.ratings || {}).forEach(p => {
+        if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.3;
+      });
+      const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Yashin Trophy', 34) + ' Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table></div>';
+    } else if (type === 'defenders') {
+      // Defenders' Award — best defensive campaign: interceptions + tackles,
+      // with clean sheets and a defensive-position bonus factored in.
+      const scores = {};
+      Object.values(stats.interceptions || {}).forEach(p => {
+        scores[p.id] = { id: p.id, name: p.name, team: p.team, interceptions: p.count, tackles: 0, clean: 0, pts: p.count * 1.4 };
+      });
+      Object.values(stats.tackles || {}).forEach(p => {
+        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, interceptions: 0, tackles: 0, clean: 0, pts: 0 };
+        scores[p.id].tackles = p.count;
+        scores[p.id].pts += p.count * 1.1;
+      });
+      Object.values(stats.cleanSheets || {}).forEach(p => {
+        if (scores[p.id]) { scores[p.id].clean = p.count; scores[p.id].pts += p.count * 1.5; }
+      });
+      Object.values(stats.ratings || {}).forEach(p => {
+        if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.25;
+      });
+      // Bonus if the player is actually a defender on their roster (CB/RB/LB/RWB/LWB).
+      Object.values(scores).forEach(s => {
+        let isDef = false;
+        for (const t of allTeams) {
+          const pl = (t.players || []).find(x => x.id === s.id);
+          if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) { isDef = true; break; }
+        }
+        if (isDef) s.pts += 3;
+      });
+      const data = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧱</div><p>No defensive stats yet.</p></div>'; return; }
+      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark("Defenders' Award", 34) + " Defenders' Award</h4><p class=\"award-winner\">" + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best defender · ' + data[0].interceptions + ' interceptions · ' + data[0].tackles + ' tackles · ' + data[0].team + '</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Int</th><th>Tkl</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
+        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.interceptions+'</td><td>'+p.tackles+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
+        '</tbody></table></div>';
+    } else if (type === 'manager') {
+      // Manager Award — tallies every manager award won (league titles,
+      // Champions League, World Cup) into a leaderboard, crediting the
+      // manager currently in charge of the team that earned each award.
+      const mgrTrophies = trophies.filter(t => t.manager);
+      if (!mgrTrophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">👔</div><p>No manager awards yet — win a league, Champions League or World Cup.</p></div>'; return; }
+      const byMgr = {};
+      mgrTrophies.forEach(t => {
+        if (!byMgr[t.manager]) byMgr[t.manager] = { name: t.manager, team: t.team, count: 0, latest: 0 };
+        byMgr[t.manager].count++;
+        byMgr[t.manager].team = t.team; // most recent team on record
+        byMgr[t.manager].latest = Math.max(byMgr[t.manager].latest, t.date || 0);
+      });
+      const data = Object.values(byMgr).sort((a,b) => b.count - a.count || b.latest - a.latest).slice(0, 50);
+      const leader = data[0];
+      const leaderTeam = allTeams.find(t => t.manager && t.manager.name === leader.name);
+      el.innerHTML = '<div class="award-card">' + managerAvatarMark(leaderTeam ? leaderTeam.manager : { name: leader.name }, 64) + '<div class="award-info"><h4>👔 Manager of the Moment</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.count + ' award' + (leader.count===1?'':'s') + ' won</p></div></div>' +
+        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Manager</th><th>Team</th><th>Awards</th></tr></thead><tbody>' +
+        data.map((m,i) => {
+          const t = allTeams.find(tt => tt.manager && tt.manager.name === m.name);
+          return '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player"><div class="lb-player-cell">' + managerAvatarMark(t ? t.manager : { name: m.name }, 34) + '<span class="lb-player-name">'+m.name+'</span></div></td><td class="lb-team">'+m.team+'</td><td style="font-weight:700;color:var(--gold)">'+m.count+'</td></tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    } else if (type === 'trophies') {
+      if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
+      el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 68) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.manager ? '👔 ' + t.manager + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
+    } else {
+      // overview
+      const topScorer = Object.values(stats.goals||{}).sort((a,b)=>b.count-a.count)[0];
+      const topAst = Object.values(stats.assists||{}).sort((a,b)=>b.count-a.count)[0];
+      const topMotm = Object.values(stats.motm||{}).sort((a,b)=>b.count-a.count)[0];
+      el.innerHTML = `
+        <div class="award-card">${topScorer ? lbAvatar(topScorer, 52) : trophyMark('Golden Boot', 68)}<div class="award-info"><h4>${trophyMark('Golden Boot', 30)} Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
+        <div class="award-card">${topAst ? lbAvatar(topAst, 52) : trophyMark('Top Assists', 68)}<div class="award-info"><h4>${trophyMark('Top Assists', 30)} Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
+        <div class="award-card">${topMotm ? lbAvatar(topMotm, 52) : trophyMark('Most MOTM', 68)}<div class="award-info"><h4>${trophyMark('Most MOTM', 30)} Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
+        <div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Trophies</h4><p class="award-winner">${trophies.length} won</p></div></div>`;
+    }
+  }
+
+  // ========== HISTORY (previous winners, team + individual) ==========
+  // Reads straight from the permanent `trophies` case (never cleared by a
+  // season reset), grouped newest-first by the run/season-year they came
+  // from so each group reads like one completed competition's honours list.
+  function trophyGroupKey(t) {
+    if (t.category === 'tournament') return 'tournament-' + (t.run || t.date);
+    if (t.category === 'season' || t.category === 'season-global') return 'season-' + (t.year != null ? t.year : '?');
+    return 'other-' + (t.date || 0);
+  }
+  function trophyGroupLabel(t) {
+    if (t.category === 'tournament') {
+      const base = (t.type || '').replace(/\s*Tournament$/, '');
+      return base || 'Tournament';
+    }
+    if (t.category === 'season' || t.category === 'season-global') return 'Season · Year ' + (t.year != null ? t.year : '?');
+    return t.type || 'History';
+  }
+
+  function showHistory(type) {
+    type = type || historyActiveTab || 'team';
+    historyActiveTab = type;
+    document.querySelectorAll('#view-history .award-tab').forEach(t => t.classList.toggle('active', t.dataset.history === type));
+    const el = document.getElementById('history-content');
+    if (!el) return;
+
+    const list = type === 'individual'
+      ? trophies.filter(t => t.player || t.manager)
+      : trophies.filter(t => !t.player && !t.manager);
+
+    if (!list.length) {
+      el.innerHTML = type === 'individual'
+        ? '<div class="empty-state"><div class="icon">⭐</div><p>No individual awards recorded yet — finish a tournament or a season.</p></div>'
+        : '<div class="empty-state"><div class="icon">🏆</div><p>No champions crowned yet — finish a tournament or a season.</p></div>';
+      return;
+    }
+
+    const groups = {};
+    list.forEach(t => {
+      const key = trophyGroupKey(t);
+      if (!groups[key]) groups[key] = { label: trophyGroupLabel(t), sortKey: t.date || 0, items: [] };
+      groups[key].items.push(t);
+      groups[key].sortKey = Math.max(groups[key].sortKey, t.date || 0);
+    });
+    const orderedKeys = Object.keys(groups).sort((a, b) => groups[b].sortKey - groups[a].sortKey);
+
+    el.innerHTML = orderedKeys.map(key => {
+      const g = groups[key];
+      const items = g.items.map(t => {
+        if (t.player) {
+          return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.player}</p><p style="color:var(--text-2);font-size:0.82rem">${t.team || ''}</p></div></div>`;
+        }
+        if (t.manager) {
+          return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">👔 ${t.manager}</p><p style="color:var(--text-2);font-size:0.82rem">${t.team || ''}</p></div></div>`;
+        }
+        return `<div class="award-card">${trophyMark(t.name, 64)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`;
+      }).join('');
+      return `<div class="group-card" style="margin-bottom:16px"><h4>${g.label}</h4>${items}</div>`;
+    }).join('');
+  }
+
+
+  function goToSeason() {
+    if (season) { renderSeasonDashboard(); }
+    else { renderSeasonSetup(); }
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = season ? 'none' : 'block';
+    if (dash) dash.style.display = season ? 'block' : 'none';
+  }
+
+  // Season Calendar only plays with the current 2026-27 squads — a club may have
+  // other-season entries in teams.json (e.g. historical or future rosters) that
+  // must never be selectable for leagues, whether auto-matched via leagues.json
+  // or picked manually.
+  const SEASON_YEAR_TAG = '2026-27';
+  function isCurrentSeasonSquad(t) {
+    return !!(t && t.name && t.name.indexOf(SEASON_YEAR_TAG) !== -1);
+  }
+  function seasonClubPool() {
+    return (teamsData.club || []).filter(isCurrentSeasonSquad);
+  }
+
+  // leagues.json lists teams like "Real Madrid 2026-27" — strip the season
+  // suffix so it can be matched against whatever team names teams.json uses.
+  function normalizeLeagueName(s) {
+    return (s || '').toLowerCase().replace(/\s*\d{4}-\d{2,4}\s*$/, '').trim();
+  }
+
+  // Resolves the club roster leagues.json defines for a given league name
+  // (e.g. "La Liga") against the clubs actually present in teams.json.
+  // Returns [] if leagues.json has no entry or none of its names match yet
+  // (e.g. before teams.json has been filled in) — callers should fall back
+  // to the full club pool in that case.
+  function getLeagueTeamPool(leagueName) {
+    const names = leaguesData[leagueName];
+    if (!names || !names.length) return [];
+    const pool = seasonClubPool();
+    const matched = [];
+    names.forEach(n => {
+      const norm = normalizeLeagueName(n);
+      let t = pool.find(x => (x.name || '').toLowerCase() === (n || '').toLowerCase());
+      if (!t) t = pool.find(x => normalizeLeagueName(x.name) === norm);
+      if (!t) t = pool.find(x => norm && (normalizeLeagueName(x.name).includes(norm) || norm.includes(normalizeLeagueName(x.name))));
+      if (t && !matched.includes(t)) matched.push(t);
+    });
+    return matched;
+  }
+
+  function renderSeasonSetup() {
+    const el = document.getElementById('season-setup-comps');
+    if (!el) return;
+    const fullPool = seasonClubPool();
+    el.innerHTML = SEASON_LEAGUE_DEFS.map(def => {
+      const sel = seasonSetup.selections[def.key];
+      const q = (seasonSetup.search[def.key] || '').toLowerCase();
+      // Prefer the roster leagues.json defines for this league; only fall
+      // back to the full club pool (manual picking) if nothing matched yet
+      // (e.g. teams.json hasn't been filled in with matching names).
+      const leaguePool = getLeagueTeamPool(def.name);
+      const usingLeagueFile = leaguePool.length > 0;
+      const pool = usingLeagueFile ? leaguePool : fullPool;
+      const visible = pool.filter(t => !q || (t.name || '').toLowerCase().includes(q) || (t.short || '').toLowerCase().includes(q));
+      return `<div class="card" style="margin-bottom:14px">
+        <div class="card-title">${def.name} <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem">(${sel.size} selected${usingLeagueFile ? ' · from leagues.json' : ''})</span></div>
+        ${usingLeagueFile ? '' : `<div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:8px">No leagues.json match found yet for ${def.name} — pick clubs manually below (add matching names to teams.json to auto-fill this).</div>`}
+        <input type="search" placeholder="Search clubs..." value="${(seasonSetup.search[def.key]||'').replace(/"/g,'&quot;')}" oninput="App.searchSeasonTeams('${def.key}', this.value)" style="margin-bottom:10px;width:100%" autocomplete="off">
+        <div class="teams-checkbox-grid">
+          ${visible.map(t => {
+            const checked = sel.has(t.id);
+            const usedElsewhere = !usingLeagueFile && SEASON_LEAGUE_DEFS.some(d => d.key !== def.key && seasonSetup.selections[d.key].has(t.id));
+            return `<label class="team-check ${checked ? 'selected' : ''}" style="${usedElsewhere ? 'opacity:0.4' : ''}">
+              <input type="checkbox" ${checked ? 'checked' : ''} ${usedElsewhere ? 'disabled' : ''} onchange="App.toggleSeasonTeam('${def.key}','${t.id}')">
+              <span>${teamMark(t, 18)} ${t.name}</span>
+            </label>`;
+          }).join('') || '<div class="empty-state"><p>No clubs found</p></div>'}
+        </div>
+      </div>`;
+    }).join('') + `<div class="card" style="margin-bottom:14px;border-color:var(--accent-gold)">
+        <div class="card-title">🏆 Champions League</div>
+        <div style="color:var(--text-muted);font-size:0.85rem">No manual selection needed — the top ${UCL_QUALIFY_PER_LEAGUE} clubs from each league table automatically qualify as Champions League candidates. In Year 1 (before any table exists), qualifiers are seeded from each club's squad strength.</div>
+      </div>`;
+  }
+
+  function searchSeasonTeams(compKey, value) {
+    seasonSetup.search[compKey] = value;
+    renderSeasonSetup();
+  }
+
+  function toggleSeasonTeam(compKey, teamId) {
+    const sel = seasonSetup.selections[compKey];
+    if (!sel) return;
+    if (sel.has(teamId)) sel.delete(teamId);
+    else {
+      // A club may only sit in one domestic league at a time.
+      SEASON_LEAGUE_DEFS.forEach(d => { if (d.key !== compKey) seasonSetup.selections[d.key].delete(teamId); });
+      sel.add(teamId);
+    }
+    renderSeasonSetup();
+  }
+
+  function autoFillSeason() {
+    Object.values(seasonSetup.selections).forEach(s => s.clear());
+    // Prefer leagues.json rosters where available.
+    const leagueFileDefs = SEASON_LEAGUE_DEFS.filter(def => getLeagueTeamPool(def.name).length > 0);
+    leagueFileDefs.forEach(def => {
+      getLeagueTeamPool(def.name).forEach(t => seasonSetup.selections[def.key].add(t.id));
+    });
+    // Any leagues without a leagues.json match get a random spread from the remaining pool.
+    const remainingDefs = SEASON_LEAGUE_DEFS.filter(def => !leagueFileDefs.includes(def));
+    if (remainingDefs.length) {
+      const used = new Set(leagueFileDefs.flatMap(def => [...seasonSetup.selections[def.key]]));
+      const pool = shuffleArray(seasonClubPool().filter(t => !used.has(t.id)));
+      const perLeague = Math.max(4, Math.min(10, Math.floor(pool.length / remainingDefs.length)));
+      let cursor = 0;
+      remainingDefs.forEach(def => {
+        for (let i = 0; i < perLeague && cursor < pool.length; i++) seasonSetup.selections[def.key].add(pool[cursor++].id);
+      });
+    }
+    renderSeasonSetup();
+    toast('Auto-filled all leagues' + (leagueFileDefs.length ? ' from leagues.json' : ''));
+  }
+
+  function clearSeasonSetup() {
+    Object.values(seasonSetup.selections).forEach(s => s.clear());
+    renderSeasonSetup();
+  }
+
+  // ---------- scheduling helpers ----------
+  function circleMethodRounds(teamIds) {
+    let ids = teamIds.slice();
+    if (ids.length % 2 !== 0) ids.push(null);
+    const n = ids.length;
+    const rounds = [];
+    let arr = ids.slice();
+    for (let r = 0; r < n - 1; r++) {
+      const pairs = [];
+      for (let i = 0; i < n / 2; i++) {
+        const a = arr[i], b = arr[n - 1 - i];
+        if (a != null && b != null) pairs.push((r + i) % 2 === 0 ? [a, b] : [b, a]);
+      }
+      rounds.push(pairs);
+      const fixed = arr[0];
+      const rest = arr.slice(1);
+      rest.unshift(rest.pop());
+      arr = [fixed, ...rest];
+    }
+    return rounds;
+  }
+
+  function buildDoubleRoundRobinRounds(teams) {
+    const ids = teams.map(t => t.id);
+    if (ids.length < 2) return [];
+    const firstLeg = circleMethodRounds(ids);
+    const secondLeg = firstLeg.map(round => round.map(([a, b]) => [b, a]));
+    return [...firstLeg, ...secondLeg].map(pairs => pairs.map(([home, away]) => ({
+      home, away, played: false, homeScore: null, awayScore: null, report: null
+    })));
+  }
+
+  function blankSeasonRow(team) {
+    return { team, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 };
+  }
+
+  function applyResultToTable(table, homeId, awayId, hg, ag) {
+    const ht = table.find(r => r.team.id === homeId);
+    const at = table.find(r => r.team.id === awayId);
+    if (!ht || !at) return;
+    ht.played++; at.played++;
+    ht.gf += hg; ht.ga += ag; at.gf += ag; at.ga += hg;
+    if (hg > ag) { ht.won++; ht.pts += 3; at.lost++; }
+    else if (ag > hg) { at.won++; at.pts += 3; ht.lost++; }
+    else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
+  }
+
+  function sortedTable(table) {
+    return [...table].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+  }
+
+  function bracketSizeFor(n) {
+    let size = 2;
+    while (size * 2 <= n && size * 2 <= 8) size *= 2;
+    return size;
+  }
+
+  function seedPairsForSize(size) {
+    if (size === 8) return [[0, 7], [3, 4], [2, 5], [1, 6]];
+    if (size === 4) return [[0, 3], [1, 2]];
+    return [[0, 1]];
+  }
+
+  function winnerOfResult(homeTeam, awayTeam, result) {
+    if (result.home > result.away) return homeTeam;
+    if (result.away > result.home) return awayTeam;
+    if (result.pens) return result.pens.home > result.pens.away ? homeTeam : awayTeam;
+    return seededRandom() < 0.5 ? homeTeam : awayTeam;
+  }
+
+  function simulateRoundFixtures(round, opts, onResult) {
+    (round || []).forEach(fx => {
+      if (fx.played) return;
+      const homeTeam = getTeam(fx.home), awayTeam = getTeam(fx.away);
+      if (!homeTeam || !awayTeam) { fx.played = true; return; }
+      const result = simQuickMatch(homeTeam, awayTeam, { countForLeaderboard: true, allowET: !!opts.allowET, allowPens: !!opts.allowPens });
+      fx.played = true;
+      fx.homeScore = result.home;
+      fx.awayScore = result.away;
+      fx.report = result.report;
+      fx.pens = result.pens;
+      if (onResult) onResult(fx, homeTeam, awayTeam, result);
+    });
+  }
+
+  function buildKnockoutFixtures(teamsInSeed, pairsIdx) {
+    return { fixtures: pairsIdx.map(([i, j]) => ({
+      home: teamsInSeed[i].id, away: teamsInSeed[j].id, played: false, homeScore: null, awayScore: null, report: null, winnerId: null
+    })), played: false };
+  }
+
+  function buildKnockoutFromWinners(winners) {
+    const fixtures = [];
+    for (let i = 0; i < winners.length; i += 2) {
+      const swap = seededRandom() < 0.5;
+      const h = swap ? winners[i] : winners[i + 1];
+      const a = swap ? winners[i + 1] : winners[i];
+      fixtures.push({ home: h.id, away: a.id, played: false, homeScore: null, awayScore: null, report: null, winnerId: null });
+    }
+    return { fixtures, played: false };
+  }
+
+  // ---------- Champions League qualification ----------
+  // Year 1: no table exists yet, so seed qualifiers by squad strength (like
+  // a pre-season club-strength ranking). Every later year uses the actual
+  // final league standings (real-life style: table-toppers qualify).
+  function computeInitialUCLQualifiers(leagueTeams) {
+    const qualifiers = [];
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const ranked = [...(leagueTeams[def.key] || [])].sort((a, b) => teamAvgOvr(b) - teamAvgOvr(a));
+      ranked.slice(0, UCL_QUALIFY_PER_LEAGUE).forEach(t => qualifiers.push(t));
+    });
+    return qualifiers;
+  }
+
+  function computeUCLQualifiersFromStandings() {
+    const qualifiers = [];
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const comp = season.leagues[def.key];
+      if (!comp) return;
+      const standings = sortedTable(comp.table).map(r => r.team);
+      standings.slice(0, UCL_QUALIFY_PER_LEAGUE).forEach(t => qualifiers.push(t));
+    });
+    return qualifiers;
+  }
+
+  // ---------- starting a season ----------
+  function startSeason() {
+    const leagueTeams = {};
+    let msg = '';
+    for (const def of SEASON_LEAGUE_DEFS) {
+      const ids = [...seasonSetup.selections[def.key]];
+      if (ids.length < 4) msg += `${def.name} needs at least 4 clubs (has ${ids.length}). `;
+      leagueTeams[def.key] = ids.map(id => getTeam(id)).filter(Boolean);
+    }
+    const el = document.getElementById('season-setup-msg');
+    if (msg) { if (el) el.textContent = msg; toast('Fix the leagues highlighted below'); return; }
+    if (el) el.textContent = '';
+
+    const leagues = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const teams = leagueTeams[def.key];
+      leagues[def.key] = {
+        key: def.key, name: def.name, teams,
+        table: teams.map(blankSeasonRow),
+        rounds: buildDoubleRoundRobinRounds(teams),
+        currentRound: 0,
+        champion: null,
+        finished: false,
+        stats: blankCompStats()
+      };
+    });
+
+    // Champions League candidates qualify automatically — top clubs from
+    // each domestic league, not a manual pick.
+    const uclTeams = computeInitialUCLQualifiers(leagueTeams);
+    const matchesPerTeam = Math.max(2, Math.min(8, uclTeams.length - 1));
+    const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
+    const uclRounds = [];
+    for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
+
+    const ucl = {
+      key: 'ucl', name: 'Champions League', teams: uclTeams,
+      table: uclTeams.map(blankSeasonRow),
+      rounds: uclRounds,
+      currentRound: 0,
+      matchesPerTeam,
+      stage: 'league',
+      bracketSize: null,
+      knockout: { qf: null, sf: null, final: null },
+      champion: null,
+      finished: false,
+      stats: blankCompStats()
+    };
+
+    season = { year: 1, week: 0, leagues, ucl };
+    seasonActiveTab = 'epl';
+    seasonActiveSubTab = 'table';
+    renderSeasonDashboard();
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = 'none';
+    if (dash) dash.style.display = 'block';
+    toast('Season started — good luck!');
+    persistAll();
+  }
+
+  function crownLeagueChampion(comp) {
+    const standings = sortedTable(comp.table);
+    comp.champion = standings[0] ? standings[0].team : null;
+    if (comp.champion) {
+      const year = season ? season.year : 1;
+      const extra = { category: 'season', year };
+      pushTeamTrophy(comp.name, comp.champion.name, 'League (Y' + year + ')', extra);
+      pushManagerAward(comp.name + ' Manager of the Season', comp.champion, 'League (Y' + year + ')', extra);
+      recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
+    }
+  }
+
+  function simulateLeagueRound(comp) {
+    if (!comp || comp.finished) return;
+    if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); return; }
+    if (!comp.stats) comp.stats = blankCompStats();
+    currentSeasonComp = comp;
+    simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+      applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
+    });
+    currentSeasonComp = null;
+    comp.currentRound++;
+    if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); }
+  }
+
+  // Builds the UCL knockout bracket from final league-phase standings.
+  // Shared by the batch simulator (simulateUCLStep) and the per-fixture
+  // live/instant path (advanceSeasonRoundIfComplete) so both routes into
+  // the knockout stage behave identically.
+  function buildUCLBracketFromLeagueTable(comp) {
+    const size = bracketSizeFor(comp.teams.length);
+    comp.bracketSize = size;
+    const standings = sortedTable(comp.table).map(r => r.team);
+    const qualifiers = standings.slice(0, size);
+    const firstRound = buildKnockoutFixtures(qualifiers, seedPairsForSize(size));
+    if (size <= 2) { comp.knockout.final = firstRound; comp.stage = 'final'; }
+    else if (size === 4) { comp.knockout.sf = firstRound; comp.stage = 'sf'; }
+    else { comp.knockout.qf = firstRound; comp.stage = 'qf'; }
+  }
+
+  function simulateUCLStep(comp) {
+    if (!comp || comp.finished) return;
+    if (!comp.stats) comp.stats = blankCompStats();
+    currentSeasonComp = comp;
+    if (comp.stage === 'league') {
+      if (comp.currentRound >= comp.rounds.length) { comp.stage = 'transition'; }
+      else {
+        simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+          applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
+        });
+        comp.currentRound++;
+      }
+      if (comp.currentRound >= comp.rounds.length) buildUCLBracketFromLeagueTable(comp);
+    } else if (comp.stage === 'qf') {
+      simulateRoundFixtures(comp.knockout.qf.fixtures, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+        fx.winnerId = winnerOfResult(h, a, result).id;
+      });
+      comp.knockout.qf.played = true;
+      const winners = comp.knockout.qf.fixtures.map(f => getTeam(f.winnerId));
+      comp.knockout.sf = buildKnockoutFromWinners(winners);
+      comp.stage = 'sf';
+    } else if (comp.stage === 'sf') {
+      simulateRoundFixtures(comp.knockout.sf.fixtures, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+        fx.winnerId = winnerOfResult(h, a, result).id;
+      });
+      comp.knockout.sf.played = true;
+      const winners = comp.knockout.sf.fixtures.map(f => getTeam(f.winnerId));
+      comp.knockout.final = buildKnockoutFromWinners(winners);
+      comp.stage = 'final';
+    } else if (comp.stage === 'final') {
+      simulateRoundFixtures(comp.knockout.final.fixtures, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+        fx.winnerId = winnerOfResult(h, a, result).id;
+      });
+      comp.knockout.final.played = true;
+      const champ = getTeam(comp.knockout.final.fixtures[0].winnerId);
+      comp.champion = champ;
+      comp.finished = true;
+      if (champ) {
+        const year = season ? season.year : 1;
+        const extra = { category: 'season', year };
+        pushTeamTrophy('Champions League', champ.name, 'Season (Y' + year + ')', extra);
+        pushManagerAward('Champions League Winning Manager', champ, 'Season (Y' + year + ')', extra);
+        recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), 'Champions League (Y' + year + ')', extra);
+      }
+    }
+    currentSeasonComp = null;
+  }
+
+  // Derives the season-wide "Matchday" counter from actual progress instead
+  // of a manually-incremented counter, so it stays correct no matter which
+  // route a fixture was played through (live, instant, or bulk simulate) —
+  // this is what's shown as "Year N · Matchday W" in the season header.
+  // Matchday W means "every domestic league has completed round W" (a
+  // finished league is treated as having completed all of its rounds), so
+  // the counter only advances once the slowest league catches up — exactly
+  // matching what "Play Now" already shows per league.
+  function computeSeasonWeek(s) {
+    if (!s || !s.leagues) return 0;
+    const rounds = SEASON_LEAGUE_DEFS.map(def => {
+      const comp = s.leagues[def.key];
+      if (!comp) return 0;
+      return comp.finished ? comp.rounds.length : comp.currentRound;
+    });
+    return rounds.length ? Math.min(...rounds) : 0;
+  }
+
+  // Advances a competition's matchday once every fixture in the current
+  // round has been played (whether via live play, instant sim, or batch
+  // simulation). Mirrors the round-increment logic that used to live only
+  // inside simulateLeagueRound/simulateUCLStep.
+  function advanceSeasonRoundIfComplete(comp, compKey) {
+    if (!comp || !comp.rounds) return;
+    const round = comp.rounds[comp.currentRound];
+    if (!round || !round.length || !round.every(f => f.played)) return;
+    comp.currentRound++;
+    if (compKey === 'ucl') {
+      if (comp.currentRound >= comp.rounds.length) buildUCLBracketFromLeagueTable(comp);
+    } else if (comp.currentRound >= comp.rounds.length) {
+      comp.finished = true;
+      crownLeagueChampion(comp);
+    }
+    // Keep the season-wide Matchday counter in sync — this is the fix for
+    // live/instant single-fixture play never advancing it (only the bulk
+    // "Simulate Matchday" actions used to update it directly).
+    if (season) season.week = computeSeasonWeek(season);
+    finalizeSeasonIfComplete();
+  }
+
+  // Simulates a single fixture from the current matchday instantly (no live
+  // view), same as the "Instant" option tournaments already offer.
+  function simSeasonFixture(compKey, idx) {
+    if (!season) return;
+    const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+    if (!comp || comp.finished) return;
+    const round = comp.rounds[comp.currentRound];
+    const f = round && round[idx];
+    if (!f || f.played) return;
+    const home = getTeam(f.home), away = getTeam(f.away);
+    if (!home || !away) { f.played = true; return; }
+    showLoading('Simulating match…');
+    setTimeout(function() {
+      try {
+        if (!comp.stats) comp.stats = blankCompStats();
+        currentSeasonComp = comp;
+        const result = simQuickMatch(home, away, { countForLeaderboard: true, allowET: false, allowPens: false });
+        currentSeasonComp = null;
+        f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report; f.pens = result.pens;
+        applyResultToTable(comp.table, f.home, f.away, result.home, result.away);
+        advanceSeasonRoundIfComplete(comp, compKey);
+        renderSeasonDashboard();
+        persistAll();
+      } finally { hideLoading(); }
+    }, 30);
+  }
+
+  // Plays a single fixture from the current matchday live in the Match view —
+  // same flow as playTournamentMatch/playUCLFixture, but writes the result
+  // back into the season's league table instead of a tournament bracket.
+  function playSeasonFixture(compKey, idx) {
+    if (!season) return;
+    const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+    if (!comp || comp.finished) return;
+    const round = comp.rounds[comp.currentRound];
+    const f = round && round[idx];
+    if (!f || f.played) return;
+    const home = getTeam(f.home), away = getTeam(f.away);
+    if (!home || !away) return;
+    window._seasonFixture = { compKey, idx };
+    window._tourFixtureIdx = null;
+    window._uclFixtureIdx = null;
+    window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._fromTournament = false;
+    window._backTarget = 'season';
+    switchView('match');
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = home.id;
+    if (awaySel) awaySel.value = away.id;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    // Clear custom lineups so random formation applies
+    customLineups.home = null;
+    customLineups.away = null;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    if (!comp.stats) comp.stats = blankCompStats();
+    currentSeasonComp = comp;
+    startMatch();
+    toast((comp.name || 'Season') + ' — live · formations randomized');
+  }
+
+  function seasonIsComplete() {
+    if (!season) return true;
+    return SEASON_LEAGUE_DEFS.every(def => season.leagues[def.key].finished) && season.ucl.finished;
+  }
+
+  function simulateSeasonWeek() {
+    if (!season) return;
+    withLoading('Simulating matchday…', function() {
+      SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
+      simulateUCLStep(season.ucl);
+      season.week = computeSeasonWeek(season);
+      finalizeSeasonIfComplete();
+      renderSeasonDashboard();
+    });
+  }
+
+  function simulateSeasonToEnd() {
+    if (!season) return;
+    withLoading('Simulating rest of season…', function() {
+      let safety = 0;
+      while (!seasonIsComplete() && safety < 500) {
+        SEASON_LEAGUE_DEFS.forEach(def => simulateLeagueRound(season.leagues[def.key]));
+        simulateUCLStep(season.ucl);
+        season.week = computeSeasonWeek(season);
+        safety++;
+      }
+      finalizeSeasonIfComplete();
+      renderSeasonDashboard();
+    });
+  }
+
+  function startNewSeasonYear() {
+    if (!season) return;
+    if (!seasonIsComplete()) { toast('Finish this season first (or Simulate To End)'); return; }
+    const year = season.year + 1;
+    const leagues = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const teams = season.leagues[def.key].teams;
+      leagues[def.key] = {
+        key: def.key, name: def.name, teams,
+        table: teams.map(blankSeasonRow),
+        rounds: buildDoubleRoundRobinRounds(teams),
+        currentRound: 0, champion: null, finished: false,
+        stats: blankCompStats()
+      };
+    });
+    // Re-qualify the Champions League from this season's just-finished
+    // final standings — the top clubs from each league carry forward.
+    const uclTeams = computeUCLQualifiersFromStandings();
+    const matchesPerTeam = Math.max(2, Math.min(8, uclTeams.length - 1));
+    const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
+    const uclRounds = [];
+    for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
+    season = {
+      year, week: 0, leagues,
+      ucl: { key: 'ucl', name: 'Champions League', teams: uclTeams, table: uclTeams.map(blankSeasonRow),
+        rounds: uclRounds, currentRound: 0, matchesPerTeam, stage: 'league', bracketSize: null,
+        knockout: { qf: null, sf: null, final: null }, champion: null, finished: false,
+        stats: blankCompStats() }
+    };
+    renderSeasonDashboard();
+    toast('Year ' + year + ' kicks off!');
+    persistAll();
+  }
+
+  function resetSeason() {
+    if (!confirm('Reset the season? All standings and fixtures will be lost.')) return;
+    season = null;
+    seasonActiveTab = 'epl';
+    seasonActiveSubTab = 'table';
+    seasonSetup = {
+      selections: { epl: new Set(), laliga: new Set(), seriea: new Set(), bundesliga: new Set(), ligue1: new Set() },
+      search: { epl: '', laliga: '', seriea: '', bundesliga: '', ligue1: '' }
+    };
+    renderSeasonSetup();
+    const setup = document.getElementById('season-setup');
+    const dash = document.getElementById('season-dashboard');
+    if (setup) setup.style.display = 'block';
+    if (dash) dash.style.display = 'none';
+    toast('Season reset');
+    persistAll();
+  }
+
+  function showSeasonComp(key) {
+    seasonActiveTab = key;
+    seasonActiveSubTab = 'table';
+    renderSeasonDashboard();
+  }
+
+  function showSeasonSubTab(key) {
+    seasonActiveSubTab = key;
+    renderSeasonDashboard();
+  }
+
+  function renderSeasonDashboard() {
+    if (!season) return;
+    seasonReportRegistry = []; // rebuilt fresh each render so onclick indices stay valid
+    const title = document.getElementById('season-status-title');
+    if (title) title.textContent = 'Year ' + season.year + ' · Matchday ' + season.week;
+    const tabsEl = document.getElementById('season-comp-tabs');
+    if (tabsEl) {
+      const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }, { key: 'trophies', name: '🏆 Trophy Room' }];
+      tabsEl.innerHTML = tabs.map(def => {
+        const comp = def.key === 'ucl' ? season.ucl : (def.key === 'trophies' ? null : season.leagues[def.key]);
+        const flag = comp && comp.finished ? ' 🏆' : '';
+        return `<button class="lb-tab ${seasonActiveTab === def.key ? 'active' : ''}" onclick="App.showSeasonComp('${def.key}')">${def.name}${flag}</button>`;
+      }).join('');
+    }
+    const contentEl = document.getElementById('season-comp-content');
+    if (!contentEl) return;
+    if (seasonActiveTab === 'trophies') {
+      contentEl.innerHTML = renderSeasonTrophyRoomHTML();
+      return;
+    }
+    const comp = seasonActiveTab === 'ucl' ? season.ucl : season.leagues[seasonActiveTab];
+    if (!comp) { contentEl.innerHTML = ''; return; }
+    if (!comp.stats) comp.stats = blankCompStats();
+
+    const subTabs = [
+      { key: 'table', name: 'Table & Fixtures' },
+      { key: 'stats', name: 'Stats' },
+      { key: 'awards', name: 'Awards' }
+    ];
+    let h = '<div class="leaderboard-tabs" style="margin-bottom:12px">' + subTabs.map(st =>
+      `<button class="lb-tab ${seasonActiveSubTab === st.key ? 'active' : ''}" onclick="App.showSeasonSubTab('${st.key}')">${st.name}</button>`
+    ).join('') + '</div>';
+
+    if (seasonActiveSubTab === 'stats') {
+      h += renderCompStatsHTML(comp);
+    } else if (seasonActiveSubTab === 'awards') {
+      h += renderCompAwardsHTML(comp);
+    } else {
+      h += seasonActiveTab === 'ucl' ? renderUCLSeasonHTML(comp) : renderLeagueCompHTML(comp, seasonActiveTab);
+    }
+    contentEl.innerHTML = h;
+  }
+
+  // ---------- per-competition stats & awards (Season Calendar) ----------
+  function compStatTop(comp, key, n) {
+    return Object.values((comp.stats && comp.stats[key]) || {}).sort((a, b) => b.count - a.count).slice(0, n || 10);
+  }
+
+  function compApps(comp, playerId) {
+    const r = comp.stats && comp.stats.ratings && comp.stats.ratings[playerId];
+    return r ? r.count : 0;
+  }
+
+  function renderCompStatTable(comp, title, icon, rows, colLabel) {
+    if (!rows.length) {
+      return `<div class="group-card" style="margin-bottom:14px"><h4>${icon} ${title}</h4><div class="empty-state" style="padding:16px 0"><p>No data yet — simulate some matchdays.</p></div></div>`;
+    }
+    return `<div class="group-card" style="margin-bottom:14px"><h4>${icon} ${title}</h4>
+      <div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>${colLabel}</th></tr></thead><tbody>
+      ${rows.map((p, i) => `<tr class="${i<3?'lb-row-top rank-'+(i+1):''}"><td class="lb-rank">${rankBadge(i)}</td><td class="lb-player">${lbPlayerCell(p)}</td><td class="lb-team">${p.team}</td><td>${compApps(comp, p.id)}</td><td style="font-weight:700;color:var(--accent-gold)">${p.count}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+
+  function renderCompStatsHTML(comp) {
+    let h = '<div class="group-card league-table-wrap" style="margin-bottom:14px"><h4>' + comp.name + ' — Season Stats</h4>' +
+      '<p style="font-size:0.8rem;color:var(--text-muted)">Top performers across every matchday played in this competition so far.</p></div>';
+    h += renderCompStatTable(comp, 'Top Scorers', '⚽', compStatTop(comp, 'goals', 15), 'Goals');
+    h += renderCompStatTable(comp, 'Top Assists', '🎯', compStatTop(comp, 'assists', 15), 'Assists');
+    h += renderCompStatTable(comp, 'Most Saves', '🧤', compStatTop(comp, 'saves', 15), 'Saves');
+    h += renderCompStatTable(comp, 'Clean Sheets', '🛡️', compStatTop(comp, 'cleanSheets', 15), 'Clean Sheets');
+    h += renderCompStatTable(comp, 'Yellow Cards', '🟨', compStatTop(comp, 'yellows', 15), 'Yellows');
+    h += renderCompStatTable(comp, 'Red Cards', '🟥', compStatTop(comp, 'reds', 15), 'Reds');
+    return h;
+  }
+
+  function assignCompAwards(comp) {
+    const goals = compStatTop(comp, 'goals', 50);
+    const assists = compStatTop(comp, 'assists', 50);
+    const saves = compStatTop(comp, 'saves', 50);
+    const cleanSheets = compStatTop(comp, 'cleanSheets', 50);
+    const motm = compStatTop(comp, 'motm', 50);
+    const ratingsAny = Object.values((comp.stats && comp.stats.ratings) || {})
+      .filter(x => (x.count || 0) > 0)
+      .sort((a, b) => b.avg - a.avg || b.count - a.count);
+    comp.awards = {
+      goldenBoot: goals[0] || null,
+      goldenGlove: saves[0] || null,
+      goldenClean: cleanSheets[0] || null,
+      topAssists: assists[0] || null,
+      mostMotm: motm[0] || null,
+      bestAvgRating: ratingsAny[0] || null,
+      champion: comp.champion || null
+    };
+    return comp.awards;
+  }
+
+  function renderCompAwardsHTML(comp) {
+    const a = assignCompAwards(comp);
+    const card = (title, icon, p, extra) => {
+      const titleHtml = `<div class="am-title">${trophyMark(title, 32)} ${title}</div>`;
+      if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
+      return `<div class="award-mini">${titleHtml}
+        ${lbAvatar(p, 44)}
+        <div class="am-name">${p.name}</div>
+        <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
+    };
+    let h = '<div class="card-title">' + comp.name + ' Awards' + (comp.finished ? ' (Final)' : ' (In Progress)') + '</div>';
+    h += `<div class="awards-row">
+      ${card('Golden Boot', '👟', a.goldenBoot, (a.goldenBoot && a.goldenBoot.count) + ' goals')}
+      ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
+      ${card('Golden Glove', '🧤', a.goldenGlove, (a.goldenGlove && a.goldenGlove.count) + ' saves')}
+      ${card('Clean Sheet King', '🛡️', a.goldenClean, (a.goldenClean && a.goldenClean.count) + ' clean sheets')}
+      ${card('Most MOTM', '⭐', a.mostMotm, (a.mostMotm && a.mostMotm.count) + ' MOTM')}
+      ${card('Best Avg Rating', '📈', a.bestAvgRating, a.bestAvgRating ? (a.bestAvgRating.avg != null ? a.bestAvgRating.avg.toFixed(2) : '—') + ' (' + a.bestAvgRating.count + ' apps)' : '')}
+    </div>`;
+    if (a.champion) {
+      h += `<div class="award-card" style="margin-top:14px">${trophyMark(comp.name, 68)}<div class="award-info"><h4>${comp.name} Champion</h4><p class="award-winner">${teamMark(a.champion, 18) + ' ' + a.champion.name}</p></div></div>`;
+    } else {
+      h += '<p style="color:var(--text-muted);font-size:0.85rem;margin-top:10px">Champion will be crowned once the competition finishes.</p>';
+    }
+    return h;
+  }
+
+  // Season-scoped trophy room: shows only trophies won inside this save's season
+  // play (domestic leagues + Champions League), grouped by year, newest first.
+  function renderSeasonTrophyRoomHTML() {
+    const seasonTrophies = trophies.filter(t => /^(League|Season)\s*\(Y\d+\)$/.test(t.type));
+    if (!seasonTrophies.length) {
+      return '<div class="empty-state"><div class="icon">🏆</div><p>No season trophies yet — simulate matchdays until a league or the Champions League finishes.</p></div>';
+    }
+    const byYear = {};
+    seasonTrophies.forEach(t => {
+      const m = t.type.match(/Y(\d+)/);
+      const y = m ? m[1] : '?';
+      if (!byYear[y]) byYear[y] = [];
+      byYear[y].push(t);
+    });
+    const years = Object.keys(byYear).sort((a, b) => Number(b) - Number(a));
+    let h = '<div class="card-title">🏆 Season Trophy Room</div>';
+    years.forEach(y => {
+      h += `<div class="group-card" style="margin-bottom:14px"><h4>Year ${y}</h4>` +
+        byYear[y].map(t => `<div class="award-card">${trophyMark(t.name, 68)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`).join('') +
+        '</div>';
+    });
+    return h;
+  }
+
+  function renderStandingsTable(comp, highlightTop) {
+    const sorted = sortedTable(comp.table);
+    let h = '<table class="group-table"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
+    sorted.forEach((r, i) => {
+      const gd = r.gf - r.ga;
+      const mark = (highlightTop && i < highlightTop) ? ' style="background:rgba(0,200,83,0.12)"' : '';
+      h += `<tr${mark}><td>${i + 1}</td><td>${teamMark(r.team, 16)} ${r.team.name}</td><td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td><td>${gd}</td><td><b>${r.pts}</b></td></tr>`;
+    });
+    h += '</tbody></table>';
+    return h;
+  }
+
+  function renderFixtureList(comp, compKey) {
+    const rounds = comp.rounds || [];
+    const currentRound = rounds[comp.currentRound] || [];
+    const currentUnplayed = comp.finished ? [] : currentRound.filter(f => !f.played);
+    const laterUnplayed = [];
+    if (!comp.finished) {
+      for (let r = comp.currentRound + 1; r < rounds.length && laterUnplayed.length < 8; r++) {
+        (rounds[r] || []).forEach(f => { if (!f.played && laterUnplayed.length < 8) laterUnplayed.push(f); });
+      }
+    }
+    const allFixtures = [].concat(...rounds);
+    const played = allFixtures.filter(f => f.played).slice(-8).reverse();
+    let h = '';
+    if (currentUnplayed.length) {
+      h += `<div class="card-title" style="margin-top:12px">Matchday ${comp.currentRound + 1} — Play Now</div>`;
+      currentUnplayed.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const idx = currentRound.indexOf(f);
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span>
+          <button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">▶ Play Live</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button></div>`;
+      });
+    }
+    if (laterUnplayed.length) {
+      h += '<div class="card-title" style="margin-top:12px">Upcoming</div>';
+      laterUnplayed.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span></div>`;
+      });
+    }
+    if (played.length) {
+      h += '<div class="card-title" style="margin-top:12px">Recent Results</div>';
+      played.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
+        h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
+      });
+    }
+    return h;
+  }
+
+  function renderLeagueCompHTML(comp, compKey) {
+    let h = '<div class="group-card league-table-wrap">';
+    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? teamMark(comp.champion, 18) + ' ' + comp.champion.name : '—') : '') + '</h4>';
+    h += renderStandingsTable(comp, UCL_QUALIFY_PER_LEAGUE);
+    h += `<p style="font-size:0.75rem;color:var(--text-muted);margin-top:6px">Green: top ${UCL_QUALIFY_PER_LEAGUE} qualify for next season's Champions League</p>`;
+    h += '</div>';
+    h += renderFixtureList(comp, compKey);
+    return h;
+  }
+
+  function renderKnockoutRoundHTML(title, ko) {
+    if (!ko) return '';
+    let h = '<div class="card-title" style="margin-top:12px">' + title + '</div>';
+    ko.fixtures.forEach(f => {
+      const home = getTeam(f.home), away = getTeam(f.away);
+      if (!home || !away) return;
+      if (!f.played) {
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span></div>`;
+      } else {
+        const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
+        const pensTxt = f.pens ? ` (pens ${f.pens.home}-${f.pens.away})` : '';
+        const winner = getTeam(f.winnerId);
+        h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
+      }
+    });
+    return h;
+  }
+
+  function renderUCLSeasonHTML(comp) {
+    let h = '<div class="group-card league-table-wrap">';
+    h += '<h4>' + comp.name + (comp.finished ? ' — Champion: ' + (comp.champion ? teamMark(comp.champion, 18) + ' ' + comp.champion.name : '—') : '') + '</h4>';
+    if (comp.stage === 'league' || !comp.bracketSize) {
+      h += renderStandingsTable(comp, comp.teams.length >= 8 ? 8 : comp.teams.length);
+      h += '</div>';
+      h += renderFixtureList(comp, 'ucl');
+    } else {
+      h += renderStandingsTable(comp, comp.bracketSize);
+      h += '</div>';
+      h += renderKnockoutRoundHTML('Quarterfinals', comp.knockout.qf);
+      h += renderKnockoutRoundHTML('Semifinals', comp.knockout.sf);
+      h += renderKnockoutRoundHTML('Final', comp.knockout.final);
+    }
+    return h;
+  }
+
+  function viewSeasonReport(idx) {
+    const report = seasonReportRegistry[idx];
+    if (!report) { toast('No detailed report for this match'); return; }
+    showMatchReport(report, null);
+  }
+
+  function goToSquadBuilder() {
+    switchView('match');
+    const setup = document.getElementById('match-setup');
+    const live = document.getElementById('match-live');
+    if (setup) setup.style.display = 'block';
+    if (live) live.style.display = 'none';
+    window._tourFixtureIdx = null;
+    window._uclFixtureIdx = null;
+    window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._fromTournament = false;
+    window._seasonFixture = null;
+    window._backTarget = null;
+    currentSeasonComp = null;
+    toast('Pick teams & formations, then Kick Off. Lineups are auto-built by formation.');
+  }
+
+  return {
+    setRngSeed, getRngSeed,
+    init, switchView, goToMatch, goToTournament, updateTeamPreview,
+    startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, finishMatch, resetMatch,
+    showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
+    simTournamentRound, simAllTournament, resetTournament, filterTeams,
+    showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
+    returnToTournament, showPlayerProfile, showTeamProfile, randomMatch,
+    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile,
+    searchTeams, sortTeams, searchTournamentTeams,
+    openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker,
+    playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
+    saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
+    setTacticsLive, continueToET, continueToPens, skipETAndEnd,
+    renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
+    simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, showMatchReportLeg,
+    simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
+    goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
+    startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
+    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
+    simSeasonFixture, playSeasonFixture
+  };
+})();
+
+// Expose for inline onclick handlers
+try { window.App = App; } catch (e) {}
+
+// ========== SEARCHABLE DROPDOWNS ==========
+// Auto-enhances every native <select> in the page (present now or added
+// later, e.g. formation pickers rebuilt mid-match) into a searchable custom
+// dropdown: a button + panel with a text search box, instead of the plain
+// browser <select> list. The original <select> stays in the DOM (hidden) as
+// the real source of truth, so all existing .value reads/writes and
+// onchange="" handlers keep working untouched.
+(function () {
+  function closeAllPanels(except) {
+    document.querySelectorAll('.ss-wrap.open').forEach(w => { if (w !== except) w.classList.remove('open'); });
+  }
+
+  function collectOptions(select) {
+    const items = [];
+    Array.from(select.children).forEach(node => {
+      if (node.tagName === 'OPTGROUP') {
+        Array.from(node.children).forEach(opt => items.push({ value: opt.value, label: opt.textContent, group: node.label }));
+      } else if (node.tagName === 'OPTION') {
+        items.push({ value: node.value, label: node.textContent, group: null });
+      }
+    });
+    return items;
+  }
+
+  function enhanceSelect(select) {
+    if (!select || select.dataset.ssEnhanced || select.closest('.ss-wrap')) return;
+    select.dataset.ssEnhanced = '1';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ss-wrap ' + select.className;
+    select.parentNode.insertBefore(wrap, select);
+    wrap.appendChild(select);
+    select.classList.add('ss-native');
+    select.tabIndex = -1;
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'ss-trigger';
+    if (select.hasAttribute('aria-label')) trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
+    wrap.appendChild(trigger);
+
+    const isTeamSelect = select.id === 'home-team' || select.id === 'away-team';
+    const panel = document.createElement('div');
+    panel.className = 'ss-panel';
+    panel.innerHTML = (isTeamSelect ? `<div class="ss-tabs">
+        <button type="button" class="ss-tab active" data-cat="all">All</button>
+        <button type="button" class="ss-tab" data-cat="National Teams">National</button>
+        <button type="button" class="ss-tab" data-cat="Club Teams">Clubs</button>
+      </div>` : '') +
+      `<div class="ss-search-wrap"><input type="text" class="ss-search" placeholder="Search…" autocomplete="off" spellcheck="false"></div>
+      <div class="ss-options" role="listbox"></div>`;
+    wrap.appendChild(panel);
+
+    const searchInput = panel.querySelector('.ss-search');
+    const optionsEl = panel.querySelector('.ss-options');
+    let activeCat = 'all';
+
+    function updateTrigger() {
+      const opt = select.options[select.selectedIndex];
+      trigger.textContent = opt ? opt.textContent : 'Select…';
+    }
+
+    function renderOptions() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      let items = collectOptions(select);
+      if (isTeamSelect && activeCat !== 'all') items = items.filter(i => i.group === activeCat);
+      if (q) items = items.filter(i => i.label.toLowerCase().includes(q));
+      if (!items.length) { optionsEl.innerHTML = '<div class="ss-empty">No matches</div>'; return; }
+      let html = '';
+      let lastGroup;
+      items.forEach(i => {
+        if (i.group !== lastGroup) {
+          if (i.group && (!isTeamSelect || activeCat === 'all')) html += `<div class="ss-group-label">${i.group}</div>`;
+          lastGroup = i.group;
+        }
+        const sel = i.value === select.value ? ' selected' : '';
+        html += `<div class="ss-option${sel}" data-value="${String(i.value).replace(/"/g, '&quot;')}" role="option">${i.label}</div>`;
+      });
+      optionsEl.innerHTML = html;
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = !wrap.classList.contains('open');
+      closeAllPanels(wrap);
+      wrap.classList.toggle('open', willOpen);
+      if (willOpen) {
+        searchInput.value = '';
+        renderOptions();
+        setTimeout(() => searchInput.focus(), 0);
+      }
+    });
+
+    searchInput.addEventListener('input', renderOptions);
+    panel.addEventListener('click', (e) => e.stopPropagation());
+
+    if (isTeamSelect) {
+      panel.querySelectorAll('.ss-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          panel.querySelectorAll('.ss-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          activeCat = tab.dataset.cat;
+          renderOptions();
+        });
+      });
+    }
+
+    optionsEl.addEventListener('click', (e) => {
+      const opt = e.target.closest('.ss-option');
+      if (!opt) return;
+      select.value = opt.dataset.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      wrap.classList.remove('open');
+    });
+
+    // Keep the trigger label in sync even when code sets select.value
+    // programmatically (no native 'change' event fires in that case).
+    const proto = window.HTMLSelectElement && HTMLSelectElement.prototype;
+    const desc = proto && Object.getOwnPropertyDescriptor(proto, 'value');
+    if (desc && desc.configurable) {
+      Object.defineProperty(select, 'value', {
+        get() { return desc.get.call(select); },
+        set(v) { desc.set.call(select, v); updateTrigger(); },
+        configurable: true
+      });
+    }
+
+    // Options list changes (e.g. formation <select> rebuilt) — refresh label/list.
+    new MutationObserver(() => { updateTrigger(); if (wrap.classList.contains('open')) renderOptions(); })
+      .observe(select, { childList: true });
+
+    updateTrigger();
+  }
+
+  document.addEventListener('click', () => closeAllPanels(null));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllPanels(null); });
+
+  function scanAndEnhance(root) {
+    (root || document).querySelectorAll('select').forEach(enhanceSelect);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => scanAndEnhance(document));
+  if (document.readyState !== 'loading') scanAndEnhance(document);
+
+  // Catch selects created later (formation pickers, live tactics selects, etc.)
+  new MutationObserver((mutations) => {
+    mutations.forEach(m => {
+      m.addedNodes.forEach(node => {
+        if (node.nodeType !== 1) return;
+        if (node.tagName === 'SELECT') enhanceSelect(node);
+        else if (node.querySelectorAll) scanAndEnhance(node);
+      });
+    });
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
+// ========== SCROLL TO TOP / BOTTOM ==========
+(function () {
+  function init() {
+    const group = document.getElementById('scroll-fab-group');
+    const topBtn = document.getElementById('scroll-fab-top');
+    const bottomBtn = document.getElementById('scroll-fab-bottom');
+    if (!group || !topBtn || !bottomBtn) return;
+
+    function toggleVisibility() {
+      const scrollable = document.documentElement.scrollHeight > window.innerHeight + 200;
+      group.classList.toggle('show', scrollable);
+      const nearTop = window.scrollY < 200;
+      const nearBottom = window.scrollY + window.innerHeight > document.documentElement.scrollHeight - 200;
+      topBtn.classList.toggle('disabled', nearTop);
+      bottomBtn.classList.toggle('disabled', nearBottom);
+    }
+
+    topBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    bottomBtn.addEventListener('click', () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+    window.addEventListener('scroll', toggleVisibility, { passive: true });
+    window.addEventListener('resize', toggleVisibility);
+    new MutationObserver(toggleVisibility).observe(document.body, { childList: true, subtree: true });
+    toggleVisibility();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState !== 'loading') init();
+})();
+
+// Start the app
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => App.init());
+} else {
+  App.init();
+}
