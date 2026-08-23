@@ -202,6 +202,67 @@
   }
 /*@CHUNK:c0168:END*/
 
+/*@CHUNK:cp022:START*/
+
+  // Human-readable name for whatever's currently being simulated, used both
+  // for the per-player match log and anywhere else a competition label is
+  // needed. Falls back to "Friendly" for a plain Kick Off match.
+  function matchCompetitionLabel(m) {
+    if (tournament) return tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    if (currentSeasonComp && currentSeasonComp.name) return currentSeasonComp.name;
+    if (m && m.countForLeaderboard) return 'Cup';
+    return 'Friendly';
+  }
+
+/*@CHUNK:cp022:END*/
+
+/*@CHUNK:cp023:START*/
+
+  // Best-effort minutes played from this match's sub log (exact) plus a
+  // fallback scan of the event feed for a red card naming this player
+  // (subs already record an exact minute; a straight red doesn't go through
+  // subLog at all, so this is the only record of when that player's
+  // involvement actually ended).
+  function computeMinutesPlayed(m, playerId, playerName, side) {
+    const endMin = Math.max(m.minute || 90, 90);
+    const log = (m.subLog && m.subLog[side] && m.subLog[side][playerId]) || {};
+    const start = typeof log.inMin === 'number' ? log.inMin : 0;
+    let end = typeof log.outMin === 'number' ? log.outMin : endMin;
+    if (typeof log.outMin !== 'number' && playerName) {
+      const evt = (m.events || []).find(e => e.type === 'red' && e.text && e.text.indexOf(playerName) !== -1);
+      if (evt) end = Math.min(end, evt.minute);
+    }
+    return Math.max(0, Math.min(end, endMin) - start);
+  }
+
+/*@CHUNK:cp023:END*/
+
+/*@CHUNK:cp024:START*/
+
+  // Appends this match's line to the player's persistent match log (see
+  // playerMatchLog in ui/playersUI.js). Called once per involved player at
+  // full time, right after their rating for this match is finalised.
+  function recordPlayerMatchLog(m, player, team, opponentTeam, ps, side) {
+    if (!player || !team) return;
+    const minutes = computeMinutesPlayed(m, player.id, player.name, side);
+    if (minutes <= 0 && !(ps.goals || ps.assists || ps.shots)) return; // never actually took part
+    if (!playerMatchLog[player.id]) playerMatchLog[player.id] = [];
+    playerMatchLog[player.id].unshift({
+      opponent: opponentTeam ? opponentTeam.name : '—',
+      opponentShort: opponentTeam ? (opponentTeam.short || opponentTeam.name) : '—',
+      competition: matchCompetitionLabel(m),
+      minutes: minutes,
+      goals: ps.goals || 0,
+      assists: ps.assists || 0,
+      shots: ps.shots || 0,
+      xg: Math.round((ps.xg || 0) * 100) / 100,
+      rating: ps.rating || 0
+    });
+    if (playerMatchLog[player.id].length > 30) playerMatchLog[player.id].length = 30;
+  }
+
+/*@CHUNK:cp024:END*/
+
 /*@CHUNK:c0185:START*/
 
 
@@ -970,6 +1031,8 @@
       // roster player, not the shallow per-match squad clone, so it sticks.
       const realPlayer = (teamObj.players || []).find(x => x.id === p.id);
       if (realPlayer) updatePlayerForm(realPlayer, ps.rating);
+      const oppTeamObj = concededSide === 'home' ? m.away.team : m.home.team;
+      recordPlayerMatchLog(m, p, teamObj, oppTeamObj, ps, concededSide);
       // Feed the season-long "Interceptions" leaderboard and Defenders' Award
       // with this match's accumulated defensive totals.
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
