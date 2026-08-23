@@ -337,6 +337,95 @@ var App = (() => {
     return !!(p && p.expandedAttrs && (p.expandedAttrs.playstyle || []).includes(styleName));
   }
 
+  // Returns one random flavor line from the first of the player's playstyle
+  // tags that has an entry in the given map, or null if none match. This is
+  // how playstyles diversify match commentary itself — not just numbers —
+  // every context below (dribbles, through balls, tackles, off-the-ball
+  // movement, goals) picks its wording partly from *which* style the player
+  // on the ball actually has.
+  function styleFlavor(p, map) {
+    if (!p || !p.expandedAttrs) return null;
+    const styles = p.expandedAttrs.playstyle || [];
+    for (let i = 0; i < styles.length; i++) {
+      const bank = map[styles[i]];
+      if (bank && bank.length) return bank[Math.floor(Math.random() * bank.length)];
+    }
+    return null;
+  }
+
+  // What a player does immediately *after* beating their man with a skill
+  // move — this is where individual playstyle turns a generic "dribbles
+  // past" into a distinct passage of play per role.
+  const DRIBBLE_FOLLOWUP = {
+    'Prolific Winger':      ['then whips a cross in first time', 'before floating a ball across the six-yard box'],
+    'Cross Specialist':     ['and immediately looks up for a cross', 'before whipping one into the danger area'],
+    'Inside Forward':       ['then cuts inside onto his favoured foot', 'and drives infield looking for the shot'],
+    'Roaming Flank':        ['before drifting inside to keep the move going', 'then picks out a pass through the middle'],
+    'Goal Poacher':         ['then bursts into the box for the return', 'and darts across his marker looking for space'],
+    'Fox in the Box':       ['and spins into the six-yard box', 'before checking his run at the near post'],
+    'Hole Player':          ['before arriving late into the box', 'and times a run beyond the last defender'],
+    'Creative Playmaker':   ['before threading a pass through the lines', 'and picks out a teammate with the outside of the boot'],
+    'Classic No. 10':       ['before slipping a clever ball through', 'and takes a touch to pick his pass'],
+    'Dummy Runner':         ['before checking away to drag a marker with him', 'and peels off to open a passing lane'],
+    'Box-to-Box':           ['before driving forward with the ball', 'and carries it thirty yards up the pitch'],
+    'Deep-Lying Forward':   ['before laying it off and continuing the move', 'and drops deep again looking for the next pass'],
+    'Orchestrator':         ['before recycling it and resetting the attack', 'and slows the tempo back down'],
+    'Offensive Full-back':  ['before overlapping down the line', 'and gets to the byline looking for a cutback'],
+    'Full-back Finisher':   ['before arriving late into the box himself', 'and keeps running into a scoring position']
+  };
+  // Through-ball / defence-splitting pass flavor by the passer's playstyle.
+  const THROUGH_BALL_FLAVOR = {
+    'Creative Playmaker':   ['reads the game a yard ahead of everyone and threads a defence-splitting ball into the channel'],
+    'Classic No. 10':       ['waits, then slides a perfectly weighted ball through the lines'],
+    'Orchestrator':         ['dictates the tempo before releasing a pass through the channel'],
+    'Deep-Lying Forward':   ['drops deep to collect, then spins a first-time pass in behind'],
+    'Dummy Runner':         ['drags a marker away before slipping the ball into the space he vacated']
+  };
+  // Tackle-and-win flavor by the defender's playstyle.
+  const TACKLE_FLAVOR = {
+    'Destroyer':            ['throws himself into a crunching challenge and comes away with the ball'],
+    'Anchor Man':           ['reads the danger early and snuffs it out with a perfectly timed tackle'],
+    'Box-to-Box':           ['recovers back at full sprint to make a vital tackle on the edge of the box'],
+    'Build Up':             ['steps in calmly to win the ball back before it becomes a problem']
+  };
+  // Interception flavor by the defender's playstyle.
+  const INTERCEPTION_FLAVOR = {
+    'Destroyer':            ['pounces to intercept, snapping into the passing lane'],
+    'Anchor Man':           ['reads the pass superbly and steps in front of his man to intercept'],
+    'Orchestrator':         ['anticipates the pass and cuts it out before it develops'],
+    'Build Up':             ['calmly intercepts and immediately looks to start a move of his own']
+  };
+  // "Keeps possession ticking over" flavor by the on-ball player's playstyle.
+  const POSSESSION_FLAVOR = {
+    'Orchestrator':         ['controls the tempo from deep, in no hurry to give the ball away'],
+    'Classic No. 10':       ['pulls the strings from a pocket of space'],
+    'Creative Playmaker':   ['probes for an opening, constantly on the move to stay available'],
+    'Build Up':             ['brings the ball out from the back under no real pressure'],
+    'Deep-Lying Forward':   ['drops off the front line to link the play']
+  };
+  // Off-the-ball movement flavor for a missed big chance, describing *how*
+  // the player got into the position in the first place.
+  const BIG_CHANCE_FLAVOR = {
+    'Goal Poacher':         ['times a run in behind the last defender'],
+    'Fox in the Box':       ['reacts quickest to a loose ball in the six-yard box'],
+    'Hole Player':          ['arrives late and unmarked at the back post'],
+    'Dummy Runner':         ["ghosts into the space a decoy run opened up"],
+    'Inside Forward':       ['cuts in from the flank onto his favoured foot']
+  };
+  // Extra descriptive clause appended to a goal's method text based on the
+  // scorer's playstyle, so the same "tap-in" reads differently for a Fox in
+  // the Box than for a Full-back Finisher arriving from deep.
+  const GOAL_FLAVOR_SUFFIX = {
+    'Goal Poacher':         ['after peeling off the last defender'],
+    'Fox in the Box':       ['pouncing first on a loose ball in the six-yard box'],
+    'Target Man':           ['rising above his marker'],
+    'Hole Player':          ['arriving late and completely unmarked'],
+    'Inside Forward':       ['cutting in from the flank onto his stronger foot'],
+    'Full-back Finisher':   ['arriving from deep, well beyond his usual position'],
+    'Extra Frontman':       ['pushing forward from the back to get on the end of it'],
+    'Deep-Lying Forward':   ['picking up the pieces after dropping deep to link play']
+  };
+
   // Derives the 5 gameplay stats from a player-attributes.json entry.
   // Goalkeepers draw def/tec from their GK-specific ratings (shot-stopping,
   // handling, distribution) instead of the outfield ones.
@@ -1890,9 +1979,14 @@ var App = (() => {
       for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r <= 0) return pool[i]; }
       return pool[pool.length - 1];
     };
-    if (tec > 88 && Math.random() < 0.42) return weightedPick(spectacular);
-    if (tec > 82 && Math.random() < 0.28) return weightedPick(spectacular);
-    return Math.random() < 0.18 ? weightedPick(spectacular) : weightedPick(normal);
+    const chosen = (tec > 88 && Math.random() < 0.42) ? weightedPick(spectacular)
+      : (tec > 82 && Math.random() < 0.28) ? weightedPick(spectacular)
+      : (Math.random() < 0.18 ? weightedPick(spectacular) : weightedPick(normal));
+    // Roughly a third of the time, tack on a playstyle-specific clause
+    // describing *how* the scorer got there — the same "tap-in" reads
+    // differently for a Fox in the Box than for a Full-back Finisher.
+    const flavor = Math.random() < 0.35 ? styleFlavor(shooter, GOAL_FLAVOR_SUFFIX) : null;
+    return flavor ? { ...chosen, desc: `${chosen.desc}, ${flavor}` } : chosen;
   }
 
   function pickMissDesc(shooter) {
@@ -1943,22 +2037,74 @@ var App = (() => {
     return list[Math.floor(Math.random() * list.length)];
   }
 
+  // A real move name (from player-attributes.json's skills list) -> a bank
+  // of specific descriptions for it. Two players who both have "Flip Flap"
+  // will still see varied wording match to match, but the move named is
+  // always the one actually on their sheet — not a random unrelated skill.
+  const SKILL_MOVE_TEXT = {
+    'Chop Turn': [
+      (a, o) => `${a} drags the ball back with a sharp chop turn, spinning away from ${o}`,
+      (a, o) => `${a} chops the ball inside off one touch, leaving ${o} facing the wrong way`
+    ],
+    'Cut Behind & Turn': [
+      (a, o) => `${a} shields the ball, cuts it behind his standing leg and spins ${o} clean out of the contest`,
+      (a, o) => `${a} rolls it behind his heel and turns away from ${o} in one motion`
+    ],
+    'Double Touch': [
+      (a, o) => `${a} sends ${o} the wrong way with a lightning double touch`,
+      (a, o) => `${a} touches it one way then the other — ${o} is left grasping at thin air`
+    ],
+    'Flip Flap': [
+      (a, o) => `${a} pulls out an audacious flip flap and ${o} simply isn't there anymore`,
+      (a, o) => `${a} rocks ${o} with a flip flap and glides past`
+    ],
+    'Marseille Turn': [
+      (a, o) => `${a} spins out of a tight spot with a Marseille turn, leaving ${o} chasing shadows`,
+      (a, o) => `${a} rolls through a full 360 to shake off ${o}`
+    ],
+    'Scissors Feint': [
+      (a, o) => `${a} scissors his feet over the ball and ${o} bites on the fake`,
+      (a, o) => `${a} sends ${o} the wrong way with a scissors feint before accelerating away`
+    ],
+    'Sole Control': [
+      (a, o) => `${a} drags the ball back under his sole, wrong-footing ${o} completely`,
+      (a, o) => `${a} rolls it under his foot and ${o} lunges into empty space`
+    ],
+    'Sombrero': [
+      (a, o) => `${a} flicks it up and over ${o}'s head with an outrageous sombrero`,
+      (a, o) => `${a} lobs the ball over ${o} with a sombrero flick and collects it on the other side`
+    ]
+  };
+  const GENERIC_MOVE_NAMES = ['elastico', 'roulette', 'step-over', 'body feint', 'shoulder drop', 'stop-and-go', 'drag-back'];
+
   function pickSkillDesc(player, opponent) {
-    const moves = [
-      'elastico', 'roulette', 'step-over', 'double touch', 'body feint',
-      'rabona', 'sombrero flick', 'rainbow flick', 'marseille turn',
-      'shoulder drop', 'scissors', 'stop-and-go', 'drag-back'
-    ];
-    const move = moves[Math.floor(Math.random() * moves.length)];
     const opp = opponent ? opponent.name : 'the defender';
-    const ends = [
-      `beats ${opp} with a ${move}`,
-      `uses a ${move} to leave ${opp} on the ground`,
-      `sells ${opp} with a sharp ${move}`,
-      `skins ${opp} using a ${move} and accelerates clear`,
-      `bamboozles ${opp} with a ${move} on the touchline`
-    ];
-    return `<span class="player">${player.name}</span> ${ends[Math.floor(Math.random() * ends.length)]}`;
+    const nameTag = `<span class="player">${player.name}</span>`;
+    // Prefer whatever real skill moves are actually on this player's sheet
+    // (player-attributes.json), so the commentary names the move he
+    // genuinely has rather than a random generic one.
+    const ownMoves = ((player && player.expandedAttrs && player.expandedAttrs.skills) || [])
+      .filter((s) => SKILL_MOVE_TEXT[s]);
+    let base;
+    if (ownMoves.length) {
+      const move = ownMoves[Math.floor(Math.random() * ownMoves.length)];
+      const templates = SKILL_MOVE_TEXT[move];
+      base = templates[Math.floor(Math.random() * templates.length)](nameTag, opp);
+    } else {
+      const move = GENERIC_MOVE_NAMES[Math.floor(Math.random() * GENERIC_MOVE_NAMES.length)];
+      const ends = [
+        `beats ${opp} with a ${move}`,
+        `uses a ${move} to leave ${opp} on the ground`,
+        `sells ${opp} with a sharp ${move}`,
+        `skins ${opp} using a ${move} and accelerates clear`,
+        `bamboozles ${opp} with a ${move} on the touchline`
+      ];
+      base = `${nameTag} ${ends[Math.floor(Math.random() * ends.length)]}`;
+    }
+    // Layer on a playstyle-specific follow-up, so what happens right after
+    // beating the man differs by role, not just the move that beat him.
+    const follow = styleFlavor(player, DRIBBLE_FOLLOWUP);
+    return follow ? `${base}, ${follow}` : base;
   }
 
   function pickPenOutcome(taker, gk) {
@@ -2788,10 +2934,13 @@ var App = (() => {
       if (p && Math.random() < 0.3) {
         const ps = (m.playerMatchStats && m.playerMatchStats[p.id]) || null;
         const pAcc = ps && ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
+        const possFlavor = styleFlavor(p, POSSESSION_FLAVOR);
         addEvent(m.minute, 'pass',
           pAcc != null
             ? `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) — ${pAcc}% passing accuracy so far.`
-            : `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) keeps the move going.`,
+            : possFlavor
+              ? `<span class="player">${p.name}</span> (${attTeam.team.short}) ${possFlavor}.`
+              : `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) keeps the move going.`,
           attackingSide);
       }
     } else if (r < 0.66) {
@@ -2804,7 +2953,10 @@ var App = (() => {
           m.playerMatchStats[def.id].interceptions = (m.playerMatchStats[def.id].interceptions || 0) + 1;
           m.playerMatchStats[def.id].tackles = (m.playerMatchStats[def.id].tackles || 0) + 1;
           if (Math.random() < 0.45) {
-            addEvent(m.minute, 'pass', `Interception by <span class="player">${def.name}</span> (${defTeam.team.short}).`, defendingSide);
+            const interceptFlavor = styleFlavor(def, INTERCEPTION_FLAVOR);
+            addEvent(m.minute, 'pass', interceptFlavor
+              ? `<span class="player">${def.name}</span> (${defTeam.team.short}) ${interceptFlavor}.`
+              : `Interception by <span class="player">${def.name}</span> (${defTeam.team.short}).`, defendingSide);
           }
         } else {
           defTeam.stats.blocks = (defTeam.stats.blocks || 0) + 1;
@@ -2825,7 +2977,10 @@ var App = (() => {
         if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
         m.playerMatchStats[p.id].shots++;
         m.playerMatchStats[p.id].xg += 0.15 + Math.random() * 0.15;
-        addEvent(m.minute, 'miss', `Big chance missed by <span class="player">${p.name}</span>!`, attackingSide);
+        const chanceFlavor = styleFlavor(p, BIG_CHANCE_FLAVOR);
+        addEvent(m.minute, 'miss', chanceFlavor
+          ? `Big chance! <span class="player">${p.name}</span> ${chanceFlavor} but can't take it!`
+          : `Big chance missed by <span class="player">${p.name}</span>!`, attackingSide);
       }
     } else if (r < 0.85) {
       // Skill move / dribble — a genuine dribbler (high `dribb`, or specific
@@ -2833,7 +2988,8 @@ var App = (() => {
       // often than the flat 50/50 everyone used to share.
       const p = pickPlayer(attTeam, ['RW','LW','CAM','ST','RM','LM']);
       if (p && Math.random() < Math.max(0.15, Math.min(0.9, 0.5 + dribbleSuccessEdge(p)))) {
-        addEvent(m.minute, 'skill', `✨ Skill move by <span class="player">${p.name}</span>! Beats the defender`, attackingSide);
+        const marker = pickPlayer(defTeam, ['CB','RB','LB','CDM','CM']);
+        addEvent(m.minute, 'skill', `✨ ${pickSkillDesc(p, marker)}`, attackingSide);
       }
     } else if (r < 0.9) {
       // Handball
@@ -2962,11 +3118,13 @@ var App = (() => {
       } else if (rare < 0.36) {
         addEvent(m.minute, 'whistle', `Stoppage as the referee speaks to both captains after a flare-up`, null);
       } else if (rare < 0.48 && def) {
-        addEvent(m.minute, 'foul', `<span class="player">${def.name}</span> times a sliding tackle to perfection on the edge of the box`, defendingSide);
+        const tackleFlavor = styleFlavor(def, TACKLE_FLAVOR) || 'times a sliding tackle to perfection on the edge of the box';
+        addEvent(m.minute, 'foul', `<span class="player">${def.name}</span> ${tackleFlavor}`, defendingSide);
       } else if (rare < 0.58 && att) {
         addEvent(m.minute, 'skill', pickSkillDesc(att, pickPlayer(defTeam, ['CB','RB','LB','CDM','CM'])), attackingSide);
       } else if (rare < 0.68 && att) {
-        addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> threads a defence-splitting ball into the channel`, attackingSide);
+        const passFlavor = styleFlavor(att, THROUGH_BALL_FLAVOR) || 'threads a defence-splitting ball into the channel';
+        addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> ${passFlavor}`, attackingSide);
       } else if (rare < 0.78) {
         const gk = pickPlayer(defTeam, ['GK']);
         if (gk) addEvent(m.minute, 'save', `<span class="player">${gk.name}</span> rushes off the line to smother a through ball`, defendingSide);
