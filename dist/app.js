@@ -5818,13 +5818,26 @@ var App = (() => {
 
   function generateGroupFixtures() {
     tournament.fixtures = [];
-    tournament.groups.forEach((g, gi) => {
-      const ts = g.teams;
-      for (let i = 0; i < ts.length; i++)
-        for (let j = i + 1; j < ts.length; j++)
-          tournament.fixtures.push({ group: gi, home: ts[i].team.id, away: ts[j].team.id, played: false });
-    });
-    shuffleArray(tournament.fixtures);
+    // Build a proper round-robin schedule per group (circle method) so each
+    // group plays its games across a series of matchdays, then interleave
+    // those matchdays across every group — matchday 1 for every group comes
+    // before any group's matchday 2, etc. — instead of playing one group's
+    // entire schedule before the next group starts.
+    const groupRounds = tournament.groups.map(g => circleMethodRounds(g.teams.map(t => t.team.id)));
+    const maxMatchdays = groupRounds.reduce((m, r) => Math.max(m, r.length), 0);
+    for (let md = 0; md < maxMatchdays; md++) {
+      let matchdayFixtures = [];
+      tournament.groups.forEach((g, gi) => {
+        const pairs = groupRounds[gi][md] || [];
+        pairs.forEach(([home, away]) => {
+          matchdayFixtures.push({ group: gi, matchday: md + 1, home, away, played: false });
+        });
+      });
+      // Shuffle which group's fixture appears first within the matchday
+      // (kickoff order) without breaking the matchday-by-matchday sequence.
+      matchdayFixtures = shuffleArray(matchdayFixtures);
+      tournament.fixtures.push(...matchdayFixtures);
+    }
   }
 
   function renderGroups() {
@@ -6173,6 +6186,7 @@ var App = (() => {
           setChampion(list[0] || winners[0]);
           break;
         }
+        maybeCreateThirdPlacePlayoff(round);
         const nextMatches = [];
         for (let i = 0; i < list.length; i += 2) {
           nextMatches.push({
@@ -6444,39 +6458,105 @@ var App = (() => {
   }
 
 
+  // Pairs qualifiers for the first knockout round so that no match is a
+  // repeat of a group-stage fixture: every group winner is drawn against a
+  // runner-up/third-place team from a DIFFERENT group. Falls back to pairing
+  // leftovers among themselves (still avoiding a shared group where possible)
+  // if the two pools aren't the same size (e.g. only one group).
+  function pairKnockoutAvoidingGroupClashes(qualifiers) {
+    const winners = qualifiers.filter(q => q.rank === 1);
+    const others = qualifiers.filter(q => q.rank !== 1);
+
+    // A single greedy left-to-right pass can dead-end into a same-group
+    // pairing even when a completely clash-free draw exists (classic
+    // greedy-matching pitfall — an early pick can strand a later winner with
+    // only their own group's runner-up left). Reshuffle and retry a number
+    // of times, keeping the best (ideally zero-clash) attempt found.
+    function attempt() {
+      const wPool = shuffleArray(winners);
+      const oPool = shuffleArray(others);
+      const usedOthers = new Array(oPool.length).fill(false);
+      const pairs = [];
+      let clashes = 0;
+
+      wPool.forEach(w => {
+        let idx = oPool.findIndex((o, i) => !usedOthers[i] && o.group !== w.group);
+        if (idx === -1) { idx = oPool.findIndex((o, i) => !usedOthers[i]); if (idx !== -1) clashes++; }
+        if (idx !== -1) {
+          usedOthers[idx] = true;
+          pairs.push([w.team, oPool[idx].team]);
+        }
+      });
+
+      let leftover = oPool.filter((o, i) => !usedOthers[i]);
+      while (leftover.length >= 2) {
+        const a = leftover.shift();
+        let bi = leftover.findIndex(b => b.group !== a.group);
+        if (bi === -1) { bi = 0; clashes++; }
+        const b = leftover.splice(bi, 1)[0];
+        pairs.push([a.team, b.team]);
+      }
+
+      return { pairs, clashes };
+    }
+
+    let best = attempt();
+    for (let i = 0; best.clashes > 0 && i < 200; i++) {
+      const next = attempt();
+      if (next.clashes < best.clashes) best = next;
+      if (best.clashes === 0) break;
+    }
+    return shuffleArray(best.pairs);
+  }
+
   function advanceToKnockout() {
     if (!tournament) return;
     if (tournament.stage === 'knockout' || tournament.stage === 'complete') return;
     if (tournament.knockout && tournament.knockout.length) return;
+    // Each qualifier is tagged with its group index and finishing rank
+    // (1 = winner, 2 = runner-up, 3 = best third) so the draw can keep group
+    // rivals apart in the first knockout round.
     const qualifiers = [];
     const thirdPlaces = [];
-    tournament.groups.forEach(g => {
+    tournament.groups.forEach((g, gi) => {
       const sorted = [...g.teams].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
-      if (sorted[0]) qualifiers.push(sorted[0].team);
-      if (sorted[1]) qualifiers.push(sorted[1].team);
-      if (sorted[2]) thirdPlaces.push(sorted[2]);
+      if (sorted[0]) qualifiers.push({ team: sorted[0].team, group: gi, rank: 1 });
+      if (sorted[1]) qualifiers.push({ team: sorted[1].team, group: gi, rank: 2 });
+      if (sorted[2]) thirdPlaces.push({ row: sorted[2], group: gi });
     });
-    // FIFA-style: if we have 12 groups (24 auto + need 8 thirds → 32)
+    // FIFA-style: if we have 8+ groups, bring in the best third-place teams
+    // to fill the bracket out to a power of two (e.g. 8 groups → 16 direct
+    // qualifiers + 8 best thirds = 32).
     if (tournament.groups.length >= 8 && thirdPlaces.length) {
-      thirdPlaces.sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      thirdPlaces.sort((a, b) => b.row.pts - a.row.pts || (b.row.gf - b.row.ga) - (a.row.gf - a.row.ga) || b.row.gf - a.row.gf);
       const need = 32 - qualifiers.length;
       if (need > 0) {
-        thirdPlaces.slice(0, need).forEach(t => qualifiers.push(t.team));
+        thirdPlaces.slice(0, need).forEach(t => qualifiers.push({ team: t.row.team, group: t.group, rank: 3 }));
       }
     }
-    // Always force power of 2 (2,4,8,16,32)
+    // Always force power of 2 (2,4,8,16,32) — trim the lowest-priority
+    // qualifiers first (best-thirds, then runners-up); group winners are
+    // never cut.
     while (qualifiers.length >= 2 && (qualifiers.length & (qualifiers.length - 1))) {
-      qualifiers.pop();
+      let cutIdx = -1;
+      for (let rank = 3; rank >= 2 && cutIdx === -1; rank--) {
+        for (let i = qualifiers.length - 1; i >= 0; i--) {
+          if (qualifiers[i].rank === rank) { cutIdx = i; break; }
+        }
+      }
+      if (cutIdx === -1) cutIdx = qualifiers.length - 1;
+      qualifiers.splice(cutIdx, 1);
     }
     if (qualifiers.length < 2) { toast('Not enough qualifiers'); return; }
     tournament.stage = 'knockout';
+    const pairs = pairKnockoutAvoidingGroupClashes(qualifiers);
     tournament.knockout = [{ name: getRoundName(qualifiers.length), matches: [] }];
-    for (let i = 0; i < qualifiers.length; i += 2) {
+    pairs.forEach(([home, away]) => {
       tournament.knockout[0].matches.push({
-        home: qualifiers[i], away: qualifiers[i + 1],
+        home, away,
         homeScore: null, awayScore: null, winner: null, played: false
       });
-    }
+    });
     // Group stage is over — clear the "Upcoming Fixtures" list so it doesn't
     // linger once the tournament has moved on to the knockout bracket.
     const fixEl = document.getElementById('fixture-list');
@@ -6522,7 +6602,7 @@ var App = (() => {
       const winners = current.matches.map(m => m.winner).filter(Boolean);
       if (winners.length === 1) { setChampion(winners[0]); renderBracket(); return false; }
       if (winners.length >= 2) {
-        createNextKnockoutRound(winners);
+        createNextKnockoutRound(winners, current);
         renderBracket();
         return true;
       }
@@ -6551,7 +6631,7 @@ var App = (() => {
     if (winners.length === 1) {
       setChampion(winners[0]);
     } else if (winners.length >= 2) {
-      createNextKnockoutRound(winners);
+      createNextKnockoutRound(winners, current);
     }
     renderBracket();
     renderTournamentLeaderboard();
@@ -6559,7 +6639,37 @@ var App = (() => {
   }
 
 
-  function createNextKnockoutRound(winners) {
+  // World Cup only: when the Semi-finals round has just finished, build and
+  // instantly simulate a "3rd Place Play-off" between the two semi-final
+  // losers, and slot it into the bracket before the Final gets created.
+  function maybeCreateThirdPlacePlayoff(finishedRound) {
+    if (!tournament || tournament.type !== 'worldcup') return;
+    if (!finishedRound || finishedRound.name !== 'Semi-finals') return;
+    if (tournament.knockout.some(r => r.name === '3rd Place Play-off')) return;
+    const losers = finishedRound.matches.map(m => {
+      if (!m.winner) return null;
+      return m.winner.id === m.home.id ? m.away : m.home;
+    }).filter(Boolean);
+    if (losers.length < 2) return;
+    const result = simQuickMatch(losers[0], losers[1], { allowET: true, allowPens: true, countForLeaderboard: true });
+    const match = {
+      home: losers[0], away: losers[1],
+      homeScore: result.home, awayScore: result.away,
+      played: true, report: result.report, penalties: false, winner: null
+    };
+    if (result.pens) {
+      match.penalties = true;
+      match.winner = result.pens.home > result.pens.away ? match.home : match.away;
+    } else if (result.home === result.away) {
+      match.penalties = true;
+      match.winner = seededRandom() < 0.5 ? match.home : match.away;
+    } else {
+      match.winner = result.home > result.away ? match.home : match.away;
+    }
+    tournament.knockout.push({ name: '3rd Place Play-off', matches: [match] });
+  }
+
+  function createNextKnockoutRound(winners, finishedRound) {
     let list = (winners || []).filter(Boolean);
     if (list.length % 2 === 1) list = list.slice(0, list.length - 1);
     if (list.length < 2) {
@@ -6569,6 +6679,7 @@ var App = (() => {
     const name = getRoundName(list.length);
     const last = tournament.knockout[tournament.knockout.length - 1];
     if (last && last.name === name && !last.matches.every(m => m.played)) return;
+    if (finishedRound) maybeCreateThirdPlacePlayoff(finishedRound);
     const nextMatches = [];
     for (let i = 0; i < list.length; i += 2) {
       nextMatches.push({
@@ -6592,15 +6703,23 @@ var App = (() => {
       const fm = finalRound.matches[0];
       tournament.runnersUp = (fm.winner && fm.winner.id === fm.home.id) ? fm.away : fm.home;
     }
-    // Third place: prefer SF losers if available
-    const sf = (tournament.knockout || []).find(r => r.name === 'Semi-finals');
-    if (sf && sf.matches && sf.matches.length >= 2) {
-      const losers = sf.matches.map(m => {
-        if (!m.winner) return null;
-        return m.winner.id === m.home.id ? m.away : m.home;
-      }).filter(Boolean);
-      tournament.thirdPlace = losers[0] || null;
-      tournament.fourthPlace = losers[1] || null;
+    // Third place: use the actual 3rd Place Play-off result when it exists
+    // (World Cup mode), otherwise fall back to the semi-final losers.
+    const thirdPlaceRound = (tournament.knockout || []).find(r => r.name === '3rd Place Play-off');
+    if (thirdPlaceRound && thirdPlaceRound.matches && thirdPlaceRound.matches[0] && thirdPlaceRound.matches[0].played) {
+      const tm = thirdPlaceRound.matches[0];
+      tournament.thirdPlace = tm.winner || null;
+      tournament.fourthPlace = tm.winner ? (tm.winner.id === tm.home.id ? tm.away : tm.home) : null;
+    } else {
+      const sf = (tournament.knockout || []).find(r => r.name === 'Semi-finals');
+      if (sf && sf.matches && sf.matches.length >= 2) {
+        const losers = sf.matches.map(m => {
+          if (!m.winner) return null;
+          return m.winner.id === m.home.id ? m.away : m.home;
+        }).filter(Boolean);
+        tournament.thirdPlace = losers[0] || null;
+        tournament.fourthPlace = losers[1] || null;
+      }
     }
     assignTournamentAwards();
     const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
@@ -6986,6 +7105,7 @@ var App = (() => {
     let list = winners.slice();
     if (list.length % 2 === 1) list.pop();
     const nextIsFinal = list.length === 2;
+    maybeCreateThirdPlacePlayoff(current);
     const nextMatches = [];
     for (let i = 0; i < list.length; i += 2) {
       if (tournament.type === 'ucl' && !nextIsFinal) {
