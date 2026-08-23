@@ -32,6 +32,7 @@
         <button class="nav-tab" data-view="awards">Awards</button>
         <button class="nav-tab" data-view="history">History</button>
         <button class="nav-tab" data-view="teams">Teams</button>
+        <button class="nav-tab" data-view="players">Players</button>
       </nav>
       <div class="header-actions">
         <button class="save-btn" id="manual-save-btn" onclick="App.manualSave()" title="Save your progress now" aria-label="Save game">
@@ -351,6 +352,49 @@
         <p style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">Tap a team to open its full profile (manager, squad, colors).</p>
       </div>
     </section>
+
+    <!-- PLAYERS -->
+    <section id="view-players" class="view">
+      <div class="card">
+        <div class="card-title">Player Database</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Browse every player across every team. Tap a player for their full profile, or turn on Compare to line two or three up side by side.</p>
+        <div class="teams-toolbar">
+          <input type="search" id="players-search" placeholder="Search players..." oninput="App.searchPlayers(this.value)" autocomplete="off" aria-label="Search players">
+          <select id="players-sort" onchange="App.sortPlayers(this.value)" aria-label="Sort players">
+            <option value="ovr">Sort: OVR</option>
+            <option value="name">Sort: Name</option>
+            <option value="goals">Sort: Goals</option>
+            <option value="assists">Sort: Assists</option>
+            <option value="apps">Sort: Apps</option>
+          </select>
+          <select id="players-pos" onchange="App.filterPlayersPos(this.value)" aria-label="Filter position">
+            <option value="all">All positions</option>
+            <option value="GK">Goalkeepers</option>
+            <option value="DEF">Defenders</option>
+            <option value="MID">Midfielders</option>
+            <option value="FWD">Forwards</option>
+          </select>
+          <select id="players-type" onchange="App.filterPlayersType(this.value)" aria-label="Filter team type">
+            <option value="all">All teams</option>
+            <option value="national">National</option>
+            <option value="club">Clubs</option>
+          </select>
+          <button type="button" class="btn btn-secondary btn-sm" id="players-compare-toggle" onclick="App.togglePlayersCompareMode()">⚖️ Compare</button>
+        </div>
+        <div id="players-compare-tray" class="compare-tray" style="display:none">
+          <span style="color:var(--text-muted);font-size:0.8rem">Tap players below to add them to comparison (up to 3)</span>
+        </div>
+        <div id="players-compare-actions" class="compare-tray-actions" style="display:none">
+          <button type="button" class="btn btn-primary btn-sm" id="players-compare-go" onclick="App.openPlayersCompare()" disabled>Compare selected</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="App.clearPlayersCompare()">Clear</button>
+        </div>
+        <p id="players-count" style="color:var(--text-muted);font-size:0.78rem;margin:10px 0 8px"></p>
+        <div id="players-list" class="teams-checkbox-grid" style="max-height:none"></div>
+        <div style="text-align:center;margin-top:16px">
+          <button type="button" class="btn btn-secondary btn-sm" id="players-load-more" onclick="App.loadMorePlayers()" style="display:none">Load more players</button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <div class="modal-overlay" id="match-report-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Match report">
@@ -361,6 +405,9 @@
   </div>
   <div class="modal-overlay" id="team-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team profile">
     <div class="modal" id="team-modal-content" style="max-width:520px"></div>
+  </div>
+  <div class="modal-overlay" id="compare-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player comparison">
+    <div class="modal" id="compare-modal-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
   </div>
   <div class="modal-overlay" id="modal" role="dialog" aria-modal="true">
     <div class="modal" id="modal-content"></div>

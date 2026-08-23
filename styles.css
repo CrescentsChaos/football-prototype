@@ -1837,3 +1837,73 @@ select.ss-native {
    MANAGER AWARD
    ======================================================================== */
 .award-tab[data-award="manager"]::before { content: "👔 "; }
+
+/* ========================================================================
+   PLAYERS TAB — search/sort/filter toolbar reuses .teams-toolbar /
+   .teams-checkbox-grid / .team-check from the Teams tab.
+   ======================================================================== */
+.compare-toggle-btn,
+#players-compare-toggle.active {
+  border-color: var(--gold); color: var(--gold); background: rgba(240,193,75,0.1);
+}
+.compare-tray {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; margin-top: 4px;
+}
+.compare-tray-actions { display: flex; gap: 8px; margin-top: 8px; }
+.compare-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-3); border: 1px solid var(--border-strong);
+  border-radius: 20px; padding: 4px 6px 4px 10px;
+  font-size: 0.78rem; font-weight: 600;
+}
+.compare-chip button {
+  background: none; border: none; color: var(--text-2); cursor: pointer;
+  font-size: 0.7rem; width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.compare-chip button:hover { color: var(--red); background: rgba(239,68,68,0.15); }
+.compare-check {
+  width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0;
+  border: 2px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 800; color: var(--bg-0);
+}
+.compare-check.checked { background: var(--gold); border-color: var(--gold); }
+
+/* Comparison modal */
+.compare-grid {
+  display: grid; gap: 8px; margin-top: 8px;
+}
+.compare-col-head { text-align: center; }
+.compare-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.compare-row-label {
+  width: 64px; flex-shrink: 0; color: var(--text-3);
+  font-weight: 600; text-transform: uppercase; font-size: 0.7rem;
+}
+.compare-row-val {
+  flex: 1; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.compare-row-val.best { color: var(--gold); }
+
+/* Match log table inside the player profile modal */
+.match-log-wrap { overflow-x: auto; margin-top: 6px; border-radius: 10px; border: 1px solid var(--border); }
+.match-log-table {
+  width: 100%; border-collapse: collapse; font-size: 0.76rem; min-width: 420px;
+}
+.match-log-table th {
+  background: var(--bg-1); color: var(--text-3); text-transform: uppercase;
+  font-size: 0.62rem; font-weight: 700; padding: 6px 8px; text-align: left;
+  position: sticky; top: 0;
+}
+.match-log-table td {
+  padding: 6px 8px; border-top: 1px solid var(--border);
+  white-space: nowrap; font-weight: 600;
+}
+.match-log-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+.match-log-table .rating-badge { padding: 2px 6px; font-size: 0.7rem; }
