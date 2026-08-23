@@ -18774,7 +18774,9 @@
   ],
   "manager": {
     "name": "Fabio Capello",
-    "ovr": 97
+    "ovr": 97,
+    "playstyle":"Long Ball Counter",
+    "formation":"4-2-2"
   }
 }
 , {
