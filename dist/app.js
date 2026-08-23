@@ -1400,18 +1400,67 @@ var App = (() => {
     return pick;
   }
 
-  function buildSquad(team, formationKey) {
+  // How hard the "recently started" rotation penalty bites, and how
+  // protected a squad's core spine is from it, depending on the
+  // competition. League football sees the heaviest week-to-week rotation
+  // (fixture congestion managed domestically); "group tournament" football
+  // (Champions League league phase, World Cup/standalone tournament groups
+  // and knockouts) sees managers overwhelmingly send out their strongest
+  // XI; a domestic cup (once available) would see the heaviest rotation of
+  // all, giving fringe players and squad depth their minutes first.
+  const ROTATION_PROFILES = {
+    league: { decay: 0.2,  penalty: 3.5, rand: 2.5, coreProtect: 0.55 },
+    ucl:    { decay: 0.35, penalty: 1.0, rand: 1.0, coreProtect: 0.9 },
+    cup:    { decay: 0.15, penalty: 5.5, rand: 3.5, coreProtect: 0.15 }
+  };
+
+  // Infers which rotation profile applies to whatever match is about to be
+  // built, from the global sim context, so most call sites don't need to
+  // know or pass it explicitly. A standalone tournament (World Cup /
+  // Champions League tournament mode) is always "group tournament"
+  // football; inside a Season, only the Champions League competition
+  // counts as one — every domestic league fixture rotates on the heavier
+  // "league" profile.
+  function inferRotationProfile() {
+    if (typeof tournament !== 'undefined' && tournament) return 'ucl';
+    if (typeof currentSeasonComp !== 'undefined' && currentSeasonComp && currentSeasonComp.key === 'ucl') return 'ucl';
+    return 'league';
+  }
+
+  // The tactical "core" of a squad — the first-choice keeper plus the
+  // highest-OVR outfield players, a rough proxy for the spine a manager
+  // builds their team around (first-choice centre-back pairing, defensive
+  // mid, main striker, etc). Core players are much less affected by the
+  // rotation penalty below regardless of competition, and are almost never
+  // rotated out for important "group tournament" fixtures.
+  function computeCoreIds(allPlayers) {
+    const core = new Set();
+    const gks = allPlayers.filter(p => (p.pos || [])[0] === 'GK').sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    if (gks[0]) core.add(gks[0].id);
+    const outfield = allPlayers.filter(p => (p.pos || [])[0] !== 'GK').sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    outfield.slice(0, 6).forEach(p => core.add(p.id));
+    return core;
+  }
+
+  function buildSquad(team, formationKey, rotationProfile) {
     const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
     const allPlayers = team.players || [];
+    const prof = ROTATION_PROFILES[rotationProfile || inferRotationProfile()] || ROTATION_PROFILES.league;
+    const coreIds = computeCoreIds(allPlayers);
 
     // Soft squad rotation: every player carries a small "recently started"
     // counter that decays a bit each match. Selection score below docks
     // players who've started often lately, so the exact same XI doesn't
     // take the pitch match after match — while still keeping OVR as the
     // dominant factor, so rotation favors genuinely close alternatives
-    // rather than randomly benching your best player.
-    allPlayers.forEach(p => { p._recentStarts = Math.max(0, (p._recentStarts || 0) - 0.2); });
-    const score = (p) => (p.ovr || 70) - (p._recentStarts || 0) * 3.5 + (seededRandom() * 2.5 - 1.25);
+    // rather than randomly benching your best player. How hard that bites,
+    // and how protected the squad's core is from it, depends on the
+    // competition (see ROTATION_PROFILES above).
+    allPlayers.forEach(p => { p._recentStarts = Math.max(0, (p._recentStarts || 0) - prof.decay); });
+    const score = (p) => {
+      const protect = coreIds.has(p.id) ? prof.coreProtect : 1;
+      return (p.ovr || 70) - (p._recentStarts || 0) * prof.penalty * protect + (seededRandom() * prof.rand - prof.rand / 2);
+    };
 
     let players = shuffleArray(allPlayers.filter(p => !isPlayerInjured(p.id) && !isPlayerSuspended(p.id)));
     if (players.length < 11) {
@@ -1494,7 +1543,7 @@ var App = (() => {
     for (const p of starting) { if (_seen.has(p.id)) continue; _seen.add(p.id); _st.push(p); }
     const _su = [];
     for (const p of subs) { if (_seen.has(p.id)) continue; _seen.add(p.id); _su.push(p); }
-    return { starting: _st, subs: _su, formation: formationKey, all: [..._st, ..._su] };
+    return { starting: _st, subs: _su, formation: formationKey, all: [..._st, ..._su], rotationProfile: rotationProfile || inferRotationProfile() };
   }
 
   function canPlay(player, slot) {
@@ -1815,7 +1864,19 @@ var App = (() => {
   }
 
   function blankStats() {
-    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0 };
+    return {
+      shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0,
+      // Attack
+      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
+      // Passing
+      progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
+      // Defense
+      tackles: 0, clearances: 0, headedClearances: 0, defensiveErrors: 0, recoveries: 0, pressures: 0, aerialDuels: 0,
+      // Physical
+      distance: 0, sprints: 0, highSpeedRuns: 0, accelerations: 0, decelerations: 0,
+      // Goalkeeping
+      punches: 0, claims: 0, crossesStopped: 0, goalsPrevented: 0, psxg: 0, distribution: 0
+    };
   }
 
   
@@ -2097,6 +2158,40 @@ var App = (() => {
       </div>`;
   }
 
+  // Renders the full Attack / Passing / Defense / Physical / Goalkeeping
+  // stat breakdown as a series of small side-by-side tables, using
+  // whatever the two teams' stats objects carry (deriveExtendedMatchStats
+  // in engine/matchEngine.js fills these in for every match at full time).
+  function renderCategorizedTeamStatsHTML(h, a) {
+    const hs = h.stats || {}, as_ = a.stats || {};
+    const row = (label, key, suffix) =>
+      `<tr><td>${label}</td><td>${hs[key] !== undefined ? hs[key] : 0}${suffix || ''}</td><td>${as_[key] !== undefined ? as_[key] : 0}${suffix || ''}</td></tr>`;
+    const section = (title, rowsHtml) =>
+      `<div class="card-title" style="margin-top:14px">${title}</div><div class="table-scroll"><table class="lb-table" style="margin-bottom:6px"><thead><tr><th></th><th>${h.short}</th><th>${a.short}</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+
+    const attack = row('Shots', 'shots') + row('On Target', 'shotsOn') + row('Big Chances', 'bigChances') + row('Big Chances Missed', 'bigChancesMissed')
+      + row('Touches', 'touches') + row('Touches In Box', 'touchesInBox') + row('Progressive Carries', 'progressiveCarries') + row('Carries', 'carries')
+      + row('Dribbles', 'dribbles') + row('Successful Dribbles', 'successfulDribbles') + row('Offsides', 'offsides');
+
+    const passAcc = (v) => v ? Math.round(100 * (v.passesCompleted || 0) / v.passes) + '%' : '—';
+    const passing = row('Passes', 'passes') + row('Completed', 'passesCompleted')
+      + `<tr><td>Pass Accuracy</td><td>${hs.passes ? passAcc(hs) : '—'}</td><td>${as_.passes ? passAcc(as_) : '—'}</td></tr>`
+      + row('Progressive Passes', 'progressivePasses') + row('Key Passes', 'keyPasses') + row('Through Balls', 'throughBalls')
+      + row('Crosses', 'crosses') + row('Switches', 'switches') + row('Long Balls', 'longBalls') + row('Final-Third Passes', 'finalThirdPasses');
+
+    const defense = row('Tackles', 'tackles') + row('Interceptions', 'interceptions') + row('Blocks', 'blocks') + row('Clearances', 'clearances')
+      + row('Headed Clearances', 'headedClearances') + row('Defensive Errors', 'defensiveErrors') + row('Recoveries', 'recoveries')
+      + row('Pressures', 'pressures') + row('Aerial Duels', 'aerialDuels');
+
+    const physical = row('Distance (km)', 'distance') + row('Sprints', 'sprints') + row('High-Speed Runs', 'highSpeedRuns')
+      + row('Accelerations', 'accelerations') + row('Decelerations', 'decelerations');
+
+    const gk = row('Saves', 'saves') + row('Punches', 'punches') + row('Claims', 'claims') + row('Crosses Stopped', 'crossesStopped')
+      + row('Goals Prevented', 'goalsPrevented') + row('PSxG', 'psxg') + row('Distribution', 'distribution', '%');
+
+    return section('⚔️ Attack', attack) + section('🎯 Passing', passing) + section('🛡️ Defense', defense) + section('🏃 Physical', physical) + section('🧤 Goalkeeping', gk);
+  }
+
   let _reportLegsCtx = null; // { legs: [{label, report}], activeIdx, aggText }
 
   function showMatchReport(report, legsCtx) {
@@ -2162,7 +2257,8 @@ var App = (() => {
         <tr><td>Saves</td><td>${(h.stats&&h.stats.saves)||0}</td><td>${(a.stats&&a.stats.saves)||0}</td></tr>
         <tr><td>Yellow / Red</td><td>${(h.stats&&h.stats.yellows)||0} / ${(h.stats&&h.stats.reds)||0}</td><td>${(a.stats&&a.stats.yellows)||0} / ${(a.stats&&a.stats.reds)||0}</td></tr>
       </tbody></table></div>
-      <div class="card-title">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
+      ${renderCategorizedTeamStatsHTML(h, a)}
+      <div class="card-title" style="margin-top:14px">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
       <div style="max-height:280px;overflow-y:auto">
         <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${teamMark(h, 18)} ${h.name}</div>
         ${homeRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
@@ -2206,7 +2302,157 @@ var App = (() => {
 
 
   function blankPlayerMatchStats(p) {
-    return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
+    return {
+      id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr,
+      goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false,
+      // Attack
+      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
+      // Passing
+      progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
+      // Defense
+      interceptions: 0, blocks: 0, clearances: 0, headedClearances: 0, defensiveErrors: 0, recoveries: 0, pressures: 0, aerialDuels: 0,
+      // Physical
+      distance: 0, sprints: 0, highSpeedRuns: 0, accelerations: 0, decelerations: 0,
+      // Goalkeeping
+      punches: 0, claims: 0, crossesStopped: 0, goalsPrevented: 0, psxg: 0, distribution: 0
+    };
+  }
+
+  // Broad role bucket for extended-stats generation below — GK / DEF / MID / FWD.
+  function posGroupOf(posArr, primaryPos) {
+    const pp = (primaryPos || (posArr || [])[0] || 'CM').toUpperCase();
+    const list = (posArr || []).map(x => (x || '').toUpperCase());
+    if (pp === 'GK' || list.includes('GK')) return 'GK';
+    if (['CB', 'RB', 'LB', 'RWB', 'LWB'].includes(pp) || list.some(x => ['CB','RB','LB','RWB','LWB'].includes(x))) return 'DEF';
+    if (['CM', 'CDM', 'CAM', 'RM', 'LM'].includes(pp) || list.some(x => ['CM','CDM','CAM','RM','LM'].includes(x))) return 'MID';
+    return 'FWD';
+  }
+
+  // Fills in the full extended stat sheet (Attack/Passing/Defense/Physical/
+  // Goalkeeping) for every player involved in the match, then sums each
+  // field into the team totals so the team sheet always agrees exactly with
+  // what's shown per-player underneath it. Runs once at full time (called
+  // from endMatch(), after ratings/goalsConceded are finalised) rather than
+  // tick-by-tick — a handful of the underlying numbers (shots, passes,
+  // passesCompleted, tackles, interceptions, blocks, saves, goals, assists)
+  // are the real minute-by-minute simulation output; everything else here
+  // is a plausible derived breakdown built from those, the player's role,
+  // and minutes played, in the same spirit as the existing rating formula.
+  const EXTENDED_STAT_KEYS = ['bigChances','bigChancesMissed','touches','touchesInBox','progressiveCarries','carries',
+    'dribbles','successfulDribbles','offsides','progressivePasses','keyPasses','throughBalls','crosses',
+    'switches','longBalls','finalThirdPasses','tackles','clearances','headedClearances','defensiveErrors',
+    'recoveries','pressures','aerialDuels','distance','sprints','highSpeedRuns','accelerations','decelerations',
+    'punches','claims','crossesStopped','goalsPrevented','psxg'];
+
+  function deriveExtendedMatchStats(m) {
+    if (!m) return;
+    ['home', 'away'].forEach(side => {
+      const teamSide = m[side];
+      const oppSide = side === 'home' ? m.away : m.home;
+      const squadAll = (teamSide.squad && teamSide.squad.all) || [];
+      squadAll.forEach(p => {
+        const ps = m.playerMatchStats[p.id];
+        if (!ps) return;
+        const minutes = computeMinutesPlayed(m, p.id, p.name, side);
+        const played = minutes > 0 || ps.goals || ps.assists || ps.shots || ps.saves || ps.tackles || ps.passes || ps.interceptions || ps.blocks;
+        if (!played) return;
+        const posArr = (ps.posArr && ps.posArr.length) ? ps.posArr : (p.pos || []);
+        const group = posGroupOf(posArr, ps.pos);
+        const minFrac = Math.max(0.15, Math.min(1, minutes / 90));
+        const shots = ps.shots || 0, passes = ps.passes || 0, passesC = ps.passesCompleted || 0;
+        const goals = ps.goals || 0, assists = ps.assists || 0;
+        const rv = (mean, spread) => Math.max(0, mean + (seededRandom() * 2 - 1) * spread);
+        const rr = (v) => Math.round(v);
+
+        if (group === 'GK') {
+          const touches = rv(16 + minFrac * 12, 5);
+          ps.touches = rr(touches);
+          ps.touchesInBox = ps.touches;
+          ps.carries = rr(touches * 0.35);
+          ps.progressiveCarries = rr(ps.carries * 0.1);
+          ps.dribbles = 0; ps.successfulDribbles = 0; ps.bigChances = 0; ps.bigChancesMissed = 0; ps.offsides = 0;
+          ps.progressivePasses = rr(passesC * 0.22);
+          ps.keyPasses = 0; ps.throughBalls = 0; ps.crosses = 0;
+          ps.switches = rr(passesC * 0.04);
+          ps.longBalls = rr(passesC * (0.3 + seededRandom() * 0.2));
+          ps.finalThirdPasses = rr(passesC * 0.04);
+          ps.clearances = rr(rv(1.5 * minFrac, 1.4));
+          ps.headedClearances = rr(ps.clearances * 0.25);
+          ps.defensiveErrors = seededRandom() < 0.035 * minFrac ? 1 : 0;
+          ps.recoveries = rr(rv(2 * minFrac, 1.4));
+          ps.pressures = rr(rv(1 * minFrac, 1));
+          ps.aerialDuels = rr(rv(0.6 * minFrac, 0.8));
+          ps.distance = +(3.2 + minFrac * 3 + seededRandom()).toFixed(1);
+          ps.sprints = rr(rv(1.5 * minFrac, 1.2));
+          ps.highSpeedRuns = rr(rv(0.8 * minFrac, 0.8));
+          ps.accelerations = rr(rv(2.5 * minFrac, 1.5));
+          ps.decelerations = rr(rv(2.5 * minFrac, 1.5));
+          const shotsFaced = oppSide.stats.shotsOn || 0;
+          ps.punches = rr(rv(shotsFaced * 0.1, 0.6));
+          ps.claims = rr(rv(minFrac * 1.3, 1));
+          ps.crossesStopped = rr(rv(minFrac * 1.1, 1));
+          // Post-shot xG faced ≈ shots-on-target faced × a per-shot quality
+          // factor; Goals Prevented is the usual "keeper overperformance"
+          // read — how many more goals an average keeper would've conceded
+          // facing the same shots.
+          ps.psxg = +(shotsFaced * (0.28 + seededRandom() * 0.12)).toFixed(2);
+          ps.goalsPrevented = +(ps.psxg - (ps.goalsConceded || 0)).toFixed(2);
+          ps.distribution = passes ? rr((passesC / passes) * 100) : 0;
+        } else {
+          const isDef = group === 'DEF', isMid = group === 'MID', isFwd = group === 'FWD';
+          const tackles = ps.tackles || 0, ints = ps.interceptions || 0;
+          const touchBase = (isFwd ? 9 : isMid ? 15 : isDef ? 8 : 8) * minFrac;
+          ps.touches = rr(touchBase + passes * 1.15 + shots * 1.3 + tackles * 0.5 + ints * 0.4 + rv(0, 3));
+          ps.touchesInBox = rr((isFwd ? ps.touches * 0.16 : isMid ? ps.touches * 0.06 : isDef ? ps.touches * 0.025 : 0.03 * ps.touches) + shots * 0.6);
+          ps.carries = rr(ps.touches * (0.5 + seededRandom() * 0.12));
+          ps.progressiveCarries = rr(ps.carries * (isFwd ? 0.22 : isMid ? 0.18 : isDef ? 0.08 : 0.15));
+          const dribbleBase = (isFwd ? 2.0 : isMid ? 1.3 : isDef ? 0.35 : 1) * minFrac + shots * 0.12;
+          ps.dribbles = rr(rv(dribbleBase, 1.1));
+          ps.successfulDribbles = rr(ps.dribbles * (0.5 + seededRandom() * 0.25));
+          ps.offsides = (isFwd && seededRandom() < 0.16 * minFrac) ? (seededRandom() < 0.2 ? 2 : 1) : 0;
+
+          ps.progressivePasses = rr(passesC * (isMid ? 0.22 : isDef ? 0.15 : isFwd ? 0.12 : 0.1));
+          ps.keyPasses = rr(passesC * (isMid ? 0.055 : isFwd ? 0.045 : 0.018) + assists * 0.7);
+          ps.throughBalls = rr(ps.keyPasses * (0.12 + seededRandom() * 0.15));
+          const wide = WIDE_SLOTS.has((ps.slot || ps.pos || '').toUpperCase());
+          ps.crosses = rr(passes * (wide ? 0.14 : isFwd ? 0.04 : 0.015) + rv(0, 1));
+          ps.switches = rr(passesC * 0.018);
+          ps.longBalls = rr(passesC * (isDef ? 0.18 : isMid ? 0.08 : 0.04));
+          ps.finalThirdPasses = rr(passesC * (isFwd ? 0.35 : isMid ? 0.3 : isDef ? 0.12 : 0.2));
+
+          ps.clearances = rr(rv((isDef ? 3.2 : isMid ? 0.6 : 0.15) * minFrac, isDef ? 2 : 0.6));
+          ps.headedClearances = rr(ps.clearances * (0.3 + seededRandom() * 0.25));
+          ps.defensiveErrors = seededRandom() < (isDef ? 0.05 : 0.02) * minFrac ? 1 : 0;
+          ps.recoveries = rr(rv((isDef ? 5 : isMid ? 5.5 : 2.5) * minFrac, 2));
+          ps.pressures = rr(rv((isFwd ? 4 : isMid ? 5 : 3) * minFrac, 2));
+          ps.aerialDuels = rr(rv((isDef ? 3.5 : isFwd ? 2.2 : 1.2) * minFrac, 1.5));
+
+          ps.distance = +((isMid ? 8.8 : isDef ? 7.6 : isFwd ? 8.2 : 5) * minFrac + seededRandom() * 1.2).toFixed(1);
+          ps.sprints = rr(rv((isFwd ? 14 : isMid ? 11 : 9) * minFrac, 4));
+          ps.highSpeedRuns = rr(ps.sprints * (0.45 + seededRandom() * 0.2));
+          ps.accelerations = rr(rv((isFwd ? 10 : 8) * minFrac, 3));
+          ps.decelerations = rr(rv((isFwd ? 10 : 8) * minFrac, 3));
+
+          ps.bigChances = rr(ps.keyPasses * 0.35 + assists * 0.6 + (isFwd ? shots * 0.12 : 0));
+          const chanceShots = Math.min(shots, rr(shots * 0.4 + (isFwd ? 0.3 : 0)));
+          ps.bigChancesMissed = Math.max(0, chanceShots - goals);
+          ps.punches = 0; ps.claims = 0; ps.crossesStopped = 0; ps.psxg = 0; ps.goalsPrevented = 0; ps.distribution = 0;
+        }
+      });
+
+      EXTENDED_STAT_KEYS.forEach(k => { teamSide.stats[k] = 0; });
+      squadAll.forEach(p => {
+        const ps = m.playerMatchStats[p.id];
+        if (!ps) return;
+        EXTENDED_STAT_KEYS.forEach(k => { if (typeof ps[k] === 'number') teamSide.stats[k] += ps[k]; });
+      });
+      teamSide.stats.distance = +teamSide.stats.distance.toFixed(1);
+      teamSide.stats.psxg = +teamSide.stats.psxg.toFixed(2);
+      teamSide.stats.goalsPrevented = +teamSide.stats.goalsPrevented.toFixed(2);
+      // Team-wide distribution accuracy is the side's overall pass accuracy,
+      // not a sum of individual keeper numbers.
+      teamSide.stats.distribution = teamSide.stats.passes ? Math.round((teamSide.stats.passesCompleted / teamSide.stats.passes) * 100) : 0;
+    });
   }
 
   function pickGoalMethod(shooter) {
@@ -4341,6 +4587,10 @@ var App = (() => {
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
       if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
     });
+    // Fill in the full Attack/Passing/Defense/Physical/Goalkeeping stat sheet
+    // for every player who took part, then roll those up into each side's
+    // team totals — see deriveExtendedMatchStats() below.
+    deriveExtendedMatchStats(m);
     let best = null, bestR = -1;
     Object.values(m.playerMatchStats).forEach(ps => {
       if (ps.rating > bestR) { bestR = ps.rating; best = ps; }
@@ -8350,11 +8600,57 @@ var App = (() => {
     renderSeasonDashboard();
   }
 
+
+  // Repeating 5-slot fixture-congestion pattern: Sat league, Tue continental,
+  // Sat league, Tue domestic cup, Sun league — the busy week-to-week rhythm
+  // real top-flight calendars follow. The season's Matchday counter is used
+  // as the cycle position so the strip advances automatically as matchdays
+  // are played. Domestic cup isn't an implemented competition yet, so that
+  // slot is shown greyed-out rather than pretending a cup fixture exists.
+  const FIXTURE_CONGESTION_CYCLE = [
+    { day: 'Sat', comp: 'League' },
+    { day: 'Tue', comp: 'UCL' },
+    { day: 'Sat', comp: 'League' },
+    { day: 'Tue', comp: 'Cup' },
+    { day: 'Sun', comp: 'League' }
+  ];
+
+  function fixtureCongestionSlot(offset) {
+    const cyc = FIXTURE_CONGESTION_CYCLE;
+    const base = (season && typeof season.week === 'number') ? season.week : 0;
+    const idx = ((base + offset) % cyc.length + cyc.length) % cyc.length;
+    return cyc[idx];
+  }
+
+  function renderFixtureCongestionHTML() {
+    if (!season) return '';
+    const uclDone = season.ucl && season.ucl.finished;
+    const items = [0, 1, 2, 3, 4].map(i => {
+      const slot = fixtureCongestionSlot(i);
+      const isCup = slot.comp === 'Cup';
+      const isUcl = slot.comp === 'UCL';
+      const disabled = isCup || (isUcl && uclDone);
+      const label = isCup ? 'Cup' : slot.comp;
+      const sub = isCup ? 'not available' : (isUcl && uclDone) ? 'finished' : '';
+      const cls = 'congestion-slot' + (i === 0 ? ' congestion-now' : '') + (disabled ? ' congestion-disabled' : '');
+      const title = isCup ? 'Domestic cup competition is not available yet' : (slot.day + ' — ' + slot.comp);
+      return `<div class="${cls}" title="${title}">
+        <div class="congestion-day">${slot.day}</div>
+        <div class="congestion-comp">${label}</div>
+        ${sub ? `<div style="font-size:0.62rem;color:var(--text-muted)">${sub}</div>` : ''}
+      </div>`;
+    });
+    const strip = items.join('<div class="congestion-arrow">→</div>');
+    return `<div style="font-size:0.7rem;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;margin-top:14px">📅 Fixture Congestion</div>
+      <div class="congestion-strip">${strip}</div>`;
+  }
   function renderSeasonDashboard() {
     if (!season) return;
     seasonReportRegistry = []; // rebuilt fresh each render so onclick indices stay valid
     const title = document.getElementById('season-status-title');
     if (title) title.textContent = 'Year ' + season.year + ' · Matchday ' + season.week;
+    const congestionEl = document.getElementById('season-congestion');
+    if (congestionEl) congestionEl.innerHTML = renderFixtureCongestionHTML();
     const tabsEl = document.getElementById('season-comp-tabs');
     if (tabsEl) {
       const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }, { key: 'trophies', name: '🏆 Trophy Room' }];
