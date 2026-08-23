@@ -1012,6 +1012,20 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .attr-bar-row .attr-track { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
 .attr-bar-row .attr-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); border-radius: 3px; }
 .attr-bar-row .attr-val { width: 24px; text-align: right; font-weight: 700; }
+/* Expanded (per-attribute) sheet shown in the player profile for players
+   whose stats come from player-attributes.json — wider label column since
+   these names ("Off. Awareness", "Lofted Pass", ...) run longer than the
+   5-stat abbreviations (ATT/DEF/...) above. */
+.expanded-attr-group { margin-bottom: 10px; }
+.expanded-attr-group-title {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-3); margin: 10px 0 6px;
+}
+.expanded-attr-group:first-child .expanded-attr-group-title { margin-top: 0; }
+.attr-bar-row.expanded .attr-name { width: 108px; color: var(--text-2); font-weight: 500; }
+.attr-bar-row.expanded.mgr-boosted .attr-name { color: var(--gold); font-weight: 700; }
+.attr-bar-row.expanded.mgr-boosted .attr-fill { background: linear-gradient(90deg, var(--gold), #fff3c4); }
+.attr-bar-row.expanded.mgr-boosted .attr-val { color: var(--gold); }
 
 /* Fixture items */
 .fixture-item {

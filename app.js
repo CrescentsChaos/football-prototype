@@ -330,6 +330,128 @@ var App = (() => {
     'Defensive Goalkeeper':  { def: 3,  phy: 1 }
   };
 
+  // Which raw expanded-attribute ratings define each individual playstyle's
+  // "signature" traits. Used two ways:
+  //  1) Overall calc: a player whose signature attributes for their own
+  //     playstyle(s) run hotter than their attribute sheet on average gets
+  //     a much bigger push toward their overall than a generic 5-stat blend
+  //     would give them — see styleSignatureBonus() below.
+  //  2) Manager attribute boost: when a player's playstyle fits their
+  //     manager's tactic, the manager boost is applied directly to these
+  //     specific raw ratings (not just a flat overall number) — see
+  //     applyManagerAttributeBoost() below.
+  const PLAYSTYLE_KEY_ATTRS = {
+    'Goal Poacher':          ['off_awr', 'ball_con', 'tight_pos', 'fin', 'spd', 'accel', 'bal'],
+    'Fox in the Box':        ['off_awr', 'tight_pos', 'fin', 'ball_con', 'head', 'bal', 'accel'],
+    'Target Man':            ['off_awr', 'tight_pos', 'fin', 'head', 'phy_con', 'bal', 'ball_con'],
+    'Deep-Lying Forward':    ['off_awr', 'ball_con', 'tight_pos', 'low_pass', 'fin', 'place_kick', 'phy_con'],
+    'Dummy Runner':          ['off_awr', 'spd', 'accel', 'stam', 'bal', 'tight_pos'],
+    'Creative Playmaker':    ['ball_con', 'dribb', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl'],
+    'Hole Player':           ['off_awr', 'tight_pos', 'fin', 'spd', 'accel', 'stam', 'bal'],
+    'Classic No. 10':        ['ball_con', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl', 'fin'],
+    'Prolific Winger':       ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'spd', 'accel', 'curl'],
+    'Cross Specialist':      ['off_awr', 'ball_con', 'low_pass', 'lofted_pass', 'curl', 'spd', 'stam'],
+    'Roaming Flank':         ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'low_pass', 'spd', 'stam'],
+    'Inside Forward':        ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'fin', 'spd', 'accel'],
+    'Box-to-Box':            ['off_awr', 'def_awr', 'def_eng', 'stam', 'spd', 'accel', 'bal', 'phy_con'],
+    'Destroyer':             ['def_awr', 'def_eng', 'tack', 'aggr', 'phy_con', 'spd', 'stam'],
+    'Anchor Man':            ['def_awr', 'def_eng', 'tack', 'aggr', 'phy_con', 'ball_con', 'low_pass'],
+    'Orchestrator':          ['ball_con', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl', 'stam'],
+    'Build Up':              ['def_awr', 'ball_con', 'low_pass', 'lofted_pass', 'tight_pos', 'phy_con'],
+    'Extra Frontman':        ['def_awr', 'off_awr', 'def_eng', 'tack', 'aggr', 'fin', 'stam'],
+    'Offensive Full-back':   ['off_awr', 'spd', 'accel', 'stam', 'low_pass', 'lofted_pass'],
+    'Full-back Finisher':    ['off_awr', 'fin', 'spd', 'accel', 'dribb', 'ball_con', 'stam'],
+    'Offensive Goalkeeper':  ['gk_awr', 'gk_reflex', 'gk_reach', 'gk_parry', 'spd', 'accel', 'ball_con'],
+    'Defensive Goalkeeper':  ['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach', 'jmp', 'phy_con']
+  };
+  // Every raw numeric rating that can appear on an expanded attribute
+  // sheet, in display order, grouped for the player-profile UI. GK ratings
+  // only render for goalkeepers; outfield ratings only render for outfield
+  // players (see expandedAttrRowsHTML below).
+  const EXPANDED_ATTR_GROUPS = [
+    { label: 'Offense', keys: [
+      ['off_awr', 'Off. Awareness'], ['fin', 'Finishing'], ['head', 'Heading'],
+      ['place_kick', 'Place Kicking'], ['kick_pwr', 'Kicking Power']
+    ] },
+    { label: 'Ball Skills', keys: [
+      ['ball_con', 'Ball Control'], ['dribb', 'Dribbling'], ['tight_pos', 'Tight Poss.'],
+      ['low_pass', 'Low Pass'], ['lofted_pass', 'Lofted Pass'], ['curl', 'Curl']
+    ] },
+    { label: 'Physical', keys: [
+      ['spd', 'Speed'], ['accel', 'Acceleration'], ['stam', 'Stamina'],
+      ['phy_con', 'Physical Contact'], ['bal', 'Balance'], ['jmp', 'Jump']
+    ] },
+    { label: 'Defense', keys: [
+      ['def_awr', 'Def. Awareness'], ['def_eng', 'Def. Engagement'], ['tack', 'Tackling'], ['aggr', 'Aggression']
+    ] },
+    { label: 'Goalkeeping', keys: [
+      ['gk_awr', 'GK Awareness'], ['gk_catch', 'GK Catch'], ['gk_parry', 'GK Parry'],
+      ['gk_reflex', 'GK Reflexes'], ['gk_reach', 'GK Reach']
+    ] }
+  ];
+  // Average of every numeric raw rating a player's sheet actually has
+  // (GK ratings only count for keepers, so a keeper's sheet isn't dragged
+  // down by outfield-only zeros and vice versa) — the baseline that a
+  // playstyle's signature attributes are compared against.
+  function attrSheetAverage(attr, isGK) {
+    const outfieldKeys = ['off_awr','ball_con','tight_pos','fin','spd','accel','bal','head','phy_con',
+      'low_pass','place_kick','stam','dribb','lofted_pass','curl','def_awr','def_eng','tack','aggr','jmp','kick_pwr'];
+    const gkKeys = ['gk_awr','gk_catch','gk_parry','gk_reflex','gk_reach','spd','accel','bal','phy_con','stam','jmp'];
+    const keys = isGK ? gkKeys : outfieldKeys;
+    const nums = keys.map(k => attr[k]).filter(v => typeof v === 'number');
+    return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 65;
+  }
+  // The core "signature attributes push overall up" rule: for each
+  // playstyle tag a player has, compare the average of that style's key
+  // attributes against the player's own sheet average. Only positive gaps
+  // count (a style whose key attributes are actually average or below
+  // gives no bonus) and each style's contribution is amplified well beyond
+  // the flat +1..+3 PLAYSTYLE_STAT_MODS nudge, so a player built around
+  // their style's signature attributes reads as meaningfully better than
+  // a same-position player with a flatter, generic spread — even at the
+  // same rough attribute total. Multiple matching styles stack, capped so
+  // it stays a strong-but-bounded identity bonus rather than unbounded.
+  function styleSignatureBonus(attr, styles, isGK) {
+    if (!styles || !styles.length) return 0;
+    const sheetAvg = attrSheetAverage(attr, isGK);
+    let bonus = 0;
+    styles.forEach((style) => {
+      const keys = PLAYSTYLE_KEY_ATTRS[style];
+      if (!keys || !keys.length) return;
+      const vals = keys.map(k => attr[k]).filter(v => typeof v === 'number');
+      if (!vals.length) return;
+      const keyAvg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const gap = keyAvg - sheetAvg;
+      if (gap > 0) bonus += gap * 0.55;
+    });
+    return Math.max(0, Math.min(14, Math.round(bonus)));
+  }
+  // Manager boost to *inner* attributes, not just the final overall number.
+  // When a player's individual playstyle fits the way their manager sets
+  // the team up (see PLAYSTYLE_AFFINITY), the manager's coaching visibly
+  // sharpens that style's specific signature ratings on the player's own
+  // attribute sheet — returns a shallow-cloned, boosted copy of attr so the
+  // original playerAttributesData source is never mutated.
+  function applyManagerAttributeBoost(attr, styles, teamStyle) {
+    if (!styles || !styles.length || !teamStyle) return attr;
+    const boosted = { ...attr };
+    let touched = false;
+    styles.forEach((style) => {
+      const suited = PLAYSTYLE_AFFINITY[style];
+      if (!suited || !suited.includes(teamStyle)) return;
+      const keys = PLAYSTYLE_KEY_ATTRS[style];
+      if (!keys) return;
+      keys.forEach((k) => {
+        if (typeof boosted[k] === 'number') {
+          boosted[k] = Math.max(1, Math.min(99, Math.round(boosted[k] + 2)));
+          touched = true;
+        }
+      });
+    });
+    boosted.managerBoosted = touched;
+    return boosted;
+  }
+
   // True if a player's expanded sheet carries the given individual
   // playstyle tag. Used throughout the match-engine "edge" functions below
   // so specific styles diversify in-match behaviour, not just derived stats.
@@ -497,18 +619,29 @@ var App = (() => {
     if (!playerAttributesData || !Object.keys(playerAttributesData).length) return;
     allTeams.forEach((team) => {
       (team.players || []).forEach((p) => {
-        const attr = playerAttributesData[p.id];
-        if (!attr) return;
-        const posArr = (attr.pos && attr.pos.length) ? attr.pos : (p.pos || ['CM']);
+        const rawAttr = playerAttributesData[p.id];
+        if (!rawAttr) return;
+        const posArr = (rawAttr.pos && rawAttr.pos.length) ? rawAttr.pos : (p.pos || ['CM']);
+        const isGK = posArr[0] === 'GK';
+        const teamStyle = getManagerPlaystyle(team);
+        // Manager coaching sharpens the specific raw ratings behind a
+        // player's playstyle when it suits the team's tactic — this feeds
+        // into everything downstream (derived stats, overall, and the
+        // expanded sheet the profile UI displays), not just a flat OVR add.
+        const attr = applyManagerAttributeBoost(rawAttr, rawAttr.playstyle, teamStyle);
         const derived = deriveStatsFromAttributes(attr, posArr);
         p.att = derived.att; p.def = derived.def; p.pac = derived.pac;
         p.phy = derived.phy; p.tec = derived.tec;
         // The expanded sheet's position list is more detailed (multiple
         // valid roles) — prefer it over teams.json's when present.
         if (attr.pos && attr.pos.length) p.pos = attr.pos.slice();
-        const teamStyle = getManagerPlaystyle(team);
         const affinity = managerAffinityBonus(attr.playstyle, teamStyle);
-        const base = weightedOverall(derived, posArr);
+        // A player whose signature attributes for their own playstyle(s)
+        // run well above their sheet average gets a much bigger push
+        // toward their overall here than the generic 5-stat blend alone
+        // would give them.
+        const signatureBonus = styleSignatureBonus(attr, attr.playstyle, isGK);
+        const base = weightedOverall(derived, posArr) + signatureBonus;
         const boostedBase = Math.max(40, Math.min(99, base + affinity));
         p.baseOvr = boostedBase;
         p.ovr = Math.max(40, Math.min(99, Math.round(boostedBase + (p.form || 0))));
@@ -516,6 +649,8 @@ var App = (() => {
         p.attrBoosted = true;
         p.affinityBonus = affinity;
         p.affinityStyle = teamStyle;
+        p.signatureBonus = signatureBonus;
+        p.managerAttrBoosted = !!attr.managerBoosted;
       });
     });
   }
@@ -6593,6 +6728,39 @@ var App = (() => {
       </div>`;
   }
 
+  // Renders the full expanded attribute sheet (grouped, individual raw
+  // ratings) for a player whose stats come from player-attributes.json —
+  // shown instead of the generic merged ATT/DEF/PHY/PAC/TEC bars, since a
+  // player with a detailed sheet should have their actual detailed sheet
+  // visible, not just the 5-stat blend it was compressed into. A rating
+  // that was lifted by the manager's tactic affinity is marked so it's
+  // clear the boost reached the individual attribute, not just the OVR.
+  function expandedAttrRowsHTML(player) {
+    const attr = player.expandedAttrs || {};
+    const boostedKeys = new Set();
+    if (player.managerAttrBoosted && player.affinityStyle) {
+      (attr.playstyle || []).forEach((style) => {
+        const suited = PLAYSTYLE_AFFINITY[style];
+        if (suited && suited.includes(player.affinityStyle)) {
+          (PLAYSTYLE_KEY_ATTRS[style] || []).forEach(k => boostedKeys.add(k));
+        }
+      });
+    }
+    return EXPANDED_ATTR_GROUPS.map((group) => {
+      const rows = group.keys.filter(([k]) => typeof attr[k] === 'number');
+      if (!rows.length) return '';
+      return `<div class="expanded-attr-group">
+        <div class="expanded-attr-group-title">${group.label}</div>
+        ${rows.map(([k, label]) => `
+          <div class="attr-bar-row expanded${boostedKeys.has(k) ? ' mgr-boosted' : ''}">
+            <span class="attr-name">${label}</span>
+            <div class="attr-track"><div class="attr-fill" style="width:${attr[k]}%"></div></div>
+            <span class="attr-val">${attr[k]}</span>
+          </div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+
   function showPlayerProfile(playerId) {
     let player = null, team = null;
     for (const t of allTeams) {
@@ -6649,6 +6817,12 @@ var App = (() => {
     const affinityNote = (boosted && player.affinityBonus > 0)
       ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.affinityBonus} OVR — fits ${team ? team.name + "'s" : "the"} ${player.affinityStyle} setup</div>`
       : '';
+    const signatureNote = (boosted && player.signatureBonus > 0)
+      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.signatureBonus} OVR — signature attributes for their playstyle run well above the rest of their sheet</div>`
+      : '';
+    const managerAttrNote = (boosted && player.managerAttrBoosted)
+      ? `<div style="color:var(--gold);font-size:0.75rem;margin-top:2px">⬆ Manager coaching is sharpening this player's playstyle attributes (marked below)</div>`
+      : '';
     const playstyleTagsHTML = (boosted && player.expandedAttrs && (player.expandedAttrs.playstyle || []).length)
       ? `<div style="margin-top:6px">${player.expandedAttrs.playstyle.map(s => {
           const suited = (PLAYSTYLE_AFFINITY[s] || []).includes(player.affinityStyle);
@@ -6664,6 +6838,8 @@ var App = (() => {
           <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${affinityNote}
+          ${signatureNote}
+          ${managerAttrNote}
           ${playstyleTagsHTML}
         </div>
       </div>
@@ -6679,10 +6855,12 @@ var App = (() => {
         <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
       </div>
       <div style="margin-top:8px">
-        ${[['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
-          <div class="attr-bar-row"><span class="attr-name">${n}</span>
-            <div class="attr-track"><div class="attr-fill" style="width:${v||50}%"></div></div>
-            <span class="attr-val">${v||'-'}</span></div>`).join('')}
+        ${boosted && player.expandedAttrs
+          ? expandedAttrRowsHTML(player)
+          : [['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
+              <div class="attr-bar-row"><span class="attr-name">${n}</span>
+                <div class="attr-track"><div class="attr-fill" style="width:${v||50}%"></div></div>
+                <span class="attr-val">${v||'-'}</span></div>`).join('')}
       </div>
       ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
