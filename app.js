@@ -291,7 +291,7 @@ var App = (() => {
     'Destroyer':             ['Long Ball Counter', 'Quick Counter'],
     'Anchor Man':            ['Possession', 'Long Ball Counter'],
     'Orchestrator':          ['Possession'],
-    'Build Up':              ['Possession'],
+    'Build Up':              ['Possession','Long Ball Counter'],
     'Extra Frontman':        ['Overload', 'Long Ball'],
     'Offensive Full-back':   ['Overload', 'Out Wide'],
     'Defensive Full-back': ['Overload','Long Ball Counter'],
@@ -2760,82 +2760,627 @@ var App = (() => {
     return { homeCompletedMin, awayCompletedMin };
   }
 
+  // ===================================================================
+  // ===================== REAL MATCH ENGINE ==========================
+  // ===================================================================
+  // Replaces the old flat "roll one dice, land on an outcome bucket" event
+  // generator with an explicit phase pipeline that mirrors how a real
+  // possession actually develops:
+  //   Possession -> Zones -> Movement -> Passing -> Duels -> Transitions
+  //   -> Chance Creation -> Shots -> GK  (with Tactics/manager playstyle
+  //   modifying probabilities at every stage).
+  // Every stage reads real player attributes — the expanded per-player
+  // sheet when available, otherwise the derived 5-stat blend — so a
+  // sequence's outcome is genuinely shaped by who's on the ball and who's
+  // defending, not a flat percentage roll.
+
+  // ---- Pitch model: 3 thirds x 3 channels, from the POV of the team in
+  // possession (their own defensive third -> midfield -> attacking third).
+  const PITCH_THIRDS = ['DEF', 'MID', 'ATT'];
+  const PITCH_CHANNELS = ['L', 'C', 'R'];
+  // Which positions naturally occupy each zone when their team has the
+  // ball — used to pick a realistic ball-carrier/target for each stage of
+  // a possession sequence instead of a flat "any outfield player" pool.
+  const ZONE_POS_MAP = {
+    DEF_L: ['LB', 'LWB', 'CB'],       DEF_C: ['CB', 'GK', 'CDM'],       DEF_R: ['RB', 'RWB', 'CB'],
+    MID_L: ['LM', 'LW', 'LWB', 'CM'], MID_C: ['CM', 'CDM', 'CAM'],      MID_R: ['RM', 'RW', 'RWB', 'CM'],
+    ATT_L: ['LW', 'LM', 'LWB'],       ATT_C: ['ST', 'CF', 'CAM', 'SS'], ATT_R: ['RW', 'RM', 'RWB']
+  };
+  // The defending team's own zone (mirrored third, same channel) is who's
+  // actually responsible for marking a given attacking zone.
+  function mirrorDefenderPos(zoneKey) {
+    const [third, ch] = zoneKey.split('_');
+    const defThird = third === 'ATT' ? 'DEF' : third === 'DEF' ? 'ATT' : 'MID';
+    return ZONE_POS_MAP[defThird + '_' + ch] || ZONE_POS_MAP.MID_C;
+  }
+
+  // ---- Attribute-driven ability reads (expanded sheet first, generic
+  // derived stat as fallback) that feed every stage of the pipeline below.
+  function passingAbility(p) {
+    if (p && p.expandedAttrs) {
+      const vals = [p.expandedAttrs.low_pass, p.expandedAttrs.lofted_pass, p.expandedAttrs.ball_con, p.expandedAttrs.tight_pos].filter(v => typeof v === 'number');
+      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+    return (p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35;
+  }
+  function defensivePressure(p) {
+    if (p && p.expandedAttrs) {
+      const vals = [p.expandedAttrs.def_awr, p.expandedAttrs.def_eng, p.expandedAttrs.tack, p.expandedAttrs.aggr].filter(v => typeof v === 'number');
+      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+    return (p.def || 70) * 0.7 + (p.ovr || 75) * 0.3;
+  }
+  function carryingAbility(p) {
+    if (p && p.expandedAttrs) {
+      const vals = [p.expandedAttrs.dribb, p.expandedAttrs.ball_con, p.expandedAttrs.bal, p.expandedAttrs.spd].filter(v => typeof v === 'number');
+      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+    return (p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2;
+  }
+
+  // ---- Shot-type profile: how a chance was created shapes its baseline
+  // quality (a through-ball 1-on-1 is a better chance than a hopeful
+  // long-range effort; a header off a cross has a lower ceiling but a
+  // distinct conversion curve of its own).
+  const CHANCE_TYPE_PROFILE = {
+    openplay:    { baseOnTarget: 0.40, baseXg: 0.09, headerWeight: 0 },
+    throughball: { baseOnTarget: 0.50, baseXg: 0.17, headerWeight: 0 },
+    cross:       { baseOnTarget: 0.44, baseXg: 0.13, headerWeight: 0.72 },
+    dribble:     { baseOnTarget: 0.47, baseXg: 0.15, headerWeight: 0 },
+    longshot:    { baseOnTarget: 0.30, baseXg: 0.05, headerWeight: 0 },
+    counter:     { baseOnTarget: 0.49, baseXg: 0.18, headerWeight: 0 }
+  };
+
+  // ===== GK phase (called once a shot is confirmed on target) =====
+  // then folds straight back to Shots for a rebound, small % of the time.
+  function resolveShot(attackingSide, defendingSide, shooter, chanceType, opts) {
+    opts = opts || {};
+    const m = currentMatch;
+    if (!m || !shooter) return;
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    const profile = CHANCE_TYPE_PROFILE[chanceType] || CHANCE_TYPE_PROFILE.openplay;
+    const isHeader = profile.headerWeight > 0 && Math.random() < profile.headerWeight;
+
+    // ---- Shots phase: shot quality drawn straight from the shooter's own
+    // finishing-relevant attributes and playstyle edges.
+    let shotQuality = isHeader
+      ? aerialSkill(shooter)
+      : Math.max(0.05, Math.min(0.98,
+          ((shooter.att || 70) * 0.42 + (shooter.tec || 70) * 0.33 + (shooter.ovr || 75) * 0.15 + (shooter.pac || 70) * 0.10) / 100
+          + finishingEdge(shooter)
+          + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)));
+    shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
+
+    // A defender in the shot's path can block it before it's even on target.
+    const blocker = pickPlayer(defTeam, ['CB', 'CDM', 'RB', 'LB']);
+    const blockSkill = blocker ? defensivePressure(blocker) / 100 : 0.6;
+    const blockChance = Math.max(0.04, Math.min(0.28, 0.15 + blockSkill * 0.10 - shotQuality * 0.10));
+    if (Math.random() < blockChance) {
+      defTeam.stats.blocks = (defTeam.stats.blocks || 0) + 1;
+      if (blocker) {
+        if (!m.playerMatchStats[blocker.id]) m.playerMatchStats[blocker.id] = blankPlayerMatchStats(blocker);
+        m.playerMatchStats[blocker.id].blocks = (m.playerMatchStats[blocker.id].blocks || 0) + 1;
+      }
+      m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.4;
+      if (blocker && Math.random() < 0.4) {
+        addEvent(m.minute, 'shot', `Attempt blocked. Blocked by <span class="player">${blocker.name}</span> (${defTeam.team.short}).`, defendingSide);
+      } else {
+        addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
+      }
+      if (Math.random() < 0.4) resolveCorner(attackingSide);
+      return;
+    }
+
+    const defAvg = calcTeamStrength(defTeam).def / 100;
+    const onTargetChance = Math.min(0.72, Math.max(0.08, profile.baseOnTarget + shotQuality * 0.42 - defAvg * 0.22 + (opts.onTargetBonus || 0)));
+    if (Math.random() >= onTargetChance) {
+      m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + Math.random() * 0.05;
+      addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
+      if (chanceType === 'throughball' && Math.random() < 0.12) {
+        addEvent(m.minute, 'offside', `Offside against <span class="player">${shooter.name}</span>`, attackingSide);
+      }
+      return;
+    }
+
+    attTeam.stats.shotsOn++;
+    // ===== GK phase =====
+    const gk = pickPlayer(defTeam, ['GK']);
+    const gkSkill = Math.max(0.05, Math.min(0.98, (gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(gk)));
+    const saveChance = Math.min(0.92, Math.max(0.28, 0.42 + gkSkill * 0.42 - shotQuality * 0.28 - (isHeader ? 0.03 : 0)));
+    if (Math.random() < saveChance) {
+      if (gk) {
+        defTeam.stats.saves++;
+        recordStat('saves', gk, defTeam.team);
+        addEvent(m.minute, 'save', `Great save by <span class="player">${gk.name}</span>!`, attackingSide);
+        if (Math.random() < 0.08) {
+          const reboundShooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, shooter.id);
+          if (reboundShooter) {
+            attTeam.stats.shots++;
+            addEvent(m.minute, 'shot', `The rebound falls to <span class="player">${reboundShooter.name}</span>!`, attackingSide);
+            resolveShot(attackingSide, defendingSide, reboundShooter, 'openplay', { qualityBonus: 0.16, onTargetBonus: 0.1 });
+          }
+        }
+      }
+      return;
+    }
+
+    // GOAL
+    attTeam.score++;
+    const method = isHeader ? { desc: 'towering header', xg: 0.3, puskas: false } : pickGoalMethod(shooter);
+    recordStat('goals', shooter, attTeam.team);
+    if (method.puskas) recordStat('puskas', shooter, attTeam.team);
+    pushGoal(attackingSide, shooter, m.minute, method.desc);
+    m.playerMatchStats[shooter.id].goals++;
+    m.playerMatchStats[shooter.id].xg += (profile.baseXg + shotQuality * 0.3);
+    const assister = opts.assistCandidate;
+    if (assister && assister.id !== shooter.id && Math.random() < 0.7) {
+      recordStat('assists', assister, attTeam.team);
+      if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
+      m.playerMatchStats[assister.id].assists++;
+      m.playerMatchStats[assister.id].xa += 0.3 + Math.random() * 0.4;
+      addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}. Assisted by <span class="player">${assister.name}</span>.`, attackingSide, true);
+    } else {
+      addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}.`, attackingSide, true);
+    }
+    maybeOffsideDisallow(attackingSide, shooter, m.minute);
+  }
+
+  // ===== Corner set piece (reached from a blocked cross/shot) =====
+  function resolveCorner(attackingSide) {
+    const m = currentMatch;
+    if (!m) return;
+    const defendingSide = attackingSide === 'home' ? 'away' : 'home';
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    attTeam.stats.corners = (attTeam.stats.corners || 0) + 1;
+    addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short}`, attackingSide);
+    if (Math.random() >= 0.05) return;
+    const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CM', 'CAM'], (p) => aerialSkill(p) * 2);
+    if (!scorer) return;
+    attTeam.stats.shots++;
+    attTeam.stats.shotsOn++;
+    attTeam.score++;
+    recordStat('goals', scorer, attTeam.team);
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+    m.playerMatchStats[scorer.id].goals++;
+    m.playerMatchStats[scorer.id].xg += 0.28 + Math.random() * 0.15;
+    const corTaker = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
+    if (corTaker && Math.random() < 0.65) {
+      recordStat('assists', corTaker, attTeam.team);
+      if (!m.playerMatchStats[corTaker.id]) m.playerMatchStats[corTaker.id] = blankPlayerMatchStats(corTaker);
+      m.playerMatchStats[corTaker.id].assists++;
+      m.playerMatchStats[corTaker.id].xa += 0.2 + Math.random() * 0.3;
+    }
+    pushGoal(attackingSide, scorer, m.minute, 'header from corner');
+    addEvent(m.minute, 'goal', `Corner converted. <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);
+    maybeOffsideDisallow(attackingSide, scorer, m.minute);
+  }
+
+  // ===== Chance Creation phase (the sequence has reached the final third) =====
+  // What kind of chance gets created is shaped by the entry channel and the
+  // ball-carrier's/team's playstyle — a wide entry with a Cross Specialist
+  // becomes a cross for an aerial target; an Inside Forward cuts in and
+  // shoots himself; a central entry through a Creative Playmaker becomes a
+  // defence-splitting through ball.
+  function resolveChanceCreation(attackingSide, defendingSide, carrier, channel) {
+    const m = currentMatch;
+    if (!m) return;
+    const attTeam = m[attackingSide];
+    const styles = (carrier.expandedAttrs && carrier.expandedAttrs.playstyle) || [];
+    const wide = channel !== 'C';
+    const crossStyle = styles.some(s => ['Cross Specialist', 'Prolific Winger', 'Roaming Flank', 'Offensive Full-back', 'Full-back Finisher'].includes(s));
+    const cutInStyle = styles.some(s => s === 'Inside Forward');
+    const throughBallStyle = styles.some(s => ['Creative Playmaker', 'Classic No. 10', 'Orchestrator', 'Deep-Lying Forward'].includes(s));
+
+    let chanceType, shooter;
+    if (wide && cutInStyle && Math.random() < 0.55) {
+      chanceType = 'dribble'; shooter = carrier;
+    } else if (wide && (crossStyle || Math.random() < 0.55)) {
+      chanceType = 'cross';
+      shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'], (p) => aerialSkill(p) * 2, carrier.id)
+        || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
+    } else if (!wide && throughBallStyle && Math.random() < 0.5) {
+      chanceType = 'throughball';
+      shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
+    } else if (Math.random() < 0.16) {
+      chanceType = 'longshot'; shooter = carrier;
+    } else {
+      chanceType = 'openplay';
+      shooter = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id);
+    }
+    if (!shooter) shooter = carrier;
+    attTeam.stats.shots++;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
+    m.playerMatchStats[shooter.id].shots++;
+    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null });
+  }
+
+  // ===== Fouls / cards (reached from a lost duel or lost pass) =====
+  // A challenge that happened as the attack was trying to break into the
+  // final third has a real chance of being a penalty rather than a free-kick.
+  function resolveFoul(defendingSide, attackingSide, fouler, victim, nearBox) {
+    const m = currentMatch;
+    if (!m || !fouler) return;
+    const defTeam = m[defendingSide], attTeam = m[attackingSide];
+    defTeam.stats.fouls++;
+    if (!m.foulCounts) m.foulCounts = { home: {}, away: {} };
+    m.foulCounts[defendingSide][fouler.id] = (m.foulCounts[defendingSide][fouler.id] || 0) + 1;
+    const foulCount = m.foulCounts[defendingSide][fouler.id];
+    const alreadyYellow = (m.cards[defendingSide][fouler.id] || 0) >= 1;
+    const aggression = 1 + Math.max(0, (75 - (fouler.def || 70)) / 80) + Math.max(0, ((fouler.phy || 70) - 80) / 100);
+    const foulText = victim
+      ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
+      : `Foul by <span class="player">${fouler.name}</span>`;
+
+    if (nearBox && Math.random() < 0.09) {
+      addEvent(m.minute, 'foul', foulText + ' — inside the area!', defendingSide);
+      const taker = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], PEN_TAKER_ROLE_WEIGHT) || victim;
+      if (taker) {
+        addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
+        attTeam.stats.shots++;
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+        m.playerMatchStats[taker.id].shots++;
+        const penGk = pickPlayer(defTeam, ['GK']);
+        const po = pickPenOutcome(taker, penGk);
+        if (po.scored) {
+          attTeam.stats.shotsOn++;
+          attTeam.score++;
+          recordStat('goals', taker, attTeam.team);
+          m.playerMatchStats[taker.id].goals++;
+          m.playerMatchStats[taker.id].xg += 0.76 + Math.random() * 0.08;
+          pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
+          addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
+          maybeOffsideDisallow(attackingSide, taker, m.minute);
+        } else {
+          if (po.text.includes('saved') || po.text.includes('palms') || po.text.includes('hand')) {
+            attTeam.stats.shotsOn++;
+            if (penGk) { defTeam.stats.saves++; recordStat('saves', penGk, defTeam.team); }
+          }
+          addEvent(m.minute, 'miss', `Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, attackingSide);
+        }
+      }
+      return;
+    }
+
+    let yellowChance = Math.min(0.72, 0.08 * aggression + (foulCount - 1) * 0.14 + (alreadyYellow ? 0.12 : 0) + (foulCount >= 3 ? 0.12 : 0));
+    const straightRedChance = 0.004 * aggression;
+    const roll = Math.random();
+    if (roll < straightRedChance && !alreadyYellow) {
+      defTeam.stats.reds++;
+      recordStat('cards', fouler, defTeam.team);
+      recordStat('reds', fouler, defTeam.team);
+      if (!m.playerMatchStats) m.playerMatchStats = {};
+      if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
+      m.playerMatchStats[fouler.id].red = true;
+      addEvent(m.minute, 'red', `🟥 Straight red! ${foulText} — reckless challenge`, defendingSide);
+      removeFromPitch(defendingSide, fouler.id);
+      handleRedCardReshuffle(defendingSide, fouler);
+    } else if (roll < straightRedChance + yellowChance) {
+      m.cards[defendingSide][fouler.id] = (m.cards[defendingSide][fouler.id] || 0) + 1;
+      defTeam.stats.yellows++;
+      recordStat('cards', fouler, defTeam.team);
+      recordStat('yellows', fouler, defTeam.team);
+      if (!m.playerMatchStats) m.playerMatchStats = {};
+      if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
+      m.playerMatchStats[fouler.id].yellow = true;
+      if (m.cards[defendingSide][fouler.id] >= 2) {
+        defTeam.stats.reds++;
+        recordStat('reds', fouler, defTeam.team);
+        m.playerMatchStats[fouler.id].red = true;
+        addEvent(m.minute, 'red', `🟥 Second yellow → red! ${foulText}`, defendingSide);
+        removeFromPitch(defendingSide, fouler.id);
+        handleRedCardReshuffle(defendingSide, fouler);
+      } else {
+        addEvent(m.minute, 'yellow', `🟨 Yellow card — ${foulText}${foulCount > 1 ? ' (repeated fouls)' : ''}`, defendingSide);
+      }
+    } else {
+      addEvent(m.minute, 'foul', foulText + (foulCount > 1 ? ' — referee has a word' : ''), defendingSide);
+    }
+  }
+
+  // ===== Transitions phase: a fast break for the side that just won the ball =====
+  // Skips the full zone-by-zone grind (the whole point of a counter is that
+  // there isn't time for one) and goes almost straight to a shot, with a
+  // quality/on-target bump reflecting the exposed, unset defence.
+  function runFastBreak(breakingSide, otherSide) {
+    const m = currentMatch;
+    if (!m) return;
+    const breakTeam = m[breakingSide];
+    const shooter = pickPlayerWeighted(breakTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], GOAL_ROLE_WEIGHT);
+    if (!shooter) return;
+    addEvent(m.minute, 'pressure', `${breakTeam.team.short} break at real pace!`, breakingSide);
+    resolveChanceCreation(breakingSide, otherSide, shooter, Math.random() < 0.5 ? 'L' : (Math.random() < 0.5 ? 'C' : 'R'));
+  }
+
+  // ===== Duels phase resolution: the ball has been lost (pass cut out, or =====
+  // ===== beaten in a 1v1) — who wins it, and does it spring a transition?
+  function resolveTurnover(attackingSide, defendingSide, contestedPlayer, winner, fromThird, toThird, kind) {
+    const m = currentMatch;
+    if (!m) return;
+    const defTeam = m[defendingSide];
+    const defenderPlayer = winner || pickPlayer(defTeam, mirrorDefenderPos(toThird + '_C'));
+    if (!defenderPlayer) return;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[defenderPlayer.id]) m.playerMatchStats[defenderPlayer.id] = blankPlayerMatchStats(defenderPlayer);
+    const ps = m.playerMatchStats[defenderPlayer.id];
+
+    // A mistimed challenge trying to win the ball back becomes a foul.
+    const aggression = 1 + Math.max(0, (75 - (defenderPlayer.def || 70)) / 80) + Math.max(0, ((defenderPlayer.phy || 70) - 80) / 100);
+    const foulChance = 0.09 * aggression * (kind === 'duel' ? 1.3 : 0.75);
+    if (Math.random() < foulChance) {
+      resolveFoul(defendingSide, attackingSide, defenderPlayer, contestedPlayer, toThird === 'ATT');
+      return;
+    }
+
+    const roll = Math.random();
+    if (roll < 0.55) {
+      ps.interceptions = (ps.interceptions || 0) + 1;
+      ps.tackles = (ps.tackles || 0) + 1;
+      defTeam.stats.interceptions = (defTeam.stats.interceptions || 0) + 1;
+      if (Math.random() < 0.4) {
+        const flavor = styleFlavor(defenderPlayer, INTERCEPTION_FLAVOR);
+        addEvent(m.minute, 'pass', flavor
+          ? `<span class="player">${defenderPlayer.name}</span> (${defTeam.team.short}) ${flavor}.`
+          : `Interception by <span class="player">${defenderPlayer.name}</span> (${defTeam.team.short}).`, defendingSide);
+      }
+    } else {
+      ps.tackles = (ps.tackles || 0) + 1;
+      if (Math.random() < 0.4) {
+        const flavor = styleFlavor(defenderPlayer, TACKLE_FLAVOR);
+        addEvent(m.minute, 'foul', flavor
+          ? `<span class="player">${defenderPlayer.name}</span> ${flavor}`
+          : `Strong challenge from <span class="player">${defenderPlayer.name}</span> (${defTeam.team.short}) wins it back.`, defendingSide);
+      }
+    }
+
+    // ===== Transitions phase: does the side that just won it break quickly? =====
+    const defMods = getPlaystyleMods(defTeam.team);
+    const spaceFactor = fromThird === 'ATT' ? 1.3 : fromThird === 'MID' ? 1.0 : 0.55;
+    const counterProb = Math.max(0.03, Math.min(0.55, 0.08 * defMods.counterBonus * spaceFactor + ((defenderPlayer.pac || 70) - 70) / 320));
+    if (Math.random() < counterProb) runFastBreak(defendingSide, attackingSide);
+  }
+
+  // ===== The core pipeline: Zones -> Movement -> Passing -> Duels, one =====
+  // ===== zone transition at a time, until the ball reaches the final third
+  // (Chance Creation) or is lost along the way (Transitions).
+  function runPossessionSequence(attackingSide) {
+    const m = currentMatch;
+    if (!m) return;
+    const defendingSide = attackingSide === 'home' ? 'away' : 'home';
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    const attMods = getPlaystyleMods(attTeam.team);
+    const tac = (m.tactics && m.tactics[attackingSide]) || 'balanced';
+    const defTac = (m.tactics && m.tactics[defendingSide]) || 'balanced';
+
+    // ===== Zones phase: which channel does this sequence develop through? =====
+    // Out Wide / Overload-minded managers lean wide; Possession/Long Ball
+    // sides are more likely to build centrally.
+    const wideBias = Math.max(0.15, Math.min(0.85, 0.42 * attMods.wingBiasMult));
+    let channel = Math.random() < wideBias ? (Math.random() < 0.5 ? 'L' : 'R') : 'C';
+
+    let carrier = pickPlayer(attTeam, ZONE_POS_MAP['DEF_' + channel]) || pickPlayer(attTeam, ['CB', 'GK']);
+    if (!carrier) return;
+
+    for (let i = 0; i < 2; i++) { // DEF->MID, then MID->ATT
+      const fromThird = PITCH_THIRDS[i], toThird = PITCH_THIRDS[i + 1];
+      // Occasional switch of play between thirds.
+      if (Math.random() < 0.22) channel = PITCH_CHANNELS[Math.floor(Math.random() * 3)];
+      const targetZone = toThird + '_' + channel;
+
+      // ===== Movement phase: who makes themselves available in that zone? =====
+      const targetPlayer = pickPlayer(attTeam, ZONE_POS_MAP[targetZone], carrier.id) || carrier;
+
+      // ===== Passing phase: can the carrier find them? =====
+      const passerSkill = passingAbility(carrier);
+      const marker = pickPlayer(defTeam, mirrorDefenderPos(targetZone));
+      const pressure = marker ? defensivePressure(marker) : 60;
+      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta;
+      if (tac === 'attack') passChance -= 0.03;
+      if (tac === 'press') passChance -= 0.015;
+      if (defTac === 'press') passChance -= 0.05;
+      if (defTac === 'defend') passChance -= 0.03; // compact shape is harder to pass through
+      passChance = Math.max(0.30, Math.min(0.93, passChance));
+
+      if (Math.random() >= passChance) {
+        resolveTurnover(attackingSide, defendingSide, carrier, marker, fromThird, toThird, 'pass');
+        return;
+      }
+
+      // ===== Duels phase: even a completed pass can be won back under =====
+      // ===== immediate pressure (a 1v1 press right as the ball arrives).
+      const duelChance = Math.max(0.35, Math.min(0.95,
+        0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0)));
+      if (Math.random() >= duelChance) {
+        resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel');
+        return;
+      } else if (Math.random() < 0.12) {
+        addEvent(m.minute, 'skill', `✨ ${pickSkillDesc(targetPlayer, marker)}`, attackingSide);
+      }
+
+      carrier = targetPlayer;
+    }
+
+    // ===== Chance Creation phase (reached the final third) =====
+    resolveChanceCreation(attackingSide, defendingSide, carrier, channel);
+  }
+
+  // ===== Secondary match texture: set pieces / handballs / VAR that the =====
+  // ===== headline possession pipeline above doesn't already cover, kept at
+  // a low independent rate so cards/set-pieces still accumulate realistically
+  // without duplicating shots the pipeline already generated this minute.
+  function maybeSecondaryMatchEvent() {
+    const m = currentMatch;
+    if (!m || Math.random() > 0.22) return;
+    const side = Math.random() < 0.5 ? 'home' : 'away';
+    const defSide = side === 'home' ? 'away' : 'home';
+    const attTeam = m[side], defTeam = m[defSide];
+    const roll = Math.random();
+    if (roll < 0.24) {
+      // Direct free-kick
+      const taker = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
+      if (taker && Math.random() < 0.35) {
+        attTeam.stats.shots++;
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+        m.playerMatchStats[taker.id].shots++;
+        const fkGk = pickPlayer(defTeam, ['GK']);
+        const fk = pickFkOutcome(taker, fkGk);
+        addEvent(m.minute, 'shot', `<span class="player">${taker.name}</span> stands over the free-kick...`, side);
+        if (fk.scored) {
+          attTeam.stats.shotsOn++;
+          attTeam.score++;
+          recordStat('goals', taker, attTeam.team);
+          m.playerMatchStats[taker.id].goals++;
+          m.playerMatchStats[taker.id].xg += 0.12 + Math.random() * 0.1;
+          pushGoal(side, taker, m.minute, fk.text);
+          addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, side, true);
+          if (Math.random() < 0.55) recordStat('puskas', taker, attTeam.team);
+          maybeOffsideDisallow(side, taker, m.minute);
+        } else {
+          if (fk.text.includes('keeper') || fk.text.includes('tips')) {
+            attTeam.stats.shotsOn++;
+            const gk = pickPlayer(defTeam, ['GK']);
+            if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
+          }
+          addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, side);
+        }
+      }
+    } else if (roll < 0.42) {
+      // Handball — small chance it's given as a penalty
+      const p = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM', 'ST']);
+      if (p) {
+        defTeam.stats.fouls++;
+        addEvent(m.minute, 'handball', `Handball against <span class="player">${p.name}</span> — referee points to the spot`, defSide);
+        if (Math.random() < 0.10) resolveFoul(defSide, side, p, null, true);
+      }
+    } else if (roll < 0.60) {
+      // VAR — red-card review
+      const player = pickPlayer(defTeam, ['CB', 'ST', 'CDM', 'CM']);
+      addEvent(m.minute, 'var', `📺 VAR checking possible red card (${defTeam.team.short})...`, defSide);
+      if (player && Math.random() < 0.16) {
+        defTeam.stats.reds++;
+        recordStat('reds', player, defTeam.team);
+        if (!m.playerMatchStats) m.playerMatchStats = {};
+        if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
+        m.playerMatchStats[player.id].red = true;
+        addEvent(m.minute, 'red', `VAR: Red card! <span class="player">${player.name}</span> (${defTeam.team.short}) sent off`, defSide);
+        removeFromPitch(defSide, player.id);
+        handleRedCardReshuffle(defSide, player);
+      } else {
+        const noRedLines = [
+          `VAR: No red card — challenge by ${player ? player.name : 'the defender'} was mistimed but not violent conduct`,
+          `VAR: Yellow card only — ${player ? player.name : 'player'} caught the man, not excessive force`,
+          `VAR: On-field decision stands — no red card for ${player ? player.name : 'the defender'}`
+        ];
+        addEvent(m.minute, 'var', noRedLines[Math.floor(Math.random() * noRedLines.length)], defSide);
+        if (player && Math.random() < 0.5 && (m.cards[defSide][player.id] || 0) < 1) {
+          m.cards[defSide][player.id] = (m.cards[defSide][player.id] || 0) + 1;
+          defTeam.stats.yellows++;
+          recordStat('yellows', player, defTeam.team);
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
+          m.playerMatchStats[player.id].yellow = true;
+          addEvent(m.minute, 'yellow', `🟨 Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
+        }
+      }
+    } else if (roll < 0.72) {
+      const att = pickPlayer(attTeam, ['ST', 'CAM', 'RW', 'LW', 'CM']);
+      const def = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM']);
+      const rare = Math.random();
+      if (rare < 0.2) {
+        addEvent(m.minute, 'whistle', `Rain starts to lash the pitch — footing becomes tricky`, null);
+      } else if (rare < 0.4 && def) {
+        const tackleFlavor = styleFlavor(def, TACKLE_FLAVOR) || 'times a sliding tackle to perfection on the edge of the box';
+        addEvent(m.minute, 'foul', `<span class="player">${def.name}</span> ${tackleFlavor}`, defSide);
+      } else if (rare < 0.6 && att) {
+        const passFlavor = styleFlavor(att, THROUGH_BALL_FLAVOR) || 'threads a defence-splitting ball into the channel';
+        addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> ${passFlavor}`, side);
+      } else if (rare < 0.8) {
+        const gk = pickPlayer(defTeam, ['GK']);
+        if (gk) addEvent(m.minute, 'save', `<span class="player">${gk.name}</span> rushes off the line to smother a through ball`, defSide);
+      } else {
+        addEvent(m.minute, 'whistle', `The crowd sense a goal — noise levels rise as ${attTeam.team.short} advance`, null);
+      }
+    } else {
+      const lines = [
+        `${attTeam.team.short} recycle possession in the final third`,
+        `${attTeam.team.short} work an opening down the flank`,
+        `Patient build-up from ${attTeam.team.short}`,
+        `${defTeam.team.short} hold a high line under pressure`,
+        `Cross claimed comfortably — ${defTeam.team.short} clear`
+      ];
+      addEvent(m.minute, 'pressure', lines[Math.floor(Math.random() * lines.length)], side);
+    }
+  }
+
+  // ===== Top-level per-minute orchestrator: Possession phase decides who =====
+  // ===== gets this minute's headline sequence, then hands off to the
+  // Zones->Movement->Passing->Duels->Transitions->Chance->Shots->GK pipeline.
   function generateEvents() {
     const m = currentMatch;
     if (!m) return;
+
+    // ---- Background per-minute stat accumulation (pass volume + off-ball
+    // defensive activity), independent of which side wins the headline
+    // sequence below — this is what keeps every outfield player's pass/
+    // tackle counts building up realistically across 90 minutes.
+    simulateMinutePassing();
+    simulateDefensiveActions();
+
     const homeStr = calcTeamStrength(m.home);
     const awayStr = calcTeamStrength(m.away);
-    // Which side creates the next chance is driven by attacking quality vs the
-    // opponent's defensive quality (not just raw attack), run through a logistic
-    // curve so real quality gaps (e.g. a title contender's front line vs a
-    // relegation-battler's back line) show up clearly over 90 minutes/a season,
-    // while a small flat home-advantage nudge and a soft floor/ceiling keep any
-    // single chance from ever being a certainty either way — upsets stay possible.
     const homeMods = getPlaystyleMods(m.home.team);
     const awayMods = getPlaystyleMods(m.away.team);
-    // Counter-attacking playstyles (Long Ball Counter, Quick Counter) get a chance
-    // boost that scales with how little of the ball they've had — rewarding them
-    // for breaking quickly rather than for camping in possession.
-    const priorPoss = m.possession != null ? m.possession : 50;
-    const homeCounter = homeMods.counterBonus * Math.max(0, 50 - priorPoss) / 50;
-    const awayCounter = awayMods.counterBonus * Math.max(0, priorPoss - 50) / 50;
-    // Manager tactical edge — a sharper manager creates a genuine, if modest, extra advantage.
+
+    // ===== Possession phase: which side's build-up is this minute's =====
+    // ===== headline sequence? Driven by attacking quality vs the opponent's
+    // defensive quality, run through a logistic curve so a genuine quality
+    // gap (a title contender's front line vs a relegation-battler's back
+    // line) shows up clearly over 90 minutes/a season, while a small home
+    // nudge and a soft floor/ceiling keep upsets possible.
     const mgrEdge = (homeStr.mgr - awayStr.mgr) * 0.15;
-    let homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10 + homeCounter;
-    let awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10 + awayCounter;
-    // Game-state realism: a team chasing the game late pushes players forward and
-    // creates more (higher risk, higher reward), while a team defending a healthy
-    // lead tends to sit in and cede a bit of territory — this stops one-sided
-    // matches from snowballing into unrealistic 90-minute blowout shot counts.
+    let homeCreate = homeStr.att * 0.62 + (100 - awayStr.def) * 0.28 + homeStr.ovr * 0.10;
+    let awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10;
+    // Game-state realism: a team chasing the game late pushes players forward
+    // and creates more (higher risk, higher reward); one nursing a lead sits in.
     if (m.minute > 55) {
       const diff = (m.home.score || 0) - (m.away.score || 0);
-      const urgency = Math.min(1, (m.minute - 55) / 35); // ramps up as the clock runs down
+      const urgency = Math.min(1, (m.minute - 55) / 35);
       if (diff <= -1) homeCreate += Math.min(10, Math.abs(diff) * 4) * urgency;
       else if (diff >= 1) homeCreate -= Math.min(6, diff * 2.5) * urgency;
       if (diff >= 1) awayCreate += Math.min(10, diff * 4) * urgency;
       else if (diff <= -1) awayCreate -= Math.min(6, Math.abs(diff) * 2.5) * urgency;
     }
-    const HOME_ADV = 4.0; // small, realistic home-field nudge, not a thumb on the scale
-    // Small per-minute "run of play" jitter — real matches ebb and flow shot to
-    // shot rather than one side holding an identical, static edge for 90 minutes.
-    const jitter = (Math.random() - 0.5) * 7;
+    const HOME_ADV = 4.0;
+    const jitter = (Math.random() - 0.5) * 7; // real ebb-and-flow, not a static edge all 90 minutes
     const qualityGap = (homeCreate - awayCreate) + HOME_ADV + mgrEdge + jitter;
-    // Curve tuned so a real quality gap (a top side vs a relegation-battler)
-    // actually shows up as a clear, lopsided share of the game's chances —
-    // previously this saturated at 78/22 for even a modest gap, which let
-    // big underdogs hang around far too often. The weaker side still gets
-    // some of the ball (upsets stay possible, just rarer), but a genuine
-    // mismatch now pushes much closer to the clamp's true edges.
     let homeChance = 1 / (1 + Math.exp(-qualityGap / 13));
     homeChance = Math.min(0.90, Math.max(0.10, homeChance));
-    // Build up real passing volume for both teams this minute (feeds player stats + rating).
-    simulateMinutePassing();
-    // Independent per-minute defensive activity (tackles/interceptions/blocks) —
-    // runs every minute, quiet or not, so defenders stay consistently involved.
-    simulateDefensiveActions();
-    // Possession is now derived from actual completed-pass share (like real match data
-    // providers compute it), smoothed minute to minute so it doesn't jump around wildly.
+
+    // Possession % derived from actual completed-pass share (like real match
+    // data providers compute it), tugged toward the side with the real
+    // ball-control edge and smoothed minute to minute.
     const hp = m.home.stats.passes || 0, ap = m.away.stats.passes || 0;
     const passShareTarget = (hp + ap) > 0 ? 100 * hp / (hp + ap) : 50;
-    // Tug toward the side with the real ball-control edge (technical ability,
-    // overall, manager) so genuine quality gaps show up clearly and don't get
-    // washed out by an ever-growing cumulative pass count from early, even minutes.
     const ctrlBias = Math.max(-14, Math.min(14, (((homeStr.tec * 0.55 + homeStr.ovr * 0.25 + (homeStr.mgr || 75) * 0.20)
-      - (awayStr.tec * 0.55 + awayStr.ovr * 0.25 + (awayStr.mgr || 75) * 0.20)) * 0.9) + 1.5)); // +1.5: home crowd nudges tempo too
-    // Manager playstyle possession bias (Possession chases the ball, Long Ball/Counter styles cede it).
+      - (awayStr.tec * 0.55 + awayStr.ovr * 0.25 + (awayStr.mgr || 75) * 0.20)) * 0.9) + 1.5));
     const styleBias = Math.max(-8, Math.min(8, (homeMods.possBias - awayMods.possBias) * 0.5));
     const target = Math.max(20, Math.min(80, passShareTarget * 0.62 + (50 + ctrlBias + styleBias) * 0.38));
     m.possession = m.possession + (target - m.possession) * 0.16 + (Math.random() - 0.5) * 1.2;
     m.possession = Math.max(18, Math.min(82, m.possession));
     m.home.stats.possession = Math.round(m.possession);
     m.away.stats.possession = 100 - m.home.stats.possession;
-    // Stronger teams create more moments
+
+    // Stronger teams create more moments — some minutes are just quiet.
     const intensity = 0.42 + (homeStr.ovr + awayStr.ovr) / 500;
     if (Math.random() > intensity) {
-      // Quiet spell with occasional texture
       if (Math.random() < 0.08) {
         const side = Math.random() < 0.5 ? m.home : m.away;
-        const p = pickPlayer(side, ['CM','CDM','CAM','CB']);
+        const p = pickPlayer(side, ['CM', 'CDM', 'CAM', 'CB']);
         if (p) {
           const quiet = [
             `<span class="player">${p.name}</span> recycles possession calmly`,
@@ -2844,444 +3389,22 @@ var App = (() => {
             `<span class="player">${p.name}</span> finds a teammate under no pressure`,
             `Spell of possession — <span class="player">${p.name}</span> dictates the tempo`
           ];
-          addEvent(m.minute, 'pass', quiet[Math.floor(Math.random()*quiet.length)], side === m.home ? 'home' : 'away');
+          addEvent(m.minute, 'pass', quiet[Math.floor(Math.random() * quiet.length)], side === m.home ? 'home' : 'away');
         }
       }
+      maybeSecondaryMatchEvent();
       return;
     }
 
-    const r = Math.random();
+    // ===== Hand off to the phase pipeline: Zones -> Movement -> Passing -> =====
+    // ===== Duels -> Transitions -> Chance Creation -> Shots -> GK, all
+    // shaped by real player attributes and each side's tactics/playstyle.
     const attackingSide = Math.random() < homeChance ? 'home' : 'away';
-    const defendingSide = attackingSide === 'home' ? 'away' : 'home';
-    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    runPossessionSequence(attackingSide);
 
-    // Even a team that's being dominated still breaks forward on the counter now
-    // and then — a small, independent chance each active minute for the side
-    // that *didn't* win the main possession roll to snatch a quick transition
-    // shot of their own. Scaled by their own attacking ability vs the
-    // dominant side's defence, so it's a real chance, not a freebie.
-    // Base rate trimmed (was 0.05) and now scaled by the counter-attacking side's
-    // own attacking quality — a top side still snatches these breaks fairly
-    // often, but a genuinely weak side shouldn't get this "free" chance at the
-    // same rate as a good one just for being the team not on the ball.
-    const counterBaseStr = attackingSide === 'home' ? awayStr : homeStr;
-    const counterProb = Math.max(0.015, Math.min(0.05, 0.02 + (counterBaseStr.att - 70) / 600));
-    if (Math.random() < counterProb) {
-      const counterStr = attackingSide === 'home' ? awayStr : homeStr;
-      const counterOppStr = attackingSide === 'home' ? homeStr : awayStr;
-      const counterTeam = defTeam, counterOppTeam = attTeam;
-      const cShooter = pickPlayerWeighted(counterTeam, ['ST','RW','LW','CAM','CM'], GOAL_ROLE_WEIGHT);
-      if (cShooter) {
-        counterTeam.stats.shots++;
-        if (!m.playerMatchStats) m.playerMatchStats = {};
-        if (!m.playerMatchStats[cShooter.id]) m.playerMatchStats[cShooter.id] = blankPlayerMatchStats(cShooter);
-        m.playerMatchStats[cShooter.id].shots++;
-        const cQuality = Math.max(0.05, Math.min(0.98, ((cShooter.att || 70) * 0.45 + (cShooter.tec || 70) * 0.35 + (cShooter.ovr || 75) * 0.2) / 100 + finishingEdge(cShooter)));
-        const cDefAvg = counterOppStr.def / 100;
-        const cOnTarget = Math.min(0.65, Math.max(0.06, 0.12 + cQuality * 0.40 - cDefAvg * 0.24));
-        if (Math.random() < cOnTarget) {
-          counterTeam.stats.shotsOn++;
-          const cGk = pickPlayer(counterOppTeam, ['GK']);
-          const cGkSkill = Math.max(0.05, Math.min(0.98, (cGk ? ((cGk.def || 70) * 0.5 + (cGk.ovr || 75) * 0.3 + (cGk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(cGk)));
-          const cSaveChance = Math.min(0.92, Math.max(0.30, 0.46 + cGkSkill * 0.40 - cQuality * 0.26));
-          if (Math.random() < cSaveChance) {
-            if (cGk) {
-              counterOppTeam.stats.saves++;
-              recordStat('saves', cGk, counterOppTeam.team);
-              addEvent(m.minute, 'save', `Quick break! <span class="player">${cGk.name}</span> is called into action and saves`, defendingSide);
-            }
-          } else {
-            counterTeam.score++;
-            const method = pickGoalMethod(cShooter);
-            recordStat('goals', cShooter, counterTeam.team);
-            pushGoal(defendingSide, cShooter, m.minute, 'on the counter — ' + method.desc);
-            m.playerMatchStats[cShooter.id].goals++;
-            m.playerMatchStats[cShooter.id].xg += method.xg;
-            addEvent(m.minute, 'goal', `Goal on the break! <span class="player">${cShooter.name}</span> (${counterTeam.team.short}) — ${method.desc}.`, defendingSide, true);
-            maybeOffsideDisallow(defendingSide, cShooter, m.minute);
-          }
-        } else {
-          m.playerMatchStats[cShooter.id].xg += 0.04 + Math.random() * 0.08;
-          addEvent(m.minute, 'miss', sofascoreMiss(cShooter, counterTeam.team), defendingSide);
-        }
-      }
-    }
-
-    if (r < 0.22) {
-      const shooter = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM','RM','LM'], GOAL_ROLE_WEIGHT);
-      if (!shooter) return;
-      attTeam.stats.shots++;
-      // Attributes matter: att/tec/ovr vs defence
-      const shotQuality = Math.max(0.05, Math.min(0.98, ((shooter.att || 70) * 0.45 + (shooter.tec || 70) * 0.35 + (shooter.ovr || 75) * 0.2) / 100 + finishingEdge(shooter)));
-      const defAvg = calcTeamStrength(defTeam).def / 100;
-      // Wider clamp + stronger quality/defence weighting so a genuine class gap
-      // (a clinical attack vs a shaky back line, or vice versa) actually shows
-      // up in conversion, not just in shot volume.
-      const onTargetChance = Math.min(0.70, Math.max(0.08, 0.14 + shotQuality * 0.42 - defAvg * 0.24));
-      if (Math.random() < onTargetChance) {
-        attTeam.stats.shotsOn++;
-        if (!m.playerMatchStats) m.playerMatchStats={};
-        if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
-        m.playerMatchStats[shooter.id].shots++;
-        const gk = pickPlayer(defTeam, ['GK']);
-        const gkSkill = Math.max(0.05, Math.min(0.98, (gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(gk)));
-        const saveChance = Math.min(0.92, Math.max(0.30, 0.44 + gkSkill * 0.42 - shotQuality * 0.26));
-        if (Math.random() < saveChance) {
-          if (gk) {
-            defTeam.stats.saves++;
-            recordStat('saves', gk, defTeam.team);
-            addEvent(m.minute, 'save', `Great save by <span class="player">${gk.name}</span>!`, attackingSide);
-          }
-        } else {
-          const assister = pickPlayerWeighted(attTeam, ['CAM','CM','RW','LW','ST','RM','LM'], ASSIST_ROLE_WEIGHT, shooter.id);
-          attTeam.score++;
-          const method = pickGoalMethod(shooter);
-          recordStat('goals', shooter, attTeam.team);
-          if (method.puskas) recordStat('puskas', shooter, attTeam.team);
-          pushGoal(attackingSide, shooter, m.minute, method.desc);
-          // track xG
-          if (!m.playerMatchStats) m.playerMatchStats = {};
-          if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
-          m.playerMatchStats[shooter.id].goals++;
-          m.playerMatchStats[shooter.id].xg += method.xg;
-          if (assister && Math.random() < 0.7) {
-            recordStat('assists', assister, attTeam.team);
-            if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
-            m.playerMatchStats[assister.id].assists++;
-            m.playerMatchStats[assister.id].xa += 0.3 + Math.random() * 0.4;
-            addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}. Assisted by <span class="player">${assister.name}</span>.`, attackingSide, true);
-          } else {
-            addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}.`, attackingSide, true);
-          }
-          maybeOffsideDisallow(attackingSide, shooter, m.minute);
-        }
-      } else {
-        if (!m.playerMatchStats) m.playerMatchStats={};
-        if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id]=blankPlayerMatchStats(shooter);
-        m.playerMatchStats[shooter.id].shots++;
-        m.playerMatchStats[shooter.id].xg += 0.05 + Math.random()*0.1;
-        addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
-      }
-    } else if (r < 0.32) {
-      attTeam.stats.corners++;
-      addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short}`, attackingSide);
-      if (Math.random() < 0.03) {
-        const scorer = pickPlayerCustomWeighted(attTeam, ['ST','CB','CM','CAM'], (p) => aerialSkill(p) * 2);
-        if (scorer) {
-          attTeam.stats.shots++;
-          attTeam.stats.shotsOn++;
-          attTeam.score++;
-          recordStat('goals', scorer, attTeam.team);
-          if (!m.playerMatchStats) m.playerMatchStats = {};
-          if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
-          m.playerMatchStats[scorer.id].goals++;
-          m.playerMatchStats[scorer.id].xg += 0.28 + Math.random() * 0.15;
-          const corTaker = pickPlayer(attTeam, ['CM','CAM','RW','LW','RB','LB'], scorer.id);
-          if (corTaker && Math.random() < 0.65) {
-            recordStat('assists', corTaker, attTeam.team);
-            if (!m.playerMatchStats[corTaker.id]) m.playerMatchStats[corTaker.id] = blankPlayerMatchStats(corTaker);
-            m.playerMatchStats[corTaker.id].assists++;
-            m.playerMatchStats[corTaker.id].xa += 0.2 + Math.random() * 0.3;
-          }
-          pushGoal(attackingSide, scorer, m.minute, 'header from corner');
-          addEvent(m.minute, 'goal', `Corner converted. <span class="player">${scorer.name}</span> (${scorer.num||''}) heads home`, attackingSide, true);
-        }
-      }
-    } else if (r < 0.45) {
-      const fouler = pickPlayer(defTeam, ['CB','CDM','CM','RB','LB','ST']);
-      if (!fouler) return;
-      defTeam.stats.fouls++;
-      if (!m.foulCounts) m.foulCounts = { home: {}, away: {} };
-      m.foulCounts[defendingSide][fouler.id] = (m.foulCounts[defendingSide][fouler.id] || 0) + 1;
-      const foulCount = m.foulCounts[defendingSide][fouler.id];
-      const alreadyYellow = (m.cards[defendingSide][fouler.id] || 0) >= 1;
-      const aggression = 1 + Math.max(0, (75 - (fouler.def || 70)) / 80) + Math.max(0, ((fouler.phy || 70) - 80) / 100);
-      let yellowChance = 0.08 * aggression + (foulCount - 1) * 0.14;
-      let straightRedChance = 0.004 * aggression;
-      if (alreadyYellow) yellowChance += 0.12;
-      if (foulCount >= 3) yellowChance += 0.12;
-      yellowChance = Math.min(0.72, yellowChance);
-      const roll = Math.random();
-      const victim = pickPlayer(attTeam, ['ST','RW','LW','CAM','CM']);
-      const foulText = victim
-        ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
-        : `Foul by <span class="player">${fouler.name}</span>`;
-      if (roll < straightRedChance && !alreadyYellow) {
-        defTeam.stats.reds++;
-        recordStat('cards', fouler, defTeam.team);
-        recordStat('reds', fouler, defTeam.team);
-        if (!m.playerMatchStats) m.playerMatchStats = {};
-        if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
-        m.playerMatchStats[fouler.id].red = true;
-        addEvent(m.minute, 'red', `🟥 Straight red! ${foulText} — reckless challenge`, defendingSide);
-        removeFromPitch(defendingSide, fouler.id);
-        handleRedCardReshuffle(defendingSide, fouler);
-      } else if (roll < straightRedChance + yellowChance) {
-        m.cards[defendingSide][fouler.id] = (m.cards[defendingSide][fouler.id] || 0) + 1;
-        defTeam.stats.yellows++;
-        recordStat('cards', fouler, defTeam.team);
-        recordStat('yellows', fouler, defTeam.team);
-        if (!m.playerMatchStats) m.playerMatchStats = {};
-        if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
-        m.playerMatchStats[fouler.id].yellow = true;
-        if (m.cards[defendingSide][fouler.id] >= 2) {
-          defTeam.stats.reds++;
-          recordStat('reds', fouler, defTeam.team);
-          m.playerMatchStats[fouler.id].red = true;
-          addEvent(m.minute, 'red', `🟥 Second yellow → red! ${foulText}`, defendingSide);
-          removeFromPitch(defendingSide, fouler.id);
-          handleRedCardReshuffle(defendingSide, fouler);
-        } else {
-          addEvent(m.minute, 'yellow', `🟨 Yellow card — ${foulText}${foulCount > 1 ? ' (repeated fouls)' : ''}`, defendingSide);
-        }
-      } else {
-        addEvent(m.minute, 'foul', foulText + (foulCount > 1 ? ' — referee has a word' : ''), defendingSide);
-      }
-    
-} else if (r < 0.55) {
-      const taker = pickPlayer(attTeam, ['CAM','CM','ST','RW','LW']);
-      if (taker && Math.random() < 0.18) {
-        attTeam.stats.shots++;
-        const fkGk = pickPlayer(defTeam, ['GK']);
-        const fk = pickFkOutcome(taker, fkGk);
-        addEvent(m.minute, 'shot', `<span class="player">${taker.name}</span> stands over the free-kick...`, attackingSide);
-        if (fk.scored) {
-          attTeam.stats.shotsOn++;
-          attTeam.score++;
-          recordStat('goals', taker, attTeam.team);
-          if (!m.playerMatchStats) m.playerMatchStats = {};
-          if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
-          m.playerMatchStats[taker.id].goals++;
-          m.playerMatchStats[taker.id].xg += 0.12 + Math.random() * 0.1;
-          pushGoal(attackingSide, taker, m.minute, fk.text);
-          addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide, true);
-          if (Math.random() < 0.55) recordStat('puskas', taker, attTeam.team);
-        } else {
-          if (fk.text.includes('keeper') || fk.text.includes('tips')) {
-            attTeam.stats.shotsOn++;
-            const gk = pickPlayer(defTeam, ['GK']);
-            if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
-          }
-          addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide);
-        }
-      }
-    } else if (r < 0.58) {
-      // Flavor text only — the actual pass volume/accuracy is already tracked
-      // every minute in simulateMinutePassing(), so we just narrate it here.
-      const p = pickPlayer(attTeam, ['CM','CAM','CDM','RB','LB','CB','RW','LW']);
-      if (p && Math.random() < 0.3) {
-        const ps = (m.playerMatchStats && m.playerMatchStats[p.id]) || null;
-        const pAcc = ps && ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
-        const possFlavor = styleFlavor(p, POSSESSION_FLAVOR);
-        addEvent(m.minute, 'pass',
-          pAcc != null
-            ? `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) — ${pAcc}% passing accuracy so far.`
-            : possFlavor
-              ? `<span class="player">${p.name}</span> (${attTeam.team.short}) ${possFlavor}.`
-              : `Pass. <span class="player">${p.name}</span> (${attTeam.team.short}) keeps the move going.`,
-          attackingSide);
-      }
-    } else if (r < 0.66) {
-      const def = pickPlayer(defTeam, ['CB','CDM','CM','RB','LB']);
-      if (def) {
-        if (!m.playerMatchStats) m.playerMatchStats = {};
-        if (!m.playerMatchStats[def.id]) m.playerMatchStats[def.id] = blankPlayerMatchStats(def);
-        if (Math.random() < 0.55) {
-          defTeam.stats.interceptions = (defTeam.stats.interceptions || 0) + 1;
-          m.playerMatchStats[def.id].interceptions = (m.playerMatchStats[def.id].interceptions || 0) + 1;
-          m.playerMatchStats[def.id].tackles = (m.playerMatchStats[def.id].tackles || 0) + 1;
-          if (Math.random() < 0.45) {
-            const interceptFlavor = styleFlavor(def, INTERCEPTION_FLAVOR);
-            addEvent(m.minute, 'pass', interceptFlavor
-              ? `<span class="player">${def.name}</span> (${defTeam.team.short}) ${interceptFlavor}.`
-              : `Interception by <span class="player">${def.name}</span> (${defTeam.team.short}).`, defendingSide);
-          }
-        } else {
-          defTeam.stats.blocks = (defTeam.stats.blocks || 0) + 1;
-          m.playerMatchStats[def.id].blocks = (m.playerMatchStats[def.id].blocks || 0) + 1;
-          if (Math.random() < 0.45) {
-            addEvent(m.minute, 'shot', `Attempt blocked. Blocked by <span class="player">${def.name}</span> (${defTeam.team.short}).`, defendingSide);
-          }
-        }
-      }
-    } else if (r < 0.72) {
-      const p = pickPlayer(attTeam, ['ST','RW','LW']);
-      if (p) addEvent(m.minute, 'offside', `Offside against <span class="player">${p.name}</span>`, attackingSide);
-    } else if (r < 0.8) {
-      const p = pickPlayer(attTeam, ['ST','CAM','RW','LW']);
-      if (p && Math.random() < 0.75) {
-        attTeam.stats.shots++;
-        if (!m.playerMatchStats) m.playerMatchStats = {};
-        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
-        m.playerMatchStats[p.id].shots++;
-        m.playerMatchStats[p.id].xg += 0.15 + Math.random() * 0.15;
-        const chanceFlavor = styleFlavor(p, BIG_CHANCE_FLAVOR);
-        addEvent(m.minute, 'miss', chanceFlavor
-          ? `Big chance! <span class="player">${p.name}</span> ${chanceFlavor} but can't take it!`
-          : `Big chance missed by <span class="player">${p.name}</span>!`, attackingSide);
-      }
-    } else if (r < 0.85) {
-      // Skill move / dribble — a genuine dribbler (high `dribb`, or specific
-      // skill moves like Flip Flap/Marseille Turn) beats their man more
-      // often than the flat 50/50 everyone used to share.
-      const p = pickPlayer(attTeam, ['RW','LW','CAM','ST','RM','LM']);
-      if (p && Math.random() < Math.max(0.15, Math.min(0.9, 0.5 + dribbleSuccessEdge(p)))) {
-        const marker = pickPlayer(defTeam, ['CB','RB','LB','CDM','CM']);
-        addEvent(m.minute, 'skill', `✨ ${pickSkillDesc(p, marker)}`, attackingSide);
-      }
-    } else if (r < 0.9) {
-      // Handball
-      const p = pickPlayer(defTeam, ['CB','RB','LB','CDM','ST']);
-      if (p) {
-        defTeam.stats.fouls++;
-        addEvent(m.minute, 'handball', `Handball against <span class="player">${p.name}</span> — referee points to the spot`, defendingSide);
-        if (Math.random() < 0.10) {
-          const taker = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM'], PEN_TAKER_ROLE_WEIGHT);
-          if (taker) {
-            addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
-            attTeam.stats.shots++;
-            if (!m.playerMatchStats) m.playerMatchStats = {};
-            if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
-            m.playerMatchStats[taker.id].shots++;
-            const penGk = pickPlayer(defTeam, ['GK']);
-            const po = pickPenOutcome(taker, penGk);
-            if (po.scored) {
-              attTeam.stats.shotsOn++;
-              attTeam.score++;
-              recordStat('goals', taker, attTeam.team);
-              m.playerMatchStats[taker.id].goals++;
-              m.playerMatchStats[taker.id].xg += 0.76 + Math.random() * 0.08;
-              pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
-              addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
-            } else {
-              const gk = penGk;
-              if (po.text.includes('saved') || po.text.includes('palms') || po.text.includes('hand')) {
-                attTeam.stats.shotsOn++;
-                if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
-              }
-              addEvent(m.minute, 'miss', `Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, attackingSide);
-            }
-          }
-        }
-      }
-    } else if (r < 0.94) {
-      // VAR — coherent sequence for one side. Note: this is a *standalone*
-      // review of an incident the referee may have missed in open play — it
-      // must never re-litigate a goal, because no goal was actually scored
-      // in this branch. (An actual goal being overturned for offside is
-      // handled separately and correctly by maybeOffsideDisallow(), which
-      // only fires right after a real goal is scored — see pushGoal/goal
-      // event above — so "goal stands/disallowed" VAR messages are always
-      // tied to a goal that really happened.)
-      const varSide = attackingSide;
-      const varTeam = attTeam;
-      const defSide = defendingSide;
-      const scenario = Math.random();
-      if (scenario < 0.55) {
-        // Penalty review for attacking team
-        const fouled = pickPlayer(attTeam, ['ST','RW','LW','CAM']);
-        const fouler = pickPlayer(defTeam, ['CB','RB','LB','CDM']);
-        addEvent(m.minute, 'var', `📺 VAR checking penalty claim — foul on ${fouled?fouled.name:'attacker'} by ${fouler?fouler.name:'defender'} (${varTeam.team.short})...`, varSide);
-        if (Math.random() < 0.5) {
-          addEvent(m.minute, 'var', `VAR: Penalty awarded to ${varTeam.team.short}!`, varSide);
-          const taker = pickPlayerWeighted(attTeam, ['ST','RW','LW','CAM','CM'], PEN_TAKER_ROLE_WEIGHT) || fouled;
-          if (taker) {
-            addEvent(m.minute, 'pen', `Penalty to ${varTeam.team.short}. <span class="player">${taker.name}</span> places the ball on the spot.`, varSide);
-            attTeam.stats.shots++;
-            if (!m.playerMatchStats) m.playerMatchStats = {};
-            if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
-            m.playerMatchStats[taker.id].shots++;
-            const varPenGk = pickPlayer(defTeam, ['GK']);
-            const po = pickPenOutcome(taker, varPenGk);
-            if (po.scored) {
-              attTeam.stats.shotsOn++;
-              attTeam.score++;
-              recordStat('goals', taker, attTeam.team);
-              m.playerMatchStats[taker.id].goals++;
-              m.playerMatchStats[taker.id].xg += 0.76 + Math.random() * 0.08;
-              pushGoal(varSide, taker, m.minute, 'penalty — ' + po.text);
-              addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, varSide, true);
-            } else {
-              const gk = varPenGk;
-              if (po.text.includes('saved') || po.text.includes('palms') || po.text.includes('hand')) {
-                attTeam.stats.shotsOn++;
-                if (gk) { defTeam.stats.saves++; recordStat('saves', gk, defTeam.team); }
-              }
-              addEvent(m.minute, 'miss', `Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, varSide);
-            }
-          }
-        } else {
-          addEvent(m.minute, 'var', `VAR: No penalty — play on`, null);
-        }
-      } else {
-        // Red card review
-        const player = pickPlayer(defTeam, ['CB','ST','CDM','CM']);
-        addEvent(m.minute, 'var', `📺 VAR checking possible red card (${defTeam.team.short})...`, defSide);
-        if (player && Math.random() < 0.16) {
-          defTeam.stats.reds++;
-          recordStat('reds', player, defTeam.team);
-          if (!m.playerMatchStats) m.playerMatchStats = {};
-          if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
-          m.playerMatchStats[player.id].red = true;
-          addEvent(m.minute, 'red', `VAR: Red card! <span class="player">${player.name}</span> (${defTeam.team.short}) sent off`, defSide);
-          removeFromPitch(defSide, player.id);
-          handleRedCardReshuffle(defSide, player);
-        } else {
-          const noRedLines = [
-            `VAR: No red card — challenge by ${player ? player.name : 'the defender'} was mistimed but not violent conduct`,
-            `VAR: Yellow card only — ${player ? player.name : 'player'} caught the man, not excessive force`,
-            `VAR: On-field decision stands — no red card for ${player ? player.name : 'the defender'}`,
-            `VAR: Review complete — foul confirmed, yellow sufficient for ${player ? player.name : 'the challenge'}`
-          ];
-          addEvent(m.minute, 'var', noRedLines[Math.floor(Math.random() * noRedLines.length)], defSide);
-          if (player && Math.random() < 0.5 && (m.cards[defSide][player.id] || 0) < 1) {
-            m.cards[defSide][player.id] = (m.cards[defSide][player.id] || 0) + 1;
-            defTeam.stats.yellows++;
-            recordStat('yellows', player, defTeam.team);
-            if (!m.playerMatchStats) m.playerMatchStats = {};
-            if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
-            m.playerMatchStats[player.id].yellow = true;
-            addEvent(m.minute, 'yellow', `🟨 Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
-          }
-        }
-      }
-    } else if (r < 0.97 && Math.random() < 0.18) {
-      const rare = Math.random();
-      const att = pickPlayer(attTeam, ['ST','CAM','RW','LW','CM']);
-      const def = pickPlayer(defTeam, ['CB','RB','LB','CDM']);
-      if (rare < 0.12) {
-        addEvent(m.minute, 'whistle', `Rain starts to lash the pitch — footing becomes tricky`, null);
-      } else if (rare < 0.24 && att) {
-        addEvent(m.minute, 'miss', `<span class="player">${att.name}</span> steals in at the far post but side-foots wide of the upright`, attackingSide);
-      } else if (rare < 0.36) {
-        addEvent(m.minute, 'whistle', `Stoppage as the referee speaks to both captains after a flare-up`, null);
-      } else if (rare < 0.48 && def) {
-        const tackleFlavor = styleFlavor(def, TACKLE_FLAVOR) || 'times a sliding tackle to perfection on the edge of the box';
-        addEvent(m.minute, 'foul', `<span class="player">${def.name}</span> ${tackleFlavor}`, defendingSide);
-      } else if (rare < 0.58 && att) {
-        addEvent(m.minute, 'skill', pickSkillDesc(att, pickPlayer(defTeam, ['CB','RB','LB','CDM','CM'])), attackingSide);
-      } else if (rare < 0.68 && att) {
-        const passFlavor = styleFlavor(att, THROUGH_BALL_FLAVOR) || 'threads a defence-splitting ball into the channel';
-        addEvent(m.minute, 'pass', `<span class="player">${att.name}</span> ${passFlavor}`, attackingSide);
-      } else if (rare < 0.78) {
-        const gk = pickPlayer(defTeam, ['GK']);
-        if (gk) addEvent(m.minute, 'save', `<span class="player">${gk.name}</span> rushes off the line to smother a through ball`, defendingSide);
-      } else if (rare < 0.88 && att) {
-        addEvent(m.minute, 'shot', `<span class="player">${att.name}</span> hits a first-time volley — always rising over the bar`, attackingSide);
-        attTeam.stats.shots++;
-      } else {
-        addEvent(m.minute, 'whistle', `The crowd sense a goal — noise levels rise as ${attTeam.team.short} advance`, null);
-      }
-    } else if (Math.random() < 0.35) {
-      const lines = [
-        `${attTeam.team.short} recycle possession in the final third`,
-        `${attTeam.team.short} work an opening down the flank`,
-        `Patient build-up from ${attTeam.team.short}`,
-        `${defTeam.team.short} hold a high line under pressure`,
-        `Cross claimed comfortably — ${defTeam.team.short} clear`
-      ];
-      addEvent(m.minute, 'pressure', lines[Math.floor(Math.random()*lines.length)], attackingSide);
-    }
+    // Occasional independent texture (set pieces / cards / VAR) at a low
+    // rate so the match keeps its color beyond just the headline sequence.
+    maybeSecondaryMatchEvent();
   }
 
   function calcTeamStrength(side) {
