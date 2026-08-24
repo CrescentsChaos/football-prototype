@@ -1120,6 +1120,13 @@
     "label": "func:renderRatingRow"
   },
   {
+    "id": "cx904",
+    "file": "ui/matchUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:renderCategorizedTeamStatsHTML"
+  },
+  {
     "id": "c0159",
     "file": "ui/matchUI.js",
     "start": 2042,
@@ -1188,6 +1195,20 @@
     "start": 2151,
     "end": 2153,
     "label": "func:blankPlayerMatchStats"
+  },
+  {
+    "id": "cx901",
+    "file": "engine/matchEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:posGroupOf"
+  },
+  {
+    "id": "cx902",
+    "file": "engine/matchEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:deriveExtendedMatchStats"
   },
   {
     "id": "c0169",
@@ -3843,6 +3864,34 @@
     "label": "func:computeSeasonWeek"
   },
   {
+    "id": "c0547b",
+    "file": "simulation/seasonEngine.js",
+    "start": 41727,
+    "end": 42903,
+    "label": "func:seasonCompEntries"
+  },
+  {
+    "id": "c0547c",
+    "file": "simulation/seasonEngine.js",
+    "start": 42926,
+    "end": 43363,
+    "label": "func:seasonCompDoneWithMatchday"
+  },
+  {
+    "id": "c0547d",
+    "file": "simulation/seasonEngine.js",
+    "start": 43386,
+    "end": 43867,
+    "label": "func:seasonCompCanPlayNow"
+  },
+  {
+    "id": "c0547e",
+    "file": "simulation/seasonEngine.js",
+    "start": 43890,
+    "end": 44895,
+    "label": "func:seasonMatchesDue"
+  },
+  {
     "id": "c0548",
     "file": "simulation/seasonEngine.js",
     "start": 7986,
@@ -3988,6 +4037,13 @@
     "start": 8170,
     "end": 8170,
     "label": "gap"
+  },
+  {
+    "id": "cx903",
+    "file": "ui/seasonUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:renderFixtureCongestionHTML"
   },
   {
     "id": "c0569",
