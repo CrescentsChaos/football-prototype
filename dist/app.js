@@ -8447,6 +8447,66 @@ var App = (() => {
     return rounds.length ? Math.min(...rounds) : 0;
   }
 
+  // ========== STRICT MATCHDAY GATING ==========
+  // Every competition that makes up a season (the 5 domestic leagues plus
+  // the Champions League) advances matchday-by-matchday in lockstep: none
+  // of them may start playing their NEXT round's fixtures until every
+  // competition has finished the CURRENT one. This is what makes "Matchday
+  // W" a single, meaningful, season-wide number instead of each league
+  // silently racing ahead at its own pace while the header still claims
+  // an earlier, incomplete matchday.
+  //
+  // The Champions League knockout stage (quarterfinals onward) is the one
+  // exception: those ties aren't part of the regular per-matchday cadence
+  // (they're the season's coverage of one-off knockout weeks), so once the
+  // UCL has left its league phase it's always treated as "due" rather than
+  // being held back waiting on the domestic leagues.
+  function seasonCompEntries(s) {
+    s = s || season;
+    if (!s || !s.leagues) return [];
+    const entries = SEASON_LEAGUE_DEFS.map(def => ({ key: def.key, comp: s.leagues[def.key] }));
+    entries.push({ key: 'ucl', comp: s.ucl });
+    return entries;
+  }
+  // True once `comp` has nothing left to play for the CURRENT global
+  // matchday (either finished outright, or — UCL knockout only — past the
+  // point where "matchday number" applies at all).
+  function seasonCompDoneWithMatchday(key, comp, targetIdx) {
+    if (!comp || comp.finished) return true;
+    if (key === 'ucl' && comp.stage !== 'league') return true;
+    return comp.currentRound > targetIdx;
+  }
+  // Whether `comp` is allowed to simulate/play a fixture right now — false
+  // if it has already completed the current global matchday and is simply
+  // waiting on slower competitions to catch up before the day can turn over.
+  function seasonCompCanPlayNow(key, comp) {
+    if (!season || !comp || comp.finished) return false;
+    if (key === 'ucl' && comp.stage !== 'league') return true;
+    return comp.currentRound <= computeSeasonWeek(season);
+  }
+  // Every still-unplayed fixture blocking the season from advancing past
+  // its current matchday — i.e. every fixture, across every competition,
+  // that belongs to the matchday the header is currently showing. Used to
+  // tell the person exactly which matches are still due before the day
+  // can change.
+  function seasonMatchesDue() {
+    if (!season) return [];
+    const targetIdx = computeSeasonWeek(season);
+    const due = [];
+    seasonCompEntries().forEach(({ key, comp }) => {
+      if (!comp || comp.finished) return;
+      if (key === 'ucl' && comp.stage !== 'league') return;
+      if (comp.currentRound !== targetIdx) return;
+      const round = comp.rounds[comp.currentRound] || [];
+      round.forEach(f => {
+        if (f.played) return;
+        const home = getTeam(f.home), away = getTeam(f.away);
+        due.push({ compName: comp.name, compKey: key, home: home ? home.short : '?', away: away ? away.short : '?' });
+      });
+    });
+    return due;
+  }
+
   // Advances a competition's matchday once every fixture in the current
   // round has been played (whether via live play, instant sim, or batch
   // simulation). Mirrors the round-increment logic that used to live only
