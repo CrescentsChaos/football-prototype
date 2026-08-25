@@ -18191,7 +18191,7 @@
   "players": [
     {
       "id": "bra1",
-      "name": "Alisson",
+      "name": "Alisson Becker",
       "pos": ["GK"],
       "ovr": 89,
       "att": 20,
@@ -19108,7 +19108,7 @@
   "logo":"liverpool.png",
   "stadium":"Anfield",
   "players": [
-    {"id":"liv20_1","name":"Alisson","pos":["GK"],"ovr":93,"att":15,"def":95,"phy":86,"pac":55,"tec":84,"num":1},
+    {"id":"liv20_1","name":"Alisson Becker","pos":["GK"],"ovr":93,"att":15,"def":95,"phy":86,"pac":55,"tec":84,"num":1},
     {"id":"liv20_3","name":"Fabinho","pos":["CDM","CB"],"ovr":90,"att":68,"def":91,"phy":88,"pac":70,"tec":83,"num":3},
     {"id":"liv20_4","name":"Virgil van Dijk","pos":["CB"],"ovr":96,"att":55,"def":98,"phy":94,"pac":78,"tec":82,"num":4},
     {"id":"liv20_5","name":"Georginio Wijnaldum","pos":["CM","CDM"],"ovr":88,"att":80,"def":82,"phy":84,"pac":78,"tec":86,"num":5},
@@ -19204,7 +19204,7 @@
     {"id":"bar15_16","name":"Douglas","pos":["RB"],"ovr":70,"att":68,"def":68,"phy":68,"pac":78,"tec":70,"num":16},
     {"id":"bar15_18","name":"Jordi Alba","pos":["LB"],"ovr":88,"att":82,"def":83,"phy":76,"pac":93,"tec":83,"num":18},
     {"id":"bar15_20","name":"Sergi Roberto","pos":["CM","RB"],"ovr":78,"att":74,"def":72,"phy":74,"pac":76,"tec":80,"num":20},
-    {"id":"bar15_21","name":"Adriano","pos":["LB","RB"],"ovr":78,"att":74,"def":75,"phy":74,"pac":80,"tec":78,"num":21},
+    {"id":"bar15_21","name":"Adriano Correia","pos":["LB","RB"],"ovr":78,"att":74,"def":75,"phy":74,"pac":80,"tec":78,"num":21},
     {"id":"bar15_22","name":"Dani Alves","pos":["RB","RWB"],"ovr":89,"att":85,"def":82,"phy":80,"pac":86,"tec":88,"num":22},
     {"id":"bar15_23","name":"Thomas Vermaelen","pos":["CB"],"ovr":79,"att":42,"def":80,"phy":78,"pac":66,"tec":72,"num":23},
     {"id":"bar15_24","name":"Jérémy Mathieu","pos":["CB","LB"],"ovr":82,"att":55,"def":82,"phy":84,"pac":80,"tec":72,"num":24},
@@ -21325,7 +21325,7 @@
     {"id":"barca10_5","name":"Carles Puyol","pos":["CB"],"ovr":88,"att":50,"def":91,"phy":88,"pac":74,"tec":68,"num":5},
     {"id":"barca10_18","name":"Gabriel Milito","pos":["CB"],"ovr":78,"att":45,"def":80,"phy":76,"pac":66,"tec":68,"num":18},
     {"id":"barca10_19","name":"Maxwell","pos":["LB","LWB"],"ovr":79,"att":76,"def":75,"phy":72,"pac":78,"tec":80,"num":19},
-    {"id":"barca10_21","name":"Adriano","pos":["LB","RB","LWB"],"ovr":78,"att":75,"def":74,"phy":74,"pac":84,"tec":79,"num":21},
+    {"id":"barca10_21","name":"Adriano Correia","pos":["LB","RB","LWB"],"ovr":78,"att":75,"def":74,"phy":74,"pac":84,"tec":79,"num":21},
     {"id":"barca10_22","name":"Éric Abidal","pos":["LB","CB"],"ovr":84,"att":68,"def":85,"phy":82,"pac":80,"tec":76,"num":22},
     {"id":"barca10_26","name":"Andreu Fontàs","pos":["CB"],"ovr":68,"att":42,"def":70,"phy":70,"pac":62,"tec":68,"num":26},
     {"id":"barca10_32","name":"Marc Bartra","pos":["CB"],"ovr":67,"att":45,"def":69,"phy":68,"pac":66,"tec":66,"num":32},
