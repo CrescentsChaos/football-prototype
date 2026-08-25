@@ -1225,6 +1225,30 @@ var App = (() => {
     return Math.round(derived.att * w.att + derived.def * w.def + derived.pac * w.pac +
       derived.phy * w.phy + derived.tec * w.tec);
   }
+  // ===== eFootball-style overall boost =====
+  // A flat positional weighted-average (weightedOverall above) treats every
+  // stat as interchangeable, so a genuine standout attribute gets diluted
+  // into the mean instead of standing out — nothing in a plain average can
+  // ever land near the top of the scale. eFootball's overall calc instead
+  // leans the final number toward a player's best stats, so a truly special
+  // attribute pulls the whole rating up with it. OVERALL_BOOST_LEAN controls
+  // how much of the gap between the flat average and the player's peak stat
+  // gets folded back in — 0 would be a pure average (old behavior), 1 would
+  // just be "OVR = best stat". Only expanded-attribute (enhanced) players
+  // run through this; everyone else keeps the plain teams.json number.
+  const OVERALL_BOOST_LEAN = 0.38;
+  const OVERALL_CAP = 100;
+  const OVERALL_FLOOR = 40;
+  // Non-expanded ("regular") players are scaled down relative to the
+  // enhanced/expanded-attribute roster so the boosted players read as
+  // genuinely special rather than everyone converging on the same numbers.
+  const REGULAR_OVR_MULTIPLIER = 0.95;
+
+  function efootballBoostedOverall(derived, posArr) {
+    const flatAvg = weightedOverall(derived, posArr);
+    const peak = Math.max(derived.att, derived.def, derived.pac, derived.phy, derived.tec);
+    return flatAvg + (peak - flatAvg) * OVERALL_BOOST_LEAN;
+  }
 
   // +2 if one of the player's individual playstyles suits the team's
   // current manager playstyle, +3 if two or more do, else 0.
@@ -1247,11 +1271,26 @@ var App = (() => {
   // accumulated form delta on top of it — see the form system's comment
   // near applyPlayerForm() for how baseOvr/form/ovr relate.
   function applyExpandedPlayerAttributes() {
-    if (!playerAttributesData || !Object.keys(playerAttributesData).length) return;
+    const hasExpandedData = !!(playerAttributesData && Object.keys(playerAttributesData).length);
     allTeams.forEach((team) => {
       (team.players || []).forEach((p) => {
-        const rawAttr = playerAttributesData[p.id];
-        if (!rawAttr) return;
+        const rawAttr = hasExpandedData ? playerAttributesData[p.id] : null;
+        if (!rawAttr) {
+          // Regular (non-enhanced) player: no expanded attribute sheet, so
+          // they don't get the eFootball-style peak-stat boost below. To
+          // keep enhanced players reading as genuinely special rather than
+          // everyone converging on similar numbers, regular players are
+          // scaled down a flat 5% off their original teams.json overall.
+          // Always derives from p.rawOvr (captured once at load, before any
+          // system here touches p.ovr) so this can never compound across
+          // repeated calls or save/reload sessions.
+          const source = (typeof p.rawOvr === 'number') ? p.rawOvr : (p.baseOvr || p.ovr || 70);
+          const scaledBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(source * REGULAR_OVR_MULTIPLIER)));
+          p.baseOvr = scaledBase;
+          p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(scaledBase + (p.form || 0))));
+          p.attrBoosted = false;
+          return;
+        }
         const posArr = (rawAttr.pos && rawAttr.pos.length) ? rawAttr.pos : (p.pos || ['CM']);
         const isGK = posArr[0] === 'GK';
         const teamStyle = getManagerPlaystyle(team);
@@ -1272,10 +1311,14 @@ var App = (() => {
         // toward their overall here than the generic 5-stat blend alone
         // would give them.
         const signatureBonus = styleSignatureBonus(attr, attr.playstyle, isGK);
-        const base = weightedOverall(derived, posArr) + signatureBonus;
-        const boostedBase = Math.max(40, Math.min(99, base + affinity));
+        // eFootball-style boost: lean the flat weighted average toward the
+        // player's peak stat instead of just averaging it away, then layer
+        // the signature/affinity bonuses on top. Cap raised to 100 (was 99)
+        // so a truly elite enhanced player can actually reach a perfect OVR.
+        const base = efootballBoostedOverall(derived, posArr) + signatureBonus;
+        const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base + affinity)));
         p.baseOvr = boostedBase;
-        p.ovr = Math.max(40, Math.min(99, Math.round(boostedBase + (p.form || 0))));
+        p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(boostedBase + (p.form || 0))));
         p.expandedAttrs = attr;
         p.attrBoosted = true;
         p.affinityBonus = affinity;
@@ -1429,40 +1472,51 @@ var App = (() => {
     return pool[pool.length - 1];
   }
 
+  // Tries each URL in order, returns the first successful JSON response, or
+  // null if every candidate fails/404s. Used for every optional/primary
+  // startup JSON file below so those files can all be requested at once via
+  // Promise.all instead of one after another — previously each of the 6
+  // files below fully awaited (including its own up-to-3-URL fallback
+  // chain) before the next one even started, which is what made startup
+  // feel laggy. Nothing about the fallback/cache-busting behavior itself
+  // changed, only the fact that the 6 chains now run concurrently.
+  async function fetchFirstJson(urls, label) {
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          if (label) console.log('Loaded', label, 'from', url);
+          return data;
+        }
+      } catch (err) { console.warn('Fetch failed', url, err); }
+    }
+    return null;
+  }
+
   async function init() {
     try {
+      const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
+      const urlSet = (file) => isHosted
+        ? [file + '?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './' + file + '?v=' + Date.now(), file]
+        : [file + '?v=' + Date.now()];
+
+      // All 6 startup JSON files (1 required, 5 optional) load concurrently.
+      const [teamsJson, leaguesJson, playersJson, trophiesJson, managersJson, attrJson] = await Promise.all([
+        fetchFirstJson(urlSet('teams.json'), 'teams'),
+        fetchFirstJson(urlSet('leagues.json'), 'leagues'),
+        fetchFirstJson(urlSet('players.json'), 'player portraits'),
+        fetchFirstJson(urlSet('trophies.json'), 'trophy images'),
+        fetchFirstJson(urlSet('managers.json'), 'manager portraits'),
+        fetchFirstJson(urlSet('player-attributes.json'), 'expanded player attributes')
+      ]);
+
       let loaded = null;
       let source = 'embedded';
-      const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
-      if (isHosted) {
-        const urls = [
-          'teams.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2),
-          './teams.json?v=' + Date.now(),
-          'teams.json'
-        ];
-        for (const url of urls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && ((data.national && data.national.length) || (data.club && data.club.length))) {
-              loaded = data;
-              source = 'teams.json';
-              console.log('Loaded teams from', url);
-              break;
-            }
-          } catch (err) {
-            console.warn('Fetch failed', url, err);
-          }
-        }
-      } else {
-        try {
-          const res = await fetch('teams.json?v=' + Date.now(), { cache: 'no-store' });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && (data.national || data.club)) { loaded = data; source = 'teams.json'; }
-          }
-        } catch (e) {}
+      if (teamsJson && ((teamsJson.national && teamsJson.national.length) || (teamsJson.club && teamsJson.club.length))) {
+        loaded = teamsJson;
+        source = 'teams.json';
       }
       teamsData = loaded || TEAMS_DATA;
       if (!loaded) {
@@ -1474,100 +1528,36 @@ var App = (() => {
       // Resolve every team's manager playstyle now (teams.json "playstyle" if
       // set, otherwise a random one) so it's stable for the rest of the session.
       allTeams.forEach(getManagerPlaystyle);
+      // Snapshot each player's raw teams.json overall (rawOvr) before form
+      // restoration or attribute boosting touch p.ovr at all — the overall
+      // system below always derives a non-expanded player's baseline from
+      // this untouched value, so the -5% adjustment can never compound
+      // across repeated init() calls or save/reload sessions.
+      allTeams.forEach(t => (t.players || []).forEach(p => { if (typeof p.rawOvr !== 'number') p.rawOvr = p.ovr; }));
 
-      // Load leagues.json (which clubs belong to which domestic league).
-      // Optional — the app still works without it, it just falls back to
-      // manual club selection in Season Setup.
-      try {
-        const lUrls = isHosted
-          ? ['leagues.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './leagues.json?v=' + Date.now(), 'leagues.json']
-          : ['leagues.json?v=' + Date.now()];
-        for (const url of lUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { leaguesData = data; console.log('Loaded leagues from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('leagues.json not loaded', e); }
+      // leagues.json — optional, falls back to manual club selection in
+      // Season Setup when absent.
+      if (leaguesJson) leaguesData = leaguesJson;
 
-      // Load players.json (player name -> portrait filename). Optional — the
-      // app still works without it, players just show their shirt number.
-      try {
-        const pUrls = isHosted
-          ? ['players.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './players.json?v=' + Date.now(), 'players.json']
-          : ['players.json?v=' + Date.now()];
-        for (const url of pUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { playerPortraits = data; console.log('Loaded player portraits from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('players.json not loaded', e); }
+      // players.json — optional, players just show their shirt number
+      // instead of a portrait when absent.
+      if (playersJson) playerPortraits = playersJson;
 
-      // Load trophies.json (trophy/competition name -> image filename). Optional —
-      // the app still works without it, trophies just show the 🏆 emoji instead.
-      try {
-        const tpUrls = isHosted
-          ? ['trophies.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './trophies.json?v=' + Date.now(), 'trophies.json']
-          : ['trophies.json?v=' + Date.now()];
-        for (const url of tpUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { trophyImages = data; console.log('Loaded trophy images from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('trophies.json not loaded', e); }
+      // trophies.json — optional, trophies show the 🏆 emoji instead of an
+      // image when absent.
+      if (trophiesJson) trophyImages = trophiesJson;
 
-      // Load managers.json (manager name -> portrait filename), resolved
-      // against assets/mportraits/ — managers.json itself lives in the main
-      // project dir, NOT inside assets/. managerPortraits already starts out
-      // populated from the embedded MANAGER_PORTRAITS_DATA above (so this
-      // works even opened straight from disk); a successful fetch here just
-      // layers any newer/edited entries from the on-disk managers.json on top.
-      try {
-        const mgUrls = isHosted
-          ? ['managers.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './managers.json?v=' + Date.now(), 'managers.json']
-          : ['managers.json?v=' + Date.now()];
-        for (const url of mgUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') {
-              const clean = { ...data };
-              delete clean._comment;
-              managerPortraits = { ...MANAGER_PORTRAITS_DATA, ...clean };
-              console.log('Loaded manager portraits from', url);
-              break;
-            }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('managers.json fetch skipped, using embedded portraits', e); }
+      // managers.json — optional layer on top of the embedded
+      // MANAGER_PORTRAITS_DATA baseline that's already loaded by default.
+      if (managersJson) {
+        const clean = { ...managersJson };
+        delete clean._comment;
+        managerPortraits = { ...MANAGER_PORTRAITS_DATA, ...clean };
+      }
 
-      // Load player-attributes.json (playerId -> expanded attribute sheet).
-      // Optional — the app works exactly as before for any player not
-      // listed here. Fetched the same way as the other optional JSON files
-      // above so it also works when this file is later edited without a
-      // rebuild.
-      try {
-        const paUrls = isHosted
-          ? ['player-attributes.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './player-attributes.json?v=' + Date.now(), 'player-attributes.json']
-          : ['player-attributes.json?v=' + Date.now()];
-        for (const url of paUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { playerAttributesData = data; console.log('Loaded expanded player attributes from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('player-attributes.json not loaded', e); }
+      // player-attributes.json — optional; the app works exactly as before
+      // for any player not listed here.
+      if (attrJson) playerAttributesData = attrJson;
 
       loadStats();
       loadPersistedGameState();
@@ -1804,6 +1794,28 @@ var App = (() => {
     if (last.length > 2 && first.length) return first[0] + '. ' + last;
     return trimmed;
   }
+  // Wraps a player's display name in a gold "enhanced" span wherever
+  // player-attributes.json gave them an expanded attribute sheet (see
+  // applyExpandedPlayerAttributes in data/playerDatabase.js). Every list/row
+  // that renders a player name across the app should go through this
+  // instead of interpolating player.name directly, so enhanced players are
+  // recognizable at a glance everywhere, not just on their profile page.
+  //
+  // Accepts either a full player object (checked directly for .attrBoosted)
+  // or a lighter-weight record like a match/season stat row that only
+  // carries an id — those are resolved through the id->player index so the
+  // highlight still works without each call site needing to look the
+  // player up itself.
+  function playerNameHTML(playerOrStatRow, displayNameOverride) {
+    if (!playerOrStatRow) return displayNameOverride || '';
+    const name = displayNameOverride != null ? displayNameOverride : (playerOrStatRow.name || '');
+    let boosted = !!playerOrStatRow.attrBoosted;
+    if (!boosted && playerOrStatRow.attrBoosted === undefined && playerOrStatRow.id != null) {
+      const found = findPlayerAndTeam(playerOrStatRow.id);
+      if (found) boosted = !!found.player.attrBoosted;
+    }
+    return boosted ? `<span class="player-name-enhanced" title="Enhanced attribute player">${name}</span>` : name;
+  }
 
   // Renders a small circular portrait for leaderboard/award rows, looked up
   // by id or name in players.json (same source as playerAvatarMark). Falls
@@ -1825,7 +1837,7 @@ var App = (() => {
   }
   // Player name + portrait, for use inside a leaderboard/award table cell.
   function lbPlayerCell(p, size) {
-    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${p.name}</span></div>`;
+    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${playerNameHTML(p)}</span></div>`;
   }
   // Rank badge for position i (0-indexed): medal for top 3, plain number after.
   function rankBadge(i) {
@@ -2698,7 +2710,7 @@ var App = (() => {
     const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals, 3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists, 2)) : '');
     return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
         <span class="player-num">${p.num || ''}</span>
-        <span style="flex:1;font-weight:600">${p.name}</span>
+        <span style="flex:1;font-weight:600">${playerNameHTML(p)}</span>
         <span>${icons}</span>
         <span class="xg">xG ${(p.xg || 0).toFixed(2)} · xA ${(p.xa || 0).toFixed(2)}</span>
         <span class="rating-badge ${rc}">${(p.rating || 0).toFixed(1)}</span>
@@ -5620,7 +5632,7 @@ var App = (() => {
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
         dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
           <span class="dot-avatar">${playerAvatarMark(p)}</span>
-          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${abbreviateName(p.name)}</span></span>
+          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
       });
       const mgrTag = s.team.manager && s.team.manager.name
@@ -5685,7 +5697,7 @@ var App = (() => {
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
         <span class="player-num">${p.num || ''}</span>
         <span class="player-pos">${pos}</span>
-        <span class="player-name">${p.name}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
+        <span class="player-name">${playerNameHTML(p)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         ${passInfo}
         <span class="player-icons">${icons}</span>
         ${rating}
@@ -5869,7 +5881,7 @@ var App = (() => {
     else if (rating >= 4.8) player.form -= 1.1;
     else player.form -= 1.8;
     player.form = Math.max(FORM_MIN, Math.min(FORM_MAX, Math.round(player.form * 100) / 100));
-    player.ovr = Math.max(40, Math.min(99, Math.round(player.baseOvr + player.form)));
+    player.ovr = Math.max(40, Math.min(100, Math.round(player.baseOvr + player.form)));
   }
 
   // Small ▲/▼/— indicator used next to a player's OVR wherever a squad list
@@ -6624,7 +6636,7 @@ var App = (() => {
       ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1}">
           <div class="lb-podium-rank">${i===0?'🥇':i===1?'🥈':'🥉'}</div>
           ${lbAvatar(p, 56)}
-          <div class="lb-podium-name">${p.name}</div>
+          <div class="lb-podium-name">${playerNameHTML(p)}</div>
           <div class="lb-podium-team">${[p.national, p.club].filter(Boolean).join(' · ') || p.team || ''}</div>
           <div class="lb-podium-value">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—') : p.count}</div>
         </div>`).join('')}
@@ -8109,7 +8121,7 @@ var App = (() => {
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini">${titleHtml}
         ${lbAvatar(p, 44)}
-        <div class="am-name">${p.name}</div>
+        <div class="am-name">${playerNameHTML(p)}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
     };
     el.innerHTML = `
@@ -8147,7 +8159,7 @@ var App = (() => {
       return;
     }
     const col = (title, arr) => `<div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">${title}</div>
-      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${p.name}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
+      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${playerNameHTML(p)}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
     el.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
         ${col('⚽ Golden Boot', g)}
@@ -8623,7 +8635,7 @@ var App = (() => {
       <div class="profile-header">
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
         <div>
-          <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
+          <h2 style="margin:0 0 4px;font-size:1.2rem">${playerNameHTML(player)}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${affinityNote}
@@ -8695,7 +8707,7 @@ var App = (() => {
           return `
           <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
             <span class="tsr-avatar">${playerAvatarMark(p)}</span>
-            <span class="tsr-name">${p.name}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
+            <span class="tsr-name">${playerNameHTML(p)}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
             <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
             ${formArrow(p)}
             <span class="player-ovr">${p.ovr || ''}</span>
@@ -9875,7 +9887,7 @@ var App = (() => {
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini">${titleHtml}
         ${lbAvatar(p, 44)}
-        <div class="am-name">${p.name}</div>
+        <div class="am-name">${playerNameHTML(p)}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
     };
     let h = '<div class="card-title">' + comp.name + ' Awards' + (comp.finished ? ' (Final)' : ' (In Progress)') + '</div>';
@@ -10085,13 +10097,27 @@ var App = (() => {
   }
 
 
-  // Shared player+team lookup, also used by showPlayerProfile.
+  // id -> {player, team} lookup index, built once (lazily, cached) off of
+  // getAllPlayersFlat(). findPlayerAndTeam used to do a fresh linear scan
+  // across every team's full roster on every single call — with ~5,500
+  // players that added up fast anywhere it ran per-row (player profile
+  // opens, leaderboards, name-highlight lookups), which was a real
+  // contributor to the app feeling laggy. Same invalidation lifetime as
+  // _allPlayersFlatCache above (built once per loaded roster).
+  let _playerTeamIndexCache = null;
+  function getPlayerTeamIndex() {
+    if (_playerTeamIndexCache) return _playerTeamIndexCache;
+    const idx = {};
+    getAllPlayersFlat().forEach((e) => { idx[e.player.id] = e; });
+    _playerTeamIndexCache = idx;
+    return idx;
+  }
+
+  // Shared player+team lookup, also used by showPlayerProfile. O(1) via
+  // getPlayerTeamIndex() instead of scanning every team's roster.
   function findPlayerAndTeam(playerId) {
-    for (const t of allTeams) {
-      const p = (t.players || []).find(x => x.id === playerId);
-      if (p) return { player: p, team: t };
-    }
-    return null;
+    const e = getPlayerTeamIndex()[playerId];
+    return e ? { player: e.player, team: e.team } : null;
   }
 
 
@@ -10163,7 +10189,7 @@ var App = (() => {
       <div style="display:flex;align-items:center;gap:8px;width:100%">
         <span class="tsr-avatar" style="width:36px;height:36px;flex-shrink:0">${playerAvatarMark(p)}</span>
         <div style="flex:1;min-width:0">
-          <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</strong>
+          <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${playerNameHTML(p)}</strong>
           <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span> · ${(p.pos || []).join('/')}</div>
         </div>
         ${playersCompareMode ? `<span class="compare-check${selected ? ' checked' : ''}">${selected ? '✓' : ''}</span>` : ''}
@@ -10244,7 +10270,7 @@ var App = (() => {
     tray.innerHTML = playersCompareSelection.map(id => {
       const found = findPlayerAndTeam(id);
       if (!found) return '';
-      return `<span class="compare-chip">${teamMark(found.team, 14)} ${found.player.name}<button type="button" onclick="event.stopPropagation();App.togglePlayerCompare('${id}')" aria-label="Remove ${found.player.name}">✕</button></span>`;
+      return `<span class="compare-chip">${teamMark(found.team, 14)} ${playerNameHTML(found.player)}<button type="button" onclick="event.stopPropagation();App.togglePlayerCompare('${id}')" aria-label="Remove ${found.player.name}">✕</button></span>`;
     }).join('');
   }
 
@@ -10273,7 +10299,7 @@ var App = (() => {
     const n = entries.length;
     const header = entries.map(e => `<div class="compare-col-head">
         <div class="profile-avatar" style="width:52px;height:52px;margin:0 auto 6px;background:${e.team.color || '#d4af37'};border:2px solid ${e.team.secondary || '#fff'};color:${e.team.secondary || '#fff'}">${playerAvatarMark(e.player)}</div>
-        <div style="font-weight:700;font-size:0.82rem;line-height:1.2">${e.player.name}</div>
+        <div style="font-weight:700;font-size:0.82rem;line-height:1.2">${playerNameHTML(e.player)}</div>
         <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px">${teamMark(e.team, 14)} ${e.team.short || ''} · ${(e.player.pos || []).join('/')}</div>
         <div style="color:var(--gold);font-weight:800;margin-top:3px">${e.player.ovr || '—'} <span style="font-size:0.6rem;font-weight:600;color:var(--text-3)">OVR</span></div>
       </div>`).join('');
