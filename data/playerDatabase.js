@@ -453,7 +453,13 @@
 /*@CHUNK:c0300:END*/
 
 /*@CHUNK:c0301:START*/
+  // ⚡ Bolt Optimization: Cache player team affiliations to avoid repeated O(N*M) scans across teams & players
+  const playerTeamsCache = new Map();
+
   function findPlayerTeams(playerId) {
+    if (playerTeamsCache.has(playerId)) {
+      return playerTeamsCache.get(playerId);
+    }
     let national = null, club = null;
     (teamsData.national || []).forEach(t => {
       if ((t.players || []).some(p => p.id === playerId)) national = t.name;
@@ -500,6 +506,8 @@
         }
       }
     }
-    return { national, club };
+    const result = { national, club };
+    playerTeamsCache.set(playerId, result);
+    return result;
   }
 /*@CHUNK:c0301:END*/
