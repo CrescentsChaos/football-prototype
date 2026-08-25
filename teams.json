@@ -22044,7 +22044,7 @@
   "logo":"roma.png",
   "stadium":"Stadio Olimpico",
   "players": [
-    {"id":"asr06_32","name":"Doni","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":48,"tec":62,"num":32},
+    {"id":"asr06_32","name":"Alexander Doni","pos":["GK"],"ovr":83,"att":15,"def":84,"phy":78,"pac":48,"tec":62,"num":32},
     {"id":"asr06_1","name":"Gianluca Curci","pos":["GK"],"ovr":75,"att":15,"def":76,"phy":72,"pac":45,"tec":55,"num":1},
     {"id":"asr06_2","name":"Christian Panucci","pos":["RB","CB"],"ovr":83,"att":72,"def":84,"phy":81,"pac":75,"tec":76,"num":2},
     {"id":"asr06_5","name":"Philippe Mexès","pos":["CB"],"ovr":85,"att":52,"def":86,"phy":84,"pac":72,"tec":70,"num":5},
@@ -23108,7 +23108,7 @@
   "id": "liverpool7677",
   "name": "Liverpool FC 1976-77",
   "short": "LIV76",
-  "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "flag": "🏴󠁧󠁢??󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#FFFFFF",
   "logo":"liverpool-old.png",
