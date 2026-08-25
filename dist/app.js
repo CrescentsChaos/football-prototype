@@ -224,6 +224,446 @@ var App = (() => {
   // formation's bonus/penalty is measured as a delta off this neutral shape.
   const SHAPE_BASELINE = { def: 3.6, fwd: 2.5, mid: 3.0 };
   const formationShapeCache = {};
+
+  // ===================================================================
+  // ===================== FATIGUE / STAMINA MODEL ====================
+  // ===================================================================
+  // Every outfield player accumulates fatigue while on the pitch, driven by
+  // minutes played, their physical attribute, the team's current tactical
+  // intensity (a high press/all-out attack drains far faster than sitting
+  // in a defensive block), and their role (wide/forward positions cover
+  // more ground than a holding centre-back). A substitute starts fresh the
+  // moment they come on. This is read directly by the substitution AI in
+  // engine/tactics.js so tired legs are a first-class reason a manager
+  // makes a change — not just an after-the-fact proxy via a dropping match
+  // rating once the damage is already done.
+  function ensureFatigueState(m) {
+    if (!m.fatigue) m.fatigue = { home: {}, away: {} };
+    return m.fatigue;
+  }
+  // 0-100, 100 = fully fresh. Defaults to fresh for anyone not yet tracked
+  // (covers players who haven't been on the pitch yet this match).
+  function getStamina(m, side, playerId) {
+    if (!m) return 100;
+    const fat = ensureFatigueState(m);
+    const rec = fat[side] && fat[side][playerId];
+    return rec ? rec.stamina : 100;
+  }
+  // Per-minute drain rate for a given player — physical attribute, position
+  // (wide/forward roles cover more ground than a holding CB or GK), and the
+  // team's current tactical intensity all feed in.
+  function fatigueDrainRate(p, tac) {
+    const slot = p.slot || (p.pos || [])[0] || 'CM';
+    if (slot === 'GK') return 0.12;
+    const line = POS_LINE[slot] || 'MID';
+    const roleLoad = WIDE_SLOTS.has(slot) ? 1.25 : line === 'MID' ? 1.15 : line === 'FWD' ? 1.05 : 0.85;
+    const phyFactor = Math.max(0.65, Math.min(1.35, (100 - (p.phy || 70)) / 45));
+    const tacFactor = tac === 'press' ? 1.35 : tac === 'attack' ? 1.15 : tac === 'defend' ? 0.8 : 1.0;
+    return 0.62 * roleLoad * phyFactor * tacFactor;
+  }
+  // Runs once per simulated minute for both sides — drains everyone
+  // currently on the pitch. Floors out at 8 rather than 0 so an exhausted
+  // player is a heavy substitution risk without ever going fully inert.
+  function updateFatigue() {
+    const m = currentMatch;
+    if (!m) return;
+    const fat = ensureFatigueState(m);
+    ['home', 'away'].forEach(side => {
+      const team = m[side];
+      const tac = (m.tactics && m.tactics[side]) || 'balanced';
+      const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const all = (team.squad && team.squad.all) || [];
+      onIds.forEach(id => {
+        const p = all.find(x => x.id === id);
+        if (!p) return;
+        if (!fat[side][id]) fat[side][id] = { stamina: 100 };
+        const rec = fat[side][id];
+        rec.stamina = Math.max(8, rec.stamina - fatigueDrainRate(p, tac));
+      });
+    });
+  }
+  // A substitute always comes on fresh — called from trySubstitution(),
+  // handleRedCardReshuffle(), and tryInjury()'s forced-sub path so the
+  // incoming player's stamina tracking starts clean rather than inheriting
+  // whatever the outgoing player's number happened to be.
+  function resetFatigueFor(m, side, playerId) {
+    const fat = ensureFatigueState(m);
+    fat[side][playerId] = { stamina: 100 };
+  }
+  // Team-wide average stamina among players currently on the pitch — used
+  // to nudge overall substitution *timing* (see tick() in matchEngine.js),
+  // on top of fatigue driving *who* comes off inside trySubstitution().
+  function teamAvgStamina(side) {
+    const m = currentMatch;
+    if (!m) return 100;
+    const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    if (!onIds.length) return 100;
+    const total = onIds.reduce((s, id) => s + getStamina(m, side, id), 0);
+    return total / onIds.length;
+  }
+
+  // ===================================================================
+  // ===================== OFFSIDE ENGINE ==============================
+  // ===================================================================
+  // A genuinely spatial read of the offside law instead of a flat dice
+  // roll. Every on-pitch player already has an (x,y) position implied by
+  // their formation slot (FORMATIONS[key].coords — see js/state.js), with
+  // y=92 sitting on a team's own goal line and y≈14-20 at the opposite
+  // end. That's converted into a single 0-1 "advancement" value (0 = own
+  // goal, 1 = opponent's goal) that's directly comparable between the two
+  // sides, since both formations share the same own-goal-at-92 convention.
+  // From there the engine reconstructs, for a single passage of play:
+  //   - the receiver's position at "the exact moment of the pass" — judged
+  //     as a small, mostly-random timing window around the defensive line
+  //     itself (not their average formation slot — see evaluateOffside for
+  //     why that would over-flag almost every through ball), biased by
+  //     pace and off-ball awareness
+  //   - the second-last defender's position — the actual legal offside
+  //     reference line, almost always the deepest outfield defender and
+  //     NOT the goalkeeper
+  //   - the goalkeeper's own position, since an advanced/stranded keeper
+  //     can itself become the "second-last opponent" instead
+  //   - active interference — only a genuine forward pass into space
+  //     (chanceType 'throughball') is ever routed through this check in
+  //     the first place; backward/square play never is
+  //   - rebounds/loose balls and a deliberate defensive touch, both of
+  //     which restart the phase of play and clear any prior offside
+  //     position under the actual Laws of the Game
+  function playerAdvancement(p, formationKey) {
+    const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
+    const slot = p.slot || (p.pos || [])[0] || 'CM';
+    const idx = formation.slots.indexOf(slot);
+    const coord = formation.coords[idx >= 0 ? idx : 0] || [50, 50];
+    const y = coord[1];
+    return Math.max(0, Math.min(1, (92 - y) / (92 - 14)));
+  }
+  // The defensive line the officials actually judge against: the second-
+  // deepest opponent, expressed on the attacking side's own advancement
+  // axis (1 - their own advancement, since the two sides' advancement
+  // scales run in opposite physical directions but describe the same
+  // pitch). A high press or a chasing team's late push both drag the line
+  // higher up the pitch (offside easier to catch); sitting deep pulls it
+  // back toward the byline (far harder to catch, at the cost of inviting
+  // pressure). Also reports the goalkeeper's own position, since an
+  // advanced/stranded keeper can himself become the second-last opponent
+  // rather than the usual deepest centre-back.
+  function defensiveLineContext(defTeam, defSide) {
+    const m = currentMatch;
+    const formationKey = defTeam.squad && defTeam.squad.formation;
+    const onIds = defSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const all = (defTeam.squad && defTeam.squad.all) || [];
+    const onPitch = onIds.map(id => all.find(p => p.id === id)).filter(Boolean);
+    const gk = onPitch.find(p => (p.slot || (p.pos || [])[0]) === 'GK');
+    const outfield = onPitch.filter(p => (p.slot || (p.pos || [])[0]) !== 'GK');
+    if (!outfield.length) return { lineShared: 0.78, gkShared: 0.94, gkStranded: false };
+    const advs = outfield.map(p => playerAdvancement(p, formationKey)).sort((a, b) => a - b);
+    // Deepest outfield defender = smallest advancement = the real offside
+    // reference line under the law.
+    const deepestOutfield = advs[0];
+    const tac = (m.tactics && m.tactics[defSide]) || 'balanced';
+    const style = getManagerPlaystyle(defTeam.team);
+    const highLineStyle = ['Possession', 'Overload'].includes(style);
+    let pushUp = tac === 'press' ? 0.09 : tac === 'attack' ? 0.05 : tac === 'defend' ? -0.07 : 0;
+    if (highLineStyle) pushUp += 0.02;
+    const lineAdv = Math.max(0.03, Math.min(0.55, deepestOutfield + pushUp));
+    const gkAdv = gk ? playerAdvancement(gk, formationKey) : 0.04;
+    // A rare sweeper-keeper case: the keeper is sat ahead of the deepest
+    // outfield defender, and becomes the offside reference line himself.
+    const gkStranded = gkAdv > lineAdv;
+    return {
+      lineShared: 1 - (gkStranded ? gkAdv : lineAdv),
+      gkShared: 1 - gkAdv,
+      gkStranded
+    };
+  }
+  // Core spatial/temporal offside check for a single attacker at "the
+  // exact moment of the pass" — used both as a live flag before a chance
+  // is even created (through balls / breakaways) and, via the same
+  // context, for the post-goal VAR recheck. `moment` distinguishes phases
+  // of play the law treats differently:
+  //   'throughball' / 'counter' — a genuine forward pass into space; the
+  //                                only case actively judged here
+  //   'corner' / 'throwin'      — exempt: nobody can be offside receiving
+  //                                the ball directly from either
+  //   'rebound'                 — exempt: a loose ball off a save/post/bar
+  //                                restarts the phase of play
+  //   'deflection'              — exempt: a deliberate touch by a defender
+  //                                plays the attacker onside regardless of
+  //                                their position
+  function evaluateOffside(attackingSide, attacker, moment) {
+    const m = currentMatch;
+    if (!m || !attacker) return { offside: false, checked: false };
+    if (moment === 'corner' || moment === 'throwin' || moment === 'rebound' || moment === 'deflection') {
+      return { offside: false, checked: false, exempt: true };
+    }
+    const defSide = attackingSide === 'home' ? 'away' : 'home';
+    const attTeam = m[attackingSide], defTeam = m[defSide];
+    const ctx = defensiveLineContext(defTeam, defSide);
+
+    // A genuine through-ball run is, by definition, an attempt to arrive
+    // right on the defensive line at "the exact moment of the pass" — a
+    // player's *typical* formation slot (a striker sits high up the pitch
+    // by design) isn't what decides this, or strikers would be given
+    // offside on almost every through ball regardless of timing. What
+    // actually decides it is a small, mostly-random timing window around
+    // that line, biased by pace against the covering defence and, where
+    // available, off-the-ball positioning/awareness — a smarter runner
+    // times the run to stay just onside; a purely physical one drifts
+    // early and gets caught square more often.
+    const defAvgPac = calcTeamStrength(defTeam).pac || 70;
+    const paceEdge = ((attacker.pac || 70) - defAvgPac) / 100;
+    const awareness = (attacker.expandedAttrs && typeof attacker.expandedAttrs.off_awr === 'number')
+      ? (attacker.expandedAttrs.off_awr - 70) / 100 : 0;
+    const timing = (seededRandom() - 0.5) * 0.16 - paceEdge * 0.05 - awareness * 0.09;
+    const attackerShared = Math.min(1, Math.max(0, ctx.lineShared + timing));
+
+    const margin = attackerShared - ctx.lineShared;
+    if (margin <= 0) return { offside: false, checked: true, marginal: margin > -0.04, margin };
+
+    // Discipline of the defensive line itself — a well-organised back line
+    // (higher collective DEF rating) plays a trap cleanly and catches a
+    // marginal case more often than a shaky one that plays the runner on.
+    const defDiscipline = (calcTeamStrength(defTeam).def || 70) / 100;
+    const catchChance = Math.max(0.08, Math.min(0.85, margin * 4.5 + defDiscipline * 0.15));
+    const offside = seededRandom() < catchChance;
+    return { offside, checked: true, marginal: margin < 0.05, margin };
+  }
+  // Applied at the point a through ball / breakaway chance is actually
+  // created — checks the spatial model above and, if the flag goes up,
+  // ends the passage immediately (no shot, no advantage played), logging
+  // it against both the live event feed and the receiver's own offside
+  // count. A marginal-but-onside call still gets VAR-style flavor text so
+  // genuinely close decisions read as tense rather than routine.
+  function checkLiveOffside(attackingSide, attacker, moment) {
+    const m = currentMatch;
+    const result = evaluateOffside(attackingSide, attacker, moment);
+    if (!result.checked) return result;
+    if (result.offside) {
+      if (!m.playerMatchStats) m.playerMatchStats = {};
+      if (!m.playerMatchStats[attacker.id]) m.playerMatchStats[attacker.id] = blankPlayerMatchStats(attacker);
+      m.playerMatchStats[attacker.id].offsides = (m.playerMatchStats[attacker.id].offsides || 0) + 1;
+      addEvent(m.minute, 'offside', `🚩 Flag up — <span class="player">${attacker.name}</span> caught offside by the last defender`, attackingSide);
+    } else if (result.marginal) {
+      addEvent(m.minute, 'offside', `Tight call — <span class="player">${attacker.name}</span> ruled level, play continues`, attackingSide);
+    }
+    return result;
+  }
+
+  // ===================================================================
+  // ================== FREE-KICK ROUTINES (open play) =================
+  // ===================================================================
+  // Replaces a single flat "stands over it and shoots" resolution with a
+  // genuine choice of routine, shaped by where the foul happened, who's
+  // around to take it, and the game state. Corners get equivalent
+  // treatment in resolveCorner() (engine/shooting.js).
+  function pickFreeKickRoutine(attTeam, closeRange) {
+    const hasCrosser = (attTeam.squad.all || []).some(p => hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Prolific Winger'));
+    const m = currentMatch;
+    const diff = m ? (attTeam.score || 0) - (m[attTeam === m.home ? 'away' : 'home'].score || 0) : 0;
+    const urgent = m && m.minute >= 75 && diff < 0;
+    const roll = seededRandom();
+    if (!closeRange) {
+      // Too far out for a direct effort — always a delivery into the box
+      // or a short recycle to reset the attack.
+      return roll < 0.62 ? 'crossing' : 'short';
+    }
+    if (urgent && roll < 0.12) return 'quickrestart';
+    if (roll < 0.38) return 'direct';
+    if (roll < (hasCrosser ? 0.76 : 0.66)) return 'crossing';
+    if (roll < 0.87) return 'short';
+    return 'indirect';
+  }
+  function resolveFreeKickRoutine(attackingSide, defendingSide, closeRange) {
+    const m = currentMatch;
+    if (!m) return;
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    const taker = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
+    if (!taker) return;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    const routine = pickFreeKickRoutine(attTeam, closeRange);
+
+    if (routine === 'direct' || routine === 'quickrestart') {
+      const quick = routine === 'quickrestart';
+      attTeam.stats.shots++;
+      if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+      m.playerMatchStats[taker.id].shots++;
+      const fkGk = pickPlayer(defTeam, ['GK']);
+      addEvent(m.minute, 'shot', quick
+        ? `<span class="player">${taker.name}</span> takes it quickly — the defence isn't set!`
+        : `<span class="player">${taker.name}</span> stands over the free-kick...`, attackingSide);
+      // A quick restart catches an unorganised wall — a genuinely better
+      // sight of goal than a fully set-up direct effort.
+      const fk = pickFkOutcome(taker, fkGk, quick ? 0.08 : 0);
+      if (fk.scored) {
+        attTeam.stats.shotsOn++;
+        attTeam.score++;
+        recordStat('goals', taker, attTeam.team);
+        m.playerMatchStats[taker.id].goals++;
+        m.playerMatchStats[taker.id].xg += 0.12 + seededRandom() * 0.1;
+        pushGoal(attackingSide, taker, m.minute, fk.text);
+        addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide, true);
+        if (seededRandom() < 0.55) recordStat('puskas', taker, attTeam.team);
+        // The taker's own direct shot on goal, not a pass to a team-mate
+        // beyond the defence — not an offside-eligible phase of play.
+      } else if (fk.saved) {
+        attTeam.stats.shotsOn++;
+        if (fkGk) {
+          defTeam.stats.saves++;
+          recordStat('saves', fkGk, defTeam.team);
+          if (!m.playerMatchStats[fkGk.id]) m.playerMatchStats[fkGk.id] = blankPlayerMatchStats(fkGk);
+          m.playerMatchStats[fkGk.id].saves = (m.playerMatchStats[fkGk.id].saves || 0) + 1;
+        }
+        addEvent(m.minute, 'save', `🧤 Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide);
+      } else {
+        addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide);
+        if (fk.wall) resolveCorner(attackingSide);
+      }
+      return;
+    }
+
+    if (routine === 'crossing') {
+      // Whipped delivery into the box — resolved like a low-key corner
+      // (aerial duel for a specific target), not a guaranteed chance.
+      addEvent(m.minute, 'whistle', `<span class="player">${taker.name}</span> whips the free-kick into the box`, attackingSide);
+      if (seededRandom() < 0.075) {
+        const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p) * 2, taker.id);
+        if (scorer) {
+          attTeam.stats.shots++; attTeam.stats.shotsOn++; attTeam.score++;
+          recordStat('goals', scorer, attTeam.team);
+          recordStat('assists', taker, attTeam.team);
+          if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+          if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+          m.playerMatchStats[scorer.id].goals++;
+          m.playerMatchStats[scorer.id].xg += 0.22 + seededRandom() * 0.15;
+          m.playerMatchStats[taker.id].assists++;
+          m.playerMatchStats[taker.id].xa += 0.2 + seededRandom() * 0.3;
+          pushGoal(attackingSide, scorer, m.minute, 'header from a direct free-kick');
+          addEvent(m.minute, 'goal', `Free-kick delivery converted. <span class="player">${scorer.name}</span> heads home`, attackingSide, true);
+        }
+      }
+      return;
+    }
+
+    if (routine === 'short') {
+      // Short link-up: lay it off to a nearby team-mate, who either shoots
+      // from range or slips a genuine forward ball to a runner — the one
+      // free-kick routine that's a real offside-eligible phase, since it
+      // funnels through resolveChanceCreation() exactly like open play.
+      const receiver = pickPlayer(attTeam, ['CM', 'CDM', 'CAM'], taker.id);
+      if (!receiver) return;
+      addEvent(m.minute, 'pass', `Short routine — <span class="player">${taker.name}</span> rolls it sideways to <span class="player">${receiver.name}</span>`, attackingSide);
+      if (seededRandom() < 0.4) resolveChanceCreation(attackingSide, defendingSide, receiver, 'C');
+      return;
+    }
+
+    // 'indirect' — given for an offence inside the area (offside, an
+    // obstruction, or similar). Defenders are allowed to line up right on
+    // their own goal-line for this one, so a first-time strike is far more
+    // likely to cannon straight into a wall than beat it.
+    addEvent(m.minute, 'whistle', `Indirect free-kick to ${attTeam.team.short} — defenders line up on their own goal-line`, attackingSide);
+    attTeam.stats.shots++;
+    if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
+    m.playerMatchStats[taker.id].shots++;
+    const layoff = pickPlayer(attTeam, ['CM', 'CAM', 'ST'], taker.id);
+    if (seededRandom() < 0.18) {
+      const scorer = layoff || taker;
+      attTeam.stats.shotsOn++;
+      attTeam.score++;
+      recordStat('goals', scorer, attTeam.team);
+      if (scorer !== taker) recordStat('assists', taker, attTeam.team);
+      if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+      m.playerMatchStats[scorer.id].goals++;
+      m.playerMatchStats[scorer.id].xg += 0.18 + seededRandom() * 0.1;
+      pushGoal(attackingSide, scorer, m.minute, 'first-time strike from an indirect routine');
+      addEvent(m.minute, 'goal', `⚽ Worked short and finished! <span class="player">${scorer.name}</span> converts the indirect routine`, attackingSide, true);
+    } else {
+      addEvent(m.minute, 'miss', `Blocked by the wall on the line — the indirect routine breaks down`, attackingSide);
+      if (seededRandom() < 0.5) resolveCorner(attackingSide);
+    }
+  }
+
+  // ===================================================================
+  // ========================= THROW-INS ================================
+  // ===================================================================
+  // Three genuine options: a normal throw upfield (can still spring an
+  // attack), a long throw hurled straight into the box for a specialist
+  // thrower, and a tactical retaining throw that just keeps possession
+  // ticking over.
+  function resolveThrowIn(side) {
+    const m = currentMatch;
+    if (!m) return;
+    const team = m[side];
+    const oppSide = side === 'home' ? 'away' : 'home';
+    const thrower = pickPlayer(team, ['RB', 'LB', 'RWB', 'LWB', 'CB']);
+    if (!thrower) return;
+    const longThrowSpecialist = (thrower.phy || 70) >= 80 || hasStyle(thrower, 'Long Throw');
+    const roll = seededRandom();
+    if (longThrowSpecialist && roll < 0.3) {
+      addEvent(m.minute, 'whistle', `Long throw hurled into the box by <span class="player">${thrower.name}</span> (${team.team.short})`, side);
+      if (seededRandom() < 0.035) {
+        const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p) * 2, thrower.id);
+        if (scorer) {
+          team.stats.shots++; team.stats.shotsOn++; team.score++;
+          recordStat('goals', scorer, team.team);
+          if (!m.playerMatchStats) m.playerMatchStats = {};
+          if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+          m.playerMatchStats[scorer.id].goals++;
+          m.playerMatchStats[scorer.id].xg += 0.16 + seededRandom() * 0.1;
+          pushGoal(side, scorer, m.minute, 'header from a long throw');
+          addEvent(m.minute, 'goal', `⚽ Long throw flick-on converted! <span class="player">${scorer.name}</span> heads home`, side, true);
+        }
+      }
+    } else if (roll < (longThrowSpecialist ? 0.55 : 0.7)) {
+      addEvent(m.minute, 'pass', `${team.team.short} keep it simple — a short retaining throw down the line`, side);
+    } else {
+      const receiver = pickPlayer(team, ['CM', 'CAM', 'RM', 'LM', 'ST'], thrower.id);
+      if (receiver && seededRandom() < 0.14) {
+        resolveChanceCreation(side, oppSide, receiver, seededRandom() < 0.5 ? 'L' : 'R');
+      } else {
+        addEvent(m.minute, 'whistle', `${team.team.short} throw it long down the line`, side);
+      }
+    }
+  }
+
+  // ===================================================================
+  // ========================= GOAL KICKS ================================
+  // ===================================================================
+  // Short rollout to build from the back (only for a keeper genuinely
+  // comfortable on the ball and a side not sat in a defensive block),
+  // a medium chip out to midfield, or a long punt contested in the air —
+  // the aerial-duel case can spring a genuine second-ball chance.
+  function resolveGoalKick(side) {
+    const m = currentMatch;
+    if (!m) return;
+    const team = m[side];
+    const oppSide = side === 'home' ? 'away' : 'home';
+    const oppTeam = m[oppSide];
+    const gk = pickPlayer(team, ['GK']);
+    if (!gk) return;
+    const tac = (m.tactics && m.tactics[side]) || 'balanced';
+    const buildFromBack = (gk.tec || 70) >= 78 && tac !== 'defend';
+    const roll = seededRandom();
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (buildFromBack && roll < 0.4) {
+      addEvent(m.minute, 'pass', `Short rollout from <span class="player">${gk.name}</span> — ${team.team.short} build from the back`, side);
+      if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+      m.playerMatchStats[gk.id].passes = (m.playerMatchStats[gk.id].passes || 0) + 1;
+      m.playerMatchStats[gk.id].passesCompleted = (m.playerMatchStats[gk.id].passesCompleted || 0) + 1;
+    } else if (roll < 0.75) {
+      addEvent(m.minute, 'pass', `<span class="player">${gk.name}</span> chips the goal-kick out to midfield`, side);
+    } else {
+      const target = pickPlayerCustomWeighted(team, ['ST', 'CB'], (p) => aerialSkill(p) * 2);
+      const defender = pickPlayerCustomWeighted(oppTeam, ['CB'], (p) => aerialSkill(p) * 2);
+      const won = target && (!defender || aerialSkill(target) + seededRandom() * 0.3 > aerialSkill(defender) + seededRandom() * 0.3);
+      addEvent(m.minute, 'whistle', (won && target)
+        ? `Long punt from <span class="player">${gk.name}</span> — <span class="player">${target.name}</span> wins the aerial duel`
+        : `Long punt from <span class="player">${gk.name}</span> — ${oppTeam.team.short} win the header back`, side);
+      if (won && target && seededRandom() < 0.1) {
+        const receiver = pickPlayer(team, ['CAM', 'CM', 'RW', 'LW'], target.id);
+        if (receiver) resolveChanceCreation(side, oppSide, receiver, 'C');
+      }
+    }
+  }
   function formationShape(formationKey) {
     const key = formationKey || '4-3-3';
     if (formationShapeCache[key]) return formationShapeCache[key];
@@ -2063,14 +2503,33 @@ var App = (() => {
     endMatch();
   }
 
-  function maybeOffsideDisallow(side, scorer, minute) {
+  function maybeOffsideDisallow(side, scorer, minute, moment) {
     const m = currentMatch;
-    if (!m || seededRandom() > 0.16) return false; // ~16% of goals get a check
+    if (!m) return false;
+    moment = moment || 'openplay';
+    // Corners, penalties, and a direct free-kick effort are all exempt from
+    // this recheck under the actual Laws of the Game — nobody can be ruled
+    // offside receiving directly from a corner, and there's no separate
+    // "receiver" to judge on a penalty or the taker's own direct free-kick.
+    if (moment === 'corner' || moment === 'penalty' || moment === 'directfreekick') return false;
+    if (seededRandom() > 0.16) return false; // ~16% of goals get a check at all
     const team = m[side];
     addEvent(minute, 'var', `📺 VAR checking possible offside in the build-up to ${team.team.short}'s goal...`, side);
-    // Pace of attacker vs defence line slightly affects
-    const defLine = calcTeamStrength(m[side === 'home' ? 'away' : 'home']);
-    const offsideLikely = 0.35 + Math.max(0, (defLine.pac || 70) - (scorer.pac || 70)) / 200;
+    // Reuse the same spatial/temporal offside model that judges a live
+    // through ball — passer/receiver advancement, the second-last
+    // defender's line, and defensive discipline — rather than a separate,
+    // disconnected pace-only roll.
+    const result = evaluateOffside(side, scorer, 'openplay');
+    let offsideLikely;
+    if (result && result.checked) {
+      offsideLikely = result.offside ? 0.85 : Math.max(0.04, (result.margin || 0) * 2 + 0.05);
+    } else {
+      // Fallback for the rare case the spatial model has nothing to judge
+      // (e.g. missing formation data mid-transition) — the old pace-only
+      // read, so a check never silently does nothing.
+      const defLine = calcTeamStrength(m[side === 'home' ? 'away' : 'home']);
+      offsideLikely = 0.35 + Math.max(0, (defLine.pac || 70) - (scorer.pac || 70)) / 200;
+    }
     if (seededRandom() < offsideLikely) {
       team.score = Math.max(0, team.score - 1);
       // remove last goal from list for this side/scorer
@@ -2658,7 +3117,7 @@ var App = (() => {
     return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
   }
 
-  function pickFkOutcome(taker, gk) {
+  function pickFkOutcome(taker, gk, boost) {
     const outcomes = [
       { scored: true, text: 'whipped curler over the wall into the top corner' },
       { scored: true, text: 'knuckleball that dips late under the bar' },
@@ -2672,7 +3131,10 @@ var App = (() => {
     ];
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
-    const scoreProb = Math.max(0.06, Math.min(0.55, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4));
+    // `boost` — a small edge for a quick restart caught the defence
+    // unorganised (see resolveFreeKickRoutine in engine/setpieces.js);
+    // defaults to 0 so every existing call site is unaffected.
+    const scoreProb = Math.max(0.06, Math.min(0.6, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4 + (boost || 0)));
     if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
     return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
   }
@@ -2990,6 +3452,7 @@ var App = (() => {
       if (seededRandom() < 0.0025) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
     }
     generateEvents();
+    updateFatigue();
     runTacticalAI();
     // Substitutions: aim for at least 3 per team (max 5)
     if (m.minute >= 55 && m.minute <= 88 && !m.inET) {
@@ -3009,6 +3472,10 @@ var App = (() => {
       else if (homeDiff >= 2) pHome *= 0.75;
       if (awayDiff <= -1) pAway *= (awayDiff <= -2 ? 1.6 : 1.3);
       else if (awayDiff >= 2) pAway *= 0.75;
+      // Fatigue nudges timing too — a visibly gassed side brings changes
+      // earlier than the scoreline-only read above would suggest.
+      if (teamAvgStamina('home') < 55) pHome *= 1.25;
+      if (teamAvgStamina('away') < 55) pAway *= 1.25;
       if (seededRandom() < pHome) trySubstitution('home');
       if (seededRandom() < pAway) trySubstitution('away');
     }
@@ -3276,9 +3743,10 @@ var App = (() => {
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
       addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
-      if (chanceType === 'throughball' && seededRandom() < 0.12) {
-        addEvent(m.minute, 'offside', `Offside against <span class="player">${shooter.name}</span>`, attackingSide);
-      }
+      // Note: through-ball offside is now judged spatially, up front, in
+      // resolveChanceCreation() before the shot is ever attempted — see
+      // checkLiveOffside() in engine/offside.js — so there's no separate
+      // flat-probability offside roll here anymore.
       return;
     }
 
@@ -3334,9 +3802,53 @@ var App = (() => {
     const defendingSide = attackingSide === 'home' ? 'away' : 'home';
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
     attTeam.stats.corners = (attTeam.stats.corners || 0) + 1;
-    addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short}`, attackingSide);
-    if (seededRandom() >= 0.05) return;
-    const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CM', 'CAM'], (p) => aerialSkill(p) * 2);
+
+    // Routine selection — a corner is no longer one flat resolution. Six
+    // realistic deliveries, each with its own target profile and
+    // defensive counter: inswinger/outswinger (whipped either way), a
+    // near-post flick-on, a far-post header, a dynamic set-up worked to
+    // the edge of the box, a crowd-the-keeper scramble ball, or a short
+    // corner recycled short.
+    const ROUTINE_LABEL = { inswinger: 'inswinging delivery', outswinger: 'outswinging delivery', nearpost: 'near-post flick', farpost: 'far-post header', edge: 'worked to the edge of the box', crowd: 'crowding the keeper', short: 'short corner' };
+    const GOAL_DESC = { inswinger: 'header from an inswinging corner', outswinger: 'header from an outswinging corner', nearpost: 'flick-on at the near post', farpost: 'towering header at the far post', edge: 'half-volley from the edge of the box', crowd: 'scrambled in from a crowded six-yard box' };
+    const hasShortOption = (attTeam.squad.all || []).some(p => (p.tec || 70) >= 82);
+    const roll = seededRandom();
+    let routine;
+    if (hasShortOption && roll < 0.1) routine = 'short';
+    else if (roll < 0.32) routine = 'inswinger';
+    else if (roll < 0.5) routine = 'outswinger';
+    else if (roll < 0.65) routine = 'nearpost';
+    else if (roll < 0.8) routine = 'farpost';
+    else if (roll < 0.92) routine = 'crowd';
+    else routine = 'edge';
+    addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short} — ${ROUTINE_LABEL[routine]}`, attackingSide);
+
+    if (routine === 'short') {
+      // Recycled short — rarely a shot on this exact passage, but can
+      // still work an opening down the side.
+      if (seededRandom() < 0.22) {
+        const receiver = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW']);
+        if (receiver) resolveChanceCreation(attackingSide, defendingSide, receiver, seededRandom() < 0.5 ? 'L' : 'R');
+      }
+      return;
+    }
+
+    // Defensive setup: zonal marking covers the back-post space and
+    // second balls better; man-marking is sharper at matching a specific
+    // near-post run or a runner attacking the keeper directly. Either way
+    // a genuinely dominant aerial defender assigned to block/screen the
+    // main threat trims the chance further.
+    const zonal = seededRandom() < 0.5;
+    const targetRoles = routine === 'crowd' ? ['ST', 'CB', 'CDM'] : ['ST', 'CB', 'CM', 'CAM'];
+    const BASE_CHANCE = { inswinger: 0.062, outswinger: 0.05, nearpost: 0.07, farpost: 0.055, edge: 0.045, crowd: 0.08 };
+    let chance = BASE_CHANCE[routine] || 0.05;
+    if (zonal && (routine === 'farpost' || routine === 'edge')) chance *= 0.82;
+    if (!zonal && (routine === 'nearpost' || routine === 'crowd')) chance *= 0.82;
+    const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p) * 2);
+    if (blocker && aerialSkill(blocker) > 0.68) chance *= 0.85;
+
+    if (seededRandom() >= chance) return;
+    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p) * 2);
     if (!scorer) return;
     attTeam.stats.shots++;
     attTeam.stats.shotsOn++;
@@ -3345,7 +3857,7 @@ var App = (() => {
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
     m.playerMatchStats[scorer.id].goals++;
-    m.playerMatchStats[scorer.id].xg += 0.28 + seededRandom() * 0.15;
+    m.playerMatchStats[scorer.id].xg += 0.24 + seededRandom() * 0.18;
     const corTaker = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
     if (corTaker && seededRandom() < 0.65) {
       recordStat('assists', corTaker, attTeam.team);
@@ -3353,9 +3865,10 @@ var App = (() => {
       m.playerMatchStats[corTaker.id].assists++;
       m.playerMatchStats[corTaker.id].xa += 0.2 + seededRandom() * 0.3;
     }
-    pushGoal(attackingSide, scorer, m.minute, 'header from corner');
-    addEvent(m.minute, 'goal', `Corner converted. <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);
-    maybeOffsideDisallow(attackingSide, scorer, m.minute);
+    pushGoal(attackingSide, scorer, m.minute, GOAL_DESC[routine] || 'header from corner');
+    addEvent(m.minute, 'goal', `Corner converted (${ROUTINE_LABEL[routine]}). <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);
+    // Exempt from offside by law — nobody can be offside receiving the
+    // ball directly from a corner kick, so no VAR recheck follows.
   }
 
   // ===== Chance Creation phase (the sequence has reached the final third) =====
@@ -3391,6 +3904,17 @@ var App = (() => {
       shooter = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id);
     }
     if (!shooter) shooter = carrier;
+
+    // A through ball is a genuine forward pass into space beyond the
+    // defence — the one chance type actively judged for offside before the
+    // shot ever happens. A flag here stops the passage immediately, the
+    // same as an assistant referee raising it in real time: no shot, no
+    // advantage played.
+    if (chanceType === 'throughball') {
+      const offsideResult = checkLiveOffside(attackingSide, shooter, 'throughball');
+      if (offsideResult && offsideResult.offside) return;
+    }
+
     attTeam.stats.shots++;
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
@@ -3441,7 +3965,7 @@ var App = (() => {
           m.playerMatchStats[taker.id].xg += 0.76 + seededRandom() * 0.08;
           pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
           addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
-          maybeOffsideDisallow(attackingSide, taker, m.minute);
+          maybeOffsideDisallow(attackingSide, taker, m.minute, 'penalty');
         } else {
           if (po.saved) {
             attTeam.stats.shotsOn++;
@@ -3637,57 +4161,36 @@ var App = (() => {
     const defSide = side === 'home' ? 'away' : 'home';
     const attTeam = m[side], defTeam = m[defSide];
     const roll = seededRandom();
-    if (roll < 0.24) {
+    if (roll < 0.20) {
       // Direct free-kick — always the consequence of an actual, logged foul
       // (never conjured out of nowhere). The fouler is picked from the
       // defending side committing a midfield/wide challenge, resolveFoul
       // handles the real foul/card bookkeeping, and only if that foul left
       // the taking side with a genuine dangerous set-piece (and didn't just
-      // end in a red card stopping play) does the free-kick shot follow.
+      // end in a red card stopping play) does a routine get taken —
+      // resolveFreeKickRoutine (engine/setpieces.js) then picks between a
+      // direct strike, a quick restart, a crossed delivery, a short
+      // link-up, or an indirect routine inside the box.
       const fouler = pickPlayer(defTeam, ['CM', 'CDM', 'CB', 'RB', 'LB', 'RWB', 'LWB']);
       const victim = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
       if (fouler) {
         const result = resolveFoul(defSide, side, fouler, victim, false);
         if (result && result.outcome !== 'red' && result.outcome !== 'penalty' && seededRandom() < 0.35) {
-          const taker = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
-          if (taker) {
-            attTeam.stats.shots++;
-            if (!m.playerMatchStats) m.playerMatchStats = {};
-            if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
-            m.playerMatchStats[taker.id].shots++;
-            const fkGk = pickPlayer(defTeam, ['GK']);
-            const fk = pickFkOutcome(taker, fkGk);
-            addEvent(m.minute, 'shot', `<span class="player">${taker.name}</span> stands over the free-kick...`, side);
-            if (fk.scored) {
-              attTeam.stats.shotsOn++;
-              attTeam.score++;
-              recordStat('goals', taker, attTeam.team);
-              m.playerMatchStats[taker.id].goals++;
-              m.playerMatchStats[taker.id].xg += 0.12 + seededRandom() * 0.1;
-              pushGoal(side, taker, m.minute, fk.text);
-              addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, side, true);
-              if (seededRandom() < 0.55) recordStat('puskas', taker, attTeam.team);
-              maybeOffsideDisallow(side, taker, m.minute);
-            } else {
-              if (fk.saved) {
-                attTeam.stats.shotsOn++;
-                const gk = fkGk || pickPlayer(defTeam, ['GK']);
-                if (gk) {
-                  defTeam.stats.saves++;
-                  recordStat('saves', gk, defTeam.team);
-                  if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
-                  m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
-                }
-                addEvent(m.minute, 'save', `🧤 Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, side);
-              } else {
-                addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, side);
-                if (fk.wall) resolveCorner(side);
-              }
-            }
-          }
+          const closeRange = seededRandom() < 0.45;
+          resolveFreeKickRoutine(side, defSide, closeRange);
         }
       }
-    } else if (roll < 0.42) {
+    } else if (roll < 0.30) {
+      // Throw-in — normal, long, or a tactical retaining throw. Whichever
+      // side is more naturally in possession here is picked at random
+      // (the possession pipeline above already decides the headline
+      // sequence each minute, so this is deliberately independent texture).
+      resolveThrowIn(seededRandom() < 0.5 ? side : defSide);
+    } else if (roll < 0.40) {
+      // Goal kick — taken by the side that was defending this passage,
+      // short/medium/long distribution via resolveGoalKick (engine/setpieces.js).
+      resolveGoalKick(defSide);
+    } else if (roll < 0.56) {
       // Handball — the vast majority are just a regular foul; only a small
       // share are actually given as a penalty. The commentary now always
       // matches what's actually awarded instead of asserting a penalty and
@@ -3704,7 +4207,7 @@ var App = (() => {
           resolveFoul(defSide, side, p, null, false);
         }
       }
-    } else if (roll < 0.60) {
+    } else if (roll < 0.68) {
       // VAR — red-card review. A card given after review still traces back
       // to a real foul/challenge that happened on the pitch, so it counts
       // toward fouls (and the 'cards' bucket) exactly like any other card.
@@ -3740,7 +4243,7 @@ var App = (() => {
           addEvent(m.minute, 'yellow', `🟨 Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
         }
       }
-    } else if (roll < 0.72) {
+    } else if (roll < 0.78) {
       const att = pickPlayer(attTeam, ['ST', 'CAM', 'RW', 'LW', 'CM']);
       const def = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM']);
       const rare = seededRandom();
@@ -4001,11 +4504,13 @@ var App = (() => {
     if (!m) return;
     const sideData = m[side];
     const otherSide = side === 'home' ? 'away' : 'home';
+    const oppData = m[otherSide];
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     if (used >= (m.maxSubs || 5)) return;
     if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
     const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
     if (!m.subLog) m.subLog = { home: {}, away: {} };
+    if (!m.cards) m.cards = { home: {}, away: {} };
     const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
     // Game-state context: is this side chasing the game or protecting a
     // lead late on? Drives which line gets sacrificed and what comes on,
@@ -4036,23 +4541,56 @@ var App = (() => {
       const frontPool = pool.filter(p => lineOf(p) === 'FWD' || lineOf(p) === 'MID');
       if (frontPool.length) pool = frontPool;
     }
-    // Weighted pick, not just "worst half": lower-rated legs are still the
-    // main driver, but forwards/midfielders get tired and rotated far more
-    // often in real football than centre-backs, so weight the line too —
-    // this stops the engine picking a defender to sub off just because a
-    // striker happens to have a marginally higher OVR that match.
+
+    // ---- Composite "who comes off" score -----------------------------
+    // Real managerial reasoning folded into one weighted pick instead of a
+    // single "lowest OVR for their line" heuristic: raw fatigue, the real
+    // risk of a second yellow costing the side a man, how the player has
+    // actually performed so far this match, a genuine tactical mismatch
+    // against this specific opponent, plus the scoreline/line-weight bias
+    // the engine already had.
+    const oppStr = calcTeamStrength(oppData);
     const LINE_SUB_WEIGHT = chasing ? { FWD: 0.5, MID: 1.1, DEF: 1.4, GK: 0 }
       : protectingLead ? { FWD: 1.5, MID: 1.1, DEF: 0.3, GK: 0 }
       : { FWD: 1.3, MID: 1.15, DEF: 0.65, GK: 0 };
-    const weighted = pool.map(p => ({ p, w: Math.max(0.15, (96 - (p.ovr || 70)) * (LINE_SUB_WEIGHT[lineOf(p)] || 1)) }));
-    const totalW = weighted.reduce((s, x) => s + x.w, 0);
-    let outPlayer = null;
+    const scored = pool.map(p => {
+      const line = lineOf(p);
+      let score = Math.max(0.15, (96 - (p.ovr || 70)) * (LINE_SUB_WEIGHT[line] || 1));
+      // Fatigue: a genuinely gassed player (see engine/fatigue.js) is a
+      // strong candidate to come off, and increasingly so as the second
+      // half wears on.
+      const stamina = getStamina(m, side, p.id);
+      if (m.minute >= 58) score += Math.max(0, 72 - stamina) * 0.55;
+      // Second-yellow risk: booked earlier and still out there for a
+      // fast/aggressive closing stretch is exactly the profile that ends
+      // up costing the team a man — pull them before that happens rather
+      // than reacting to it after.
+      const hasYellow = (m.cards[side] && m.cards[side][p.id]) >= 1;
+      if (hasYellow && m.minute >= 55) score += 24 + Math.min(20, (m.minute - 55) * 0.6);
+      // Poor match rating so far — a genuinely bad game, not just tired or
+      // booked. Only weighed once there's enough of a sample to mean
+      // anything.
+      const ps = m.playerMatchStats && m.playerMatchStats[p.id];
+      if (ps && ((ps.passes || 0) + (ps.tackles || 0) + (ps.shots || 0)) >= 5) {
+        const liveRating = calcPlayerRating(Object.assign({}, ps, { pos: p.slot || (p.pos || [])[0] }));
+        if (liveRating < 6.2) score += (6.2 - liveRating) * 14;
+      }
+      // Tactical mismatch: a defender being physically overrun by a
+      // quicker opposing attack, or a midfielder outclassed technically by
+      // the opposing midfield, reads as a player who needs help now.
+      if (line === 'DEF' && (oppStr.pac || 70) - (p.pac || 70) >= 10) score += 10;
+      if (line === 'MID' && (oppStr.tec || 70) - (p.tec || 70) >= 10) score += 8;
+      return { p, w: score, stamina, hasYellow };
+    });
+    const totalW = scored.reduce((s, x) => s + x.w, 0);
+    let outPick = null;
     if (totalW > 0) {
       let r = seededRandom() * totalW;
-      for (const x of weighted) { r -= x.w; if (r <= 0) { outPlayer = x.p; break; } }
+      for (const x of scored) { r -= x.w; if (r <= 0) { outPick = x; break; } }
     }
-    if (!outPlayer) outPlayer = pool[Math.floor(seededRandom() * pool.length)];
-    if (!outPlayer) return;
+    if (!outPick) outPick = scored[Math.floor(seededRandom() * scored.length)];
+    if (!outPick) return;
+    const outPlayer = outPick.p;
 
     // A substitute can only come from the bench, must not already be on the
     // pitch, and — critically — must never have left the pitch already this
@@ -4084,12 +4622,26 @@ var App = (() => {
     if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => lineOf(p) === outLine); tacticalChange = false; }
     if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => canPlay(p, outSlot)); matchedOwnPosition = false; tacticalChange = false; }
     if (!candidatesIn.length) { candidatesIn = availableSubs; matchedOwnPosition = false; tacticalChange = false; }
-    candidatesIn.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
+
+    // Positional need on top of raw quality: if this line is specifically
+    // being outrun by the opponent (the same mismatch signal that pushed
+    // this player toward being subbed off in the first place), prefer the
+    // bench option with real recovery pace to counter it rather than just
+    // the highest OVR among the tiered candidates.
+    const needsPace = outLine === 'DEF' && (oppStr.pac || 70) - (outPlayer.pac || 70) >= 10;
+    candidatesIn = candidatesIn.slice().sort((a, b) => {
+      if (needsPace) {
+        const d = (b.pac || 70) - (a.pac || 70);
+        if (Math.abs(d) >= 4) return d;
+      }
+      return (b.ovr || 70) - (a.ovr || 70);
+    });
     const top = candidatesIn.slice(0, Math.min(3, candidatesIn.length));
     const inPlayer = top[Math.floor(seededRandom() * top.length)];
     const idx = onPitchIds.indexOf(outPlayer.id);
     if (idx >= 0) onPitchIds[idx] = inPlayer.id;
     markLeftPitch(m, side, outPlayer.id);
+    resetFatigueFor(m, side, inPlayer.id);
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
@@ -4099,8 +4651,14 @@ var App = (() => {
     if (!matchedOwnPosition) inPlayer.slot = tacticalChange ? (inPlayer.pos || [outSlot])[0] : outSlot;
     else if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CM'])[0];
     const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
+    // Surface the real reason behind a notable change (booked/tiring) in
+    // the event log, same spirit as the tactical tag above.
+    const reasonBits = [];
+    if (outPick.hasYellow && m.minute >= 55) reasonBits.push('booked, managing risk');
+    if (outPick.stamina < 40) reasonBits.push('tiring');
+    const reasonTag = reasonBits.length ? ` <span style="opacity:0.55">(${reasonBits.join(', ')})</span>` : '';
     addEvent(m.minute, 'sub',
-      `Substitution · ${sideData.team.short}${tag}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
+      `Substitution · ${sideData.team.short}${tag}${reasonTag}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
       side);
     if (!m.quietSim) { renderLineups(); renderPitch(); }
   }
@@ -4146,6 +4704,7 @@ var App = (() => {
     const idx = onPitchIds.indexOf(outPlayer.id);
     if (idx >= 0) onPitchIds[idx] = inPlayer.id;
     markLeftPitch(m, side, outPlayer.id);
+    resetFatigueFor(m, side, inPlayer.id);
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
@@ -4358,6 +4917,7 @@ var App = (() => {
         const idx = onPitchIds.indexOf(injured.id);
         if (idx >= 0) onPitchIds[idx] = inPlayer.id;
         markLeftPitch(m, side, injured.id);
+        resetFatigueFor(m, side, inPlayer.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
         addEvent(m.minute, 'sub', `Forced sub: <span class="player">${inPlayer.name}</span> replaces injured <span class="player">${injured.name}</span>`, side);
       } else {
