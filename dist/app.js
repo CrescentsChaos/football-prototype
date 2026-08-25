@@ -1864,19 +1864,7 @@ var App = (() => {
   }
 
   function blankStats() {
-    return {
-      shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0,
-      // Attack
-      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
-      // Passing
-      progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
-      // Defense
-      tackles: 0, clearances: 0, headedClearances: 0, defensiveErrors: 0, recoveries: 0, pressures: 0, aerialDuels: 0,
-      // Physical
-      distance: 0, sprints: 0, highSpeedRuns: 0, accelerations: 0, decelerations: 0,
-      // Goalkeeping
-      punches: 0, claims: 0, crossesStopped: 0, goalsPrevented: 0, psxg: 0, distribution: 0
-    };
+    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0 };
   }
 
   
@@ -2302,22 +2290,8 @@ var App = (() => {
 
 
   function blankPlayerMatchStats(p) {
-    return {
-      id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr,
-      goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false,
-      // Attack
-      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
-      // Passing
-      progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
-      // Defense
-      interceptions: 0, blocks: 0, clearances: 0, headedClearances: 0, defensiveErrors: 0, recoveries: 0, pressures: 0, aerialDuels: 0,
-      // Physical
-      distance: 0, sprints: 0, highSpeedRuns: 0, accelerations: 0, decelerations: 0,
-      // Goalkeeping
-      punches: 0, claims: 0, crossesStopped: 0, goalsPrevented: 0, psxg: 0, distribution: 0
-    };
+    return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
   }
-
   // Broad role bucket for extended-stats generation below — GK / DEF / MID / FWD.
   function posGroupOf(posArr, primaryPos) {
     const pp = (primaryPos || (posArr || [])[0] || 'CM').toUpperCase();
@@ -2327,7 +2301,6 @@ var App = (() => {
     if (['CM', 'CDM', 'CAM', 'RM', 'LM'].includes(pp) || list.some(x => ['CM','CDM','CAM','RM','LM'].includes(x))) return 'MID';
     return 'FWD';
   }
-
   // Fills in the full extended stat sheet (Attack/Passing/Defense/Physical/
   // Goalkeeping) for every player involved in the match, then sums each
   // field into the team totals so the team sheet always agrees exactly with
@@ -2418,7 +2391,7 @@ var App = (() => {
           ps.crosses = rr(passes * (wide ? 0.14 : isFwd ? 0.04 : 0.015) + rv(0, 1));
           ps.switches = rr(passesC * 0.018);
           ps.longBalls = rr(passesC * (isDef ? 0.18 : isMid ? 0.08 : 0.04));
-          ps.finalThirdPasses = rr(passesC * (isFwd ? 0.35 : isMid ? 0.3 : isDef ? 0.12 : 0.2));
+          ps.finalThirdPasses = rr(passesC * (isFwd ? 0.35 : isMid ? 0.3 : isDef ? 0.2));
 
           ps.clearances = rr(rv((isDef ? 3.2 : isMid ? 0.6 : 0.15) * minFrac, isDef ? 2 : 0.6));
           ps.headedClearances = rr(ps.clearances * (0.3 + seededRandom() * 0.25));
@@ -4587,10 +4560,6 @@ var App = (() => {
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
       if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
     });
-    // Fill in the full Attack/Passing/Defense/Physical/Goalkeeping stat sheet
-    // for every player who took part, then roll those up into each side's
-    // team totals — see deriveExtendedMatchStats() below.
-    deriveExtendedMatchStats(m);
     let best = null, bestR = -1;
     Object.values(m.playerMatchStats).forEach(ps => {
       if (ps.rating > bestR) { bestR = ps.rating; best = ps; }
@@ -5175,7 +5144,13 @@ var App = (() => {
     } catch (e) {}
   }
 
+  // ⚡ Bolt Optimization: Cache player team affiliations to avoid repeated O(N*M) scans across teams & players
+  const playerTeamsCache = new Map();
+
   function findPlayerTeams(playerId) {
+    if (playerTeamsCache.has(playerId)) {
+      return playerTeamsCache.get(playerId);
+    }
     let national = null, club = null;
     (teamsData.national || []).forEach(t => {
       if ((t.players || []).some(p => p.id === playerId)) national = t.name;
@@ -5222,7 +5197,9 @@ var App = (() => {
         }
       }
     }
-    return { national, club };
+    const result = { national, club };
+    playerTeamsCache.set(playerId, result);
+    return result;
   }
 
   function recordStat(type, player, team) {
@@ -8326,7 +8303,7 @@ var App = (() => {
       stats: blankCompStats()
     };
 
-    season = { year: 1, week: 0, daySlot: 0, leagues, ucl };
+    season = { year: 1, week: 0, leagues, ucl };
     seasonActiveTab = 'epl';
     seasonActiveSubTab = 'table';
     renderSeasonDashboard();
@@ -8440,23 +8417,11 @@ var App = (() => {
   // sitting unplayed — fixed by folding the UCL into the same calculation.
   function computeSeasonWeek(s) {
     if (!s || !s.leagues) return 0;
-    // A finished competition's currentRound stops moving forever, and so
-    // does the UCL's once it leaves its league phase for the knockout
-    // bracket (progress from there is tracked via the bracket, not
-    // currentRound) — neither should ever act as a floor on the
-    // season-wide matchday count, or the very first competition to reach
-    // either state permanently freezes every other competition that's
-    // still progressing.
-    const active = seasonCompEntries(s).filter(({ key, comp }) => {
-      if (!comp || comp.finished) return false;
-      if (key === 'ucl' && comp.stage !== 'league') return false;
-      return true;
+    const rounds = seasonCompEntries(s).map(({ comp }) => {
+      if (!comp) return 0;
+      return comp.finished ? comp.rounds.length : comp.currentRound;
     });
-    if (!active.length) {
-      const finalRounds = seasonCompEntries(s).map(({ comp }) => comp ? comp.rounds.length : 0);
-      return finalRounds.length ? Math.max(...finalRounds) : 0;
-    }
-    return Math.min(...active.map(({ comp }) => comp.currentRound));
+    return rounds.length ? Math.min(...rounds) : 0;
   }
 
   // ========== STRICT MATCHDAY GATING ==========
@@ -8490,30 +8455,11 @@ var App = (() => {
   }
   // Whether `comp` is allowed to simulate/play a fixture right now — false
   // if it has already completed the current global matchday and is simply
-  // waiting on slower competitions to catch up before the day can turn over,
-  // OR if today's fixture-congestion slot belongs to a different competition
-  // (e.g. it's a UCL day, so the domestic leagues sit idle until the cycle
-  // comes back round to them).
+  // waiting on slower competitions to catch up before the day can turn over.
   function seasonCompCanPlayNow(key, comp) {
     if (!season || !comp || comp.finished) return false;
     if (key === 'ucl' && comp.stage !== 'league') return true;
-    const slot = currentCongestionSlot();
-    if (!seasonKeysForCongestionComp(slot.comp).includes(key)) return false;
     return comp.currentRound <= computeSeasonWeek(season);
-  }
-
-  // Human-readable reason a fixture can't be played right now, for the
-  // toasts in simSeasonFixture/playSeasonFixture — distinguishes "it's not
-  // this competition's day yet" from "the matchday itself isn't finished".
-  function seasonBlockedFixtureMessage(compKey) {
-    const slot = currentCongestionSlot();
-    const eligible = seasonKeysForCongestionComp(slot.comp);
-    if (!eligible.includes(compKey)) {
-      return "It's " + slot.day + " — " + slot.comp + " fixtures only today. Simulate today's matches first to move on.";
-    }
-    const due = seasonMatchesDue();
-    return 'Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
-      due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first';
   }
   // Every still-unplayed fixture blocking the season from advancing past
   // its current matchday — i.e. every fixture, across every competition,
@@ -8556,7 +8502,7 @@ var App = (() => {
     // Keep the season-wide Matchday counter in sync — this is the fix for
     // live/instant single-fixture play never advancing it (only the bulk
     // "Simulate Matchday" actions used to update it directly).
-    if (season) { season.week = computeSeasonWeek(season); advanceCongestionSlotIfComplete(); }
+    if (season) season.week = computeSeasonWeek(season);
     finalizeSeasonIfComplete();
   }
 
@@ -8567,7 +8513,9 @@ var App = (() => {
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
-      toast(seasonBlockedFixtureMessage(compKey));
+      const due = seasonMatchesDue();
+      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
+        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
       return;
     }
     const round = comp.rounds[comp.currentRound];
@@ -8599,7 +8547,9 @@ var App = (() => {
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
-      toast(seasonBlockedFixtureMessage(compKey));
+      const due = seasonMatchesDue();
+      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
+        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
       return;
     }
     const round = comp.rounds[comp.currentRound];
@@ -8649,20 +8599,11 @@ var App = (() => {
       // UCL, moved into its knockout stage) is left alone so the day only
       // turns over once literally everything due has been played.
       const targetIdx = computeSeasonWeek(season);
-      const eligibleKeys = new Set(seasonKeysForCongestionComp(currentCongestionSlot().comp));
       seasonCompEntries().forEach(({ key, comp }) => {
-        if (!comp || comp.finished) return;
-        // Knockout ties (QF/SF/Final) are one-off weeks outside the normal
-        // matchday cadence and congestion cycle entirely, so they must be
-        // checked — and simulated — before the matchday/congestion gates
-        // below, not filtered out by them.
-        if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); return; }
         if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
-        if (!eligibleKeys.has(key)) return; // not today's competition
         if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
       });
       season.week = computeSeasonWeek(season);
-      advanceCongestionSlotIfComplete();
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
       persistAll();
@@ -8674,22 +8615,10 @@ var App = (() => {
     if (!season) return;
     withLoading('Simulating rest of season…', function() {
       let safety = 0;
-      // "Simulate to End" fast-forwards past the fixture-congestion cadence
-      // on purpose — it's a bulk skip-ahead action, not a day-by-day play
-      // session, so every competition due for the matchday plays regardless
-      // of whose day it is in the congestion cycle.
       while (!seasonIsComplete() && safety < 1000) {
         const targetIdx = computeSeasonWeek(season);
         let playedSomething = false;
         seasonCompEntries().forEach(({ key, comp }) => {
-          if (!comp || comp.finished) return;
-          // Knockout ties must be checked — and simulated — before the
-          // matchday gate below, since seasonCompDoneWithMatchday treats
-          // them as "done with the matchday" (correctly, so they don't
-          // block the domestic leagues) but that's not the same as "don't
-          // simulate them"; without this they'd never advance in a bulk
-          // sim and the season would never actually finish.
-          if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); playedSomething = true; return; }
           if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
           if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
           playedSomething = true;
@@ -8700,7 +8629,6 @@ var App = (() => {
         // progress at all, stop rather than spin forever.
         if (!playedSomething) break;
       }
-      advanceCongestionSlotIfComplete();
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
       persistAll();
@@ -8731,7 +8659,7 @@ var App = (() => {
     const uclRounds = [];
     for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
     season = {
-      year, week: 0, daySlot: 0, leagues,
+      year, week: 0, leagues,
       ucl: { key: 'ucl', name: 'Champions League', teams: uclTeams, table: uclTeams.map(blankSeasonRow),
         rounds: uclRounds, currentRound: 0, matchesPerTeam, stage: 'league', bracketSize: null,
         knockout: { qf: null, sf: null, final: null }, champion: null, finished: false,
@@ -8774,12 +8702,10 @@ var App = (() => {
 
   // Repeating 5-slot fixture-congestion pattern: Sat league, Tue continental,
   // Sat league, Tue domestic cup, Sun league — the busy week-to-week rhythm
-  // real top-flight calendars follow. `season.daySlot` tracks the season's
-  // actual position in this cycle (separate from the Matchday/round counter)
-  // and is what real play is gated against — see seasonCompCanPlayNow and
-  // advanceCongestionSlotIfComplete. Domestic cup isn't an implemented
-  // competition yet, so that slot is auto-skipped and shown greyed-out
-  // rather than pretending a cup fixture exists.
+  // real top-flight calendars follow. The season's Matchday counter is used
+  // as the cycle position so the strip advances automatically as matchdays
+  // are played. Domestic cup isn't an implemented competition yet, so that
+  // slot is shown greyed-out rather than pretending a cup fixture exists.
   const FIXTURE_CONGESTION_CYCLE = [
     { day: 'Sat', comp: 'League' },
     { day: 'Tue', comp: 'UCL' },
@@ -8788,51 +8714,9 @@ var App = (() => {
     { day: 'Sun', comp: 'League' }
   ];
 
-  function currentCongestionSlot() {
-    const cyc = FIXTURE_CONGESTION_CYCLE;
-    const base = (season && typeof season.daySlot === 'number') ? season.daySlot : 0;
-    const idx = ((base % cyc.length) + cyc.length) % cyc.length;
-    return cyc[idx];
-  }
-
-  // Which season competition keys are eligible to play under a given
-  // congestion slot's competition label — 'League' covers all five
-  // domestic leagues at once (they're not individually staggered), 'UCL'
-  // is just the Champions League, and 'Cup' never resolves to anything
-  // since that competition isn't implemented yet.
-  function seasonKeysForCongestionComp(compLabel) {
-    if (compLabel === 'League') return SEASON_LEAGUE_DEFS.map(d => d.key);
-    if (compLabel === 'UCL') return ['ucl'];
-    return [];
-  }
-
-  // Every fixture still due for TODAY's congestion slot specifically —
-  // narrower than seasonMatchesDue(), which covers every competition due
-  // for the current matchday regardless of which day's slot they belong to.
-  function seasonSlotMatchesDue() {
-    if (!season) return [];
-    const keys = new Set(seasonKeysForCongestionComp(currentCongestionSlot().comp));
-    return seasonMatchesDue().filter(d => keys.has(d.compKey));
-  }
-
-  // Moves the season on to the next day in the congestion cycle once
-  // nothing due today is left to play — auto-skipping the Cup slot (never
-  // has fixtures) so the cycle never stalls waiting on an unimplemented
-  // competition.
-  function advanceCongestionSlotIfComplete() {
-    if (!season) return;
-    if (typeof season.daySlot !== 'number') season.daySlot = 0;
-    let guard = 0;
-    while (guard++ < FIXTURE_CONGESTION_CYCLE.length) {
-      const slot = currentCongestionSlot();
-      if (slot.comp !== 'Cup' && seasonSlotMatchesDue().length) break;
-      season.daySlot++;
-    }
-  }
-
   function fixtureCongestionSlot(offset) {
     const cyc = FIXTURE_CONGESTION_CYCLE;
-    const base = (season && typeof season.daySlot === 'number') ? season.daySlot : 0;
+    const base = (season && typeof season.week === 'number') ? season.week : 0;
     const idx = ((base + offset) % cyc.length + cyc.length) % cyc.length;
     return cyc[idx];
   }
