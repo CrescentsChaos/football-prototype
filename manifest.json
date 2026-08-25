@@ -14,6 +14,13 @@
     "label": "gap"
   },
   {
+    "id": "ccomp01",
+    "file": "data/competitions.js",
+    "start": -1,
+    "end": -1,
+    "label": "tournament formats registry"
+  },
+  {
     "id": "cfat01",
     "file": "engine/fatigue.js",
     "start": -1,
@@ -572,6 +579,13 @@
     "start": 1098,
     "end": 1113,
     "label": "func:goToTournament"
+  },
+  {
+    "id": "ccomp02",
+    "file": "ui/seasonUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:selectTournamentFormat"
   },
   {
     "id": "c0062",
@@ -2756,6 +2770,13 @@
     "start": 5582,
     "end": 5617,
     "label": "func:startUCLTournament"
+  },
+  {
+    "id": "cko0001",
+    "file": "simulation/knockoutEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:startKnockoutTournament"
   },
   {
     "id": "c0364",

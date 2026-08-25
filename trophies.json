@@ -6,7 +6,6 @@
   "Serie A": "serie-a.png",
   "Bundesliga": "bundesliga.png",
   "Ligue 1": "ligue-1.png",
-
   "Golden Boot": "golden-boot.png",
   "Golden Ball": "golden-ball.png",
   "Golden Glove": "golden-glove.png",
@@ -17,5 +16,22 @@
   "Ballon d'Or": "ballon-dor.png",
   "Puskás Award": "puskas-award.png",
   "Gerd Müller Award": "gerd-muller-award.png",
-  "Yashin Trophy": "yashin-trophy.png"
+  "Yashin Trophy": "yashin-trophy.png",
+  "Nations League": "nations-league.png",
+  "European Championship": "euros.png",
+  "Copa América": "copa-america.png",
+  "Africa Cup of Nations": "afcon.png",
+  "AFC Asian Cup": "asian-cup.png",
+  "CONCACAF Gold Cup": "gold-cup.png",
+  "FA Cup": "fa-cup.png",
+  "EFL Cup": "efl-cup.png",
+  "FA Community Shield": "fa-community-shield.png",
+  "Copa del Rey": "copa-del-rey.png",
+  "Supercopa de España": "supercopa-de-espana.png",
+  "DFB-Pokal": "dfb-pokal.png",
+  "DFL-Supercup": "dfl-supercup.png",
+  "Coppa Italia": "coppa-italia.png",
+  "Supercoppa Italiana": "supercoppa-italiana.png",
+  "Coupe de France": "coupe-de-france.png",
+  "Trophée des Champions": "trophee-des-champions.png"
 }
