@@ -224,6 +224,83 @@ var App = (() => {
   // formation's bonus/penalty is measured as a delta off this neutral shape.
   const SHAPE_BASELINE = { def: 3.6, fwd: 2.5, mid: 3.0 };
   const formationShapeCache = {};
+  const TOURNAMENT_FORMATS = {
+    'worldcup': { name: 'World Cup', short: 'World Cup', engine: 'groups', pool: 'national', leaguesKey: null,
+      desc: 'Select national teams. Supports groups (up to 48 teams, World Cup style).' },
+    'ucl': { name: 'Champions League', short: 'Champions League', engine: 'league', pool: 'club', leaguesKey: null,
+      desc: 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.' },
+    'nations-league': { name: 'Nations League', short: 'Nations League', engine: 'groups', pool: 'national', leaguesKey: 'Nations League',
+      desc: 'European nations in groups, then knockout. Team picker is restricted to the eligible nations in leagues.json.' },
+    'euros': { name: 'European Championship', short: 'Euros', engine: 'groups', pool: 'national', leaguesKey: 'Euros',
+      desc: 'European nations compete through groups and knockouts.' },
+    'copa-america': { name: 'Copa América', short: 'Copa América', engine: 'groups', pool: 'national', leaguesKey: 'Copa América',
+      desc: 'South American nations compete through groups and knockouts.' },
+    'afcon': { name: 'Africa Cup of Nations', short: 'AFCON', engine: 'groups', pool: 'national', leaguesKey: 'AFCON',
+      desc: 'African nations compete through groups and knockouts.' },
+    'asian-cup': { name: 'AFC Asian Cup', short: 'Asian Cup', engine: 'groups', pool: 'national', leaguesKey: 'Asian Cup',
+      desc: 'Asian nations compete through groups and knockouts.' },
+    'gold-cup': { name: 'CONCACAF Gold Cup', short: 'Gold Cup', engine: 'groups', pool: 'national', leaguesKey: 'Gold Cup',
+      desc: 'North/Central American & Caribbean nations compete through groups and knockouts.' },
+    'fa-cup': { name: 'FA Cup', short: 'FA Cup', engine: 'knockout', pool: 'club', leaguesKey: 'FA Cup',
+      desc: 'English clubs in a straight single-elimination knockout, from Round 1 to the Final.' },
+    'efl-cup': { name: 'EFL Cup', short: 'EFL Cup', engine: 'knockout', pool: 'club', leaguesKey: 'EFL Cup',
+      desc: 'English clubs in a straight single-elimination knockout, from Round 1 to the Final.' },
+    'community-shield': { name: 'FA Community Shield', short: 'Community Shield', engine: 'knockout', pool: 'club', leaguesKey: 'FA Community Shield',
+      desc: 'A single curtain-raiser match — pick exactly two English clubs.' },
+    'copa-del-rey': { name: 'Copa del Rey', short: 'Copa del Rey', engine: 'knockout', pool: 'club', leaguesKey: 'Copa del Rey',
+      desc: 'Spanish clubs in a straight single-elimination knockout, from Round 1 to the Final.' },
+    'supercopa-esp': { name: 'Supercopa de España', short: 'Supercopa de España', engine: 'knockout', pool: 'club', leaguesKey: 'Supercopa de España',
+      desc: 'A short knockout between Spain\u2019s top clubs — pick 2 or 4.' },
+    'dfb-pokal': { name: 'DFB-Pokal', short: 'DFB-Pokal', engine: 'knockout', pool: 'club', leaguesKey: 'DFB-Pokal',
+      desc: 'German clubs in a straight single-elimination knockout, from Round 1 to the Final.' },
+    'dfl-supercup': { name: 'DFL-Supercup', short: 'DFL-Supercup', engine: 'knockout', pool: 'club', leaguesKey: 'DFL-Supercup',
+      desc: 'A single curtain-raiser match — pick exactly two German clubs.' },
+    'coppa-italia': { name: 'Coppa Italia', short: 'Coppa Italia', engine: 'knockout', pool: 'club', leaguesKey: 'Coppa Italia',
+      desc: 'Italian clubs in a straight single-elimination knockout, from Round 1 to the Final.' },
+    'supercoppa-ita': { name: 'Supercoppa Italiana', short: 'Supercoppa Italiana', engine: 'knockout', pool: 'club', leaguesKey: 'Supercoppa Italiana',
+      desc: 'A short knockout between Italy\u2019s top clubs — pick 2 or 4.' },
+    'coupe-de-france': { name: 'Coupe de France', short: 'Coupe de France', engine: 'knockout', pool: 'club', leaguesKey: 'Coupe de France',
+      desc: 'French clubs in a straight single-elimination knockout, from Round 1 to the Final.' },
+    'trophee-des-champions': { name: 'Troph\u00e9e des Champions', short: 'Troph\u00e9e des Champions', engine: 'knockout', pool: 'club', leaguesKey: 'Troph\u00e9e des Champions',
+      desc: 'A single curtain-raiser match — pick exactly two French clubs.' }
+  };
+
+  // Generic name-matching resolver shared by every competition's eligibility
+  // list. Mirrors getLeagueTeamPool()'s matching order (exact -> normalized
+  // -> loose substring) but works against either the national or the club
+  // pool, since it's used for both continental national-team competitions
+  // and domestic club competitions.
+  function resolveEligiblePool(names, sourcePool) {
+    if (!names || !names.length || !sourcePool || !sourcePool.length) return [];
+    const matched = [];
+    names.forEach(n => {
+      const norm = normalizeLeagueName(n);
+      let t = sourcePool.find(x => (x.name || '').toLowerCase() === (n || '').toLowerCase());
+      if (!t) t = sourcePool.find(x => normalizeLeagueName(x.name) === norm);
+      if (!t) t = sourcePool.find(x => norm && (normalizeLeagueName(x.name).includes(norm) || norm.includes(normalizeLeagueName(x.name))));
+      if (t && !matched.includes(t)) matched.push(t);
+    });
+    return matched;
+  }
+
+  // Resolves the eligible team-selection pool for a given tournament format
+  // key. World Cup and Champions League have no leaguesKey, so they keep
+  // offering the full national/club pool exactly as before. Every other
+  // format restricts the picker to the names listed under its key in
+  // leagues.json — falling back to the full pool (like getLeagueTeamPool()
+  // does for the Season Calendar) if leagues.json has no entry yet or none
+  // of its names match teams.json.
+  function getCompetitionEligiblePool(formatKey) {
+    const cfg = TOURNAMENT_FORMATS[formatKey];
+    if (!cfg) return [];
+    const rawPool = cfg.pool === 'national' ? (teamsData.national || []) : (teamsData.club || []);
+    if (!cfg.leaguesKey) return rawPool;
+    const fullPool = cfg.pool === 'national' ? rawPool : rawPool.filter(isCurrentSeasonSquad);
+    const names = leaguesData[cfg.leaguesKey];
+    if (!names || !names.length) return fullPool;
+    const matched = resolveEligiblePool(names, fullPool);
+    return matched.length ? matched : fullPool;
+  }
 
   // ===================================================================
   // ===================== FATIGUE / STAMINA MODEL ====================
@@ -1593,19 +1670,30 @@ var App = (() => {
   }
 
   function goToTournament(type) {
-    tournamentType = type || 'worldcup';
     switchView('tournament');
     const setup = document.getElementById('tournament-setup');
     const live = document.getElementById('tournament-live');
     if (setup) setup.style.display = 'block';
     if (live) live.style.display = 'none';
-    const isWC = tournamentType === 'worldcup';
+    selectTournamentFormat(type || tournamentType || 'worldcup');
+  }
+  // Applies a tournament format selection — used by the Home mode-cards, the
+  // Tournament tab's own format <select>, and restoreTournamentUI() on
+  // reload. Updates tournamentType, the setup card's title/description
+  // (from the TOURNAMENT_FORMATS registry), keeps the <select> in sync, and
+  // re-renders the eligible team picker for that format.
+  function selectTournamentFormat(key) {
+    tournamentType = (key && TOURNAMENT_FORMATS[key]) ? key : 'worldcup';
+    const cfg = TOURNAMENT_FORMATS[tournamentType];
     const title = document.getElementById('tournament-title');
     const desc = document.getElementById('tournament-desc');
-    if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
-    if (desc) desc.textContent = isWC
-      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
-      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
+    if (title) title.textContent = cfg.name + ' Setup';
+    if (desc) desc.textContent = cfg.desc;
+    const select = document.getElementById('tour-format-select');
+    if (select && select.value !== tournamentType) select.value = tournamentType;
+    tourTeamsSearch = '';
+    const search = document.getElementById('tour-teams-search');
+    if (search) search.value = '';
     renderTournamentTeamSelect();
   }
 
@@ -6278,13 +6366,13 @@ var App = (() => {
     const live = document.getElementById('tournament-live');
     if (setup) setup.style.display = 'none';
     if (live) live.style.display = 'block';
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || TOURNAMENT_FORMATS.worldcup;
     const title = document.getElementById('tournament-title');
     const desc = document.getElementById('tournament-desc');
-    const isWC = tournamentType === 'worldcup';
-    if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
-    if (desc) desc.textContent = isWC
-      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
-      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
+    if (title) title.textContent = cfg.name + ' Setup';
+    if (desc) desc.textContent = cfg.desc;
+    const select = document.getElementById('tour-format-select');
+    if (select) select.value = tournamentType;
     try {
       if (tournament.format === 'league') { renderUCLLeague(); renderUCLFixtures(); }
       else { renderGroups(); }
@@ -6552,7 +6640,7 @@ var App = (() => {
   }
 
   function renderTournamentTeamSelect() {
-    let pool = tournamentType === 'worldcup' ? (teamsData.national || []) : (teamsData.club || []);
+    let pool = getCompetitionEligiblePool(tournamentType);
     if (tourTeamsSearch) {
       pool = pool.filter(t =>
         (t.name || '').toLowerCase().includes(tourTeamsSearch) ||
@@ -6603,7 +6691,11 @@ var App = (() => {
       }
     }
     if (el) {
-      const need = tournamentType === 'ucl' ? '36 ideal (min 8)' : '4+ (8/16/32/48 ideal)';
+      const cfg = TOURNAMENT_FORMATS[tournamentType];
+      const engine = cfg && cfg.engine;
+      const need = engine === 'league' ? '36 ideal (min 8)'
+        : engine === 'knockout' ? 'a power of 2 — 2/4/8/16/32… (min 2)'
+        : '4+ (8/16/32/48 ideal)';
       el.innerHTML = '<strong>' + n + '</strong> teams selected <span style="color:var(--text-3)">· ' + need + '</span>';
     }
   }
@@ -6627,7 +6719,12 @@ var App = (() => {
 
   function startTournament() {
     const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
-    if (selected.length < 4) { toast('Select at least 4 teams'); return; }
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || TOURNAMENT_FORMATS.worldcup;
+    // Straight-knockout formats (domestic cups, Super Cups) only need a
+    // power-of-2 field as small as 2 (a one-off Super Cup match); every
+    // other engine still needs the original minimum of 4.
+    const minTeams = cfg.engine === 'knockout' ? 2 : 4;
+    if (selected.length < minTeams) { toast('Select at least ' + minTeams + ' teams'); return; }
 
     tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
     // Clear previous tournament UI
@@ -6636,8 +6733,10 @@ var App = (() => {
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
 
-    if (tournamentType === 'ucl') {
+    if (cfg.engine === 'league') {
       startUCLTournament(selected);
+    } else if (cfg.engine === 'knockout') {
+      startKnockoutTournament(selected);
     } else {
       startWorldCupTournament(selected);
     }
@@ -6668,7 +6767,11 @@ var App = (() => {
         }))
       });
     }
-    tournament = { type: 'worldcup', format: 'groups', groups, knockout: [], stage: 'groups', fixtures: [], champion: null, playoff: [] };
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
+    tournament = {
+      type: 'worldcup', format: 'groups', groups, knockout: [], stage: 'groups', fixtures: [], champion: null, playoff: [],
+      competition: tournamentType, competitionName: cfg.name || 'World Cup'
+    };
     generateGroupFixtures();
     renderGroups();
     const stageTitle = document.getElementById('tour-stage-title');
@@ -6684,7 +6787,9 @@ var App = (() => {
     // Prefer 36; if fewer, use largest even count >= 8 (scale format)
     if (teams.length >= 36) teams = teams.slice(0, 36);
     else if (teams.length % 2 === 1) teams = teams.slice(0, teams.length - 1);
-    if (teams.length < 8) { toast('Champions League needs at least 8 clubs (36 ideal)'); return; }
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
+    const compName = cfg.name || 'Champions League';
+    if (teams.length < 8) { toast(compName + ' needs at least 8 clubs (36 ideal)'); return; }
 
     const league = teams.map(t => ({
       team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
@@ -6703,7 +6808,9 @@ var App = (() => {
       knockout: [],
       groups: [],
       champion: null,
-      matchesPerTeam
+      matchesPerTeam,
+      competition: tournamentType,
+      competitionName: compName
     };
 
     renderUCLLeague();
@@ -6713,7 +6820,46 @@ var App = (() => {
     if (bracket) bracket.innerHTML = '<p style="color:var(--text-muted)">Playoffs & knockout appear after the league phase.</p>';
     const btn = document.getElementById('btn-sim-round');
     if (btn) btn.textContent = 'Simulate League Round';
-    toast('UCL league phase: ' + teams.length + ' teams, ' + fixtures.length + ' matches');
+    toast(compName + ' league phase: ' + teams.length + ' teams, ' + fixtures.length + ' matches');
+  }
+  function startKnockoutTournament(selected) {
+    let teams = shuffleArray([...selected]);
+    // Force a power of 2 (2, 4, 8, 16, 32…) so the bracket is a clean
+    // single-elimination ladder from Round 1 straight through to the Final.
+    while (teams.length >= 2 && (teams.length & (teams.length - 1))) teams.pop();
+    if (teams.length < 2) { toast('Need at least 2 teams (a power of 2) for a knockout'); return; }
+
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
+    const matches = [];
+    for (let i = 0; i < teams.length; i += 2) {
+      matches.push({
+        home: teams[i], away: teams[i + 1],
+        homeScore: null, awayScore: null, winner: null, played: false, penalties: false
+      });
+    }
+    tournament = {
+      type: 'knockout',
+      format: 'knockout',
+      stage: 'knockout',
+      groups: [],
+      fixtures: [],
+      knockout: [{ name: getRoundName(teams.length), matches }],
+      champion: null,
+      playoff: [],
+      competition: tournamentType,
+      competitionName: cfg.name || 'Cup'
+    };
+
+    const fixEl = document.getElementById('fixture-list');
+    if (fixEl) fixEl.innerHTML = '';
+    const groupsEl = document.getElementById('groups-container');
+    if (groupsEl) groupsEl.innerHTML = '';
+    renderBracket();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = tournament.knockout[0].name;
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Knockout Round';
+    toast((cfg.name || 'Knockout') + ': ' + teams.length + ' teams, straight knockout');
   }
 
   function generateUCLLeagueFixtures(teams, matchesPerTeam) {
@@ -7164,7 +7310,7 @@ var App = (() => {
       if (tournament.champion) {
         const stageTitle = document.getElementById('tour-stage-title');
         if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
-        toast(tournament.champion.name + ' win the Champions League!');
+        toast(tournament.champion.name + ' win the ' + (tournament.competitionName || 'Champions League') + '!');
       } else {
         toast('Tournament simulation finished');
       }
@@ -7783,7 +7929,7 @@ var App = (() => {
       }
     }
     assignTournamentAwards();
-    const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    const tName = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
     const runExtra = { category: 'tournament', run: tournament._runId || Date.now() };
     pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
     pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
@@ -10244,7 +10390,7 @@ var App = (() => {
 
   return {
     setRngSeed, getRngSeed,
-    init, switchView, goToMatch, goToTournament, updateTeamPreview,
+    init, switchView, goToMatch, goToTournament, selectTournamentFormat, updateTeamPreview,
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, finishMatch, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
