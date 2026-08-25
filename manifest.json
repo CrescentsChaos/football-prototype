@@ -14,6 +14,139 @@
     "label": "gap"
   },
   {
+    "id": "cfat01",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "cfat02",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:ensureFatigueState"
+  },
+  {
+    "id": "cfat03",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:getStamina"
+  },
+  {
+    "id": "cfat04",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:fatigueDrainRate"
+  },
+  {
+    "id": "cfat05",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:updateFatigue"
+  },
+  {
+    "id": "cfat06",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:resetFatigueFor"
+  },
+  {
+    "id": "cfat07",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:teamAvgStamina"
+  },
+  {
+    "id": "cofs01",
+    "file": "engine/offside.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "cofs02",
+    "file": "engine/offside.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:playerAdvancement"
+  },
+  {
+    "id": "cofs03",
+    "file": "engine/offside.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:defensiveLineContext"
+  },
+  {
+    "id": "cofs04",
+    "file": "engine/offside.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:evaluateOffside"
+  },
+  {
+    "id": "cofs05",
+    "file": "engine/offside.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:checkLiveOffside"
+  },
+  {
+    "id": "csp01",
+    "file": "engine/setpieces.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "csp02",
+    "file": "engine/setpieces.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:pickFreeKickRoutine"
+  },
+  {
+    "id": "csp03",
+    "file": "engine/setpieces.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:resolveFreeKickRoutine"
+  },
+  {
+    "id": "csp04",
+    "file": "engine/setpieces.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "csp05",
+    "file": "engine/setpieces.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:resolveThrowIn"
+  },
+  {
+    "id": "csp06",
+    "file": "engine/setpieces.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "csp07",
+    "file": "engine/setpieces.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:resolveGoalKick"
+  },
+  {
     "id": "c0001",
     "file": "engine/tactics.js",
     "start": 171,
