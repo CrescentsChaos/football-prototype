@@ -339,6 +339,37 @@ body::before {
   text-transform: uppercase;
 }
 
+/* Fixture congestion strip — a short cycle of upcoming matchdays showing
+   which competition each falls on (Sat league / Tue continental / Sat
+   league / Tue cup / Sun league), so a busy run of fixtures reads at a
+   glance from the season dashboard. */
+.congestion-strip {
+  display: flex; align-items: center; gap: 4px; margin: 10px 0 4px;
+  overflow-x: auto; padding-bottom: 2px;
+}
+.congestion-slot {
+  flex: 0 0 auto; min-width: 64px; text-align: center;
+  padding: 8px 6px; border-radius: 8px;
+  background: var(--panel-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+}
+.congestion-slot.congestion-now {
+  border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset;
+}
+.congestion-slot.congestion-disabled {
+  opacity: 0.45;
+}
+.congestion-day {
+  font-family: var(--display); font-size: 0.68rem; letter-spacing: 1px;
+  color: var(--text-muted); text-transform: uppercase;
+}
+.congestion-comp {
+  font-size: 0.78rem; font-weight: 700; margin-top: 2px;
+}
+.congestion-arrow {
+  flex: 0 0 auto; color: var(--text-muted); font-size: 0.8rem;
+}
+
 /* Buttons */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -943,6 +974,13 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   padding: 2px 7px; border-radius: 10px; margin-left: 6px;
   background: rgba(240,193,75,0.14); border: 1px solid var(--gold-dim); color: var(--gold);
   vertical-align: middle;
+}
+/* Player name highlight for enhanced/expanded-attribute players — applied
+   via playerNameHTML() wherever a player name renders in a list/row. */
+.player-name-enhanced {
+  color: var(--gold);
+  font-weight: 700;
+  text-shadow: 0 0 10px var(--gold-glow);
 }
 .playstyle-tag {
   display: inline-flex; align-items: center;

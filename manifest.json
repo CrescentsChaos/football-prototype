@@ -329,6 +329,13 @@
     "label": "func:weightedOverall"
   },
   {
+    "id": "c0025b",
+    "file": "data/playerDatabase.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:efootballBoostedOverall + overall system constants"
+  },
+  {
     "id": "c0026",
     "file": "ai/managerAI.js",
     "start": 655,
@@ -712,6 +719,13 @@
     "start": 1213,
     "end": 1221,
     "label": "func:abbreviateName"
+  },
+  {
+    "id": "c0079b",
+    "file": "ui/playerUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:playerNameHTML"
   },
   {
     "id": "c0080",
