@@ -2699,18 +2699,20 @@ var App = (() => {
       events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
       goals: JSON.parse(JSON.stringify(m.goalList || [])),
       ratings: allStats,
+      motmId: m.motmId || null,
       finished: true
     };
   }
 
   // Shared row renderer so a tournament/season match report and the live
   // post-match panel render a player's rating line identically.
-  function renderRatingRow(p) {
-    const rc = (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+  function renderRatingRow(p, motmId) {
+    const isMotm = motmId != null && p.id === motmId;
+    const rc = isMotm ? 'rating-motm' : (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
     const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals, 3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists, 2)) : '');
     return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
         <span class="player-num">${p.num || ''}</span>
-        <span style="flex:1;font-weight:600">${playerNameHTML(p)}</span>
+        <span style="flex:1;font-weight:600">${playerNameHTML(p)}${isMotm ? ' <span title="Man of the Match">⭐</span>' : ''}</span>
         <span>${icons}</span>
         <span class="xg">xG ${(p.xg || 0).toFixed(2)} · xA ${(p.xa || 0).toFixed(2)}</span>
         <span class="rating-badge ${rc}">${(p.rating || 0).toFixed(1)}</span>
@@ -2820,9 +2822,9 @@ var App = (() => {
       <div class="card-title" style="margin-top:14px">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
       <div style="max-height:280px;overflow-y:auto">
         <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${teamMark(h, 18)} ${h.name}</div>
-        ${homeRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
+        ${homeRatings.map(p => renderRatingRow(p, report.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
         <div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${teamMark(a, 18)} ${a.name}</div>
-        ${awayRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
+        ${awayRatings.map(p => renderRatingRow(p, report.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
       </div>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
@@ -5324,7 +5326,14 @@ var App = (() => {
       const playerObj = [...(m.home.squad.all||[]), ...(m.away.squad.all||[])].find(p => p.id === best.id) || best;
       recordStat('motm', playerObj, team);
       addEvent(90, 'motm', `Player of the Match: <span class="player">${best.name}</span> (${best.rating.toFixed(1)})`, null);
+      // Stash the MOTM's player id on the match itself so any ratings list
+      // (live post-match panel, match report modal) can pick them out and
+      // render their rating badge in the MOTM color — see renderRatingRow()
+      // in ui/matchUI.js.
+      m.motmId = best.id;
     }
+    recordTeamMatchLog(m, m.home.team, m.away.team, m.home.score, m.away.score);
+    recordTeamMatchLog(m, m.away.team, m.home.team, m.away.score, m.home.score);
     /* ratings live in lineup */ renderLineups();
     globalMatchDay++;
     // Progress injury/suspension countdowns for both squads. A match only counts
@@ -6298,6 +6307,7 @@ var App = (() => {
       ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
       ok = safeSetItem('apexPlayerMatchLog', JSON.stringify(playerMatchLog)) && ok;
+      ok = safeSetItem('apexTeamMatchLog', JSON.stringify(teamMatchLog)) && ok;
     } catch(e) { ok = false; }
     return ok;
   }
@@ -6316,6 +6326,8 @@ var App = (() => {
       if (md) globalMatchDay = parseInt(md, 10) || 1;
       const pml = localStorage.getItem('apexPlayerMatchLog');
       if (pml) playerMatchLog = JSON.parse(pml);
+      const tml = localStorage.getItem('apexTeamMatchLog');
+      if (tml) teamMatchLog = JSON.parse(tml);
     } catch(e) {}
   }
 
@@ -6488,6 +6500,7 @@ var App = (() => {
       data.apexMatchDay = String(globalMatchDay);
       data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
       data.apexPlayerMatchLog = JSON.stringify(playerMatchLog);
+      data.apexTeamMatchLog = JSON.stringify(teamMatchLog);
     } catch (e) {}
     return data;
   }
@@ -7212,38 +7225,58 @@ var App = (() => {
 
   function simAllTournament() {
     if (!tournament) return;
-    withLoading('Simulating full tournament…', function() {
-      _simAllTournamentWork();
+    withLoadingProgress('Simulating full tournament…', async function() {
+      await _simAllTournamentWork();
       // setChampion()/simPlayoffTie() already persist on the paths that hit
       // them, but not every branch above does (e.g. group-stage fixtures
-      // simulated directly in the forEach) — persist unconditionally so a
+      // simulated directly in the loop) — persist unconditionally so a
       // full-tournament bulk sim is always saved immediately.
       persistAll();
       saveStats();
     });
   }
 
-  function _simAllTournamentWork() {
+  // Rough remaining-match count for a single-elimination bracket, used only
+  // to size the "Simulate All" progress bar denominator — counts the
+  // current round's unplayed ties plus a geometric estimate of every round
+  // still to come (N + N/2 + N/4 + … + 1).
+  function estimateRemainingKnockoutMatches(knockout) {
+    if (!knockout || !knockout.length) return 0;
+    const round = knockout[knockout.length - 1];
+    let n = (round && round.matches) ? round.matches.filter(m => !m.played && m.home && m.away).length : 0;
+    let total = 0;
+    while (n >= 1) { total += n; if (n === 1) break; n = Math.floor(n / 2); }
+    return total;
+  }
+  async function _simAllTournamentWork() {
     if (!tournament) return;
     const updateLoading = (msg) => {
       const t = document.getElementById('loading-text');
       if (t) t.textContent = msg;
     };
+    const startTime = Date.now();
+    let done = 0;
 
     // ========== UCL / League format ==========
     if (tournament.format === 'league' || tournament.type === 'ucl') {
+      const unplayedFixtures = (tournament.fixtures || []).filter(f => !f.played);
+      const unplayedPlayoff = (tournament.playoff || []).filter(p => !p.played);
+      const total = unplayedFixtures.length + unplayedPlayoff.length
+        + estimateRemainingKnockoutMatches(tournament.knockout);
+      updateLoadingProgress(0, Math.max(total, 1), startTime);
+
       updateLoading('Simulating league phase…');
-      (tournament.fixtures || []).forEach((f) => {
-        if (f.played) return;
+      for (const f of unplayedFixtures) {
         const home = getTeam(f.home), away = getTeam(f.away);
-        if (!home || !away) return;
+        if (!home || !away) continue;
         const result = simQuickMatch(home, away, { countForLeaderboard: true });
         f.played = true;
         f.homeScore = result.home;
         f.awayScore = result.away;
         f.report = result.report;
         applyLeagueResult(f.home, f.away, result.home, result.away);
-      });
+        done++; updateLoadingProgress(done, total, startTime); await simTick();
+      }
 
       if (tournament.stage === 'league' || !tournament.playoff) {
         try { advanceUCLFromLeague(); } catch (e) { console.warn(e); }
@@ -7251,11 +7284,12 @@ var App = (() => {
 
       updateLoading('Simulating playoffs…');
       if (tournament.playoff && tournament.playoff.length) {
-        tournament.playoff.forEach((p, i) => {
-          if (!p.played) {
+        for (let i = 0; i < tournament.playoff.length; i++) {
+          if (!tournament.playoff[i].played) {
             try { simPlayoffTie(i); } catch (e) { console.warn(e); }
+            done++; updateLoadingProgress(done, total, startTime); await simTick();
           }
-        });
+        }
         if (tournament.stage === 'playoff' || tournament.playoff.every(p => p.played)) {
           try { finishUCLPlayoffs(); } catch (e) { console.warn(e); }
         }
@@ -7270,11 +7304,12 @@ var App = (() => {
         if (!round || !round.matches) break;
         const isFinal = round.name === 'Final' || round.matches.length === 1;
 
-        round.matches.forEach((m) => {
-          if (m.played || !m.home || !m.away) return;
+        for (const m of round.matches) {
+          if (m.played || !m.home || !m.away) continue;
           if (isFinal || m.twoLeg === false) simSingleFinal(m);
           else simTwoLegTie(m);
-        });
+          done++; updateLoadingProgress(done, total, startTime); await simTick();
+        }
 
         // If any still unplayed, stop this iteration
         if (round.matches.some(m => !m.played && m.home && m.away)) break;
@@ -7315,6 +7350,7 @@ var App = (() => {
         }
       }
 
+      updateLoadingProgress(Math.max(total, 1), Math.max(total, 1), startTime);
       assignTournamentAwards();
       try { renderUCLLeague(); } catch (e) {}
       try { renderBracket(); } catch (e) {}
@@ -7330,28 +7366,41 @@ var App = (() => {
     }
 
     // ========== World Cup path ==========
+    const unplayedGroupFixtures = (tournament.fixtures || []).filter(f => !f.played);
+    // Knockout bracket doesn't exist yet at this point (it's built by
+    // advanceToKnockout() once groups finish), so estimate its match count
+    // from the qualifier count instead: a single-elim bracket of Q teams
+    // plays exactly Q-1 matches.
+    const qualifierEstimate = tournament.knockout && tournament.knockout.length
+      ? 0 : (tournament.groups || []).length * 2;
+    const knockoutEstimate = tournament.knockout && tournament.knockout.length
+      ? estimateRemainingKnockoutMatches(tournament.knockout)
+      : Math.max(0, qualifierEstimate - 1);
+    const total = unplayedGroupFixtures.length + knockoutEstimate;
+    updateLoadingProgress(0, Math.max(total, 1), startTime);
+
     updateLoading('Simulating group stage…');
-    (tournament.fixtures || []).forEach((f) => {
-      if (f.played) return;
+    for (const f of unplayedGroupFixtures) {
       const home = getTeam(f.home), away = getTeam(f.away);
-      if (!home || !away) return;
+      if (!home || !away) continue;
       const result = simQuickMatch(home, away, { countForLeaderboard: true });
       f.played = true;
       f.homeScore = result.home;
       f.awayScore = result.away;
       f.report = result.report;
       const g = tournament.groups && tournament.groups[f.group];
-      if (!g) return;
+      done++; updateLoadingProgress(done, total, startTime); await simTick();
+      if (!g) continue;
       const ht = g.teams.find(t => t.team.id === f.home);
       const at = g.teams.find(t => t.team.id === f.away);
-      if (!ht || !at) return;
+      if (!ht || !at) continue;
       ht.played++; at.played++;
       ht.gf += result.home; ht.ga += result.away;
       at.gf += result.away; at.ga += result.home;
       if (result.home > result.away) { ht.won++; ht.pts += 3; at.lost++; }
       else if (result.away > result.home) { at.won++; at.pts += 3; ht.lost++; }
       else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
-    });
+    }
 
     if (!tournament.champion && tournament.stage !== 'knockout' && tournament.stage !== 'complete') {
       updateLoading('Advancing to knockout…');
@@ -7367,8 +7416,8 @@ var App = (() => {
       const round = tournament.knockout[ri];
       if (!round || !round.matches) break;
 
-      round.matches.forEach((m) => {
-        if (m.played || !m.home || !m.away) return;
+      for (const m of round.matches) {
+        if (m.played || !m.home || !m.away) continue;
         const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true, countForLeaderboard: true });
         m.homeScore = result.home;
         m.awayScore = result.away;
@@ -7383,7 +7432,8 @@ var App = (() => {
           m.penalties = true;
           m.winner = seededRandom() < 0.5 ? m.home : m.away;
         }
-      });
+        done++; updateLoadingProgress(done, total, startTime); await simTick();
+      }
 
       if (round.matches.some(m => m.home && m.away && !m.played)) break;
 
@@ -7415,6 +7465,7 @@ var App = (() => {
       }
     }
 
+    updateLoadingProgress(Math.max(total, 1), Math.max(total, 1), startTime);
     tournament.stage = tournament.champion ? 'complete' : (tournament.knockout && tournament.knockout.length ? 'knockout' : tournament.stage);
     assignTournamentAwards();
     try { renderGroups(); } catch (e) {}
@@ -8426,13 +8477,22 @@ var App = (() => {
     if (!el) {
       el = document.createElement('div');
       el.id = 'loading-overlay';
-      el.innerHTML = '<div class="loading-box"><div class="loading-spinner"></div><div class="loading-text" id="loading-text">Simulating…</div><div class="loading-sub" id="loading-sub">Please wait</div></div>';
+      el.innerHTML = '<div class="loading-box"><div class="loading-spinner"></div><div class="loading-text" id="loading-text">Simulating…</div>'
+        + '<div class="loading-progress-track" id="loading-progress-track" style="display:none"><div class="loading-progress-fill" id="loading-progress-fill" style="width:0%"></div></div>'
+        + '<div class="loading-sub" id="loading-sub">Please wait</div></div>';
       document.body.appendChild(el);
     }
     const t = document.getElementById('loading-text');
     const s = document.getElementById('loading-sub');
+    const track = document.getElementById('loading-progress-track');
+    const fill = document.getElementById('loading-progress-fill');
     if (t) t.textContent = msg || 'Simulating…';
     if (s) s.textContent = 'Please wait — do not close the page';
+    // Reset any progress bar from a previous run until updateLoadingProgress()
+    // is explicitly called again (plain single-shot sims never call it, so
+    // they correctly stay a bare spinner with no bar).
+    if (track) track.style.display = 'none';
+    if (fill) fill.style.width = '0%';
     el.classList.add('show');
   }
 
@@ -8441,6 +8501,52 @@ var App = (() => {
     if (el) el.classList.remove('show');
   }
 
+  // Formats a millisecond duration as a short "Xm Ys" / "Xs" string for the
+  // progress bar's estimated-time-remaining label.
+  function formatEtaDuration(ms) {
+    const totalSec = Math.max(0, Math.ceil(ms / 1000));
+    if (totalSec < 1) return '<1s';
+    if (totalSec < 60) return totalSec + 's';
+    const m = Math.floor(totalSec / 60), s = totalSec % 60;
+    return m + 'm ' + (s ? s + 's' : '');
+  }
+
+  // Updates the loading overlay's progress bar (fill width + ETA label)
+  // given how many of `total` work units are done and when the whole
+  // operation started. `startTime` should be a Date.now() timestamp taken
+  // right before the first unit was simulated — the ETA is extrapolated
+  // from the average time-per-unit seen so far, so it gets more accurate
+  // as the simulation progresses. Shows/reveals the bar on first call so
+  // plain single-shot sims (which never call this) keep the old bare
+  // spinner look.
+  function updateLoadingProgress(done, total, startTime) {
+    const track = document.getElementById('loading-progress-track');
+    const fill = document.getElementById('loading-progress-fill');
+    const s = document.getElementById('loading-sub');
+    if (!track || !fill) return;
+    track.style.display = 'block';
+    const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((done / total) * 100))) : 0;
+    fill.style.width = pct + '%';
+    if (s) {
+      if (done >= total) {
+        s.textContent = 'Finishing up…';
+      } else {
+        const elapsed = Date.now() - startTime;
+        const perUnit = done > 0 ? elapsed / done : 0;
+        const etaMs = perUnit * Math.max(0, total - done);
+        s.textContent = `${pct}% · ${done}/${total} · ~${formatEtaDuration(etaMs)} remaining`;
+      }
+    }
+  }
+
+  // A zero-work "tick" that yields control back to the browser for one
+  // frame so a progress bar update actually gets painted before the next
+  // chunk of (synchronous) simulation work runs. Used between individual
+  // match simulations in bulk sim loops (simAllTournament, Simulate To End
+  // of Season) — see their async loops in tournamentEngine.js / seasonEngine.js.
+  function simTick() {
+    return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  }
   function withLoading(msg, fn) {
     showLoading(msg || 'Simulating…');
     // Double rAF so the overlay is painted before heavy sync work
@@ -8463,6 +8569,28 @@ var App = (() => {
         });
       });
     });
+  }
+  // Async counterpart to withLoading() for bulk sims that need to show real
+  // incremental progress (Simulate All / Simulate To End of Season) instead
+  // of a single blocking spinner. `asyncFn` is an async function that does
+  // its own repeated updateLoadingProgress()+await simTick() calls between
+  // chunks of work — this wrapper just handles showing/hiding the overlay
+  // and the same error/persist handling as withLoading().
+  async function withLoadingProgress(msg, asyncFn) {
+    showLoading(msg || 'Simulating…');
+    await simTick();
+    await simTick();
+    let result;
+    try {
+      result = await asyncFn();
+    } catch (e) {
+      console.error(e);
+      toast('Error: ' + (e && e.message ? e.message : e));
+    } finally {
+      hideLoading();
+      persistAll();
+    }
+    return result;
   }
 
   function toast(msg) {
@@ -8489,9 +8617,9 @@ var App = (() => {
     const homeP = entries.filter(p => homeIds.has(p.id));
     const awayP = entries.filter(p => !homeIds.has(p.id));
     h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${m.home.team.flag||''} ${m.home.team.name}</div>`;
-    h += homeP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += homeP.map(p => renderRatingRow(p, m.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
     h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${m.away.team.flag||''} ${m.away.team.name}</div>`;
-    h += awayP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += awayP.map(p => renderRatingRow(p, m.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
     el.innerHTML = h;
     el.style.display = 'block';
   }
@@ -8714,6 +8842,7 @@ var App = (() => {
           </button>`;
         }).join('')}
       </div>
+      ${renderTeamMatchLogHTML(team.id)}
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
   }
@@ -9580,8 +9709,15 @@ var App = (() => {
 
   function simulateSeasonToEnd() {
     if (!season) return;
-    withLoading('Simulating rest of season…', function() {
+    // Rough denominator for the progress bar: the most matchdays any single
+    // still-active competition has left. Not exact (competitions advance at
+    // different rates and some weeks skip a competition entirely), but a
+    // reasonable estimate that self-corrects as remaining rounds shrink.
+    const estimatedWeeks = Math.max(1, ...seasonCompEntries()
+      .map(({ comp }) => (comp && !comp.finished) ? Math.max(0, comp.rounds.length - comp.currentRound) : 0));
+    withLoadingProgress('Simulating rest of season…', async function() {
       let safety = 0;
+      const startTime = Date.now();
       // "Simulate to End" fast-forwards past the fixture-congestion cadence
       // on purpose — it's a bulk skip-ahead action, not a day-by-day play
       // session, so every competition due for the matchday plays regardless
@@ -9604,10 +9740,13 @@ var App = (() => {
         });
         season.week = computeSeasonWeek(season);
         safety++;
+        updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
+        await simTick();
         // Safety valve: if a pass through every competition made no
         // progress at all, stop rather than spin forever.
         if (!playedSomething) break;
       }
+      updateLoadingProgress(estimatedWeeks, estimatedWeeks, startTime);
       advanceCongestionSlotIfComplete();
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
@@ -10064,6 +10203,38 @@ var App = (() => {
     toast('Pick teams & formations, then Kick Off. Lineups are auto-built by formation.');
   }
 
+  // ========== TEAM MATCH LOG ==========
+  // teamMatchLog[teamId] -> [{opponent, opponentShort, opponentLogo,
+  // opponentFlag, competition, scoreFor, scoreAgainst, result}], newest
+  // first, capped per team so persisted save size stays bounded. Populated
+  // at full-time for both sides — see recordTeamMatchLog() in
+  // engine/matchEngine.js.
+  let teamMatchLog = {};
+
+
+  // Renders a team's recent-results log (last 10) with a colored W/D/L tag
+  // per row and the opponent's logo + abbreviation. Shares the same
+  // "Match Log" look as renderPlayerMatchLogHTML in ui/playersUI.js, and is
+  // dropped straight into the team profile modal — see showTeamProfile()
+  // in ui/playerUI.js.
+  function renderTeamMatchLogHTML(teamId) {
+    const log = teamMatchLog[teamId] || [];
+    if (!log.length) return '';
+    const resultClass = { W: 'result-w', D: 'result-d', L: 'result-l' };
+    const rows = log.slice(0, 10).map(e => {
+      const oppMark = teamMark({ logo: e.opponentLogo, flag: e.opponentFlag }, 18);
+      return `<div class="team-log-row">
+        <span class="result-tag ${resultClass[e.result] || 'result-d'}">${e.result}</span>
+        <span class="tlr-opp">${oppMark}<span class="tlr-opp-abbr">${e.opponentShort || e.opponent || '—'}</span></span>
+        <span class="tlr-score">${e.scoreFor}-${e.scoreAgainst}</span>
+        <span class="tlr-comp">${e.competition || ''}</span>
+      </div>`;
+    }).join('');
+    return `<div class="card-title" style="margin-top:14px">Match Log <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(last ${Math.min(log.length, 10)})</span></div>
+      <div class="match-log-wrap">${rows}</div>`;
+  }
+
+
   // ========== PLAYERS TAB ==========
   // Flat, lazily-rendered list of every player across all teams. All players
   // already live in memory via teamsData (loaded once from teams.json), so
@@ -10341,8 +10512,9 @@ var App = (() => {
     if (!log.length) return '';
     const rows = log.slice(0, 10).map(e => {
       const rc = (e.rating || 0) >= 7.5 ? 'rating-high' : (e.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+      const oppMark = teamMark({ logo: e.opponentLogo, flag: e.opponentFlag }, 16);
       return `<tr>
-        <td>${e.opponentShort || e.opponent || '—'}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:4px">${oppMark}${e.opponentShort || e.opponent || '—'}</span></td>
         <td>${e.competition || ''}</td>
         <td>${e.minutes}'</td>
         <td>${e.goals || 0}</td>
@@ -10366,7 +10538,10 @@ var App = (() => {
   // for the per-player match log and anywhere else a competition label is
   // needed. Falls back to "Friendly" for a plain Kick Off match.
   function matchCompetitionLabel(m) {
-    if (tournament) return tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    if (tournament) {
+      if (tournament.competitionName) return tournament.competitionName;
+      return tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    }
     if (currentSeasonComp && currentSeasonComp.name) return currentSeasonComp.name;
     if (m && m.countForLeaderboard) return 'Cup';
     return 'Friendly';
@@ -10402,6 +10577,8 @@ var App = (() => {
     playerMatchLog[player.id].unshift({
       opponent: opponentTeam ? opponentTeam.name : '—',
       opponentShort: opponentTeam ? (opponentTeam.short || opponentTeam.name) : '—',
+      opponentLogo: opponentTeam ? (opponentTeam.logo || null) : null,
+      opponentFlag: opponentTeam ? (opponentTeam.flag || null) : null,
       competition: matchCompetitionLabel(m),
       minutes: minutes,
       goals: ps.goals || 0,
@@ -10411,6 +10588,27 @@ var App = (() => {
       rating: ps.rating || 0
     });
     if (playerMatchLog[player.id].length > 30) playerMatchLog[player.id].length = 30;
+  }
+
+
+  // Appends this match's line to a team's persistent match log (see
+  // teamMatchLog in ui/teamUI.js). Called once per side at full time, right
+  // after both players' match logs are recorded, so the two stay in sync.
+  function recordTeamMatchLog(m, team, opponentTeam, scoreFor, scoreAgainst) {
+    if (!team || !opponentTeam) return;
+    if (!teamMatchLog[team.id]) teamMatchLog[team.id] = [];
+    const result = scoreFor > scoreAgainst ? 'W' : scoreFor < scoreAgainst ? 'L' : 'D';
+    teamMatchLog[team.id].unshift({
+      opponent: opponentTeam.name || '—',
+      opponentShort: opponentTeam.short || opponentTeam.name || '—',
+      opponentLogo: opponentTeam.logo || null,
+      opponentFlag: opponentTeam.flag || null,
+      competition: matchCompetitionLabel(m),
+      scoreFor: scoreFor,
+      scoreAgainst: scoreAgainst,
+      result: result
+    });
+    if (teamMatchLog[team.id].length > 30) teamMatchLog[team.id].length = 30;
   }
 
 
