@@ -1554,6 +1554,34 @@
     "label": "gap"
   },
   {
+    "id": "c0198a",
+    "file": "engine/matchEngine.js",
+    "start": 2603,
+    "end": 2612,
+    "label": "gap"
+  },
+  {
+    "id": "c0198b",
+    "file": "engine/matchEngine.js",
+    "start": 2613,
+    "end": 2637,
+    "label": "func:computeAddedTime"
+  },
+  {
+    "id": "c0198c",
+    "file": "engine/matchEngine.js",
+    "start": 2638,
+    "end": 2642,
+    "label": "gap"
+  },
+  {
+    "id": "c0198d",
+    "file": "engine/matchEngine.js",
+    "start": 2643,
+    "end": 2652,
+    "label": "func:describeAddedTime"
+  },
+  {
     "id": "c0199",
     "file": "engine/matchEngine.js",
     "start": 2603,
@@ -2177,6 +2205,20 @@
     "label": "func:bumpRatingBucket"
   },
   {
+    "id": "c0287b",
+    "file": "ui/statisticsUI.js",
+    "start": 47,
+    "end": 50,
+    "label": "func:bumpRatingBucket"
+  },
+  {
+    "id": "c0287c",
+    "file": "ui/statisticsUI.js",
+    "start": 51,
+    "end": 66,
+    "label": "func:isBigGameContext"
+  },
+  {
     "id": "c0288",
     "file": "ui/statisticsUI.js",
     "start": 4775,
@@ -2370,6 +2412,13 @@
     "file": "simulation/seasonEngine.js",
     "start": 4997,
     "end": 5040,
+    "label": "func:computeBallonRanking"
+  },
+  {
+    "id": "c0315b",
+    "file": "simulation/seasonEngine.js",
+    "start": 5040,
+    "end": 5048,
     "label": "func:computeBallonRanking"
   },
   {
