@@ -6179,18 +6179,6 @@
       "num": 18
     },
     {
-      "id": "aut19",
-      "name": "Florian Wirtz",
-      "pos": ["CAM", "LW", "RW"],
-      "ovr": 91,
-      "att": 93,
-      "def": 35,
-      "phy": 72,
-      "pac": 86,
-      "tec": 96,
-      "num": 11
-    },
-    {
       "id": "aut20",
       "name": "Michael Gregoritsch",
       "pos": ["ST"],
@@ -18215,7 +18203,7 @@
     },
     {
       "id": "bra2",
-      "name": "Ederson",
+      "name": "Ederson Moraes",
       "pos": ["GK"],
       "ovr": 88,
       "att": 25,
@@ -19916,7 +19904,7 @@
   "logo":"fenerbahce.png",
   "stadium":"Ülker Stadyumu",
   "players": [
-    {"id":"fen26_31","name":"Ederson","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":78,"pac":58,"tec":80,"num":31},
+    {"id":"fen26_31","name":"Ederson Moraes","pos":["GK"],"ovr":86,"att":15,"def":87,"phy":78,"pac":58,"tec":80,"num":31},
     {"id":"fen26_40","name":"Dominik Livaković","pos":["GK"],"ovr":81,"att":15,"def":82,"phy":76,"pac":48,"tec":62,"num":40},
     {"id":"fen26_34","name":"Mert Günok","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":42,"tec":58,"num":34},
     {"id":"fen26_15","name":"Nathan Aké","pos":["CB","LB"],"ovr":84,"att":52,"def":85,"phy":80,"pac":75,"tec":78,"num":15},
@@ -22124,7 +22112,7 @@
   "logo":"mci.png",
   "stadium":"Etihad Stadium",
   "players": [
-    {"id":"mci22_31","name":"Ederson","pos":["GK"],"ovr":88,"att":15,"def":86,"phy":82,"pac":50,"tec":70,"num":31},
+    {"id":"mci22_31","name":"Ederson Moraes","pos":["GK"],"ovr":88,"att":15,"def":86,"phy":82,"pac":50,"tec":70,"num":31},
     {"id":"mci22_18","name":"Stefan Ortega","pos":["GK"],"ovr":81,"att":15,"def":80,"phy":78,"pac":45,"tec":62,"num":18},
     {"id":"mci22_3","name":"Rúben Dias","pos":["CB"],"ovr":89,"att":48,"def":90,"phy":87,"pac":72,"tec":73,"num":3},
     {"id":"mci22_5","name":"John Stones","pos":["CB","CDM","RB"],"ovr":88,"att":70,"def":88,"phy":78,"pac":75,"tec":85,"num":5},
