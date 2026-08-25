@@ -100,8 +100,8 @@ var App = (() => {
   // pac/phy/tec/ovr as read from teams.json for that player are ignored —
   // see applyExpandedPlayerAttributes()).
   let playerAttributesData = {};
-  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
-  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
   // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
   // can also tally into that competition's own stat bucket (comp.stats), giving each
@@ -3365,6 +3365,62 @@ var App = (() => {
     if (live) live.style.display = 'none';
   }
 
+
+  // ========== CONTEXTUAL ADDED TIME ==========
+  // Real stoppage time isn't a flat random number — the fourth official
+  // builds it up from what actually happened in the half: ball retrieved
+  // from the net and the restart after every goal, the walk to the technical
+  // area for every substitution, treatment/stretcher time for injuries, the
+  // referee jogging to the pitchside monitor (or waiting on a check) for
+  // every VAR review, cards taking a moment to brandish and log, and a
+  // time-wasting allowance when fouls pile up late in the half (a leading
+  // side "managing the clock"). This scans the half's own event log so two
+  // otherwise-identical matches with different incident counts get
+  // different, explainable stoppage totals instead of the same dice roll.
+  function computeAddedTime(m, fromMin, toMin) {
+    const evs = (m.events || []).filter(e => e.minute >= fromMin && e.minute <= toMin);
+    const count = (type) => evs.filter(e => e.type === type).length;
+    const goals = count('goal');
+    const subs = count('sub');
+    const injuries = count('injury');
+    const varChecks = count('var');
+    const cards = count('yellow') + count('red');
+    // Late fouls/handballs (closing quarter of the half) read as a proxy for
+    // a team managing — or wasting — the clock rather than genuine 50-50s.
+    const lateWindow = Math.max(fromMin, toMin - 15);
+    const lateFouls = evs.filter(e => (e.type === 'foul' || e.type === 'handball') && e.minute >= lateWindow).length;
+    const lateCards = evs.filter(e => (e.type === 'yellow' || e.type === 'red') && e.minute >= lateWindow).length;
+
+    const goalTime = goals * 0.5;                       // ball back to center circle + restart
+    const celebrationTime = goals * 0.45 + evs.filter(e => e.type === 'goal' && e.minute >= lateWindow).length * 0.25; // mobbed-by-teammates time, longer for late/dramatic goals
+    const subTime = subs * 0.4;                         // walk-off/walk-on + board held up
+    const injuryTime = injuries * 1.6;                   // treatment or stretcher
+    const varTime = varChecks * 1.1;                     // review + pitchside monitor
+    const cardTime = cards * 0.15;                       // brandishing + logging the name
+    const timeWastingTime = lateFouls * 0.25 + lateCards * 0.2; // clock management called out by the ref
+
+    const raw = goalTime + celebrationTime + subTime + injuryTime + varTime + cardTime + timeWastingTime;
+    const minutes = Math.max(1, Math.min(11, Math.round(raw)));
+    return {
+      minutes,
+      breakdown: { goals, subs, injuries, var: varChecks, cards, timeWasting: lateFouls + lateCards }
+    };
+  }
+
+  // Human-readable rundown of what built up a stoppage-time total, used in
+  // the announcement event so the extra minutes feel earned rather than
+  // arbitrary.
+  function describeAddedTime(added) {
+    const b = added.breakdown;
+    const parts = [];
+    if (b.goals) parts.push(b.goals + ' goal celebration' + (b.goals > 1 ? 's' : ''));
+    if (b.subs) parts.push(b.subs + ' substitution' + (b.subs > 1 ? 's' : ''));
+    if (b.injuries) parts.push(b.injuries + ' injury stoppage' + (b.injuries > 1 ? 's' : ''));
+    if (b.var) parts.push(b.var + ' VAR check' + (b.var > 1 ? 's' : ''));
+    if (b.cards) parts.push(b.cards + ' card' + (b.cards > 1 ? 's' : ''));
+    if (b.timeWasting) parts.push('time-wasting');
+    return parts.length ? parts.join(', ') : 'general stoppages';
+  }
   function tick(silent) {
     if (!currentMatch || currentMatch.finished) return;
     const m = currentMatch;
@@ -3388,7 +3444,11 @@ var App = (() => {
       addEvent(46, 'whistle', 'Second half begins', null);
     }
     if (m.minute >= 90 && !m.inET && !m.inPens && !m._awaitingET) {
-      if (!m._stoppage) m._stoppage = 1 + Math.floor(seededRandom() * 5);
+      if (!m._stoppage) {
+        const added = computeAddedTime(m, 46, 90);
+        m._stoppage = added.minutes;
+        addEvent(90, 'whistle', `📋 ${added.minutes} minute${added.minutes === 1 ? '' : 's'} of stoppage time signalled: ${describeAddedTime(added)}`, null);
+      }
       if (m.minute >= 90 + m._stoppage) {
         const drawn = m.home.score === m.away.score;
         if (drawn && (m.allowET || m.allowPens)) {
@@ -5087,6 +5147,10 @@ var App = (() => {
     }
     // Compute ratings for everyone who played, then MOTM = highest rating
     if (!m.playerMatchStats) m.playerMatchStats = {};
+    // Flag this match as a "big game" (knockout-stage/final, or two top-tier
+    // sides going at it) once, up front, so every recordRating() call below
+    // for this match consistently feeds the bigGames award-scoring bucket.
+    m.isBigGame = isBigGameContext(m);
     const allOnPitch = [...(m.home.squad.starting||[]), ...(m.away.squad.starting||[])];
     // Include subs who came on
     const onIds = new Set([...(m.homeOnPitch||[]), ...(m.awayOnPitch||[])]);
@@ -5610,7 +5674,7 @@ var App = (() => {
   // Shape used for every per-competition stat bucket: season leagues, the season's
   // UCL, and (already existing) the global `stats` / `tournamentStats` buckets.
   function blankCompStats() {
-    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
   }
 
   function bumpStatBucket(bucket, type, player, team) {
@@ -5630,16 +5694,45 @@ var App = (() => {
     bucket[type][player.id].count += amount;
   }
 
-  function bumpRatingBucket(bucket, player, team, rating) {
-    if (!bucket.ratings) bucket.ratings = {};
-    if (!bucket.ratings[player.id]) {
+
+  // Generalized keyed-average bucket: powers both the plain `ratings` bucket
+  // (every appearance) and the `bigGames` bucket (knockout/final/top-clash
+  // appearances only) with the same count/sum/avg shape, plus a short rolling
+  // history of recent ratings so award scoring can gauge consistency (low
+  // variance at a genuinely good level) rather than just a career average.
+  function bumpKeyedAvgBucket(bucket, key, player, team, rating) {
+    if (!bucket[key]) bucket[key] = {};
+    if (!bucket[key][player.id]) {
       const aff = findPlayerTeams(player.id);
-      bucket.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
+      bucket[key][player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club, recent: [] };
     }
-    const e = bucket.ratings[player.id];
+    const e = bucket[key][player.id];
     e.count++;
     e.sum += rating;
     e.avg = Math.round((e.sum / e.count) * 100) / 100;
+    if (!e.recent) e.recent = [];
+    e.recent.push(rating);
+    if (e.recent.length > 12) e.recent.shift();
+  }
+  function bumpRatingBucket(bucket, player, team, rating) {
+    bumpKeyedAvgBucket(bucket, 'ratings', player, team, rating);
+  }
+
+  // A match counts as a "big game" for award-scoring purposes when it's a
+  // knockout-stage/final fixture in a tournament or the season's Champions
+  // League, or a clash between two genuinely top-tier sides (judged by
+  // starting-XI average OVR) — the kind of fixture that actually shapes a
+  // Ballon d'Or/Golden Ball case in real life, not just bulk appearances.
+  function isBigGameContext(m) {
+    if (!m) return false;
+    if (tournament && tournament.stage === 'knockout') return true;
+    if (currentSeasonComp && ['qf', 'sf', 'final'].includes(currentSeasonComp.stage)) return true;
+    const avgOvr = (side) => {
+      const arr = (side && side.squad && side.squad.starting) || [];
+      if (!arr.length) return 0;
+      return arr.reduce((s, p) => s + (p.ovr || 70), 0) / arr.length;
+    };
+    return avgOvr(m.home) >= 82 && avgOvr(m.away) >= 82;
   }
 
   function recordRating(player, team, rating) {
@@ -5650,6 +5743,14 @@ var App = (() => {
     if (currentSeasonComp) {
       if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
       bumpRatingBucket(currentSeasonComp.stats, player, team, rating);
+    }
+    if (currentMatch && currentMatch.isBigGame) {
+      if (competitive) bumpKeyedAvgBucket(stats, 'bigGames', player, team, rating);
+      if (tournament) bumpKeyedAvgBucket(tournamentStats, 'bigGames', player, team, rating);
+      if (currentSeasonComp) {
+        if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+        bumpKeyedAvgBucket(currentSeasonComp.stats, 'bigGames', player, team, rating);
+      }
     }
   }
 
@@ -5863,32 +5964,140 @@ var App = (() => {
   // both always agree on who the leader is. Pass in a `stats`-shaped object
   // (global `stats`, a competition's `comp.stats`, etc).
   const BALLON_MIN_APPS = 3;
-  function computeBallonRanking(statsSource) {
-    const src = statsSource || stats;
-    const MIN_APPS = BALLON_MIN_APPS;
+
+  // Holistic "best player" scoring shared by the Ballon d'Or ranking (season/
+  // global `stats`) and the tournament Golden Ball (`tournamentStats`) — a
+  // real MVP vote isn't just "who scored/rated highest", it weighs where
+  // those numbers came from. Folds in:
+  //  - individual statistics: raw production (goals/assists/MOTM/saves/
+  //    clean sheets/Puskas contenders) plus overall match rating quality.
+  //  - domestic performance: rating quality sustained across a league campaign.
+  //  - continental performance: the season's Champions League run (or a
+  //    standalone Champions League tournament), weighted above domestic
+  //    since continental football carries more real-world Ballon d'Or weight.
+  //  - international performance: a World Cup run, weighted highest of all —
+  //    a big international tournament moves the needle more than a single
+  //    club season ever does.
+  //  - trophies: lifting a league title, continental trophy, or international
+  //    trophy with the squad that season, plus a small nod to past individual
+  //    silverware (established quality/reputation).
+  //  - consistency: low match-to-match rating variance at a genuinely good
+  //    level, not just one or two standout performances propping up an average.
+  //  - big games: how a player performed specifically in knockout-stage/final
+  //    fixtures and clashes against other top sides, not just accumulated bulk.
+  function computeContextualPlayerScores(baseStats, minApps) {
+    const src = baseStats || stats;
+    const MIN_APPS = minApps || BALLON_MIN_APPS;
     const scores = {};
     const ensure = (p) => {
-      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0 };
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0, trophyPts: 0, consistency: 0, bigGamePts: 0 };
       return scores[p.id];
     };
+
+    // ---- Individual statistics ----
     Object.values(src.ratings || {}).forEach(p => {
       const e = ensure(p);
       e.apps = p.count || 0;
       e.avg = p.avg || 0;
     });
-    Object.values(src.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 4; });
-    Object.values(src.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.5; });
-    Object.values(src.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 5; });
-    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.35; });
-    Object.values(src.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
-    Object.values(src.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
+    Object.values(src.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 3.2; });
+    Object.values(src.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.1; });
+    Object.values(src.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 3.6; });
+    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.3; });
+    Object.values(src.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.6; });
+    Object.values(src.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.2; });
     Object.values(scores).forEach(e => {
-      if (e.apps >= MIN_APPS && e.avg > 0) {
-        e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
-      } else if (e.apps > 0 && e.apps < MIN_APPS) {
-        e.pts += e.avg * 0.15;
+      if (e.apps >= MIN_APPS && e.avg > 0) e.pts += e.avg * Math.min(e.apps, 15) * 0.65;
+      else if (e.apps > 0 && e.apps < MIN_APPS) e.pts += e.avg * 0.12;
+    });
+
+    // ---- Domestic performance (league campaign quality) ----
+    if (season && Array.isArray(season.leagues)) {
+      season.leagues.forEach(lg => {
+        if (!lg.stats) return;
+        Object.values(lg.stats.ratings || {}).forEach(p => {
+          const e = ensure(p);
+          if (p.count >= 3 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 20) * 0.35;
+        });
+        Object.values(lg.stats.goals || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.6; });
+        Object.values(lg.stats.assists || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.4; });
+      });
+    }
+
+    // ---- Continental performance (season UCL run, or a standalone UCL tournament) ----
+    if (season && season.ucl && season.ucl.stats) {
+      Object.values(season.ucl.stats.ratings || {}).forEach(p => {
+        const e = ensure(p);
+        if (p.count >= 2 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 13) * 0.55;
+      });
+      Object.values(season.ucl.stats.goals || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.3; });
+      Object.values(season.ucl.stats.assists || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.9; });
+    }
+    if (tournament && tournament.type === 'ucl' && tournamentStats && tournamentStats !== src) {
+      Object.values(tournamentStats.ratings || {}).forEach(p => {
+        const e = ensure(p);
+        if (p.count >= 2 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 13) * 0.55;
+      });
+    }
+
+    // ---- International performance (World Cup — highest single-tournament weight) ----
+    if (tournament && tournament.type === 'worldcup' && tournamentStats) {
+      Object.values(tournamentStats.ratings || {}).forEach(p => {
+        const e = ensure(p);
+        if (p.count >= 2 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 7) * 0.9;
+      });
+      Object.values(tournamentStats.goals || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.6; });
+      Object.values(tournamentStats.assists || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.1; });
+    }
+
+    // ---- Big games (knockout-stage/final fixtures and top-vs-top clashes) ----
+    const bigGameSources = [
+      src.bigGames,
+      season && season.ucl && season.ucl.stats && season.ucl.stats.bigGames,
+      tournamentStats && tournamentStats !== src && tournamentStats.bigGames
+    ];
+    bigGameSources.forEach(bg => {
+      if (!bg) return;
+      Object.values(bg).forEach(p => {
+        const e = ensure(p);
+        if (p.count > 0 && p.avg > 0) { e.pts += p.avg * Math.min(p.count, 10) * 0.5; e.bigGamePts = Math.round(e.bigGamePts + p.avg * Math.min(p.count, 10) * 0.5); }
+      });
+    });
+
+    // ---- Trophies (team success this season/tournament + individual pedigree) ----
+    Object.values(scores).forEach(e => {
+      const aff = findPlayerTeams(e.id) || {};
+      let trophyPts = 0;
+      if (season && Array.isArray(season.leagues)) {
+        season.leagues.forEach(lg => { if (lg.champion && aff.club === lg.champion.name) trophyPts += 3; });
+        if (season.ucl && season.ucl.champion && aff.club === season.ucl.champion.name) trophyPts += 5;
+      }
+      if (tournament && tournament.champion) {
+        if (tournament.type === 'worldcup' && aff.national === tournament.champion.name) trophyPts += 6;
+        if (tournament.type === 'ucl' && aff.club === tournament.champion.name) trophyPts += 5;
+      }
+      const pastIndividual = (trophies || []).filter(t => t.player === e.name).length;
+      trophyPts += Math.min(pastIndividual, 5) * 0.4;
+      e.pts += trophyPts;
+      e.trophyPts = Math.round(trophyPts * 10) / 10;
+    });
+
+    // ---- Consistency (steady quality across recent appearances, not one hot streak) ----
+    Object.values(scores).forEach(e => {
+      const rEntry = (src.ratings || {})[e.id];
+      const recent = rEntry && rEntry.recent;
+      if (recent && recent.length >= 5) {
+        const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
+        const variance = recent.reduce((a, b) => a + (b - mean) * (b - mean), 0) / recent.length;
+        const stdev = Math.sqrt(variance);
+        const consistencyBonus = mean >= 6.3 ? Math.max(0, 2.4 - stdev) * 1.1 : 0;
+        e.pts += consistencyBonus;
+        e.consistency = Math.round(consistencyBonus * 10) / 10;
       }
     });
+
+    // ---- Award-show nomination bonus: a genuine contender shows up across ----
+    // ---- multiple individual categories, not just one ----
     const awardLeaders = {
       goldenboot: new Set(Object.values(src.goals || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
       assists: new Set(Object.values(src.assists || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
@@ -5900,8 +6109,15 @@ var App = (() => {
       let noms = 0;
       Object.values(awardLeaders).forEach(set => { if (set.has(e.id)) noms++; });
       e.noms = noms;
-      if (noms >= 2) e.pts += (noms - 1) * 1.4;
+      if (noms >= 2) e.pts += (noms - 1) * 1.2;
     });
+
+    return scores;
+  }
+  function computeBallonRanking(statsSource) {
+    const src = statsSource || stats;
+    const MIN_APPS = BALLON_MIN_APPS;
+    const scores = computeContextualPlayerScores(src, MIN_APPS);
     return Object.values(scores)
       .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
       .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
@@ -5925,12 +6141,12 @@ var App = (() => {
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
     // otherwise this would wipe that tournament's own live leaderboard mid-run.
     if (!tournament || tournament.champion) {
-      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
     }
     saveStats();
   }
@@ -6413,7 +6629,7 @@ var App = (() => {
     const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
     if (selected.length < 4) { toast('Select at least 4 teams'); return; }
 
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
@@ -7716,40 +7932,14 @@ var App = (() => {
       .filter(x => (x.count || 0) > 0)
       .sort((a,b) => b.avg - a.avg || b.count - a.count);
 
-    // Golden Ball: a composite of G+A, average rating, MOTM count and "award show"
-    // presence across the other individual categories — not rating alone — so a
-    // quiet-but-consistent passer can't out-rank a genuine standout performer.
-    const goldenScores = {};
-    const ensureG = (p) => {
-      if (!goldenScores[p.id]) goldenScores[p.id] = { id: p.id, name: p.name, team: p.team, count: 0, avg: 0, apps: 0, pts: 0, goals: 0, assists: 0, motm: 0 };
-      return goldenScores[p.id];
-    };
-    goals.forEach(p => { const e = ensureG(p); e.goals = p.count; e.pts += p.count * 4; });
-    assists.forEach(p => { const e = ensureG(p); e.assists = p.count; e.pts += p.count * 2.5; });
-    motm.forEach(p => { const e = ensureG(p); e.motm = p.count; e.pts += p.count * 5; });
-    cleanSheets.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
-    puskas.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
-    Object.values(tournamentStats.ratings || {}).forEach(p => {
-      const e = ensureG(p);
-      e.apps = p.count || 0;
-      e.avg = p.avg || 0;
-      if (e.apps >= 3 && e.avg > 0) e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
-      else if (e.apps > 0) e.pts += e.avg * 0.15;
-    });
-    // Award-show-appearance bonus: nominee across multiple individual tournament awards
-    const topSets = {
-      goldenboot: new Set(goals.slice(0,10).map(p=>p.id)),
-      assists: new Set(assists.slice(0,10).map(p=>p.id)),
-      motm: new Set(motm.slice(0,10).map(p=>p.id)),
-      glove: new Set(saves.slice(0,10).map(p=>p.id)),
-      puskas: new Set(puskas.slice(0,10).map(p=>p.id))
-    };
-    Object.values(goldenScores).forEach(e => {
-      let noms = 0;
-      Object.values(topSets).forEach(set => { if (set.has(e.id)) noms++; });
-      if (noms >= 2) e.pts += (noms - 1) * 1.4;
-      e.count = Math.round(e.pts);
-    });
+    // Golden Ball: the same holistic "best player" scoring as the Ballon
+    // d'Or (domestic/continental/international context, trophies, consistency,
+    // big-game performances) run against this tournament's own stat bucket —
+    // not just G+A and average rating, so a quiet-but-consistent passer can't
+    // out-rank a genuine standout, and a genuine standout still needs more
+    // than one big night to top a player who was excellent throughout.
+    const goldenScores = computeContextualPlayerScores(tournamentStats, 3);
+    Object.values(goldenScores).forEach(e => { e.count = Math.round(e.pts); });
     const goldenBallData = Object.values(goldenScores)
       .filter(e => e.pts > 0 && (e.apps >= 3 || e.goals + e.assists + e.motm >= 3))
       .sort((a,b) => b.pts - a.pts || b.apps - a.apps);
