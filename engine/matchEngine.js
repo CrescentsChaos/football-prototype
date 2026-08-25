@@ -91,7 +91,19 @@
 
 /*@CHUNK:c0130:START*/
   function blankStats() {
-    return { shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0 };
+    return {
+      shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0,
+      // Attack
+      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
+      // Passing
+      progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
+      // Defense
+      tackles: 0, clearances: 0, headedClearances: 0, defensiveErrors: 0, recoveries: 0, pressures: 0, aerialDuels: 0,
+      // Physical
+      distance: 0, sprints: 0, highSpeedRuns: 0, accelerations: 0, decelerations: 0,
+      // Goalkeeping
+      punches: 0, claims: 0, crossesStopped: 0, goalsPrevented: 0, psxg: 0, distribution: 0
+    };
   }
 /*@CHUNK:c0130:END*/
 
@@ -198,9 +210,165 @@
 
 /*@CHUNK:c0168:START*/
   function blankPlayerMatchStats(p) {
-    return { id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr, goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false };
+    return {
+      id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr,
+      goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false,
+      // Attack
+      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
+      // Passing
+      progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
+      // Defense
+      interceptions: 0, blocks: 0, clearances: 0, headedClearances: 0, defensiveErrors: 0, recoveries: 0, pressures: 0, aerialDuels: 0,
+      // Physical
+      distance: 0, sprints: 0, highSpeedRuns: 0, accelerations: 0, decelerations: 0,
+      // Goalkeeping
+      punches: 0, claims: 0, crossesStopped: 0, goalsPrevented: 0, psxg: 0, distribution: 0
+    };
   }
 /*@CHUNK:c0168:END*/
+
+/*@CHUNK:cx901:START*/
+
+  // Broad role bucket for extended-stats generation below — GK / DEF / MID / FWD.
+  function posGroupOf(posArr, primaryPos) {
+    const pp = (primaryPos || (posArr || [])[0] || 'CM').toUpperCase();
+    const list = (posArr || []).map(x => (x || '').toUpperCase());
+    if (pp === 'GK' || list.includes('GK')) return 'GK';
+    if (['CB', 'RB', 'LB', 'RWB', 'LWB'].includes(pp) || list.some(x => ['CB','RB','LB','RWB','LWB'].includes(x))) return 'DEF';
+    if (['CM', 'CDM', 'CAM', 'RM', 'LM'].includes(pp) || list.some(x => ['CM','CDM','CAM','RM','LM'].includes(x))) return 'MID';
+    return 'FWD';
+  }
+/*@CHUNK:cx901:END*/
+
+/*@CHUNK:cx902:START*/
+
+  // Fills in the full extended stat sheet (Attack/Passing/Defense/Physical/
+  // Goalkeeping) for every player involved in the match, then sums each
+  // field into the team totals so the team sheet always agrees exactly with
+  // what's shown per-player underneath it. Runs once at full time (called
+  // from endMatch(), after ratings/goalsConceded are finalised) rather than
+  // tick-by-tick — a handful of the underlying numbers (shots, passes,
+  // passesCompleted, tackles, interceptions, blocks, saves, goals, assists)
+  // are the real minute-by-minute simulation output; everything else here
+  // is a plausible derived breakdown built from those, the player's role,
+  // and minutes played, in the same spirit as the existing rating formula.
+  const EXTENDED_STAT_KEYS = ['bigChances','bigChancesMissed','touches','touchesInBox','progressiveCarries','carries',
+    'dribbles','successfulDribbles','offsides','progressivePasses','keyPasses','throughBalls','crosses',
+    'switches','longBalls','finalThirdPasses','tackles','clearances','headedClearances','defensiveErrors',
+    'recoveries','pressures','aerialDuels','distance','sprints','highSpeedRuns','accelerations','decelerations',
+    'punches','claims','crossesStopped','goalsPrevented','psxg'];
+
+  function deriveExtendedMatchStats(m) {
+    if (!m) return;
+    ['home', 'away'].forEach(side => {
+      const teamSide = m[side];
+      const oppSide = side === 'home' ? m.away : m.home;
+      const squadAll = (teamSide.squad && teamSide.squad.all) || [];
+      squadAll.forEach(p => {
+        const ps = m.playerMatchStats[p.id];
+        if (!ps) return;
+        const minutes = computeMinutesPlayed(m, p.id, p.name, side);
+        const played = minutes > 0 || ps.goals || ps.assists || ps.shots || ps.saves || ps.tackles || ps.passes || ps.interceptions || ps.blocks;
+        if (!played) return;
+        const posArr = (ps.posArr && ps.posArr.length) ? ps.posArr : (p.pos || []);
+        const group = posGroupOf(posArr, ps.pos);
+        const minFrac = Math.max(0.15, Math.min(1, minutes / 90));
+        const shots = ps.shots || 0, passes = ps.passes || 0, passesC = ps.passesCompleted || 0;
+        const goals = ps.goals || 0, assists = ps.assists || 0;
+        const rv = (mean, spread) => Math.max(0, mean + (seededRandom() * 2 - 1) * spread);
+        const rr = (v) => Math.round(v);
+
+        if (group === 'GK') {
+          const touches = rv(16 + minFrac * 12, 5);
+          ps.touches = rr(touches);
+          ps.touchesInBox = ps.touches;
+          ps.carries = rr(touches * 0.35);
+          ps.progressiveCarries = rr(ps.carries * 0.1);
+          ps.dribbles = 0; ps.successfulDribbles = 0; ps.bigChances = 0; ps.bigChancesMissed = 0; ps.offsides = 0;
+          ps.progressivePasses = rr(passesC * 0.22);
+          ps.keyPasses = 0; ps.throughBalls = 0; ps.crosses = 0;
+          ps.switches = rr(passesC * 0.04);
+          ps.longBalls = rr(passesC * (0.3 + seededRandom() * 0.2));
+          ps.finalThirdPasses = rr(passesC * 0.04);
+          ps.clearances = rr(rv(1.5 * minFrac, 1.4));
+          ps.headedClearances = rr(ps.clearances * 0.25);
+          ps.defensiveErrors = seededRandom() < 0.035 * minFrac ? 1 : 0;
+          ps.recoveries = rr(rv(2 * minFrac, 1.4));
+          ps.pressures = rr(rv(1 * minFrac, 1));
+          ps.aerialDuels = rr(rv(0.6 * minFrac, 0.8));
+          ps.distance = +(3.2 + minFrac * 3 + seededRandom()).toFixed(1);
+          ps.sprints = rr(rv(1.5 * minFrac, 1.2));
+          ps.highSpeedRuns = rr(rv(0.8 * minFrac, 0.8));
+          ps.accelerations = rr(rv(2.5 * minFrac, 1.5));
+          ps.decelerations = rr(rv(2.5 * minFrac, 1.5));
+          const shotsFaced = oppSide.stats.shotsOn || 0;
+          ps.punches = rr(rv(shotsFaced * 0.1, 0.6));
+          ps.claims = rr(rv(minFrac * 1.3, 1));
+          ps.crossesStopped = rr(rv(minFrac * 1.1, 1));
+          // Post-shot xG faced ≈ shots-on-target faced × a per-shot quality
+          // factor; Goals Prevented is the usual "keeper overperformance"
+          // read — how many more goals an average keeper would've conceded
+          // facing the same shots.
+          ps.psxg = +(shotsFaced * (0.28 + seededRandom() * 0.12)).toFixed(2);
+          ps.goalsPrevented = +(ps.psxg - (ps.goalsConceded || 0)).toFixed(2);
+          ps.distribution = passes ? rr((passesC / passes) * 100) : 0;
+        } else {
+          const isDef = group === 'DEF', isMid = group === 'MID', isFwd = group === 'FWD';
+          const tackles = ps.tackles || 0, ints = ps.interceptions || 0;
+          const touchBase = (isFwd ? 9 : isMid ? 15 : isDef ? 8 : 8) * minFrac;
+          ps.touches = rr(touchBase + passes * 1.15 + shots * 1.3 + tackles * 0.5 + ints * 0.4 + rv(0, 3));
+          ps.touchesInBox = rr((isFwd ? ps.touches * 0.16 : isMid ? ps.touches * 0.06 : isDef ? ps.touches * 0.025 : 0.03 * ps.touches) + shots * 0.6);
+          ps.carries = rr(ps.touches * (0.5 + seededRandom() * 0.12));
+          ps.progressiveCarries = rr(ps.carries * (isFwd ? 0.22 : isMid ? 0.18 : isDef ? 0.08 : 0.15));
+          const dribbleBase = (isFwd ? 2.0 : isMid ? 1.3 : isDef ? 0.35 : 1) * minFrac + shots * 0.12;
+          ps.dribbles = rr(rv(dribbleBase, 1.1));
+          ps.successfulDribbles = rr(ps.dribbles * (0.5 + seededRandom() * 0.25));
+          ps.offsides = (isFwd && seededRandom() < 0.16 * minFrac) ? (seededRandom() < 0.2 ? 2 : 1) : 0;
+
+          ps.progressivePasses = rr(passesC * (isMid ? 0.22 : isDef ? 0.15 : isFwd ? 0.12 : 0.1));
+          ps.keyPasses = rr(passesC * (isMid ? 0.055 : isFwd ? 0.045 : 0.018) + assists * 0.7);
+          ps.throughBalls = rr(ps.keyPasses * (0.12 + seededRandom() * 0.15));
+          const wide = WIDE_SLOTS.has((ps.slot || ps.pos || '').toUpperCase());
+          ps.crosses = rr(passes * (wide ? 0.14 : isFwd ? 0.04 : 0.015) + rv(0, 1));
+          ps.switches = rr(passesC * 0.018);
+          ps.longBalls = rr(passesC * (isDef ? 0.18 : isMid ? 0.08 : 0.04));
+          ps.finalThirdPasses = rr(passesC * (isFwd ? 0.35 : isMid ? 0.3 : isDef ? 0.12 : 0.2));
+
+          ps.clearances = rr(rv((isDef ? 3.2 : isMid ? 0.6 : 0.15) * minFrac, isDef ? 2 : 0.6));
+          ps.headedClearances = rr(ps.clearances * (0.3 + seededRandom() * 0.25));
+          ps.defensiveErrors = seededRandom() < (isDef ? 0.05 : 0.02) * minFrac ? 1 : 0;
+          ps.recoveries = rr(rv((isDef ? 5 : isMid ? 5.5 : 2.5) * minFrac, 2));
+          ps.pressures = rr(rv((isFwd ? 4 : isMid ? 5 : 3) * minFrac, 2));
+          ps.aerialDuels = rr(rv((isDef ? 3.5 : isFwd ? 2.2 : 1.2) * minFrac, 1.5));
+
+          ps.distance = +((isMid ? 8.8 : isDef ? 7.6 : isFwd ? 8.2 : 5) * minFrac + seededRandom() * 1.2).toFixed(1);
+          ps.sprints = rr(rv((isFwd ? 14 : isMid ? 11 : 9) * minFrac, 4));
+          ps.highSpeedRuns = rr(ps.sprints * (0.45 + seededRandom() * 0.2));
+          ps.accelerations = rr(rv((isFwd ? 10 : 8) * minFrac, 3));
+          ps.decelerations = rr(rv((isFwd ? 10 : 8) * minFrac, 3));
+
+          ps.bigChances = rr(ps.keyPasses * 0.35 + assists * 0.6 + (isFwd ? shots * 0.12 : 0));
+          const chanceShots = Math.min(shots, rr(shots * 0.4 + (isFwd ? 0.3 : 0)));
+          ps.bigChancesMissed = Math.max(0, chanceShots - goals);
+          ps.punches = 0; ps.claims = 0; ps.crossesStopped = 0; ps.psxg = 0; ps.goalsPrevented = 0; ps.distribution = 0;
+        }
+      });
+
+      EXTENDED_STAT_KEYS.forEach(k => { teamSide.stats[k] = 0; });
+      squadAll.forEach(p => {
+        const ps = m.playerMatchStats[p.id];
+        if (!ps) return;
+        EXTENDED_STAT_KEYS.forEach(k => { if (typeof ps[k] === 'number') teamSide.stats[k] += ps[k]; });
+      });
+      teamSide.stats.distance = +teamSide.stats.distance.toFixed(1);
+      teamSide.stats.psxg = +teamSide.stats.psxg.toFixed(2);
+      teamSide.stats.goalsPrevented = +teamSide.stats.goalsPrevented.toFixed(2);
+      // Team-wide distribution accuracy is the side's overall pass accuracy,
+      // not a sum of individual keeper numbers.
+      teamSide.stats.distribution = teamSide.stats.passes ? Math.round((teamSide.stats.passesCompleted / teamSide.stats.passes) * 100) : 0;
+    });
+  }
+/*@CHUNK:cx902:END*/
 
 /*@CHUNK:cp022:START*/
 
@@ -620,6 +788,7 @@
       if (seededRandom() < 0.0025) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
     }
     generateEvents();
+    updateFatigue();
     runTacticalAI();
     // Substitutions: aim for at least 3 per team (max 5)
     if (m.minute >= 55 && m.minute <= 88 && !m.inET) {
@@ -639,6 +808,10 @@
       else if (homeDiff >= 2) pHome *= 0.75;
       if (awayDiff <= -1) pAway *= (awayDiff <= -2 ? 1.6 : 1.3);
       else if (awayDiff >= 2) pAway *= 0.75;
+      // Fatigue nudges timing too — a visibly gassed side brings changes
+      // earlier than the scoreline-only read above would suggest.
+      if (teamAvgStamina('home') < 55) pHome *= 1.25;
+      if (teamAvgStamina('away') < 55) pAway *= 1.25;
       if (seededRandom() < pHome) trySubstitution('home');
       if (seededRandom() < pAway) trySubstitution('away');
     }
@@ -669,57 +842,36 @@
     const defSide = side === 'home' ? 'away' : 'home';
     const attTeam = m[side], defTeam = m[defSide];
     const roll = seededRandom();
-    if (roll < 0.24) {
+    if (roll < 0.20) {
       // Direct free-kick — always the consequence of an actual, logged foul
       // (never conjured out of nowhere). The fouler is picked from the
       // defending side committing a midfield/wide challenge, resolveFoul
       // handles the real foul/card bookkeeping, and only if that foul left
       // the taking side with a genuine dangerous set-piece (and didn't just
-      // end in a red card stopping play) does the free-kick shot follow.
+      // end in a red card stopping play) does a routine get taken —
+      // resolveFreeKickRoutine (engine/setpieces.js) then picks between a
+      // direct strike, a quick restart, a crossed delivery, a short
+      // link-up, or an indirect routine inside the box.
       const fouler = pickPlayer(defTeam, ['CM', 'CDM', 'CB', 'RB', 'LB', 'RWB', 'LWB']);
       const victim = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
       if (fouler) {
         const result = resolveFoul(defSide, side, fouler, victim, false);
         if (result && result.outcome !== 'red' && result.outcome !== 'penalty' && seededRandom() < 0.35) {
-          const taker = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
-          if (taker) {
-            attTeam.stats.shots++;
-            if (!m.playerMatchStats) m.playerMatchStats = {};
-            if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
-            m.playerMatchStats[taker.id].shots++;
-            const fkGk = pickPlayer(defTeam, ['GK']);
-            const fk = pickFkOutcome(taker, fkGk);
-            addEvent(m.minute, 'shot', `<span class="player">${taker.name}</span> stands over the free-kick...`, side);
-            if (fk.scored) {
-              attTeam.stats.shotsOn++;
-              attTeam.score++;
-              recordStat('goals', taker, attTeam.team);
-              m.playerMatchStats[taker.id].goals++;
-              m.playerMatchStats[taker.id].xg += 0.12 + seededRandom() * 0.1;
-              pushGoal(side, taker, m.minute, fk.text);
-              addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, side, true);
-              if (seededRandom() < 0.55) recordStat('puskas', taker, attTeam.team);
-              maybeOffsideDisallow(side, taker, m.minute);
-            } else {
-              if (fk.saved) {
-                attTeam.stats.shotsOn++;
-                const gk = fkGk || pickPlayer(defTeam, ['GK']);
-                if (gk) {
-                  defTeam.stats.saves++;
-                  recordStat('saves', gk, defTeam.team);
-                  if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
-                  m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
-                }
-                addEvent(m.minute, 'save', `🧤 Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, side);
-              } else {
-                addEvent(m.minute, 'miss', `Free-kick from <span class="player">${taker.name}</span> — ${fk.text}`, side);
-                if (fk.wall) resolveCorner(side);
-              }
-            }
-          }
+          const closeRange = seededRandom() < 0.45;
+          resolveFreeKickRoutine(side, defSide, closeRange);
         }
       }
-    } else if (roll < 0.42) {
+    } else if (roll < 0.30) {
+      // Throw-in — normal, long, or a tactical retaining throw. Whichever
+      // side is more naturally in possession here is picked at random
+      // (the possession pipeline above already decides the headline
+      // sequence each minute, so this is deliberately independent texture).
+      resolveThrowIn(seededRandom() < 0.5 ? side : defSide);
+    } else if (roll < 0.40) {
+      // Goal kick — taken by the side that was defending this passage,
+      // short/medium/long distribution via resolveGoalKick (engine/setpieces.js).
+      resolveGoalKick(defSide);
+    } else if (roll < 0.56) {
       // Handball — the vast majority are just a regular foul; only a small
       // share are actually given as a penalty. The commentary now always
       // matches what's actually awarded instead of asserting a penalty and
@@ -736,7 +888,7 @@
           resolveFoul(defSide, side, p, null, false);
         }
       }
-    } else if (roll < 0.60) {
+    } else if (roll < 0.68) {
       // VAR — red-card review. A card given after review still traces back
       // to a real foul/challenge that happened on the pitch, so it counts
       // toward fouls (and the 'cards' bucket) exactly like any other card.
@@ -772,7 +924,7 @@
           addEvent(m.minute, 'yellow', `🟨 Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
         }
       }
-    } else if (roll < 0.72) {
+    } else if (roll < 0.78) {
       const att = pickPlayer(attTeam, ['ST', 'CAM', 'RW', 'LW', 'CM']);
       const def = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM']);
       const rare = seededRandom();
@@ -1038,6 +1190,10 @@
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
       if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
     });
+    // Fill in the full Attack/Passing/Defense/Physical/Goalkeeping stat sheet
+    // for every player who took part, then roll those up into each side's
+    // team totals — see deriveExtendedMatchStats() below.
+    deriveExtendedMatchStats(m);
     let best = null, bestR = -1;
     Object.values(m.playerMatchStats).forEach(ps => {
       if (ps.rating > bestR) { bestR = ps.rating; best = ps; }

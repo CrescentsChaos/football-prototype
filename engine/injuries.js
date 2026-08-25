@@ -106,6 +106,7 @@
         const idx = onPitchIds.indexOf(injured.id);
         if (idx >= 0) onPitchIds[idx] = inPlayer.id;
         markLeftPitch(m, side, injured.id);
+        resetFatigueFor(m, side, inPlayer.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
         addEvent(m.minute, 'sub', `Forced sub: <span class="player">${inPlayer.name}</span> replaces injured <span class="player">${injured.name}</span>`, side);
       } else {

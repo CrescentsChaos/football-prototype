@@ -116,11 +116,13 @@
     if (!m) return;
     const sideData = m[side];
     const otherSide = side === 'home' ? 'away' : 'home';
+    const oppData = m[otherSide];
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     if (used >= (m.maxSubs || 5)) return;
     if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
     const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
     if (!m.subLog) m.subLog = { home: {}, away: {} };
+    if (!m.cards) m.cards = { home: {}, away: {} };
     const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
     // Game-state context: is this side chasing the game or protecting a
     // lead late on? Drives which line gets sacrificed and what comes on,
@@ -151,23 +153,56 @@
       const frontPool = pool.filter(p => lineOf(p) === 'FWD' || lineOf(p) === 'MID');
       if (frontPool.length) pool = frontPool;
     }
-    // Weighted pick, not just "worst half": lower-rated legs are still the
-    // main driver, but forwards/midfielders get tired and rotated far more
-    // often in real football than centre-backs, so weight the line too —
-    // this stops the engine picking a defender to sub off just because a
-    // striker happens to have a marginally higher OVR that match.
+
+    // ---- Composite "who comes off" score -----------------------------
+    // Real managerial reasoning folded into one weighted pick instead of a
+    // single "lowest OVR for their line" heuristic: raw fatigue, the real
+    // risk of a second yellow costing the side a man, how the player has
+    // actually performed so far this match, a genuine tactical mismatch
+    // against this specific opponent, plus the scoreline/line-weight bias
+    // the engine already had.
+    const oppStr = calcTeamStrength(oppData);
     const LINE_SUB_WEIGHT = chasing ? { FWD: 0.5, MID: 1.1, DEF: 1.4, GK: 0 }
       : protectingLead ? { FWD: 1.5, MID: 1.1, DEF: 0.3, GK: 0 }
       : { FWD: 1.3, MID: 1.15, DEF: 0.65, GK: 0 };
-    const weighted = pool.map(p => ({ p, w: Math.max(0.15, (96 - (p.ovr || 70)) * (LINE_SUB_WEIGHT[lineOf(p)] || 1)) }));
-    const totalW = weighted.reduce((s, x) => s + x.w, 0);
-    let outPlayer = null;
+    const scored = pool.map(p => {
+      const line = lineOf(p);
+      let score = Math.max(0.15, (96 - (p.ovr || 70)) * (LINE_SUB_WEIGHT[line] || 1));
+      // Fatigue: a genuinely gassed player (see engine/fatigue.js) is a
+      // strong candidate to come off, and increasingly so as the second
+      // half wears on.
+      const stamina = getStamina(m, side, p.id);
+      if (m.minute >= 58) score += Math.max(0, 72 - stamina) * 0.55;
+      // Second-yellow risk: booked earlier and still out there for a
+      // fast/aggressive closing stretch is exactly the profile that ends
+      // up costing the team a man — pull them before that happens rather
+      // than reacting to it after.
+      const hasYellow = (m.cards[side] && m.cards[side][p.id]) >= 1;
+      if (hasYellow && m.minute >= 55) score += 24 + Math.min(20, (m.minute - 55) * 0.6);
+      // Poor match rating so far — a genuinely bad game, not just tired or
+      // booked. Only weighed once there's enough of a sample to mean
+      // anything.
+      const ps = m.playerMatchStats && m.playerMatchStats[p.id];
+      if (ps && ((ps.passes || 0) + (ps.tackles || 0) + (ps.shots || 0)) >= 5) {
+        const liveRating = calcPlayerRating(Object.assign({}, ps, { pos: p.slot || (p.pos || [])[0] }));
+        if (liveRating < 6.2) score += (6.2 - liveRating) * 14;
+      }
+      // Tactical mismatch: a defender being physically overrun by a
+      // quicker opposing attack, or a midfielder outclassed technically by
+      // the opposing midfield, reads as a player who needs help now.
+      if (line === 'DEF' && (oppStr.pac || 70) - (p.pac || 70) >= 10) score += 10;
+      if (line === 'MID' && (oppStr.tec || 70) - (p.tec || 70) >= 10) score += 8;
+      return { p, w: score, stamina, hasYellow };
+    });
+    const totalW = scored.reduce((s, x) => s + x.w, 0);
+    let outPick = null;
     if (totalW > 0) {
       let r = seededRandom() * totalW;
-      for (const x of weighted) { r -= x.w; if (r <= 0) { outPlayer = x.p; break; } }
+      for (const x of scored) { r -= x.w; if (r <= 0) { outPick = x; break; } }
     }
-    if (!outPlayer) outPlayer = pool[Math.floor(seededRandom() * pool.length)];
-    if (!outPlayer) return;
+    if (!outPick) outPick = scored[Math.floor(seededRandom() * scored.length)];
+    if (!outPick) return;
+    const outPlayer = outPick.p;
 
     // A substitute can only come from the bench, must not already be on the
     // pitch, and — critically — must never have left the pitch already this
@@ -199,12 +234,26 @@
     if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => lineOf(p) === outLine); tacticalChange = false; }
     if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => canPlay(p, outSlot)); matchedOwnPosition = false; tacticalChange = false; }
     if (!candidatesIn.length) { candidatesIn = availableSubs; matchedOwnPosition = false; tacticalChange = false; }
-    candidatesIn.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
+
+    // Positional need on top of raw quality: if this line is specifically
+    // being outrun by the opponent (the same mismatch signal that pushed
+    // this player toward being subbed off in the first place), prefer the
+    // bench option with real recovery pace to counter it rather than just
+    // the highest OVR among the tiered candidates.
+    const needsPace = outLine === 'DEF' && (oppStr.pac || 70) - (outPlayer.pac || 70) >= 10;
+    candidatesIn = candidatesIn.slice().sort((a, b) => {
+      if (needsPace) {
+        const d = (b.pac || 70) - (a.pac || 70);
+        if (Math.abs(d) >= 4) return d;
+      }
+      return (b.ovr || 70) - (a.ovr || 70);
+    });
     const top = candidatesIn.slice(0, Math.min(3, candidatesIn.length));
     const inPlayer = top[Math.floor(seededRandom() * top.length)];
     const idx = onPitchIds.indexOf(outPlayer.id);
     if (idx >= 0) onPitchIds[idx] = inPlayer.id;
     markLeftPitch(m, side, outPlayer.id);
+    resetFatigueFor(m, side, inPlayer.id);
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
@@ -214,8 +263,14 @@
     if (!matchedOwnPosition) inPlayer.slot = tacticalChange ? (inPlayer.pos || [outSlot])[0] : outSlot;
     else if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CM'])[0];
     const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
+    // Surface the real reason behind a notable change (booked/tiring) in
+    // the event log, same spirit as the tactical tag above.
+    const reasonBits = [];
+    if (outPick.hasYellow && m.minute >= 55) reasonBits.push('booked, managing risk');
+    if (outPick.stamina < 40) reasonBits.push('tiring');
+    const reasonTag = reasonBits.length ? ` <span style="opacity:0.55">(${reasonBits.join(', ')})</span>` : '';
     addEvent(m.minute, 'sub',
-      `Substitution · ${sideData.team.short}${tag}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
+      `Substitution · ${sideData.team.short}${tag}${reasonTag}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used+1}/${m.maxSubs})</span>`,
       side);
     if (!m.quietSim) { renderLineups(); renderPitch(); }
   }
@@ -267,6 +322,7 @@
     const idx = onPitchIds.indexOf(outPlayer.id);
     if (idx >= 0) onPitchIds[idx] = inPlayer.id;
     markLeftPitch(m, side, outPlayer.id);
+    resetFatigueFor(m, side, inPlayer.id);
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });

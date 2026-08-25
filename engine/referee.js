@@ -46,7 +46,7 @@
           m.playerMatchStats[taker.id].xg += 0.76 + seededRandom() * 0.08;
           pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
           addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
-          maybeOffsideDisallow(attackingSide, taker, m.minute);
+          maybeOffsideDisallow(attackingSide, taker, m.minute, 'penalty');
         } else {
           if (po.saved) {
             attTeam.stats.shotsOn++;

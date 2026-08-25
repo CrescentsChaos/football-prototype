@@ -142,6 +142,17 @@
       shooter = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id);
     }
     if (!shooter) shooter = carrier;
+
+    // A through ball is a genuine forward pass into space beyond the
+    // defence — the one chance type actively judged for offside before the
+    // shot ever happens. A flag here stops the passage immediately, the
+    // same as an assistant referee raising it in real time: no shot, no
+    // advantage played.
+    if (chanceType === 'throughball') {
+      const offsideResult = checkLiveOffside(attackingSide, shooter, 'throughball');
+      if (offsideResult && offsideResult.offside) return;
+    }
+
     attTeam.stats.shots++;
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);

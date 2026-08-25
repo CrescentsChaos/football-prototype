@@ -234,14 +234,33 @@
 /*@CHUNK:c0149:END*/
 
 /*@CHUNK:c0150:START*/
-  function maybeOffsideDisallow(side, scorer, minute) {
+  function maybeOffsideDisallow(side, scorer, minute, moment) {
     const m = currentMatch;
-    if (!m || seededRandom() > 0.16) return false; // ~16% of goals get a check
+    if (!m) return false;
+    moment = moment || 'openplay';
+    // Corners, penalties, and a direct free-kick effort are all exempt from
+    // this recheck under the actual Laws of the Game — nobody can be ruled
+    // offside receiving directly from a corner, and there's no separate
+    // "receiver" to judge on a penalty or the taker's own direct free-kick.
+    if (moment === 'corner' || moment === 'penalty' || moment === 'directfreekick') return false;
+    if (seededRandom() > 0.16) return false; // ~16% of goals get a check at all
     const team = m[side];
     addEvent(minute, 'var', `📺 VAR checking possible offside in the build-up to ${team.team.short}'s goal...`, side);
-    // Pace of attacker vs defence line slightly affects
-    const defLine = calcTeamStrength(m[side === 'home' ? 'away' : 'home']);
-    const offsideLikely = 0.35 + Math.max(0, (defLine.pac || 70) - (scorer.pac || 70)) / 200;
+    // Reuse the same spatial/temporal offside model that judges a live
+    // through ball — passer/receiver advancement, the second-last
+    // defender's line, and defensive discipline — rather than a separate,
+    // disconnected pace-only roll.
+    const result = evaluateOffside(side, scorer, 'openplay');
+    let offsideLikely;
+    if (result && result.checked) {
+      offsideLikely = result.offside ? 0.85 : Math.max(0.04, (result.margin || 0) * 2 + 0.05);
+    } else {
+      // Fallback for the rare case the spatial model has nothing to judge
+      // (e.g. missing formation data mid-transition) — the old pace-only
+      // read, so a check never silently does nothing.
+      const defLine = calcTeamStrength(m[side === 'home' ? 'away' : 'home']);
+      offsideLikely = 0.35 + Math.max(0, (defLine.pac || 70) - (scorer.pac || 70)) / 200;
+    }
     if (seededRandom() < offsideLikely) {
       team.score = Math.max(0, team.score - 1);
       // remove last goal from list for this side/scorer
@@ -483,7 +502,7 @@
 /*@CHUNK:c0183:END*/
 
 /*@CHUNK:c0184:START*/
-  function pickFkOutcome(taker, gk) {
+  function pickFkOutcome(taker, gk, boost) {
     const outcomes = [
       { scored: true, text: 'whipped curler over the wall into the top corner' },
       { scored: true, text: 'knuckleball that dips late under the bar' },
@@ -497,7 +516,10 @@
     ];
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
-    const scoreProb = Math.max(0.06, Math.min(0.55, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4));
+    // `boost` — a small edge for a quick restart caught the defence
+    // unorganised (see resolveFreeKickRoutine in engine/setpieces.js);
+    // defaults to 0 so every existing call site is unaffected.
+    const scoreProb = Math.max(0.06, Math.min(0.6, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4 + (boost || 0)));
     if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
     return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
   }
@@ -568,9 +590,10 @@
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
       addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
-      if (chanceType === 'throughball' && seededRandom() < 0.12) {
-        addEvent(m.minute, 'offside', `Offside against <span class="player">${shooter.name}</span>`, attackingSide);
-      }
+      // Note: through-ball offside is now judged spatially, up front, in
+      // resolveChanceCreation() before the shot is ever attempted — see
+      // checkLiveOffside() in engine/offside.js — so there's no separate
+      // flat-probability offside roll here anymore.
       return;
     }
 
@@ -632,9 +655,53 @@
     const defendingSide = attackingSide === 'home' ? 'away' : 'home';
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
     attTeam.stats.corners = (attTeam.stats.corners || 0) + 1;
-    addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short}`, attackingSide);
-    if (seededRandom() >= 0.05) return;
-    const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CM', 'CAM'], (p) => aerialSkill(p) * 2);
+
+    // Routine selection — a corner is no longer one flat resolution. Six
+    // realistic deliveries, each with its own target profile and
+    // defensive counter: inswinger/outswinger (whipped either way), a
+    // near-post flick-on, a far-post header, a dynamic set-up worked to
+    // the edge of the box, a crowd-the-keeper scramble ball, or a short
+    // corner recycled short.
+    const ROUTINE_LABEL = { inswinger: 'inswinging delivery', outswinger: 'outswinging delivery', nearpost: 'near-post flick', farpost: 'far-post header', edge: 'worked to the edge of the box', crowd: 'crowding the keeper', short: 'short corner' };
+    const GOAL_DESC = { inswinger: 'header from an inswinging corner', outswinger: 'header from an outswinging corner', nearpost: 'flick-on at the near post', farpost: 'towering header at the far post', edge: 'half-volley from the edge of the box', crowd: 'scrambled in from a crowded six-yard box' };
+    const hasShortOption = (attTeam.squad.all || []).some(p => (p.tec || 70) >= 82);
+    const roll = seededRandom();
+    let routine;
+    if (hasShortOption && roll < 0.1) routine = 'short';
+    else if (roll < 0.32) routine = 'inswinger';
+    else if (roll < 0.5) routine = 'outswinger';
+    else if (roll < 0.65) routine = 'nearpost';
+    else if (roll < 0.8) routine = 'farpost';
+    else if (roll < 0.92) routine = 'crowd';
+    else routine = 'edge';
+    addEvent(m.minute, 'corner', `Corner for ${attTeam.team.short} — ${ROUTINE_LABEL[routine]}`, attackingSide);
+
+    if (routine === 'short') {
+      // Recycled short — rarely a shot on this exact passage, but can
+      // still work an opening down the side.
+      if (seededRandom() < 0.22) {
+        const receiver = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW']);
+        if (receiver) resolveChanceCreation(attackingSide, defendingSide, receiver, seededRandom() < 0.5 ? 'L' : 'R');
+      }
+      return;
+    }
+
+    // Defensive setup: zonal marking covers the back-post space and
+    // second balls better; man-marking is sharper at matching a specific
+    // near-post run or a runner attacking the keeper directly. Either way
+    // a genuinely dominant aerial defender assigned to block/screen the
+    // main threat trims the chance further.
+    const zonal = seededRandom() < 0.5;
+    const targetRoles = routine === 'crowd' ? ['ST', 'CB', 'CDM'] : ['ST', 'CB', 'CM', 'CAM'];
+    const BASE_CHANCE = { inswinger: 0.062, outswinger: 0.05, nearpost: 0.07, farpost: 0.055, edge: 0.045, crowd: 0.08 };
+    let chance = BASE_CHANCE[routine] || 0.05;
+    if (zonal && (routine === 'farpost' || routine === 'edge')) chance *= 0.82;
+    if (!zonal && (routine === 'nearpost' || routine === 'crowd')) chance *= 0.82;
+    const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p) * 2);
+    if (blocker && aerialSkill(blocker) > 0.68) chance *= 0.85;
+
+    if (seededRandom() >= chance) return;
+    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p) * 2);
     if (!scorer) return;
     attTeam.stats.shots++;
     attTeam.stats.shotsOn++;
@@ -643,7 +710,7 @@
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
     m.playerMatchStats[scorer.id].goals++;
-    m.playerMatchStats[scorer.id].xg += 0.28 + seededRandom() * 0.15;
+    m.playerMatchStats[scorer.id].xg += 0.24 + seededRandom() * 0.18;
     const corTaker = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
     if (corTaker && seededRandom() < 0.65) {
       recordStat('assists', corTaker, attTeam.team);
@@ -651,8 +718,9 @@
       m.playerMatchStats[corTaker.id].assists++;
       m.playerMatchStats[corTaker.id].xa += 0.2 + seededRandom() * 0.3;
     }
-    pushGoal(attackingSide, scorer, m.minute, 'header from corner');
-    addEvent(m.minute, 'goal', `Corner converted. <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);
-    maybeOffsideDisallow(attackingSide, scorer, m.minute);
+    pushGoal(attackingSide, scorer, m.minute, GOAL_DESC[routine] || 'header from corner');
+    addEvent(m.minute, 'goal', `Corner converted (${ROUTINE_LABEL[routine]}). <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);
+    // Exempt from offside by law — nobody can be offside receiving the
+    // ball directly from a corner kick, so no VAR recheck follows.
   }
 /*@CHUNK:c0213:END*/
