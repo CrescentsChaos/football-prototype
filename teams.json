@@ -149,7 +149,7 @@
     {"id":"bra62_8","name":"Zito","pos":["CDM","CM"],"ovr":87,"att":74,"def":87,"phy":86,"pac":75,"tec":84,"num":8},
     {"id":"bra62_18","name":"Mengálvio","pos":["CM","CAM"],"ovr":79,"att":78,"def":65,"phy":76,"pac":74,"tec":82,"num":18},
     {"id":"bra62_7","name":"Garrincha","pos":["RW","RM"],"ovr":95,"att":94,"def":38,"phy":77,"pac":92,"tec":97,"num":7},
-    {"id":"bra62_10","name":"Pelé","pos":["CF","ST","CAM"],"ovr":96,"att":97,"def":45,"phy":85,"pac":91,"tec":96,"num":10},
+    {"id":"san62_10","name":"Pelé","pos":["CF","ST","CAM"],"ovr":96,"att":97,"def":45,"phy":85,"pac":91,"tec":96,"num":10},
     {"id":"bra62_19","name":"Vavá","pos":["ST"],"ovr":87,"att":89,"def":36,"phy":86,"pac":83,"tec":81,"num":19},
     {"id":"bra62_21","name":"Zagallo","pos":["LW","LM"],"ovr":86,"att":82,"def":62,"phy":80,"pac":84,"tec":85,"num":21},
     {"id":"bra62_20","name":"Amarildo","pos":["ST","LW"],"ovr":85,"att":86,"def":38,"phy":79,"pac":86,"tec":85,"num":20},
@@ -1524,46 +1524,6 @@
   ],
   "manager": {
     "name": "Enzo Bearzot",
-    "ovr": 95
-  }
-}
-,
-{
-  "id": "fra1998",
-  "name": "France 1998",
-  "short": "FRA98",
-  "flag": "🇫🇷",
-  "color": "#0055A4",
-  "secondary": "#EF4135",
-  "players": [
-    {"id":"fra98_1","name":"Fabien Barthez","pos":["GK"],"ovr":92,"att":15,"def":96,"phy":86,"pac":55,"tec":78,"num":16},
-    {"id":"fra98_2","name":"Bernard Lama","pos":["GK"],"ovr":85,"att":15,"def":88,"phy":82,"pac":50,"tec":72,"num":1},
-    {"id":"fra98_3","name":"Lionel Charbonnier","pos":["GK"],"ovr":80,"att":15,"def":84,"phy":79,"pac":48,"tec":66,"num":23},
-    {"id":"fra98_4","name":"Lilian Thuram","pos":["RB","CB"],"ovr":94,"att":70,"def":96,"phy":91,"pac":91,"tec":85,"num":15},
-    {"id":"fra98_5","name":"Marcel Desailly","pos":["CB","CDM"],"ovr":94,"att":52,"def":97,"phy":94,"pac":76,"tec":82,"num":8},
-    {"id":"fra98_6","name":"Laurent Blanc","pos":["CB"],"ovr":93,"att":65,"def":95,"phy":87,"pac":68,"tec":91,"num":5},
-    {"id":"fra98_7","name":"Frank Leboeuf","pos":["CB"],"ovr":85,"att":42,"def":88,"phy":84,"pac":65,"tec":75,"num":18},
-    {"id":"fra98_8","name":"Bixente Lizarazu","pos":["LB"],"ovr":91,"att":72,"def":90,"phy":84,"pac":88,"tec":89,"num":3},
-    {"id":"fra98_9","name":"Vincent Candela","pos":["LB","RB","LM"],"ovr":86,"att":67,"def":80,"phy":81,"pac":87,"tec":82,"num":2},
-    {"id":"fra98_10","name":"Christian Karembeu","pos":["CM","RM"],"ovr":87,"att":62,"def":84,"phy":88,"pac":77,"tec":78,"num":19},
-    {"id":"fra98_11","name":"Didier Deschamps","pos":["CDM","CM"],"ovr":91,"att":55,"def":94,"phy":88,"pac":68,"tec":82,"num":7},
-    {"id":"fra98_12","name":"Patrick Vieira","pos":["CM","CDM"],"ovr":90,"att":70,"def":88,"phy":94,"pac":79,"tec":82,"num":4},
-    {"id":"fra98_13","name":"Zinedine Zidane","pos":["CAM","CM"],"ovr":98,"att":96,"def":42,"phy":88,"pac":80,"tec":100,"num":10},
-    {"id":"fra98_14","name":"Emmanuel Petit","pos":["CM","CDM","LB"],"ovr":91,"att":72,"def":86,"phy":91,"pac":81,"tec":88,"num":17},
-    {"id":"fra98_15","name":"Youri Djorkaeff","pos":["CAM","ST"],"ovr":90,"att":91,"def":32,"phy":76,"pac":80,"tec":94,"num":6},
-    {"id":"fra98_16","name":"Robert Pirès","pos":["LW","RW","LM"],"ovr":85,"att":80,"def":32,"phy":72,"pac":89,"tec":88,"num":22},
-    {"id":"fra98_17","name":"Christophe Dugarry","pos":["ST","LW"],"ovr":82,"att":82,"def":30,"phy":82,"pac":78,"tec":76,"num":14},
-    {"id":"fra98_18","name":"Thierry Henry","pos":["ST","LW"],"ovr":87,"att":91,"def":28,"phy":78,"pac":95,"tec":86,"num":12},
-    {"id":"fra98_19","name":"David Trezeguet","pos":["ST"],"ovr":84,"att":91,"def":22,"phy":82,"pac":78,"tec":78,"num":20},
-    {"id":"fra98_20","name":"Stéphane Guivarc'h","pos":["ST"],"ovr":80,"att":83,"def":24,"phy":80,"pac":72,"tec":70,"num":9},
-    {"id":"fra98_21","name":"Bernard Diomède","pos":["LW","RW"],"ovr":78,"att":75,"def":30,"phy":70,"pac":84,"tec":75,"num":21},
-    {"id":"fra98_22","name":"Alain Boghossian","pos":["CM","CDM"],"ovr":79,"att":55,"def":73,"phy":82,"pac":65,"tec":70,"num":13},
-    {"id":"fra98_23","name":"Bernard Lama","pos":["GK"],"ovr":85,"att":15,"def":88,"phy":82,"pac":50,"tec":72,"num":1},
-    {"id":"fra98_24","name":"Patrick Vieira","pos":["CM","CDM"],"ovr":90,"att":70,"def":88,"phy":94,"pac":79,"tec":82,"num":4},
-    {"id":"fra98_25","name":"Robert Pirès","pos":["LW","RW","LM"],"ovr":85,"att":80,"def":32,"phy":72,"pac":89,"tec":88,"num":22}
-  ],
-  "manager": {
-    "name": "Aimé Jacquet",
     "ovr": 95
   }
 },  {
@@ -19242,7 +19202,7 @@
 }
 ,{
   "id": "bar2015",
-  "name": "FC Barcelona 2015",
+  "name": "FC Barcelona 2014-15",
   "short": "BAR15",
   "flag": "🇪🇸",
   "color": "#004D98",
