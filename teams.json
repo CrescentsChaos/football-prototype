@@ -8400,18 +8400,6 @@
       "num": 10
     },
     {
-      "id": "nor14",
-      "name": "Martin Ødegaard",
-      "pos": ["CAM", "CM"],
-      "ovr": 90,
-      "att": 91,
-      "def": 42,
-      "phy": 72,
-      "pac": 79,
-      "tec": 96,
-      "num": 8
-    },
-    {
       "id": "nor15",
       "name": "Sander Berge",
       "pos": ["CM", "CDM"],
