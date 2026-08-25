@@ -966,6 +966,30 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .rating-high { background: #22c55e; color: #052e16; }
 .rating-mid { background: #f59e0b; color: #1c1000; }
 .rating-low { background: #ef4444; color: #fff; }
+/* Man of the Match rating always renders blue, overriding the high/mid/low
+   performance color, so MOTM is instantly scannable in any ratings list. */
+.rating-motm { background: var(--blue); color: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset; }
+
+/* Team match log (see renderTeamMatchLogHTML in ui/teamUI.js) */
+.match-log-wrap { overflow-x: auto; }
+.team-log-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 4px; border-bottom: 1px solid var(--border-dim, rgba(255,255,255,0.06));
+  font-size: 0.82rem;
+}
+.team-log-row:last-child { border-bottom: none; }
+.tlr-comp { flex: 1; min-width: 0; color: var(--text-2); font-size: 0.74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlr-opp { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1.4; }
+.tlr-opp-abbr { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlr-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.result-tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 20px; border-radius: 5px;
+  font-size: 0.7rem; font-weight: 800; padding: 0 4px;
+}
+.result-w { background: #22c55e; color: #052e16; }
+.result-d { background: #9ca3af; color: #111827; }
+.result-l { background: #ef4444; color: #fff; }
 /* Badge shown next to OVR for players whose stats come from the expanded
    player-attributes.json sheet instead of teams.json's base numbers. */
 .attr-boost-badge {
@@ -1719,6 +1743,20 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   font-size: 0.78rem;
   color: var(--text-3);
   margin-top: 8px;
+}
+.loading-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+  margin-top: 14px;
+}
+.loading-progress-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--gold-dim, #b98f2c), var(--gold));
+  transition: width 0.15s ease-out;
 }
 
 .player-dot.sub-on {

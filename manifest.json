@@ -3535,6 +3535,13 @@
     "label": "func:withLoading"
   },
   {
+    "id": "c0469b",
+    "file": "ui/matchUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:withLoadingProgress"
+  },
+  {
     "id": "c0470",
     "file": "ui/matchUI.js",
     "start": 7098,
@@ -4466,6 +4473,20 @@
     "label": "func:goToSquadBuilder"
   },
   {
+    "id": "ctml01",
+    "file": "ui/teamUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "team-match-log-store"
+  },
+  {
+    "id": "ctml02",
+    "file": "ui/teamUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:renderTeamMatchLogHTML"
+  },
+  {
     "id": "cp001",
     "file": "ui/playersUI.js",
     "start": -1,
@@ -4632,6 +4653,13 @@
     "start": -1,
     "end": -1,
     "label": "player-match-log"
+  },
+  {
+    "id": "cp024b",
+    "file": "engine/matchEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "team-match-log"
   },
   {
     "id": "c0598",
