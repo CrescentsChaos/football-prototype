@@ -154,7 +154,7 @@
     {"id":"bra62_21","name":"Zagallo","pos":["LW","LM"],"ovr":86,"att":82,"def":62,"phy":80,"pac":84,"tec":85,"num":21},
     {"id":"bra62_20","name":"Amarildo","pos":["ST","LW"],"ovr":85,"att":86,"def":38,"phy":79,"pac":86,"tec":85,"num":20},
     {"id":"bra62_9","name":"Coutinho","pos":["ST"],"ovr":84,"att":86,"def":32,"phy":78,"pac":82,"tec":86,"num":9},
-    {"id":"bra62_11","name":"Pepe","pos":["LW"],"ovr":84,"att":85,"def":35,"phy":80,"pac":86,"tec":84,"num":11}
+    {"id":"san62_11","name":"Pepe","pos":["LW"],"ovr":84,"att":85,"def":35,"phy":80,"pac":86,"tec":84,"num":11}
   ],
   "manager": {
     "name": "Aymoré Moreira",
