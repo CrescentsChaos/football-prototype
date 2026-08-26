@@ -19460,7 +19460,7 @@
     {"id":"psg26_51","name":"Willian Pacho","pos":["CB"],"ovr":83,"att":45,"def":84,"phy":85,"pac":78,"tec":72,"num":51},
     {"id":"psg26_8","name":"Fabián Ruiz","pos":["CM","CAM"],"ovr":83,"att":78,"def":72,"phy":74,"pac":70,"tec":84,"num":8},
     {"id":"psg26_11","name":"Maghnes Akliouche","pos":["CAM","RW","RM"],"ovr":81,"att":80,"def":52,"phy":68,"pac":82,"tec":85,"num":11},
-    {"id":"por13",,"name":"Vitinha","pos":["CM","CDM"],"ovr":87,"att":80,"def":76,"phy":74,"pac":78,"tec":88,"num":17},
+    {"id":"por13","name":"Vitinha","pos":["CM","CDM"],"ovr":87,"att":80,"def":76,"phy":74,"pac":78,"tec":88,"num":17},
     {"id":"psg26_24","name":"Senny Mayulu","pos":["CM","CAM"],"ovr":75,"att":72,"def":60,"phy":68,"pac":78,"tec":78,"num":24},
     {"id":"psg26_27","name":"Dro Fernández","pos":["CAM","LW"],"ovr":74,"att":74,"def":45,"phy":62,"pac":78,"tec":80,"num":27},
     {"id":"psg26_33","name":"Warren Zaïre-Emery","pos":["CM","CDM","RB"],"ovr":84,"att":76,"def":78,"phy":82,"pac":80,"tec":83,"num":33},
