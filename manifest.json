@@ -385,6 +385,13 @@
     "label": "func:xattr"
   },
   {
+    "id": "c0032b",
+    "file": "data/playerDatabase.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:matchStateHelpers (skill context)"
+  },
+  {
     "id": "c0033",
     "file": "engine/shooting.js",
     "start": 734,
