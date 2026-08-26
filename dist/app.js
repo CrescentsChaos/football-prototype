@@ -201,6 +201,58 @@ var App = (() => {
     RW: ['RW','RM','ST','CAM'], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
   };
 
+  // Different data sources (teams.json, player-attributes.json) name the
+  // same real-world position differently — eFootball-style codes (CMF,
+  // DMF, AMF, RMF/LMF, RWF/LWF, SS), plain-language ones (AM), even a
+  // sweeper (SW). FORMATIONS/POS_COMPAT/POS_LINE above only ever speak the
+  // one canonical code per position (e.g. ST, not CF) — so any player whose
+  // pos array uses a variant spelling would silently never match a
+  // formation slot by exact position, and would fall through to Pass 2's
+  // compatibility check where THAT variant is equally absent from
+  // POS_COMPAT, so they wouldn't even qualify as a fallback. That's the
+  // "ST gets preferred over CF" bias: normalizePositions() (called once per
+  // team right after teams.json/player-attributes.json load, see init() in
+  // ui/matchUI.js) rewrites every player's pos array to these canonical
+  // codes so the exact same eligibility logic treats every naming variant
+  // of a position identically, with no formation-slot code needing to
+  // change at all.
+  const POS_ALIASES = {
+    GK: 'GK',
+    SW: 'CB', CB: 'CB',
+    RB: 'RB', LB: 'LB',
+    RWB: 'RWB', LWB: 'LWB',
+    CDM: 'CDM', DMF: 'CDM', DM: 'CDM',
+    CM: 'CM', CMF: 'CM', MF: 'CM',
+    CAM: 'CAM', AM: 'CAM', AMF: 'CAM', SS: 'CAM',
+    RM: 'RM', RMF: 'RM',
+    LM: 'LM', LMF: 'LM',
+    RW: 'RW', RWF: 'RW', RF: 'RW',
+    LW: 'LW', LWF: 'LW', LF: 'LW',
+    ST: 'ST', CF: 'ST'
+  };
+  function canonPos(p) { return POS_ALIASES[p] || p; }
+  // Normalizes a player's pos array to canonical codes, in place, and
+  // dedupes any resulting repeats (e.g. a player listed as both CM and CMF
+  // would otherwise end up with 'CM' twice). No-op for a player whose pos
+  // is already canonical or missing.
+  function normalizePlayerPos(p) {
+    if (!p || !p.pos || !p.pos.length) return;
+    const seen = new Set();
+    const out = [];
+    p.pos.forEach((raw) => {
+      const c = canonPos(raw);
+      if (!seen.has(c)) { seen.add(c); out.push(c); }
+    });
+    p.pos = out;
+  }
+  // Normalizes every player on every given team. Safe to call repeatedly
+  // (already-canonical positions round-trip unchanged) — called once after
+  // the initial teams.json load and again after player-attributes.json
+  // overrides a player's pos array (see applyExpandedPlayerAttributes()).
+  function normalizeAllPositions(teams) {
+    (teams || []).forEach(t => (t.players || []).forEach(normalizePlayerPos));
+  }
+
   // Broad position "line" for a player, used to keep substitutions tactically
   // sensible — like-for-like where possible, and to spot when a red card has
   // left a hole specifically in defence.
@@ -856,7 +908,7 @@ var App = (() => {
     FWD:      { att: 0.45, pac: 0.20, tec: 0.20, phy: 0.15, def: 0.00 }
   };
   function attrPosGroup(posArr) {
-    const p = (posArr && posArr[0]) || 'CM';
+    const p = canonPos((posArr && posArr[0]) || 'CM');
     if (p === 'GK') return 'GK';
     if (p === 'CB') return 'CB';
     if (['RB', 'LB', 'RWB', 'LWB'].includes(p)) return 'FB';
@@ -864,8 +916,8 @@ var App = (() => {
     if (p === 'CM') return 'CM';
     if (p === 'CAM') return 'CAM';
     if (['RM', 'LM'].includes(p)) return 'WIDE_MID';
-    if (['RW', 'LW', 'LWF', 'RWF'].includes(p)) return 'WINGER';
-    if (['ST', 'CF', 'SS'].includes(p)) return 'FWD';
+    if (['RW', 'LW'].includes(p)) return 'WINGER';
+    if (p === 'ST') return 'FWD';
     return 'CM';
   }
 
@@ -1563,6 +1615,14 @@ var App = (() => {
       loadPersistedGameState();
       restorePlayerForms();
       applyExpandedPlayerAttributes();
+      // Canonicalize every player's position codes (CF -> ST, RWF -> RW,
+      // CMF -> CM, DMF -> CDM, SS/AMF -> CAM, etc.) so formation auto-fill,
+      // substitutions, and position filters treat every naming variant of
+      // the same real position identically — see normalizeAllPositions()
+      // in js/state.js for why this has to run after
+      // applyExpandedPlayerAttributes() (which is what sets pos from the
+      // raw, non-canonical player-attributes.json codes in the first place).
+      normalizeAllPositions(allTeams);
       populateTeamSelects();
       populateFormations();
       bindNav();
@@ -2222,7 +2282,7 @@ var App = (() => {
         return '<button type="button" class="sb-picker-item' + (p.id === selected ? ' selected' : '') + '" onclick="App.setSquadSlot(' + index + ',\'' + p.id + '\');App.closeSlotPicker()">' +
           '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
           '<span class="sb-bench-name">' + p.name + '</span>' +
-          '<span class="sb-bench-meta">' + (p.pos || []).join('/') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
+          '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
       }).join('') + '</div>';
     picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -8666,6 +8726,30 @@ var App = (() => {
   // visible, not just the 5-stat blend it was compressed into. A rating
   // that was lifted by the manager's tactic affinity is marked so it's
   // clear the boost reached the individual attribute, not just the OVR.
+
+  // Bio strip for an enhanced player's profile — age, height, preferred
+  // foot, weak foot rating, injury resilience, and their skill-card list.
+  // All of it comes straight off the expanded attribute sheet
+  // (player-attributes.json), so this only ever gets called for a boosted
+  // player — see showPlayerProfile()'s bioHTML.
+  function renderPlayerBioHTML(attr) {
+    const facts = [];
+    if (typeof attr.age === 'number') facts.push(['Age', attr.age]);
+    if (typeof attr.height_cm === 'number') facts.push(['Height', Math.round(attr.height_cm) + ' cm']);
+    if (attr.preferred_foot) facts.push(['Foot', attr.preferred_foot]);
+    if (typeof attr['weak foot'] === 'number') facts.push(['Weak Foot', attr['weak foot'] + '★']);
+    if (attr.injury_res) facts.push(['Injury Res.', attr.injury_res]);
+    const factsHTML = facts.length
+      ? `<div class="profile-stats-grid">${facts.map(([lbl, val]) => `<div class="profile-stat"><div class="val">${val}</div><div class="lbl">${lbl}</div></div>`).join('')}</div>`
+      : '';
+    const skillsHTML = (attr.skills || []).length
+      ? `<div class="card-title" style="margin-top:10px">Skills</div>
+         <div>${attr.skills.map(sk => `<span class="playstyle-tag">${sk}</span>`).join('')}</div>`
+      : '';
+    if (!factsHTML && !skillsHTML) return '';
+    return `<div class="card-title" style="margin-top:8px">Bio</div>${factsHTML}${skillsHTML}`;
+  }
+
   function expandedAttrRowsHTML(player) {
     const attr = player.expandedAttrs || {};
     const boostedKeys = new Set();
@@ -8759,12 +8843,16 @@ var App = (() => {
           return `<span class="playstyle-tag${suited ? ' affinity-match' : ''}" title="${desc}">${s}</span>`;
         }).join('')}</div>`
       : '';
+    // Bio block: age/height/foot only exist on the expanded attribute sheet
+    // (player-attributes.json), so this whole section is naturally absent
+    // for a regular, non-enhanced player rather than showing empty fields.
+    const bioHTML = (boosted && player.expandedAttrs) ? renderPlayerBioHTML(player.expandedAttrs) : '';
     content.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
         <div>
           <h2 style="margin:0 0 4px;font-size:1.2rem">${playerNameHTML(player)}</h2>
-          <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
+          <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[])[0] || ''}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${affinityNote}
           ${signatureNote}
@@ -8773,6 +8861,7 @@ var App = (() => {
         </div>
       </div>
       ${matchBlock}
+      ${bioHTML}
       <div class="card-title">Career (competitive)</div>
       <div class="profile-stats-grid">
         <div class="profile-stat"><div class="val">${apps}</div><div class="lbl">Apps</div></div>
@@ -8836,7 +8925,7 @@ var App = (() => {
           <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
             <span class="tsr-avatar">${playerAvatarMark(p)}</span>
             <span class="tsr-name">${playerNameHTML(p)}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
-            <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
+            <span class="tsr-pos">${(p.pos||[])[0] || ''}</span>
             ${formArrow(p)}
             <span class="player-ovr">${p.ovr || ''}</span>
           </button>`;
@@ -10305,17 +10394,45 @@ var App = (() => {
       list = list.filter(e => POS_LINE[(e.player.pos || [])[0]] === playersPosFilter);
     }
     if (playersSearch) {
-      list = list.filter(e =>
-        (e.player.name || '').toLowerCase().includes(playersSearch) ||
-        (e.team.name || '').toLowerCase().includes(playersSearch) ||
-        (e.team.short || '').toLowerCase().includes(playersSearch)
-      );
+      list = list.filter(e => {
+        const p = e.player;
+        const skills = (p.expandedAttrs && p.expandedAttrs.skills) || [];
+        const styles = (p.expandedAttrs && p.expandedAttrs.playstyle) || [];
+        return (p.name || '').toLowerCase().includes(playersSearch) ||
+          (e.team.name || '').toLowerCase().includes(playersSearch) ||
+          (e.team.short || '').toLowerCase().includes(playersSearch) ||
+          skills.some(s => s.toLowerCase().includes(playersSearch)) ||
+          styles.some(s => s.toLowerCase().includes(playersSearch));
+      });
     }
     list = [...list];
     if (playersSort === 'name') list.sort((a, b) => (a.player.name || '').localeCompare(b.player.name || ''));
     else if (playersSort === 'goals') list.sort((a, b) => playerCareerCount('goals', b.player.id) - playerCareerCount('goals', a.player.id));
     else if (playersSort === 'assists') list.sort((a, b) => playerCareerCount('assists', b.player.id) - playerCareerCount('assists', a.player.id));
     else if (playersSort === 'apps') list.sort((a, b) => playerCareerCount('ratings', b.player.id) - playerCareerCount('ratings', a.player.id));
+    else if (playersSort === 'age') {
+      // Age/height only exist on the expanded attribute sheet, so players
+      // without one sort to the bottom regardless of direction rather than
+      // clumping at either end as false zeros.
+      list.sort((a, b) => {
+        const av = a.player.expandedAttrs && a.player.expandedAttrs.age;
+        const bv = b.player.expandedAttrs && b.player.expandedAttrs.age;
+        if (typeof av !== 'number' && typeof bv !== 'number') return 0;
+        if (typeof av !== 'number') return 1;
+        if (typeof bv !== 'number') return -1;
+        return av - bv;
+      });
+    }
+    else if (playersSort === 'height') {
+      list.sort((a, b) => {
+        const av = a.player.expandedAttrs && a.player.expandedAttrs.height_cm;
+        const bv = b.player.expandedAttrs && b.player.expandedAttrs.height_cm;
+        if (typeof av !== 'number' && typeof bv !== 'number') return 0;
+        if (typeof av !== 'number') return 1;
+        if (typeof bv !== 'number') return -1;
+        return bv - av;
+      });
+    }
     else list.sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0));
     return list;
   }
@@ -10356,12 +10473,19 @@ var App = (() => {
     const selected = playersCompareSelection.indexOf(p.id) !== -1;
     const clickAction = playersCompareMode ? `App.togglePlayerCompare('${p.id}')` : `App.showPlayerProfile('${p.id}')`;
     const primary = t.color || '#d4af37';
+    // Age/height only exist on the expanded attribute sheet — shown inline
+    // only for those players so the Age/Height sort options have a visible
+    // reference point in the list itself.
+    const attr = p.expandedAttrs;
+    const bioBit = attr && (typeof attr.age === 'number' || typeof attr.height_cm === 'number')
+      ? ` · ${typeof attr.age === 'number' ? attr.age + 'y' : ''}${(typeof attr.age === 'number' && typeof attr.height_cm === 'number') ? ' · ' : ''}${typeof attr.height_cm === 'number' ? Math.round(attr.height_cm) + 'cm' : ''}`
+      : '';
     return `<div class="team-check${selected ? ' selected' : ''}" style="cursor:pointer;border-left:3px solid ${primary}" onclick="${clickAction}">
       <div style="display:flex;align-items:center;gap:8px;width:100%">
         <span class="tsr-avatar" style="width:36px;height:36px;flex-shrink:0">${playerAvatarMark(p)}</span>
         <div style="flex:1;min-width:0">
           <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${playerNameHTML(p)}</strong>
-          <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span> · ${(p.pos || []).join('/')}</div>
+          <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span> · ${(p.pos || [])[0] || ''}${bioBit}</div>
         </div>
         ${playersCompareMode ? `<span class="compare-check${selected ? ' checked' : ''}">${selected ? '✓' : ''}</span>` : ''}
         ${formArrow(p)}
@@ -10471,7 +10595,7 @@ var App = (() => {
     const header = entries.map(e => `<div class="compare-col-head">
         <div class="profile-avatar" style="width:52px;height:52px;margin:0 auto 6px;background:${e.team.color || '#d4af37'};border:2px solid ${e.team.secondary || '#fff'};color:${e.team.secondary || '#fff'}">${playerAvatarMark(e.player)}</div>
         <div style="font-weight:700;font-size:0.82rem;line-height:1.2">${playerNameHTML(e.player)}</div>
-        <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px">${teamMark(e.team, 14)} ${e.team.short || ''} · ${(e.player.pos || []).join('/')}</div>
+        <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px">${teamMark(e.team, 14)} ${e.team.short || ''} · ${(e.player.pos || [])[0] || ''}</div>
         <div style="color:var(--gold);font-weight:800;margin-top:3px">${e.player.ovr || '—'} <span style="font-size:0.6rem;font-weight:600;color:var(--text-3)">OVR</span></div>
       </div>`).join('');
 
