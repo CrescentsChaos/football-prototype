@@ -3605,6 +3605,13 @@
     "label": "gap"
   },
   {
+    "id": "c0478b",
+    "file": "ui/playerUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:renderPlayerBioHTML"
+  },
+  {
     "id": "c0479",
     "file": "ui/playerUI.js",
     "start": 7172,
