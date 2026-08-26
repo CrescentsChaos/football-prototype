@@ -22,30 +22,87 @@
 
 /*@CHUNK:cp002:START*/
 
-  // Builds (once, cached) a flat [{player, team, isNational}] list across
-  // every team. Cheap — teamsData is already fully resident in memory —
-  // rendering is where the actual cost lives, and that's handled separately
-  // by windowing (see renderPlayersList).
+  // Builds (once, cached) a flat [{player, team, isNational, hasClub,
+  // hasNational, clubTeam, nationalTeam}] list across every team. Cheap —
+  // teamsData is already fully resident in memory — rendering is where the
+  // actual cost lives, and that's handled separately by windowing (see
+  // renderPlayersList).
+  //
+  // A real player who shows up on both a national side and a club (same id,
+  // same name — see repairDuplicatePlayerIds() in ui/matchUI.js, which has
+  // already split off any *accidental* id collisions between different
+  // players before this ever runs) is merged into a single entry here
+  // instead of appearing as two separate rows, with both team references
+  // attached so the UI can show "Club · Country" together. The club
+  // appearance is preferred as the entry's primary `player`/`team` (richer
+  // data — logo, stadium, etc.) when both exist.
   function getAllPlayersFlat() {
     if (_allPlayersFlatCache) return _allPlayersFlatCache;
-    const flat = [];
-    (teamsData.national || []).forEach(t => (t.players || []).forEach(p => flat.push({ player: p, team: t, isNational: true })));
-    (teamsData.club || []).forEach(t => (t.players || []).forEach(p => flat.push({ player: p, team: t, isNational: false })));
+    const byId = {};
+    const order = [];
+    (teamsData.national || []).forEach(t => (t.players || []).forEach(p => {
+      if (!p || !p.id) return;
+      if (!byId[p.id]) {
+        byId[p.id] = { player: p, team: t, isNational: true, hasNational: true, hasClub: false, nationalTeam: t, clubTeam: null };
+        order.push(p.id);
+      } else {
+        byId[p.id].hasNational = true;
+        byId[p.id].nationalTeam = t;
+      }
+    }));
+    (teamsData.club || []).forEach(t => (t.players || []).forEach(p => {
+      if (!p || !p.id) return;
+      if (!byId[p.id]) {
+        byId[p.id] = { player: p, team: t, isNational: false, hasNational: false, hasClub: true, nationalTeam: null, clubTeam: t };
+        order.push(p.id);
+      } else {
+        byId[p.id].hasClub = true;
+        byId[p.id].clubTeam = t;
+        // Prefer the club appearance as the primary display record.
+        byId[p.id].player = p;
+        byId[p.id].team = t;
+        byId[p.id].isNational = false;
+      }
+    }));
+    const flat = order.map(id => byId[id]);
     _allPlayersFlatCache = flat;
     return flat;
+  }
+
+  // Both team affiliations (club/national) for a merged player entry, or
+  // nulls if that side doesn't exist for this player. Used to show "Club ·
+  // Country" together wherever a player's team affiliation is displayed.
+  function getPlayerAffiliations(playerId) {
+    const e = getPlayerTeamIndex()[playerId];
+    if (!e) return { club: null, national: null };
+    return { club: e.clubTeam || null, national: e.nationalTeam || null };
   }
 
 /*@CHUNK:cp002:END*/
 
 /*@CHUNK:cp003:START*/
 
-  // Shared player+team lookup, also used by showPlayerProfile.
+  // id -> {player, team} lookup index, built once (lazily, cached) off of
+  // getAllPlayersFlat(). findPlayerAndTeam used to do a fresh linear scan
+  // across every team's full roster on every single call — with ~5,500
+  // players that added up fast anywhere it ran per-row (player profile
+  // opens, leaderboards, name-highlight lookups), which was a real
+  // contributor to the app feeling laggy. Same invalidation lifetime as
+  // _allPlayersFlatCache above (built once per loaded roster).
+  let _playerTeamIndexCache = null;
+  function getPlayerTeamIndex() {
+    if (_playerTeamIndexCache) return _playerTeamIndexCache;
+    const idx = {};
+    getAllPlayersFlat().forEach((e) => { idx[e.player.id] = e; });
+    _playerTeamIndexCache = idx;
+    return idx;
+  }
+
+  // Shared player+team lookup, also used by showPlayerProfile. O(1) via
+  // getPlayerTeamIndex() instead of scanning every team's roster.
   function findPlayerAndTeam(playerId) {
-    for (const t of allTeams) {
-      const p = (t.players || []).find(x => x.id === playerId);
-      if (p) return { player: p, team: t };
-    }
-    return null;
+    const e = getPlayerTeamIndex()[playerId];
+    return e ? { player: e.player, team: e.team } : null;
   }
 
 /*@CHUNK:cp003:END*/
@@ -62,23 +119,53 @@
 
   function getFilteredSortedPlayers() {
     let list = getAllPlayersFlat();
-    if (playersFilter === 'national') list = list.filter(e => e.isNational);
-    else if (playersFilter === 'club') list = list.filter(e => !e.isNational);
+    // hasNational/hasClub (not the single isNational flag) so a merged
+    // player who appears on both sides still shows up under either filter.
+    if (playersFilter === 'national') list = list.filter(e => e.hasNational);
+    else if (playersFilter === 'club') list = list.filter(e => e.hasClub);
     if (playersPosFilter !== 'all') {
       list = list.filter(e => POS_LINE[(e.player.pos || [])[0]] === playersPosFilter);
     }
     if (playersSearch) {
-      list = list.filter(e =>
-        (e.player.name || '').toLowerCase().includes(playersSearch) ||
-        (e.team.name || '').toLowerCase().includes(playersSearch) ||
-        (e.team.short || '').toLowerCase().includes(playersSearch)
-      );
+      list = list.filter(e => {
+        const p = e.player;
+        const skills = (p.expandedAttrs && p.expandedAttrs.skills) || [];
+        const styles = (p.expandedAttrs && p.expandedAttrs.playstyle) || [];
+        return (p.name || '').toLowerCase().includes(playersSearch) ||
+          (e.team.name || '').toLowerCase().includes(playersSearch) ||
+          (e.team.short || '').toLowerCase().includes(playersSearch) ||
+          skills.some(s => s.toLowerCase().includes(playersSearch)) ||
+          styles.some(s => s.toLowerCase().includes(playersSearch));
+      });
     }
     list = [...list];
     if (playersSort === 'name') list.sort((a, b) => (a.player.name || '').localeCompare(b.player.name || ''));
     else if (playersSort === 'goals') list.sort((a, b) => playerCareerCount('goals', b.player.id) - playerCareerCount('goals', a.player.id));
     else if (playersSort === 'assists') list.sort((a, b) => playerCareerCount('assists', b.player.id) - playerCareerCount('assists', a.player.id));
     else if (playersSort === 'apps') list.sort((a, b) => playerCareerCount('ratings', b.player.id) - playerCareerCount('ratings', a.player.id));
+    else if (playersSort === 'age') {
+      // Age/height only exist on the expanded attribute sheet, so players
+      // without one sort to the bottom regardless of direction rather than
+      // clumping at either end as false zeros.
+      list.sort((a, b) => {
+        const av = a.player.expandedAttrs && a.player.expandedAttrs.age;
+        const bv = b.player.expandedAttrs && b.player.expandedAttrs.age;
+        if (typeof av !== 'number' && typeof bv !== 'number') return 0;
+        if (typeof av !== 'number') return 1;
+        if (typeof bv !== 'number') return -1;
+        return av - bv;
+      });
+    }
+    else if (playersSort === 'height') {
+      list.sort((a, b) => {
+        const av = a.player.expandedAttrs && a.player.expandedAttrs.height_cm;
+        const bv = b.player.expandedAttrs && b.player.expandedAttrs.height_cm;
+        if (typeof av !== 'number' && typeof bv !== 'number') return 0;
+        if (typeof av !== 'number') return 1;
+        if (typeof bv !== 'number') return -1;
+        return bv - av;
+      });
+    }
     else list.sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0));
     return list;
   }
@@ -137,12 +224,24 @@
     const selected = playersCompareSelection.indexOf(p.id) !== -1;
     const clickAction = playersCompareMode ? `App.togglePlayerCompare('${p.id}')` : `App.showPlayerProfile('${p.id}')`;
     const primary = t.color || '#d4af37';
+    // Age/height only exist on the expanded attribute sheet — shown inline
+    // only for those players so the Age/Height sort options have a visible
+    // reference point in the list itself.
+    const attr = p.expandedAttrs;
+    const bioBit = attr && (typeof attr.age === 'number' || typeof attr.height_cm === 'number')
+      ? ` · ${typeof attr.age === 'number' ? attr.age + 'y' : ''}${(typeof attr.age === 'number' && typeof attr.height_cm === 'number') ? ' · ' : ''}${typeof attr.height_cm === 'number' ? Math.round(attr.height_cm) + 'cm' : ''}`
+      : '';
+    // A merged player (same real person on both a club and a national
+    // side) shows both affiliations together instead of just one.
+    const teamLine = (entry.clubTeam && entry.nationalTeam)
+      ? `${teamMark(entry.clubTeam, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entry.clubTeam.short || entry.clubTeam.name}</span> · ${teamMark(entry.nationalTeam, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entry.nationalTeam.short || entry.nationalTeam.name}</span>`
+      : `${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span>`;
     return `<div class="team-check${selected ? ' selected' : ''}" style="cursor:pointer;border-left:3px solid ${primary}" onclick="${clickAction}">
       <div style="display:flex;align-items:center;gap:8px;width:100%">
         <span class="tsr-avatar" style="width:36px;height:36px;flex-shrink:0">${playerAvatarMark(p)}</span>
         <div style="flex:1;min-width:0">
-          <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</strong>
-          <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span> · ${(p.pos || []).join('/')}</div>
+          <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${playerNameHTML(p)}</strong>
+          <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamLine} · ${(p.pos || [])[0] || ''}${bioBit}</div>
         </div>
         ${playersCompareMode ? `<span class="compare-check${selected ? ' checked' : ''}">${selected ? '✓' : ''}</span>` : ''}
         ${formArrow(p)}
@@ -237,7 +336,7 @@
     tray.innerHTML = playersCompareSelection.map(id => {
       const found = findPlayerAndTeam(id);
       if (!found) return '';
-      return `<span class="compare-chip">${teamMark(found.team, 14)} ${found.player.name}<button type="button" onclick="event.stopPropagation();App.togglePlayerCompare('${id}')" aria-label="Remove ${found.player.name}">✕</button></span>`;
+      return `<span class="compare-chip">${teamMark(found.team, 14)} ${playerNameHTML(found.player)}<button type="button" onclick="event.stopPropagation();App.togglePlayerCompare('${id}')" aria-label="Remove ${found.player.name}">✕</button></span>`;
     }).join('');
   }
 
@@ -275,8 +374,8 @@
     const n = entries.length;
     const header = entries.map(e => `<div class="compare-col-head">
         <div class="profile-avatar" style="width:52px;height:52px;margin:0 auto 6px;background:${e.team.color || '#d4af37'};border:2px solid ${e.team.secondary || '#fff'};color:${e.team.secondary || '#fff'}">${playerAvatarMark(e.player)}</div>
-        <div style="font-weight:700;font-size:0.82rem;line-height:1.2">${e.player.name}</div>
-        <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px">${teamMark(e.team, 14)} ${e.team.short || ''} · ${(e.player.pos || []).join('/')}</div>
+        <div style="font-weight:700;font-size:0.82rem;line-height:1.2">${playerNameHTML(e.player)}</div>
+        <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px">${teamMark(e.team, 14)} ${e.team.short || ''} · ${(e.player.pos || [])[0] || ''}</div>
         <div style="color:var(--gold);font-weight:800;margin-top:3px">${e.player.ovr || '—'} <span style="font-size:0.6rem;font-weight:600;color:var(--text-3)">OVR</span></div>
       </div>`).join('');
 
@@ -323,8 +422,9 @@
     if (!log.length) return '';
     const rows = log.slice(0, 10).map(e => {
       const rc = (e.rating || 0) >= 7.5 ? 'rating-high' : (e.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+      const oppMark = teamMark({ logo: e.opponentLogo, flag: e.opponentFlag }, 16);
       return `<tr>
-        <td>${e.opponentShort || e.opponent || '—'}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:4px">${oppMark}${e.opponentShort || e.opponent || '—'}</span></td>
         <td>${e.competition || ''}</td>
         <td>${e.minutes}'</td>
         <td>${e.goals || 0}</td>

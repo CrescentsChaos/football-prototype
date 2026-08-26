@@ -4,22 +4,36 @@
 
 /*@CHUNK:c0061:START*/
   function goToTournament(type) {
-    tournamentType = type || 'worldcup';
     switchView('tournament');
     const setup = document.getElementById('tournament-setup');
     const live = document.getElementById('tournament-live');
     if (setup) setup.style.display = 'block';
     if (live) live.style.display = 'none';
-    const isWC = tournamentType === 'worldcup';
-    const title = document.getElementById('tournament-title');
-    const desc = document.getElementById('tournament-desc');
-    if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
-    if (desc) desc.textContent = isWC
-      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
-      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
-    renderTournamentTeamSelect();
+    selectTournamentFormat(type || tournamentType || 'worldcup');
   }
 /*@CHUNK:c0061:END*/
+
+/*@CHUNK:ccomp02:START*/
+  // Applies a tournament format selection — used by the Home mode-cards, the
+  // Tournament tab's own format <select>, and restoreTournamentUI() on
+  // reload. Updates tournamentType, the setup card's title/description
+  // (from the TOURNAMENT_FORMATS registry), keeps the <select> in sync, and
+  // re-renders the eligible team picker for that format.
+  function selectTournamentFormat(key) {
+    tournamentType = (key && TOURNAMENT_FORMATS[key]) ? key : 'worldcup';
+    const cfg = TOURNAMENT_FORMATS[tournamentType];
+    const title = document.getElementById('tournament-title');
+    const desc = document.getElementById('tournament-desc');
+    if (title) title.textContent = cfg.name + ' Setup';
+    if (desc) desc.textContent = cfg.desc;
+    const select = document.getElementById('tour-format-select');
+    if (select && select.value !== tournamentType) select.value = tournamentType;
+    tourTeamsSearch = '';
+    const search = document.getElementById('tour-teams-search');
+    if (search) search.value = '';
+    renderTournamentTeamSelect();
+  }
+/*@CHUNK:ccomp02:END*/
 
 /*@CHUNK:c0351:START*/
 
@@ -27,7 +41,7 @@
 
 /*@CHUNK:c0352:START*/
   function renderTournamentTeamSelect() {
-    let pool = tournamentType === 'worldcup' ? (teamsData.national || []) : (teamsData.club || []);
+    let pool = getCompetitionEligiblePool(tournamentType);
     if (tourTeamsSearch) {
       pool = pool.filter(t =>
         (t.name || '').toLowerCase().includes(tourTeamsSearch) ||
@@ -84,7 +98,11 @@
       }
     }
     if (el) {
-      const need = tournamentType === 'ucl' ? '36 ideal (min 8)' : '4+ (8/16/32/48 ideal)';
+      const cfg = TOURNAMENT_FORMATS[tournamentType];
+      const engine = cfg && cfg.engine;
+      const need = engine === 'league' ? '36 ideal (min 8)'
+        : engine === 'knockout' ? 'a power of 2 — 2/4/8/16/32… (min 2)'
+        : '4+ (8/16/32/48 ideal)';
       el.innerHTML = '<strong>' + n + '</strong> teams selected <span style="color:var(--text-3)">· ' + need + '</span>';
     }
   }
@@ -291,21 +309,28 @@
 
 /*@CHUNK:c0426:START*/
   function renderTournamentPodium() {
+    // Lives inside the "Tournament Stats" card (#tour-leaderboard-mini),
+    // above the awards row, rather than as its own block above the bracket
+    // — keeps every end-of-tournament summary (standings, awards, stat
+    // leaders) together in one place instead of scattered across the page.
     let el = document.getElementById('tour-podium');
     if (!el) {
-      const bracket = document.getElementById('bracket');
-      if (bracket) {
+      const statsCard = document.getElementById('tour-leaderboard-mini');
+      const awards = document.getElementById('tour-awards');
+      if (statsCard) {
         el = document.createElement('div');
         el.id = 'tour-podium';
-        bracket.parentNode.insertBefore(el, bracket);
+        if (awards) statsCard.insertBefore(el, awards);
+        else statsCard.appendChild(el);
       }
     }
     if (!el || !tournament || !tournament.champion) return;
     const first = tournament.champion;
     const second = tournament.runnersUp;
     const third = tournament.thirdPlace;
+    const tName = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
     el.innerHTML = `
-      <div class="card-title">Final Standings</div>
+      <div class="card-title">${trophyMark(tName, 28)} Final Standings</div>
       <div class="podium">
         <div class="podium-place">
           <div class="place-num">2</div>
@@ -341,7 +366,7 @@
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini">${titleHtml}
         ${lbAvatar(p, 44)}
-        <div class="am-name">${p.name}</div>
+        <div class="am-name">${playerNameHTML(p)}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
     };
     el.innerHTML = `
@@ -368,6 +393,7 @@
       assignTournamentAwards();
       renderTournamentAwards();
       renderTournamentLeaderboard();
+      if (tournament.champion) renderTournamentPodium();
     } catch (e) { console.warn(e); }
   }
 /*@CHUNK:c0436:END*/
@@ -391,7 +417,7 @@
       return;
     }
     const col = (title, arr) => `<div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">${title}</div>
-      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${p.name}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
+      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${playerNameHTML(p)}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
     el.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
         ${col('⚽ Golden Boot', g)}
@@ -604,10 +630,12 @@
 
   // Repeating 5-slot fixture-congestion pattern: Sat league, Tue continental,
   // Sat league, Tue domestic cup, Sun league — the busy week-to-week rhythm
-  // real top-flight calendars follow. The season's Matchday counter is used
-  // as the cycle position so the strip advances automatically as matchdays
-  // are played. Domestic cup isn't an implemented competition yet, so that
-  // slot is shown greyed-out rather than pretending a cup fixture exists.
+  // real top-flight calendars follow. `season.daySlot` tracks the season's
+  // actual position in this cycle (separate from the Matchday/round counter)
+  // and is what real play is gated against — see seasonCompCanPlayNow and
+  // advanceCongestionSlotIfComplete. Domestic cup isn't an implemented
+  // competition yet, so that slot is auto-skipped and shown greyed-out
+  // rather than pretending a cup fixture exists.
   const FIXTURE_CONGESTION_CYCLE = [
     { day: 'Sat', comp: 'League' },
     { day: 'Tue', comp: 'UCL' },
@@ -616,9 +644,51 @@
     { day: 'Sun', comp: 'League' }
   ];
 
+  function currentCongestionSlot() {
+    const cyc = FIXTURE_CONGESTION_CYCLE;
+    const base = (season && typeof season.daySlot === 'number') ? season.daySlot : 0;
+    const idx = ((base % cyc.length) + cyc.length) % cyc.length;
+    return cyc[idx];
+  }
+
+  // Which season competition keys are eligible to play under a given
+  // congestion slot's competition label — 'League' covers all five
+  // domestic leagues at once (they're not individually staggered), 'UCL'
+  // is just the Champions League, and 'Cup' never resolves to anything
+  // since that competition isn't implemented yet.
+  function seasonKeysForCongestionComp(compLabel) {
+    if (compLabel === 'League') return SEASON_LEAGUE_DEFS.map(d => d.key);
+    if (compLabel === 'UCL') return ['ucl'];
+    return [];
+  }
+
+  // Every fixture still due for TODAY's congestion slot specifically —
+  // narrower than seasonMatchesDue(), which covers every competition due
+  // for the current matchday regardless of which day's slot they belong to.
+  function seasonSlotMatchesDue() {
+    if (!season) return [];
+    const keys = new Set(seasonKeysForCongestionComp(currentCongestionSlot().comp));
+    return seasonMatchesDue().filter(d => keys.has(d.compKey));
+  }
+
+  // Moves the season on to the next day in the congestion cycle once
+  // nothing due today is left to play — auto-skipping the Cup slot (never
+  // has fixtures) so the cycle never stalls waiting on an unimplemented
+  // competition.
+  function advanceCongestionSlotIfComplete() {
+    if (!season) return;
+    if (typeof season.daySlot !== 'number') season.daySlot = 0;
+    let guard = 0;
+    while (guard++ < FIXTURE_CONGESTION_CYCLE.length) {
+      const slot = currentCongestionSlot();
+      if (slot.comp !== 'Cup' && seasonSlotMatchesDue().length) break;
+      season.daySlot++;
+    }
+  }
+
   function fixtureCongestionSlot(offset) {
     const cyc = FIXTURE_CONGESTION_CYCLE;
-    const base = (season && typeof season.week === 'number') ? season.week : 0;
+    const base = (season && typeof season.daySlot === 'number') ? season.daySlot : 0;
     const idx = ((base + offset) % cyc.length + cyc.length) % cyc.length;
     return cyc[idx];
   }

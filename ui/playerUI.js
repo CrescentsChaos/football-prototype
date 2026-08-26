@@ -89,6 +89,31 @@
   }
 /*@CHUNK:c0079:END*/
 
+/*@CHUNK:c0079b:START*/
+  // Wraps a player's display name in a gold "enhanced" span wherever
+  // player-attributes.json gave them an expanded attribute sheet (see
+  // applyExpandedPlayerAttributes in data/playerDatabase.js). Every list/row
+  // that renders a player name across the app should go through this
+  // instead of interpolating player.name directly, so enhanced players are
+  // recognizable at a glance everywhere, not just on their profile page.
+  //
+  // Accepts either a full player object (checked directly for .attrBoosted)
+  // or a lighter-weight record like a match/season stat row that only
+  // carries an id — those are resolved through the id->player index so the
+  // highlight still works without each call site needing to look the
+  // player up itself.
+  function playerNameHTML(playerOrStatRow, displayNameOverride) {
+    if (!playerOrStatRow) return displayNameOverride || '';
+    const name = displayNameOverride != null ? displayNameOverride : (playerOrStatRow.name || '');
+    let boosted = !!playerOrStatRow.attrBoosted;
+    if (!boosted && playerOrStatRow.attrBoosted === undefined && playerOrStatRow.id != null) {
+      const found = findPlayerAndTeam(playerOrStatRow.id);
+      if (found) boosted = !!found.player.attrBoosted;
+    }
+    return boosted ? `<span class="player-name-enhanced" title="Enhanced attribute player">${name}</span>` : name;
+  }
+/*@CHUNK:c0079b:END*/
+
 /*@CHUNK:c0080:START*/
 
   // Renders a small circular portrait for leaderboard/award rows, looked up
@@ -123,7 +148,7 @@
 
 /*@CHUNK:c0084:START*/
   function lbPlayerCell(p, size) {
-    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${p.name}</span></div>`;
+    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${playerNameHTML(p)}</span></div>`;
   }
 /*@CHUNK:c0084:END*/
 
@@ -228,6 +253,33 @@
   // clear the boost reached the individual attribute, not just the OVR.
 /*@CHUNK:c0478:END*/
 
+/*@CHUNK:c0478b:START*/
+
+  // Bio strip for an enhanced player's profile — age, height, preferred
+  // foot, weak foot rating, injury resilience, and their skill-card list.
+  // All of it comes straight off the expanded attribute sheet
+  // (player-attributes.json), so this only ever gets called for a boosted
+  // player — see showPlayerProfile()'s bioHTML.
+  function renderPlayerBioHTML(attr) {
+    const facts = [];
+    if (typeof attr.age === 'number') facts.push(['Age', attr.age]);
+    if (typeof attr.height_cm === 'number') facts.push(['Height', Math.round(attr.height_cm) + ' cm']);
+    if (attr.preferred_foot) facts.push(['Foot', attr.preferred_foot]);
+    if (typeof attr['weak foot'] === 'number') facts.push(['Weak Foot', attr['weak foot'] + '★']);
+    if (attr.injury_res) facts.push(['Injury Res.', attr.injury_res]);
+    const factsHTML = facts.length
+      ? `<div class="profile-stats-grid">${facts.map(([lbl, val]) => `<div class="profile-stat"><div class="val">${val}</div><div class="lbl">${lbl}</div></div>`).join('')}</div>`
+      : '';
+    const skillsHTML = (attr.skills || []).length
+      ? `<div class="card-title" style="margin-top:10px">Skills</div>
+         <div>${attr.skills.map(sk => `<span class="playstyle-tag">${sk}</span>`).join('')}</div>`
+      : '';
+    if (!factsHTML && !skillsHTML) return '';
+    return `<div class="card-title" style="margin-top:8px">Bio</div>${factsHTML}${skillsHTML}`;
+  }
+
+/*@CHUNK:c0478b:END*/
+
 /*@CHUNK:c0479:START*/
   function expandedAttrRowsHTML(player) {
     const attr = player.expandedAttrs || {};
@@ -328,12 +380,22 @@
           return `<span class="playstyle-tag${suited ? ' affinity-match' : ''}" title="${desc}">${s}</span>`;
         }).join('')}</div>`
       : '';
+    // Bio block: age/height/foot only exist on the expanded attribute sheet
+    // (player-attributes.json), so this whole section is naturally absent
+    // for a regular, non-enhanced player rather than showing empty fields.
+    const bioHTML = (boosted && player.expandedAttrs) ? renderPlayerBioHTML(player.expandedAttrs) : '';
     content.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
         <div>
-          <h2 style="margin:0 0 4px;font-size:1.2rem">${player.name}</h2>
-          <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[]).join('/')}</div>
+          <h2 style="margin:0 0 4px;font-size:1.2rem">${playerNameHTML(player)}</h2>
+          <div style="color:var(--text-2);font-size:0.85rem">${(function () {
+            const aff = getPlayerAffiliations(player.id);
+            if (aff.club && aff.national) {
+              return `${teamMark(aff.club, 18)} ${aff.club.name} · ${teamMark(aff.national, 18)} ${aff.national.name}`;
+            }
+            return `${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''}`;
+          })()} · ${(player.pos||[])[0] || ''}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${affinityNote}
           ${signatureNote}
@@ -342,6 +404,7 @@
         </div>
       </div>
       ${matchBlock}
+      ${bioHTML}
       <div class="card-title">Career (competitive)</div>
       <div class="profile-stats-grid">
         <div class="profile-stat"><div class="val">${apps}</div><div class="lbl">Apps</div></div>
@@ -410,13 +473,14 @@
           return `
           <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
             <span class="tsr-avatar">${playerAvatarMark(p)}</span>
-            <span class="tsr-name">${p.name}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
-            <span class="tsr-pos">${(p.pos||[]).join('/')}</span>
+            <span class="tsr-name">${playerNameHTML(p)}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
+            <span class="tsr-pos">${(p.pos||[])[0] || ''}</span>
             ${formArrow(p)}
             <span class="player-ovr">${p.ovr || ''}</span>
           </button>`;
         }).join('')}
       </div>
+      ${renderTeamMatchLogHTML(team.id)}
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
   }

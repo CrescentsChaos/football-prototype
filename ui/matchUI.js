@@ -1,149 +1,147 @@
 /*@CHUNK:c0052:START*/
 
+  // Tries each URL in order, returns the first successful JSON response, or
+  // null if every candidate fails/404s. Used for every optional/primary
+  // startup JSON file below so those files can all be requested at once via
+  // Promise.all instead of one after another — previously each of the 6
+  // files below fully awaited (including its own up-to-3-URL fallback
+  // chain) before the next one even started, which is what made startup
+  // feel laggy. Nothing about the fallback/cache-busting behavior itself
+  // changed, only the fact that the 6 chains now run concurrently.
+  async function fetchFirstJson(urls, label) {
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          if (label) console.log('Loaded', label, 'from', url);
+          return data;
+        }
+      } catch (err) { console.warn('Fetch failed', url, err); }
+    }
+    return null;
+  }
+
+  // Some players in teams.json legitimately appear twice under the SAME id
+  // — once on their national side, once on their club — because they're
+  // the same real person (e.g. Pelé for Brazil 1962 and Santos 1962-63).
+  // That's fine and is what lets getAllPlayersFlat() merge them into one
+  // profile showing both affiliations. But a handful of ids collide by
+  // accident between two DIFFERENT players on the same squad (a genuine
+  // data bug) — those must never be treated as "the same player", since
+  // merging them would corrupt stats, squad selection, and substitution
+  // bookkeeping (all keyed by player id). This repairs that second case by
+  // giving every genuinely-colliding duplicate a fresh, unique id before
+  // anything else in the app touches teamsData, while leaving true
+  // same-player-same-id pairs (matching name) completely untouched so the
+  // national/club merge in getAllPlayersFlat() keeps working.
+  function repairDuplicatePlayerIds() {
+    const seen = {}; // id -> first player object seen with that id
+    const allIds = new Set();
+    (teamsData.national || []).forEach(t => (t.players || []).forEach(p => allIds.add(p.id)));
+    (teamsData.club || []).forEach(t => (t.players || []).forEach(p => allIds.add(p.id)));
+    let renamed = 0;
+    const rename = (p) => {
+      let n = 2, newId;
+      do { newId = p.id + '__dup' + n; n++; } while (allIds.has(newId));
+      allIds.add(newId);
+      p.id = newId;
+      renamed++;
+    };
+    [...(teamsData.national || []), ...(teamsData.club || [])].forEach(t => {
+      (t.players || []).forEach(p => {
+        if (!p || !p.id) return;
+        const prior = seen[p.id];
+        if (!prior) { seen[p.id] = p; return; }
+        // Same id already seen. Same name -> genuinely the same real
+        // player on a second squad, leave as-is (this is the merge case).
+        // Different name -> accidental collision between two different
+        // players; give this one a new id so they stop clobbering each
+        // other's stats/selection.
+        if (prior.name !== p.name) rename(p);
+      });
+    });
+    if (renamed) console.warn('Repaired', renamed, 'colliding duplicate player id(s) in teams.json');
+  }
+
   async function init() {
     try {
+      const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
+      const urlSet = (file) => isHosted
+        ? [file + '?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './' + file + '?v=' + Date.now(), file]
+        : [file + '?v=' + Date.now()];
+
+      // All 6 startup JSON files (1 required, 5 optional) load concurrently.
+      const [teamsJson, leaguesJson, playersJson, trophiesJson, managersJson, attrJson] = await Promise.all([
+        fetchFirstJson(urlSet('teams.json'), 'teams'),
+        fetchFirstJson(urlSet('leagues.json'), 'leagues'),
+        fetchFirstJson(urlSet('players.json'), 'player portraits'),
+        fetchFirstJson(urlSet('trophies.json'), 'trophy images'),
+        fetchFirstJson(urlSet('managers.json'), 'manager portraits'),
+        fetchFirstJson(urlSet('player-attributes.json'), 'expanded player attributes')
+      ]);
+
       let loaded = null;
       let source = 'embedded';
-      const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
-      if (isHosted) {
-        const urls = [
-          'teams.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2),
-          './teams.json?v=' + Date.now(),
-          'teams.json'
-        ];
-        for (const url of urls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && ((data.national && data.national.length) || (data.club && data.club.length))) {
-              loaded = data;
-              source = 'teams.json';
-              console.log('Loaded teams from', url);
-              break;
-            }
-          } catch (err) {
-            console.warn('Fetch failed', url, err);
-          }
-        }
-      } else {
-        try {
-          const res = await fetch('teams.json?v=' + Date.now(), { cache: 'no-store' });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && (data.national || data.club)) { loaded = data; source = 'teams.json'; }
-          }
-        } catch (e) {}
+      if (teamsJson && ((teamsJson.national && teamsJson.national.length) || (teamsJson.club && teamsJson.club.length))) {
+        loaded = teamsJson;
+        source = 'teams.json';
       }
       teamsData = loaded || TEAMS_DATA;
       if (!loaded) {
         source = 'embedded';
         console.warn('Using EMBEDDED team data — teams.json was NOT loaded from server');
       }
+      repairDuplicatePlayerIds();
       allTeams = [...(teamsData.national || []), ...(teamsData.club || [])];
       if (!allTeams.length) throw new Error('No teams found');
       // Resolve every team's manager playstyle now (teams.json "playstyle" if
       // set, otherwise a random one) so it's stable for the rest of the session.
       allTeams.forEach(getManagerPlaystyle);
+      // Snapshot each player's raw teams.json overall (rawOvr) before form
+      // restoration or attribute boosting touch p.ovr at all — the overall
+      // system below always derives a non-expanded player's baseline from
+      // this untouched value, so the -5% adjustment can never compound
+      // across repeated init() calls or save/reload sessions.
+      allTeams.forEach(t => (t.players || []).forEach(p => { if (typeof p.rawOvr !== 'number') p.rawOvr = p.ovr; }));
 
-      // Load leagues.json (which clubs belong to which domestic league).
-      // Optional — the app still works without it, it just falls back to
-      // manual club selection in Season Setup.
-      try {
-        const lUrls = isHosted
-          ? ['leagues.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './leagues.json?v=' + Date.now(), 'leagues.json']
-          : ['leagues.json?v=' + Date.now()];
-        for (const url of lUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { leaguesData = data; console.log('Loaded leagues from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('leagues.json not loaded', e); }
+      // leagues.json — optional, falls back to manual club selection in
+      // Season Setup when absent.
+      if (leaguesJson) leaguesData = leaguesJson;
 
-      // Load players.json (player name -> portrait filename). Optional — the
-      // app still works without it, players just show their shirt number.
-      try {
-        const pUrls = isHosted
-          ? ['players.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './players.json?v=' + Date.now(), 'players.json']
-          : ['players.json?v=' + Date.now()];
-        for (const url of pUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { playerPortraits = data; console.log('Loaded player portraits from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('players.json not loaded', e); }
+      // players.json — optional, players just show their shirt number
+      // instead of a portrait when absent.
+      if (playersJson) playerPortraits = playersJson;
 
-      // Load trophies.json (trophy/competition name -> image filename). Optional —
-      // the app still works without it, trophies just show the 🏆 emoji instead.
-      try {
-        const tpUrls = isHosted
-          ? ['trophies.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './trophies.json?v=' + Date.now(), 'trophies.json']
-          : ['trophies.json?v=' + Date.now()];
-        for (const url of tpUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { trophyImages = data; console.log('Loaded trophy images from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('trophies.json not loaded', e); }
+      // trophies.json — optional, trophies show the 🏆 emoji instead of an
+      // image when absent.
+      if (trophiesJson) trophyImages = trophiesJson;
 
-      // Load managers.json (manager name -> portrait filename), resolved
-      // against assets/mportraits/ — managers.json itself lives in the main
-      // project dir, NOT inside assets/. managerPortraits already starts out
-      // populated from the embedded MANAGER_PORTRAITS_DATA above (so this
-      // works even opened straight from disk); a successful fetch here just
-      // layers any newer/edited entries from the on-disk managers.json on top.
-      try {
-        const mgUrls = isHosted
-          ? ['managers.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './managers.json?v=' + Date.now(), 'managers.json']
-          : ['managers.json?v=' + Date.now()];
-        for (const url of mgUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') {
-              const clean = { ...data };
-              delete clean._comment;
-              managerPortraits = { ...MANAGER_PORTRAITS_DATA, ...clean };
-              console.log('Loaded manager portraits from', url);
-              break;
-            }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('managers.json fetch skipped, using embedded portraits', e); }
+      // managers.json — optional layer on top of the embedded
+      // MANAGER_PORTRAITS_DATA baseline that's already loaded by default.
+      if (managersJson) {
+        const clean = { ...managersJson };
+        delete clean._comment;
+        managerPortraits = { ...MANAGER_PORTRAITS_DATA, ...clean };
+      }
 
-      // Load player-attributes.json (playerId -> expanded attribute sheet).
-      // Optional — the app works exactly as before for any player not
-      // listed here. Fetched the same way as the other optional JSON files
-      // above so it also works when this file is later edited without a
-      // rebuild.
-      try {
-        const paUrls = isHosted
-          ? ['player-attributes.json?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './player-attributes.json?v=' + Date.now(), 'player-attributes.json']
-          : ['player-attributes.json?v=' + Date.now()];
-        for (const url of paUrls) {
-          try {
-            const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (data && typeof data === 'object') { playerAttributesData = data; console.log('Loaded expanded player attributes from', url); break; }
-          } catch (err) { console.warn('Fetch failed', url, err); }
-        }
-      } catch (e) { console.warn('player-attributes.json not loaded', e); }
+      // player-attributes.json — optional; the app works exactly as before
+      // for any player not listed here.
+      if (attrJson) playerAttributesData = attrJson;
 
       loadStats();
       loadPersistedGameState();
       restorePlayerForms();
       applyExpandedPlayerAttributes();
+      // Canonicalize every player's position codes (CF -> ST, RWF -> RW,
+      // CMF -> CM, DMF -> CDM, SS/AMF -> CAM, etc.) so formation auto-fill,
+      // substitutions, and position filters treat every naming variant of
+      // the same real position identically — see normalizeAllPositions()
+      // in js/state.js for why this has to run after
+      // applyExpandedPlayerAttributes() (which is what sets pos from the
+      // raw, non-canonical player-attributes.json codes in the first place).
+      normalizeAllPositions(allTeams);
       populateTeamSelects();
       populateFormations();
       bindNav();
@@ -250,7 +248,15 @@
     const live = document.getElementById('match-live');
     if (setup) setup.style.display = 'block';
     if (live) live.style.display = 'none';
-    // Plain Kick Off from Home — not linked to any tournament or season fixture
+    // Plain Kick Off from Home — not linked to any tournament or season fixture.
+    // `tournament` must be cleared here too (not just the fixture-index flags
+    // below): matchCompetitionLabel() checks `tournament` first when labelling
+    // a completed match for the player/team match logs, so a stale tournament
+    // object left over from a previous tournament run (only ever cleared by
+    // resetTournament(), never just by navigating away) caused every
+    // "friendly" match played afterward to be mislabelled with the old
+    // tournament's name instead of falling through to "Friendly".
+    tournament = null;
     window._tourFixtureIdx = null;
     window._uclFixtureIdx = null;
     window._koRoundIdx = null;
@@ -334,12 +340,13 @@
 /*@CHUNK:c0157:END*/
 
 /*@CHUNK:c0158:START*/
-  function renderRatingRow(p) {
-    const rc = (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
+  function renderRatingRow(p, motmId) {
+    const isMotm = motmId != null && p.id === motmId;
+    const rc = isMotm ? 'rating-motm' : (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
     const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals, 3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists, 2)) : '');
     return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
         <span class="player-num">${p.num || ''}</span>
-        <span style="flex:1;font-weight:600">${p.name}</span>
+        <span style="flex:1;font-weight:600">${playerNameHTML(p)}${isMotm ? ' <span title="Man of the Match">⭐</span>' : ''}</span>
         <span>${icons}</span>
         <span class="xg">xG ${(p.xg || 0).toFixed(2)} · xA ${(p.xa || 0).toFixed(2)}</span>
         <span class="rating-badge ${rc}">${(p.rating || 0).toFixed(1)}</span>
@@ -458,9 +465,9 @@
       <div class="card-title" style="margin-top:14px">Player Ratings (${homeRatings.length + awayRatings.length} players)</div>
       <div style="max-height:280px;overflow-y:auto">
         <div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${teamMark(h, 18)} ${h.name}</div>
-        ${homeRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
+        ${homeRatings.map(p => renderRatingRow(p, report.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
         <div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${teamMark(a, 18)} ${a.name}</div>
-        ${awayRatings.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
+        ${awayRatings.map(p => renderRatingRow(p, report.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>'}
       </div>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
@@ -806,24 +813,43 @@
         let c = coords[idx] || [50, 50];
         let x = c[0], y = c[1];
         // Collision avoidance: name labels are wider than the dot, so push
-        // apart mostly along x (weighted distance) with a bigger minimum gap
-        // and more iterations than a simple circle-only check. Labels always
-        // sit below the dot (no more flipping above on crowded rows) —
-        // spacing is handled here instead so names don't need to jump around.
-        for (let t = 0; t < 10; t++) {
-          const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 19);
-          if (!hit) break;
-          x += (x >= hit.x ? 1 : -1) * 8 + (t % 2 ? 2 : -2);
-          y += (t % 3 === 0 ? 1 : -1) * 3;
-          x = Math.max(8, Math.min(92, x));
-          y = Math.max(7, Math.min(92, y));
+        // apart when two dots sit too close together (weighted distance,
+        // since labels overflow horizontally more than vertically).
+        //
+        // Two things were wrong with the previous version, and together
+        // they visibly warped most formations' shapes (4-3-3, 4-1-4-1,
+        // every back-three/back-five system, etc.):
+        //  1. It pushed a dot toward/away from whichever neighbor it
+        //     happened to collide with, rather than away from the pitch's
+        //     own center line — for a symmetric formation (e.g. a central
+        //     CDM sitting between two wide CMs) this dragged the CENTER
+        //     player sideways into one teammate's territory instead of
+        //     nudging outward, breaking left/right symmetry.
+        //  2. It also jittered players vertically, which pulled the
+        //     center-back of every back-three formation out of its
+        //     designed deeper "sweeper" spot and flattened the back line.
+        // The fix: only ever push horizontally, and always outward from
+        // pitch-center (x=50) based on the dot's OWN side — so a nudge
+        // preserves the formation's shape/symmetry instead of distorting
+        // it. The goalkeeper is also excluded from the check entirely: it
+        // sits alone at the byline and its designed proximity to a deep
+        // center-back (intentional in back-three systems) was being
+        // mistaken for a dot overlap.
+        if (idx !== 0) {
+          for (let t = 0; t < 8; t++) {
+            const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 16);
+            if (!hit) break;
+            const dir = (x - 50) >= 0 ? 1 : -1;
+            x += dir * 4;
+            x = Math.max(8, Math.min(92, x));
+          }
         }
-        used.push({ x, y });
+        if (idx !== 0) used.push({ x, y });
 
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
         dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
           <span class="dot-avatar">${playerAvatarMark(p)}</span>
-          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${abbreviateName(p.name)}</span></span>
+          <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
       });
       const mgrTag = s.team.manager && s.team.manager.name
@@ -906,7 +932,7 @@
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
         <span class="player-num">${p.num || ''}</span>
         <span class="player-pos">${pos}</span>
-        <span class="player-name">${p.name}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
+        <span class="player-name">${playerNameHTML(p)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         ${passInfo}
         <span class="player-icons">${icons}</span>
         ${rating}
@@ -991,13 +1017,22 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'loading-overlay';
-      el.innerHTML = '<div class="loading-box"><div class="loading-spinner"></div><div class="loading-text" id="loading-text">Simulating…</div><div class="loading-sub" id="loading-sub">Please wait</div></div>';
+      el.innerHTML = '<div class="loading-box"><div class="loading-spinner"></div><div class="loading-text" id="loading-text">Simulating…</div>'
+        + '<div class="loading-progress-track" id="loading-progress-track" style="display:none"><div class="loading-progress-fill" id="loading-progress-fill" style="width:0%"></div></div>'
+        + '<div class="loading-sub" id="loading-sub">Please wait</div></div>';
       document.body.appendChild(el);
     }
     const t = document.getElementById('loading-text');
     const s = document.getElementById('loading-sub');
+    const track = document.getElementById('loading-progress-track');
+    const fill = document.getElementById('loading-progress-fill');
     if (t) t.textContent = msg || 'Simulating…';
     if (s) s.textContent = 'Please wait — do not close the page';
+    // Reset any progress bar from a previous run until updateLoadingProgress()
+    // is explicitly called again (plain single-shot sims never call it, so
+    // they correctly stay a bare spinner with no bar).
+    if (track) track.style.display = 'none';
+    if (fill) fill.style.width = '0%';
     el.classList.add('show');
   }
 /*@CHUNK:c0465:END*/
@@ -1015,6 +1050,52 @@
 
 /*@CHUNK:c0468:START*/
 
+  // Formats a millisecond duration as a short "Xm Ys" / "Xs" string for the
+  // progress bar's estimated-time-remaining label.
+  function formatEtaDuration(ms) {
+    const totalSec = Math.max(0, Math.ceil(ms / 1000));
+    if (totalSec < 1) return '<1s';
+    if (totalSec < 60) return totalSec + 's';
+    const m = Math.floor(totalSec / 60), s = totalSec % 60;
+    return m + 'm ' + (s ? s + 's' : '');
+  }
+
+  // Updates the loading overlay's progress bar (fill width + ETA label)
+  // given how many of `total` work units are done and when the whole
+  // operation started. `startTime` should be a Date.now() timestamp taken
+  // right before the first unit was simulated — the ETA is extrapolated
+  // from the average time-per-unit seen so far, so it gets more accurate
+  // as the simulation progresses. Shows/reveals the bar on first call so
+  // plain single-shot sims (which never call this) keep the old bare
+  // spinner look.
+  function updateLoadingProgress(done, total, startTime) {
+    const track = document.getElementById('loading-progress-track');
+    const fill = document.getElementById('loading-progress-fill');
+    const s = document.getElementById('loading-sub');
+    if (!track || !fill) return;
+    track.style.display = 'block';
+    const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((done / total) * 100))) : 0;
+    fill.style.width = pct + '%';
+    if (s) {
+      if (done >= total) {
+        s.textContent = 'Finishing up…';
+      } else {
+        const elapsed = Date.now() - startTime;
+        const perUnit = done > 0 ? elapsed / done : 0;
+        const etaMs = perUnit * Math.max(0, total - done);
+        s.textContent = `${pct}% · ${done}/${total} · ~${formatEtaDuration(etaMs)} remaining`;
+      }
+    }
+  }
+
+  // A zero-work "tick" that yields control back to the browser for one
+  // frame so a progress bar update actually gets painted before the next
+  // chunk of (synchronous) simulation work runs. Used between individual
+  // match simulations in bulk sim loops (simAllTournament, Simulate To End
+  // of Season) — see their async loops in tournamentEngine.js / seasonEngine.js.
+  function simTick() {
+    return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  }
 /*@CHUNK:c0468:END*/
 
 /*@CHUNK:c0469:START*/
@@ -1042,6 +1123,31 @@
     });
   }
 /*@CHUNK:c0469:END*/
+
+/*@CHUNK:c0469b:START*/
+  // Async counterpart to withLoading() for bulk sims that need to show real
+  // incremental progress (Simulate All / Simulate To End of Season) instead
+  // of a single blocking spinner. `asyncFn` is an async function that does
+  // its own repeated updateLoadingProgress()+await simTick() calls between
+  // chunks of work — this wrapper just handles showing/hiding the overlay
+  // and the same error/persist handling as withLoading().
+  async function withLoadingProgress(msg, asyncFn) {
+    showLoading(msg || 'Simulating…');
+    await simTick();
+    await simTick();
+    let result;
+    try {
+      result = await asyncFn();
+    } catch (e) {
+      console.error(e);
+      toast('Error: ' + (e && e.message ? e.message : e));
+    } finally {
+      hideLoading();
+      persistAll();
+    }
+    return result;
+  }
+/*@CHUNK:c0469b:END*/
 
 /*@CHUNK:c0470:START*/
 
@@ -1078,9 +1184,9 @@
     const homeP = entries.filter(p => homeIds.has(p.id));
     const awayP = entries.filter(p => !homeIds.has(p.id));
     h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:8px 0 4px">${m.home.team.flag||''} ${m.home.team.name}</div>`;
-    h += homeP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += homeP.map(p => renderRatingRow(p, m.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
     h += `<div style="font-size:0.8rem;color:var(--accent-gold);margin:12px 0 4px">${m.away.team.flag||''} ${m.away.team.name}</div>`;
-    h += awayP.map(renderRatingRow).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
+    h += awayP.map(p => renderRatingRow(p, m.motmId)).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No data</div>';
     el.innerHTML = h;
     el.style.display = 'block';
   }
@@ -1119,7 +1225,7 @@
 
   return {
     setRngSeed, getRngSeed,
-    init, switchView, goToMatch, goToTournament, updateTeamPreview,
+    init, switchView, goToMatch, goToTournament, selectTournamentFormat, updateTeamPreview,
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, finishMatch, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
@@ -1171,9 +1277,9 @@ try { window.App = App; } catch (e) {}
     const items = [];
     Array.from(select.children).forEach(node => {
       if (node.tagName === 'OPTGROUP') {
-        Array.from(node.children).forEach(opt => items.push({ value: opt.value, label: opt.textContent, group: node.label }));
+        Array.from(node.children).forEach(opt => items.push({ value: opt.value, label: opt.textContent, group: node.label, logo: opt.dataset.logo, flag: opt.dataset.flag, name: opt.dataset.name }));
       } else if (node.tagName === 'OPTION') {
-        items.push({ value: node.value, label: node.textContent, group: null });
+        items.push({ value: node.value, label: node.textContent, group: null, logo: node.dataset.logo, flag: node.dataset.flag, name: node.dataset.name });
       }
     });
     return items;
@@ -1185,6 +1291,22 @@ try { window.App = App; } catch (e) {}
 /*@CHUNK:c0602:END*/
 
 /*@CHUNK:c0603:START*/
+  // Local mirror of teamMark() (defined inside the main App closure in
+  // ui/playerUI.js, and NOT reachable from this separate IIFE — calling the
+  // real teamMark() here throws "teamMark is not defined" and silently
+  // aborts renderOptions(), which is why searching/opening the team
+  // dropdowns showed no results at all). Kept intentionally identical to
+  // teamMark()'s output (logo image with flag-emoji fallback) so the two
+  // never visually diverge.
+  function ssTeamMark(logo, flag, size) {
+    size = size || 22;
+    const f = flag || '⚽';
+    if (logo) {
+      const src = 'assets/logos/' + logo;
+      return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px"><img src="${src}" alt="" loading="lazy" onerror="this.parentElement.textContent='${f}'"></span>`;
+    }
+    return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px">${f}</span>`;
+  }
   function enhanceSelect(select) {
     if (!select || select.dataset.ssEnhanced || select.closest('.ss-wrap')) return;
     select.dataset.ssEnhanced = '1';
@@ -1237,7 +1359,14 @@ try { window.App = App; } catch (e) {}
           lastGroup = i.group;
         }
         const sel = i.value === select.value ? ' selected' : '';
-        html += `<div class="ss-option${sel}" data-value="${String(i.value).replace(/"/g, '&quot;')}" role="option">${i.label}</div>`;
+        // Team dropdowns show the club/country logo (falling back to the
+        // flag emoji when no logo is set — same behavior as everywhere
+        // else in the app, via teamMark()) instead of just the flag
+        // character baked into the plain option text.
+        const rowLabel = isTeamSelect
+          ? `${ssTeamMark(i.logo, i.flag, 18)} <span>${i.name || i.label}</span>`
+          : i.label;
+        html += `<div class="ss-option${sel}" data-value="${String(i.value).replace(/"/g, '&quot;')}" role="option">${rowLabel}</div>`;
       });
       optionsEl.innerHTML = html;
     }

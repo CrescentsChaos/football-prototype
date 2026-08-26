@@ -7,7 +7,7 @@
 
 /*@CHUNK:c0281:START*/
   function blankCompStats() {
-    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
   }
 /*@CHUNK:c0281:END*/
 
@@ -45,18 +45,53 @@
 /*@CHUNK:c0286:END*/
 
 /*@CHUNK:c0287:START*/
-  function bumpRatingBucket(bucket, player, team, rating) {
-    if (!bucket.ratings) bucket.ratings = {};
-    if (!bucket.ratings[player.id]) {
+
+  // Generalized keyed-average bucket: powers both the plain `ratings` bucket
+  // (every appearance) and the `bigGames` bucket (knockout/final/top-clash
+  // appearances only) with the same count/sum/avg shape, plus a short rolling
+  // history of recent ratings so award scoring can gauge consistency (low
+  // variance at a genuinely good level) rather than just a career average.
+  function bumpKeyedAvgBucket(bucket, key, player, team, rating) {
+    if (!bucket[key]) bucket[key] = {};
+    if (!bucket[key][player.id]) {
       const aff = findPlayerTeams(player.id);
-      bucket.ratings[player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club };
+      bucket[key][player.id] = { id: player.id, name: player.name, team: team.name, teamId: team.id, count: 0, sum: 0, avg: 0, national: aff.national, club: aff.club, recent: [] };
     }
-    const e = bucket.ratings[player.id];
+    const e = bucket[key][player.id];
     e.count++;
     e.sum += rating;
     e.avg = Math.round((e.sum / e.count) * 100) / 100;
+    if (!e.recent) e.recent = [];
+    e.recent.push(rating);
+    if (e.recent.length > 12) e.recent.shift();
   }
 /*@CHUNK:c0287:END*/
+
+/*@CHUNK:c0287b:START*/
+  function bumpRatingBucket(bucket, player, team, rating) {
+    bumpKeyedAvgBucket(bucket, 'ratings', player, team, rating);
+  }
+/*@CHUNK:c0287b:END*/
+
+/*@CHUNK:c0287c:START*/
+
+  // A match counts as a "big game" for award-scoring purposes when it's a
+  // knockout-stage/final fixture in a tournament or the season's Champions
+  // League, or a clash between two genuinely top-tier sides (judged by
+  // starting-XI average OVR) — the kind of fixture that actually shapes a
+  // Ballon d'Or/Golden Ball case in real life, not just bulk appearances.
+  function isBigGameContext(m) {
+    if (!m) return false;
+    if (tournament && tournament.stage === 'knockout') return true;
+    if (currentSeasonComp && ['qf', 'sf', 'final'].includes(currentSeasonComp.stage)) return true;
+    const avgOvr = (side) => {
+      const arr = (side && side.squad && side.squad.starting) || [];
+      if (!arr.length) return 0;
+      return arr.reduce((s, p) => s + (p.ovr || 70), 0) / arr.length;
+    };
+    return avgOvr(m.home) >= 82 && avgOvr(m.away) >= 82;
+  }
+/*@CHUNK:c0287c:END*/
 
 /*@CHUNK:c0288:START*/
 
@@ -71,6 +106,14 @@
     if (currentSeasonComp) {
       if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
       bumpRatingBucket(currentSeasonComp.stats, player, team, rating);
+    }
+    if (currentMatch && currentMatch.isBigGame) {
+      if (competitive) bumpKeyedAvgBucket(stats, 'bigGames', player, team, rating);
+      if (tournament) bumpKeyedAvgBucket(tournamentStats, 'bigGames', player, team, rating);
+      if (currentSeasonComp) {
+        if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
+        bumpKeyedAvgBucket(currentSeasonComp.stats, 'bigGames', player, team, rating);
+      }
     }
   }
 /*@CHUNK:c0289:END*/
@@ -107,7 +150,7 @@
     else if (rating >= 4.8) player.form -= 1.1;
     else player.form -= 1.8;
     player.form = Math.max(FORM_MIN, Math.min(FORM_MAX, Math.round(player.form * 100) / 100));
-    player.ovr = Math.max(40, Math.min(99, Math.round(player.baseOvr + player.form)));
+    player.ovr = Math.max(40, Math.min(100, Math.round(player.baseOvr + player.form)));
   }
 /*@CHUNK:c0291:END*/
 
@@ -251,7 +294,7 @@
       ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1}">
           <div class="lb-podium-rank">${i===0?'🥇':i===1?'🥈':'🥉'}</div>
           ${lbAvatar(p, 56)}
-          <div class="lb-podium-name">${p.name}</div>
+          <div class="lb-podium-name">${playerNameHTML(p)}</div>
           <div class="lb-podium-team">${[p.national, p.club].filter(Boolean).join(' · ') || p.team || ''}</div>
           <div class="lb-podium-value">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—') : p.count}</div>
         </div>`).join('')}
@@ -597,7 +640,7 @@
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
       return `<div class="award-mini">${titleHtml}
         ${lbAvatar(p, 44)}
-        <div class="am-name">${p.name}</div>
+        <div class="am-name">${playerNameHTML(p)}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
     };
     let h = '<div class="card-title">' + comp.name + ' Awards' + (comp.finished ? ' (Final)' : ' (In Progress)') + '</div>';

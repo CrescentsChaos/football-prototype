@@ -348,7 +348,7 @@
         return '<button type="button" class="sb-picker-item' + (p.id === selected ? ' selected' : '') + '" onclick="App.setSquadSlot(' + index + ',\'' + p.id + '\');App.closeSlotPicker()">' +
           '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
           '<span class="sb-bench-name">' + p.name + '</span>' +
-          '<span class="sb-bench-meta">' + (p.pos || []).join('/') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
+          '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
       }).join('') + '</div>';
     picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -630,3 +630,41 @@
     toast('Pick teams & formations, then Kick Off. Lineups are auto-built by formation.');
   }
 /*@CHUNK:c0597:END*/
+
+/*@CHUNK:ctml01:START*/
+
+  // ========== TEAM MATCH LOG ==========
+  // teamMatchLog[teamId] -> [{opponent, opponentShort, opponentLogo,
+  // opponentFlag, competition, scoreFor, scoreAgainst, result}], newest
+  // first, capped per team so persisted save size stays bounded. Populated
+  // at full-time for both sides — see recordTeamMatchLog() in
+  // engine/matchEngine.js.
+  let teamMatchLog = {};
+
+/*@CHUNK:ctml01:END*/
+
+/*@CHUNK:ctml02:START*/
+
+  // Renders a team's recent-results log (last 10) with a colored W/D/L tag
+  // per row and the opponent's logo + abbreviation. Shares the same
+  // "Match Log" look as renderPlayerMatchLogHTML in ui/playersUI.js, and is
+  // dropped straight into the team profile modal — see showTeamProfile()
+  // in ui/playerUI.js.
+  function renderTeamMatchLogHTML(teamId) {
+    const log = teamMatchLog[teamId] || [];
+    if (!log.length) return '';
+    const resultClass = { W: 'result-w', D: 'result-d', L: 'result-l' };
+    const rows = log.slice(0, 10).map(e => {
+      const oppMark = teamMark({ logo: e.opponentLogo, flag: e.opponentFlag }, 18);
+      return `<div class="team-log-row">
+        <span class="result-tag ${resultClass[e.result] || 'result-d'}">${e.result}</span>
+        <span class="tlr-opp">${oppMark}<span class="tlr-opp-abbr">${e.opponentShort || e.opponent || '—'}</span></span>
+        <span class="tlr-score">${e.scoreFor}-${e.scoreAgainst}</span>
+        <span class="tlr-comp">${e.competition || ''}</span>
+      </div>`;
+    }).join('');
+    return `<div class="card-title" style="margin-top:14px">Match Log <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(last ${Math.min(log.length, 10)})</span></div>
+      <div class="match-log-wrap">${rows}</div>`;
+  }
+
+/*@CHUNK:ctml02:END*/
