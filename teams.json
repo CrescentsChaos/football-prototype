@@ -8507,7 +8507,7 @@
       "num": 25
     },
     {
-      "id": "nor25",
+      "id": "mci26_9",
       "name": "Erling Haaland",
       "pos": ["ST"],
       "ovr": 94,
@@ -21008,7 +21008,7 @@
     {"id":"rma03_24","name":"Claude Makélélé","pos":["CDM"],"ovr":88,"att":58,"def":89,"phy":84,"pac":74,"tec":78,"num":24},
     {"id":"rma03_7","name":"Raúl","pos":["CF","ST"],"ovr":90,"att":91,"def":45,"phy":74,"pac":82,"tec":90,"num":7},
     {"id":"rma03_9","name":"Fernando Morientes","pos":["ST"],"ovr":84,"att":86,"def":38,"phy":82,"pac":76,"tec":78,"num":9},
-    {"id":"rma03_11","name":"Ronaldo Nazário","pos":["ST"],"ovr":92,"att":94,"def":35,"phy":80,"pac":93,"tec":92,"num":11},
+    {"id":"bra02_20","name":"Ronaldo Nazário","pos":["ST"],"ovr":92,"att":94,"def":35,"phy":80,"pac":93,"tec":92,"num":11},
     {"id":"rma03_18","name":"Javier Portillo","pos":["ST"],"ovr":75,"att":78,"def":30,"phy":68,"pac":80,"tec":74,"num":18}
   ],
   "manager": {
