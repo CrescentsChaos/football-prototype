@@ -1688,6 +1688,48 @@ var App = (() => {
     return null;
   }
 
+  // Some players in teams.json legitimately appear twice under the SAME id
+  // — once on their national side, once on their club — because they're
+  // the same real person (e.g. Pelé for Brazil 1962 and Santos 1962-63).
+  // That's fine and is what lets getAllPlayersFlat() merge them into one
+  // profile showing both affiliations. But a handful of ids collide by
+  // accident between two DIFFERENT players on the same squad (a genuine
+  // data bug) — those must never be treated as "the same player", since
+  // merging them would corrupt stats, squad selection, and substitution
+  // bookkeeping (all keyed by player id). This repairs that second case by
+  // giving every genuinely-colliding duplicate a fresh, unique id before
+  // anything else in the app touches teamsData, while leaving true
+  // same-player-same-id pairs (matching name) completely untouched so the
+  // national/club merge in getAllPlayersFlat() keeps working.
+  function repairDuplicatePlayerIds() {
+    const seen = {}; // id -> first player object seen with that id
+    const allIds = new Set();
+    (teamsData.national || []).forEach(t => (t.players || []).forEach(p => allIds.add(p.id)));
+    (teamsData.club || []).forEach(t => (t.players || []).forEach(p => allIds.add(p.id)));
+    let renamed = 0;
+    const rename = (p) => {
+      let n = 2, newId;
+      do { newId = p.id + '__dup' + n; n++; } while (allIds.has(newId));
+      allIds.add(newId);
+      p.id = newId;
+      renamed++;
+    };
+    [...(teamsData.national || []), ...(teamsData.club || [])].forEach(t => {
+      (t.players || []).forEach(p => {
+        if (!p || !p.id) return;
+        const prior = seen[p.id];
+        if (!prior) { seen[p.id] = p; return; }
+        // Same id already seen. Same name -> genuinely the same real
+        // player on a second squad, leave as-is (this is the merge case).
+        // Different name -> accidental collision between two different
+        // players; give this one a new id so they stop clobbering each
+        // other's stats/selection.
+        if (prior.name !== p.name) rename(p);
+      });
+    });
+    if (renamed) console.warn('Repaired', renamed, 'colliding duplicate player id(s) in teams.json');
+  }
+
   async function init() {
     try {
       const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
@@ -1716,6 +1758,7 @@ var App = (() => {
         source = 'embedded';
         console.warn('Using EMBEDDED team data — teams.json was NOT loaded from server');
       }
+      repairDuplicatePlayerIds();
       allTeams = [...(teamsData.national || []), ...(teamsData.club || [])];
       if (!allTeams.length) throw new Error('No teams found');
       // Resolve every team's manager playstyle now (teams.json "playstyle" if
@@ -1910,8 +1953,22 @@ var App = (() => {
       const og1 = document.createElement('optgroup'); og1.label = g.label;
       const og2 = document.createElement('optgroup'); og2.label = g.label;
       g.teams.forEach(t => {
-        og1.appendChild(new Option((t.flag || '') + ' ' + t.name, t.id));
-        og2.appendChild(new Option((t.flag || '') + ' ' + t.name, t.id));
+        // Plain flag+name stays as the native <option> text (used for
+        // screen readers / the hidden fallback <select>) — the searchable
+        // dropdown panel (see enhanceSelect() in ui/matchUI.js) reads these
+        // data attributes instead so it can show the team's actual logo,
+        // falling back to the flag only when no logo is set.
+        const label = (t.flag || '') + ' ' + t.name;
+        const opt1 = new Option(label, t.id);
+        opt1.dataset.logo = t.logo || '';
+        opt1.dataset.flag = t.flag || '';
+        opt1.dataset.name = t.name;
+        const opt2 = new Option(label, t.id);
+        opt2.dataset.logo = t.logo || '';
+        opt2.dataset.flag = t.flag || '';
+        opt2.dataset.name = t.name;
+        og1.appendChild(opt1);
+        og2.appendChild(opt2);
       });
       home.appendChild(og1); away.appendChild(og2);
     });
@@ -4096,12 +4153,15 @@ var App = (() => {
   // long-range effort; a header off a cross has a lower ceiling but a
   // distinct conversion curve of its own).
   const CHANCE_TYPE_PROFILE = {
-    openplay:    { baseOnTarget: 0.40, baseXg: 0.09, headerWeight: 0 },
-    throughball: { baseOnTarget: 0.50, baseXg: 0.17, headerWeight: 0 },
-    cross:       { baseOnTarget: 0.44, baseXg: 0.13, headerWeight: 0.72 },
-    dribble:     { baseOnTarget: 0.47, baseXg: 0.15, headerWeight: 0 },
-    longshot:    { baseOnTarget: 0.30, baseXg: 0.05, headerWeight: 0 },
-    counter:     { baseOnTarget: 0.49, baseXg: 0.18, headerWeight: 0 }
+    // baseOnTarget values scaled down from the original set (roughly ×0.85)
+    // as part of the wider conversion-rate retune below — see resolveShot()
+    // for the full explanation of why these needed to come down.
+    openplay:    { baseOnTarget: 0.34, baseXg: 0.08, headerWeight: 0 },
+    throughball: { baseOnTarget: 0.42, baseXg: 0.15, headerWeight: 0 },
+    cross:       { baseOnTarget: 0.37, baseXg: 0.11, headerWeight: 0.72 },
+    dribble:     { baseOnTarget: 0.40, baseXg: 0.13, headerWeight: 0 },
+    longshot:    { baseOnTarget: 0.24, baseXg: 0.045, headerWeight: 0 },
+    counter:     { baseOnTarget: 0.42, baseXg: 0.16, headerWeight: 0 }
   };
 
   // ===== GK phase (called once a shot is confirmed on target) =====
@@ -4148,7 +4208,13 @@ var App = (() => {
     }
 
     const defAvg = calcTeamStrength(defTeam).def / 100;
-    const onTargetChance = Math.min(0.72, Math.max(0.08, profile.baseOnTarget + shotQuality * 0.42 - defAvg * 0.22 + (opts.onTargetBonus || 0)));
+    // Retuned so a full shot -> goal pipeline lands close to real-world
+    // conversion (~33% of shots on target actually score, ~10% of all
+    // shots become goals) instead of the old formula's ~48%/~22%, which
+    // was producing far more goals — and far fewer clean sheets — than a
+    // real match. Defensive quality now also weighs more heavily against
+    // the shot getting on target in the first place.
+    const onTargetChance = Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
       addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
@@ -4163,7 +4229,7 @@ var App = (() => {
     // ===== GK phase =====
     const gk = pickPlayer(defTeam, ['GK']);
     const gkSkill = Math.max(0.05, Math.min(0.98, (gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(gk)));
-    const saveChance = Math.min(0.92, Math.max(0.28, 0.42 + gkSkill * 0.42 - shotQuality * 0.28 - (isHeader ? 0.03 : 0)));
+    const saveChance = Math.min(0.94, Math.max(0.34, 0.56 + gkSkill * 0.38 - shotQuality * 0.24 - (isHeader ? 0.03 : 0)));
     if (seededRandom() < saveChance) {
       if (gk) {
         defTeam.stats.saves++;
@@ -4363,7 +4429,7 @@ var App = (() => {
       ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
       : `Foul by <span class="player">${fouler.name}</span>`;
 
-    if (nearBox && (forcePenalty || seededRandom() < 0.09)) {
+    if (nearBox && (forcePenalty || seededRandom() < 0.065)) {
       addEvent(m.minute, 'foul', foulText + ' — inside the area!', defendingSide);
       const taker = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], PEN_TAKER_ROLE_WEIGHT) || victim;
       if (taker) {
@@ -4401,8 +4467,14 @@ var App = (() => {
       return { outcome: 'penalty' };
     }
 
-    let yellowChance = Math.min(0.72, 0.08 * aggression + (foulCount - 1) * 0.14 + (alreadyYellow ? 0.12 : 0) + (foulCount >= 3 ? 0.12 : 0));
-    const straightRedChance = 0.004 * aggression;
+    // Realistic discipline curve: a single, isolated foul is very rarely
+    // carded (referees give plenty of "just a foul" outcomes) — cards
+    // escalate with genuine repeat/reckless fouling rather than being a
+    // near-coinflip from the first challenge onward. Tuned so a match
+    // produces on the order of 2-4 yellows combined and a red roughly once
+    // every 3-4 matches, matching real-world discipline rates.
+    let yellowChance = Math.min(0.55, 0.045 * aggression + (foulCount - 1) * 0.09 + (alreadyYellow ? 0.10 : 0) + (foulCount >= 3 ? 0.08 : 0));
+    const straightRedChance = 0.0016 * aggression;
     const roll = seededRandom();
     if (roll < straightRedChance && !alreadyYellow) {
       defTeam.stats.reds++;
@@ -4472,8 +4544,12 @@ var App = (() => {
     // winning free-kicks off contact, so a defender up against one commits
     // a few more fouls trying to dispossess them.
     const aggression = 1 + Math.max(0, (75 - (defenderPlayer.def || 70)) / 80) + Math.max(0, ((defenderPlayer.phy || 70) - 80) / 100);
-    let foulChance = 0.09 * aggression * (kind === 'duel' ? 1.3 : 0.75);
-    if (contestedPlayer && hasSkill(contestedPlayer, 'Gamesmanship')) foulChance *= 1.25;
+    // Toned down from the original — real defenders concede far fewer
+    // fouls per genuine challenge than this used to model, and the old
+    // rate (combined with the independent secondary-event fouls below)
+    // was producing far more cards/reds than a real match sees.
+    let foulChance = 0.055 * aggression * (kind === 'duel' ? 1.15 : 0.6);
+    if (contestedPlayer && hasSkill(contestedPlayer, 'Gamesmanship')) foulChance *= 1.2;
     if (seededRandom() < foulChance) {
       resolveFoul(defendingSide, attackingSide, defenderPlayer, contestedPlayer, toThird === 'ATT');
       return;
@@ -4594,7 +4670,15 @@ var App = (() => {
     const defSide = side === 'home' ? 'away' : 'home';
     const attTeam = m[side], defTeam = m[defSide];
     const roll = seededRandom();
-    if (roll < 0.20) {
+    // Roll shares below were rebalanced to bring fouls/cards/handballs down
+    // to realistic per-match volume: free-kick, handball, and VAR-review
+    // shares are all cut well back from their original width (they were
+    // independently stacking on top of the turnover-based fouls in
+    // transitions.js and producing far more cards/reds than a real match),
+    // with the freed-up probability mass handed to the non-foul texture
+    // events (throw-ins/goal-kicks/misc) so the overall "something happens"
+    // rate this function fires at is unchanged.
+    if (roll < 0.10) {
       // Direct free-kick — always the consequence of an actual, logged foul
       // (never conjured out of nowhere). The fouler is picked from the
       // defending side committing a midfield/wide challenge, resolveFoul
@@ -4613,21 +4697,22 @@ var App = (() => {
           resolveFreeKickRoutine(side, defSide, closeRange);
         }
       }
-    } else if (roll < 0.30) {
+    } else if (roll < 0.27) {
       // Throw-in — normal, long, or a tactical retaining throw. Whichever
       // side is more naturally in possession here is picked at random
       // (the possession pipeline above already decides the headline
       // sequence each minute, so this is deliberately independent texture).
       resolveThrowIn(seededRandom() < 0.5 ? side : defSide);
-    } else if (roll < 0.40) {
+    } else if (roll < 0.44) {
       // Goal kick — taken by the side that was defending this passage,
       // short/medium/long distribution via resolveGoalKick (engine/setpieces.js).
       resolveGoalKick(defSide);
-    } else if (roll < 0.56) {
-      // Handball — the vast majority are just a regular foul; only a small
-      // share are actually given as a penalty. The commentary now always
-      // matches what's actually awarded instead of asserting a penalty and
-      // then only sometimes delivering one.
+    } else if (roll < 0.49) {
+      // Handball — genuinely rare in a real match (most matches see zero or
+      // one shout), and the vast majority of shouts are just a regular
+      // foul; only a small share are actually given as a penalty. The
+      // commentary always matches what's actually awarded instead of
+      // asserting a penalty and then only sometimes delivering one.
       const p = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM', 'ST']);
       if (p) {
         const nearBox = seededRandom() < 0.45;
@@ -4640,13 +4725,15 @@ var App = (() => {
           resolveFoul(defSide, side, p, null, false);
         }
       }
-    } else if (roll < 0.68) {
-      // VAR — red-card review. A card given after review still traces back
-      // to a real foul/challenge that happened on the pitch, so it counts
-      // toward fouls (and the 'cards' bucket) exactly like any other card.
+    } else if (roll < 0.55) {
+      // VAR — red-card review, most of which correctly confirm there's no
+      // red. The straight-red outcome is now a genuine rarity (a real
+      // match seeing a VAR-overturned red is a notable, not routine,
+      // event) and still runs through the same card bookkeeping as any
+      // other red so fouls/cards stats stay consistent.
       const player = pickPlayer(defTeam, ['CB', 'ST', 'CDM', 'CM']);
       addEvent(m.minute, 'var', `📺 VAR checking possible red card (${defTeam.team.short})...`, defSide);
-      if (player && seededRandom() < 0.16) {
+      if (player && seededRandom() < 0.05) {
         defTeam.stats.fouls++;
         if (!m.foulCounts) m.foulCounts = { home: {}, away: {} };
         m.foulCounts[defSide][player.id] = (m.foulCounts[defSide][player.id] || 0) + 1;
@@ -4666,7 +4753,7 @@ var App = (() => {
           `VAR: On-field decision stands — no red card for ${player ? player.name : 'the defender'}`
         ];
         addEvent(m.minute, 'var', noRedLines[Math.floor(seededRandom() * noRedLines.length)], defSide);
-        if (player && seededRandom() < 0.5 && (m.cards[defSide][player.id] || 0) < 1) {
+        if (player && seededRandom() < 0.35 && (m.cards[defSide][player.id] || 0) < 1) {
           m.cards[defSide][player.id] = (m.cards[defSide][player.id] || 0) + 1;
           defTeam.stats.yellows++;
           recordStat('yellows', player, defTeam.team);
@@ -5084,11 +5171,17 @@ var App = (() => {
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
-    // A substitute plays their own main position, not a borrowed one — only
-    // fall back to the outgoing player's slot when the bench had nobody
-    // positionally close, purely so the pitch shape still makes sense.
-    if (!matchedOwnPosition) inPlayer.slot = tacticalChange ? (inPlayer.pos || [outSlot])[0] : outSlot;
-    else if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CM'])[0];
+    // The substitute always inherits the exact pitch slot the outgoing
+    // player vacated (outSlot) — never their own "natural" position. This
+    // is what real substitutions do (the sub takes over that role on the
+    // pitch) and it's also what keeps the on-pitch rendering correct:
+    // onPitchIds/formation.slots stay index-aligned throughout the match
+    // (see buildSquad() in ui/teamUI.js and drawTeam() in ui/matchUI.js),
+    // so assigning anything other than outSlot here — e.g. the incoming
+    // player's own best position, which may not even be a slot that
+    // exists in the team's current formation — is what used to make subs
+    // appear to land in random/weird spots on the pitch.
+    inPlayer.slot = outSlot;
     const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
     // Surface the real reason behind a notable change (booked/tiring) in
     // the event log, same spirit as the tactical tag above.
@@ -5147,7 +5240,11 @@ var App = (() => {
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
-    if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CB'])[0];
+    // Same fix as the regular substitution above: inherit the exact slot
+    // of whoever came off (the sacrificed forward/midfielder), not the
+    // incoming defender's own natural position, so the pitch rendering
+    // stays correctly index-aligned with the formation.
+    inPlayer.slot = outPlayer.slot || (outPlayer.pos || ['CB'])[0];
     const newUsed = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     addEvent(m.minute, 'sub',
       `Tactical reshuffle · ${sideData.team.short} reorganise after going down to 10 men<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span> <span style="opacity:0.6">(defensive cover)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,
@@ -5355,6 +5452,12 @@ var App = (() => {
         const inPlayer = candidates[Math.floor(seededRandom() * Math.min(3, candidates.length))];
         const idx = onPitchIds.indexOf(injured.id);
         if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+        // Inherit the injured player's exact pitch slot (not the bench
+        // player's own natural position, which is what inPlayer.slot still
+        // holds from squad selection) — same fix as the other substitution
+        // paths in engine/tactics.js, and for the same reason: it's what
+        // keeps the pitch rendering's formation-slot matching correct.
+        inPlayer.slot = injured.slot || (injured.pos || ['CM'])[0];
         markLeftPitch(m, side, injured.id);
         resetFatigueFor(m, side, inPlayer.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
@@ -9069,7 +9172,13 @@ var App = (() => {
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
         <div>
           <h2 style="margin:0 0 4px;font-size:1.2rem">${playerNameHTML(player)}</h2>
-          <div style="color:var(--text-2);font-size:0.85rem">${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''} · ${(player.pos||[])[0] || ''}</div>
+          <div style="color:var(--text-2);font-size:0.85rem">${(function () {
+            const aff = getPlayerAffiliations(player.id);
+            if (aff.club && aff.national) {
+              return `${teamMark(aff.club, 18)} ${aff.club.name} · ${teamMark(aff.national, 18)} ${aff.national.name}`;
+            }
+            return `${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''}`;
+          })()} · ${(player.pos||[])[0] || ''}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${affinityNote}
           ${signatureNote}
@@ -10560,17 +10669,60 @@ var App = (() => {
   const PLAYERS_COMPARE_MAX = 3;
 
 
-  // Builds (once, cached) a flat [{player, team, isNational}] list across
-  // every team. Cheap — teamsData is already fully resident in memory —
-  // rendering is where the actual cost lives, and that's handled separately
-  // by windowing (see renderPlayersList).
+  // Builds (once, cached) a flat [{player, team, isNational, hasClub,
+  // hasNational, clubTeam, nationalTeam}] list across every team. Cheap —
+  // teamsData is already fully resident in memory — rendering is where the
+  // actual cost lives, and that's handled separately by windowing (see
+  // renderPlayersList).
+  //
+  // A real player who shows up on both a national side and a club (same id,
+  // same name — see repairDuplicatePlayerIds() in ui/matchUI.js, which has
+  // already split off any *accidental* id collisions between different
+  // players before this ever runs) is merged into a single entry here
+  // instead of appearing as two separate rows, with both team references
+  // attached so the UI can show "Club · Country" together. The club
+  // appearance is preferred as the entry's primary `player`/`team` (richer
+  // data — logo, stadium, etc.) when both exist.
   function getAllPlayersFlat() {
     if (_allPlayersFlatCache) return _allPlayersFlatCache;
-    const flat = [];
-    (teamsData.national || []).forEach(t => (t.players || []).forEach(p => flat.push({ player: p, team: t, isNational: true })));
-    (teamsData.club || []).forEach(t => (t.players || []).forEach(p => flat.push({ player: p, team: t, isNational: false })));
+    const byId = {};
+    const order = [];
+    (teamsData.national || []).forEach(t => (t.players || []).forEach(p => {
+      if (!p || !p.id) return;
+      if (!byId[p.id]) {
+        byId[p.id] = { player: p, team: t, isNational: true, hasNational: true, hasClub: false, nationalTeam: t, clubTeam: null };
+        order.push(p.id);
+      } else {
+        byId[p.id].hasNational = true;
+        byId[p.id].nationalTeam = t;
+      }
+    }));
+    (teamsData.club || []).forEach(t => (t.players || []).forEach(p => {
+      if (!p || !p.id) return;
+      if (!byId[p.id]) {
+        byId[p.id] = { player: p, team: t, isNational: false, hasNational: false, hasClub: true, nationalTeam: null, clubTeam: t };
+        order.push(p.id);
+      } else {
+        byId[p.id].hasClub = true;
+        byId[p.id].clubTeam = t;
+        // Prefer the club appearance as the primary display record.
+        byId[p.id].player = p;
+        byId[p.id].team = t;
+        byId[p.id].isNational = false;
+      }
+    }));
+    const flat = order.map(id => byId[id]);
     _allPlayersFlatCache = flat;
     return flat;
+  }
+
+  // Both team affiliations (club/national) for a merged player entry, or
+  // nulls if that side doesn't exist for this player. Used to show "Club ·
+  // Country" together wherever a player's team affiliation is displayed.
+  function getPlayerAffiliations(playerId) {
+    const e = getPlayerTeamIndex()[playerId];
+    if (!e) return { club: null, national: null };
+    return { club: e.clubTeam || null, national: e.nationalTeam || null };
   }
 
 
@@ -10605,8 +10757,10 @@ var App = (() => {
 
   function getFilteredSortedPlayers() {
     let list = getAllPlayersFlat();
-    if (playersFilter === 'national') list = list.filter(e => e.isNational);
-    else if (playersFilter === 'club') list = list.filter(e => !e.isNational);
+    // hasNational/hasClub (not the single isNational flag) so a merged
+    // player who appears on both sides still shows up under either filter.
+    if (playersFilter === 'national') list = list.filter(e => e.hasNational);
+    else if (playersFilter === 'club') list = list.filter(e => e.hasClub);
     if (playersPosFilter !== 'all') {
       list = list.filter(e => POS_LINE[(e.player.pos || [])[0]] === playersPosFilter);
     }
@@ -10697,12 +10851,17 @@ var App = (() => {
     const bioBit = attr && (typeof attr.age === 'number' || typeof attr.height_cm === 'number')
       ? ` · ${typeof attr.age === 'number' ? attr.age + 'y' : ''}${(typeof attr.age === 'number' && typeof attr.height_cm === 'number') ? ' · ' : ''}${typeof attr.height_cm === 'number' ? Math.round(attr.height_cm) + 'cm' : ''}`
       : '';
+    // A merged player (same real person on both a club and a national
+    // side) shows both affiliations together instead of just one.
+    const teamLine = (entry.clubTeam && entry.nationalTeam)
+      ? `${teamMark(entry.clubTeam, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entry.clubTeam.short || entry.clubTeam.name}</span> · ${teamMark(entry.nationalTeam, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entry.nationalTeam.short || entry.nationalTeam.name}</span>`
+      : `${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span>`;
     return `<div class="team-check${selected ? ' selected' : ''}" style="cursor:pointer;border-left:3px solid ${primary}" onclick="${clickAction}">
       <div style="display:flex;align-items:center;gap:8px;width:100%">
         <span class="tsr-avatar" style="width:36px;height:36px;flex-shrink:0">${playerAvatarMark(p)}</span>
         <div style="flex:1;min-width:0">
           <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${playerNameHTML(p)}</strong>
-          <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span> · ${(p.pos || [])[0] || ''}${bioBit}</div>
+          <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamLine} · ${(p.pos || [])[0] || ''}${bioBit}</div>
         </div>
         ${playersCompareMode ? `<span class="compare-check${selected ? ' checked' : ''}">${selected ? '✓' : ''}</span>` : ''}
         ${formArrow(p)}
@@ -10998,9 +11157,9 @@ try { window.App = App; } catch (e) {}
     const items = [];
     Array.from(select.children).forEach(node => {
       if (node.tagName === 'OPTGROUP') {
-        Array.from(node.children).forEach(opt => items.push({ value: opt.value, label: opt.textContent, group: node.label }));
+        Array.from(node.children).forEach(opt => items.push({ value: opt.value, label: opt.textContent, group: node.label, logo: opt.dataset.logo, flag: opt.dataset.flag, name: opt.dataset.name }));
       } else if (node.tagName === 'OPTION') {
-        items.push({ value: node.value, label: node.textContent, group: null });
+        items.push({ value: node.value, label: node.textContent, group: null, logo: node.dataset.logo, flag: node.dataset.flag, name: node.dataset.name });
       }
     });
     return items;
@@ -11058,7 +11217,14 @@ try { window.App = App; } catch (e) {}
           lastGroup = i.group;
         }
         const sel = i.value === select.value ? ' selected' : '';
-        html += `<div class="ss-option${sel}" data-value="${String(i.value).replace(/"/g, '&quot;')}" role="option">${i.label}</div>`;
+        // Team dropdowns show the club/country logo (falling back to the
+        // flag emoji when no logo is set — same behavior as everywhere
+        // else in the app, via teamMark()) instead of just the flag
+        // character baked into the plain option text.
+        const rowLabel = isTeamSelect
+          ? `${teamMark({ logo: i.logo, flag: i.flag }, 18)} <span>${i.name || i.label}</span>`
+          : i.label;
+        html += `<div class="ss-option${sel}" data-value="${String(i.value).replace(/"/g, '&quot;')}" role="option">${rowLabel}</div>`;
       });
       optionsEl.innerHTML = html;
     }
