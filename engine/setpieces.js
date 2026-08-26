@@ -11,7 +11,7 @@
 
 /*@CHUNK:csp02:START*/
   function pickFreeKickRoutine(attTeam, closeRange) {
-    const hasCrosser = (attTeam.squad.all || []).some(p => hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Prolific Winger'));
+    const hasCrosser = (attTeam.squad.all || []).some(p => hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Prolific Winger') || hasSkill(p, 'Pinpoint Crossing') || hasSkill(p, 'Edged Crossing'));
     const m = currentMatch;
     const diff = m ? (attTeam.score || 0) - (m[attTeam === m.home ? 'away' : 'home'].score || 0) : 0;
     const urgent = m && m.minute >= 75 && diff < 0;
@@ -82,8 +82,9 @@
       // Whipped delivery into the box — resolved like a low-key corner
       // (aerial duel for a specific target), not a guaranteed chance.
       addEvent(m.minute, 'whistle', `<span class="player">${taker.name}</span> whips the free-kick into the box`, attackingSide);
-      if (seededRandom() < 0.075) {
-        const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p) * 2, taker.id);
+      const crossChance = 0.075 + (hasSkill(taker, 'Pinpoint Crossing') || hasSkill(taker, 'Edged Crossing') ? 0.02 : 0);
+      if (seededRandom() < crossChance) {
+        const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p, false) * 2, taker.id);
         if (scorer) {
           attTeam.stats.shots++; attTeam.stats.shotsOn++; attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
@@ -159,12 +160,13 @@
     const oppSide = side === 'home' ? 'away' : 'home';
     const thrower = pickPlayer(team, ['RB', 'LB', 'RWB', 'LWB', 'CB']);
     if (!thrower) return;
-    const longThrowSpecialist = (thrower.phy || 70) >= 80 || hasStyle(thrower, 'Long Throw');
+    const longThrowSpecialist = (thrower.phy || 70) >= 80 || hasStyle(thrower, 'Long Throw') || hasSkill(thrower, 'Long Throws');
     const roll = seededRandom();
     if (longThrowSpecialist && roll < 0.3) {
       addEvent(m.minute, 'whistle', `Long throw hurled into the box by <span class="player">${thrower.name}</span> (${team.team.short})`, side);
-      if (seededRandom() < 0.035) {
-        const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p) * 2, thrower.id);
+      const flickOnChance = 0.035 + (hasSkill(thrower, 'Long Throws') ? 0.01 : 0);
+      if (seededRandom() < flickOnChance) {
+        const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p, false) * 2, thrower.id);
         if (scorer) {
           team.stats.shots++; team.stats.shotsOn++; team.score++;
           recordStat('goals', scorer, team.team);
@@ -210,9 +212,24 @@
     const gk = pickPlayer(team, ['GK']);
     if (!gk) return;
     const tac = (m.tactics && m.tactics[side]) || 'balanced';
-    const buildFromBack = (gk.tec || 70) >= 78 && tac !== 'defend';
+    // GK Low Punt sharpens exactly the short/medium distribution this
+    // build-from-back check is gating, so a keeper with the skill can
+    // credibly play out from the back even without elite raw tec.
+    const buildFromBack = ((gk.tec || 70) >= 78 || hasSkill(gk, 'GK Low Punt')) && tac !== 'defend';
     const roll = seededRandom();
     if (!m.playerMatchStats) m.playerMatchStats = {};
+    // GK Long Throws: an entirely separate, quicker distribution option
+    // straight out of the keeper's hands to a winger, bypassing the
+    // punt/rollout choice altogether.
+    if (hasSkill(gk, 'GK Long Throws') && roll < 0.18) {
+      addEvent(m.minute, 'whistle', `<span class="player">${gk.name}</span> skips the goal-kick and launches a long throw straight down the line`, side);
+      if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+      m.playerMatchStats[gk.id].passes = (m.playerMatchStats[gk.id].passes || 0) + 1;
+      m.playerMatchStats[gk.id].passesCompleted = (m.playerMatchStats[gk.id].passesCompleted || 0) + 1;
+      const receiver = pickPlayer(team, ['RM', 'LM', 'RW', 'LW', 'CM']);
+      if (receiver && seededRandom() < 0.16) resolveChanceCreation(side, oppSide, receiver, seededRandom() < 0.5 ? 'L' : 'R');
+      return;
+    }
     if (buildFromBack && roll < 0.4) {
       addEvent(m.minute, 'pass', `Short rollout from <span class="player">${gk.name}</span> — ${team.team.short} build from the back`, side);
       if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
@@ -220,10 +237,20 @@
       m.playerMatchStats[gk.id].passesCompleted = (m.playerMatchStats[gk.id].passesCompleted || 0) + 1;
     } else if (roll < 0.75) {
       addEvent(m.minute, 'pass', `<span class="player">${gk.name}</span> chips the goal-kick out to midfield`, side);
+      // GK Low Punt: a genuinely well-placed medium ball occasionally
+      // sticks well enough to spring an immediate chance.
+      if (hasSkill(gk, 'GK Low Punt') && seededRandom() < 0.12) {
+        const receiver = pickPlayer(team, ['CM', 'CAM'], gk.id);
+        if (receiver) resolveChanceCreation(side, oppSide, receiver, 'C');
+      }
     } else {
-      const target = pickPlayerCustomWeighted(team, ['ST', 'CB'], (p) => aerialSkill(p) * 2);
-      const defender = pickPlayerCustomWeighted(oppTeam, ['CB'], (p) => aerialSkill(p) * 2);
-      const won = target && (!defender || aerialSkill(target) + seededRandom() * 0.3 > aerialSkill(defender) + seededRandom() * 0.3);
+      const target = pickPlayerCustomWeighted(team, ['ST', 'CB'], (p) => aerialSkill(p, false) * 2);
+      const defender = pickPlayerCustomWeighted(oppTeam, ['CB'], (p) => aerialSkill(p, true) * 2);
+      // GK High Punt: a sharper, more accurate long punt gives the target a
+      // genuinely better sight of winning the header, not just a coin-flip
+      // against whoever the defence puts up.
+      const puntEdge = hasSkill(gk, 'GK High Punt') ? 0.08 : 0;
+      const won = target && (!defender || aerialSkill(target, false) + puntEdge + seededRandom() * 0.3 > aerialSkill(defender, true) + seededRandom() * 0.3);
       addEvent(m.minute, 'whistle', (won && target)
         ? `Long punt from <span class="player">${gk.name}</span> — <span class="player">${target.name}</span> wins the aerial duel`
         : `Long punt from <span class="player">${gk.name}</span> — ${oppTeam.team.short} win the header back`, side);

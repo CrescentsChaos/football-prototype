@@ -257,11 +257,17 @@
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
-    // A substitute plays their own main position, not a borrowed one — only
-    // fall back to the outgoing player's slot when the bench had nobody
-    // positionally close, purely so the pitch shape still makes sense.
-    if (!matchedOwnPosition) inPlayer.slot = tacticalChange ? (inPlayer.pos || [outSlot])[0] : outSlot;
-    else if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CM'])[0];
+    // The substitute always inherits the exact pitch slot the outgoing
+    // player vacated (outSlot) — never their own "natural" position. This
+    // is what real substitutions do (the sub takes over that role on the
+    // pitch) and it's also what keeps the on-pitch rendering correct:
+    // onPitchIds/formation.slots stay index-aligned throughout the match
+    // (see buildSquad() in ui/teamUI.js and drawTeam() in ui/matchUI.js),
+    // so assigning anything other than outSlot here — e.g. the incoming
+    // player's own best position, which may not even be a slot that
+    // exists in the team's current formation — is what used to make subs
+    // appear to land in random/weird spots on the pitch.
+    inPlayer.slot = outSlot;
     const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
     // Surface the real reason behind a notable change (booked/tiring) in
     // the event log, same spirit as the tactical tag above.
@@ -326,7 +332,11 @@
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
-    if (!inPlayer.slot) inPlayer.slot = (inPlayer.pos || ['CB'])[0];
+    // Same fix as the regular substitution above: inherit the exact slot
+    // of whoever came off (the sacrificed forward/midfielder), not the
+    // incoming defender's own natural position, so the pitch rendering
+    // stays correctly index-aligned with the formation.
+    inPlayer.slot = outPlayer.slot || (outPlayer.pos || ['CB'])[0];
     const newUsed = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     addEvent(m.minute, 'sub',
       `Tactical reshuffle · ${sideData.team.short} reorganise after going down to 10 men<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span> <span style="opacity:0.6">(defensive cover)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,

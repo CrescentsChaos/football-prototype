@@ -12,6 +12,12 @@
     if (hasSkill(p, 'Interception')) { chance += 0.006; interceptBias += 0.15; }
     if (hasSkill(p, 'Man Marking')) chance += 0.006;
     if (hasSkill(p, 'Blocker')) chance += 0.006;
+    if (hasSkill(p, 'Track Back')) chance += 0.006;
+    if (hasSkill(p, 'Long Reach Tackle')) chance += 0.007;
+    // Shadow Hunt: a defender who reads a ball played into the space behind
+    // them and reacts before it becomes a real chance — biases toward a
+    // clean interception rather than a late/rash tackle.
+    if (hasSkill(p, 'Shadow Hunt')) { chance += 0.005; interceptBias += 0.08; }
     // Destroyer/Anchor Man actively hunt the ball; Build Up and Box-to-Box
     // read the game well enough to time a challenge, but less aggressively.
     if (hasStyle(p, 'Destroyer')) { chance += 0.012; interceptBias += 0.05; }
@@ -133,7 +139,19 @@
   function defensivePressure(p) {
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.def_awr, p.expandedAttrs.def_eng, p.expandedAttrs.tack, p.expandedAttrs.aggr].filter(v => typeof v === 'number');
-      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.def || 70) * 0.7 + (p.ovr || 75) * 0.3);
+      let bonus = 0;
+      if (hasSkill(p, 'Track Back')) bonus += 1.5;
+      if (hasSkill(p, 'Long Reach Tackle')) bonus += 1.5;
+      // Fortress: this player's whole side defends better once they're
+      // ahead in the second half.
+      if (hasSkill(p, 'Fortress') && playerTeamLeadingSecondHalf(p)) bonus += 3;
+      // GK Directing Defense / GK Spirit Roar: the team's own keeper
+      // organizing (or roaring on) the back line lifts every defender in
+      // front of him, not just his own shot-stopping.
+      if (teamGkHasSkill(p, 'GK Directing Defense')) bonus += 1.5;
+      if (teamGkHasSkill(p, 'GK Spirit Roar') && playerTeamLeadingSecondHalf(p)) bonus += 2;
+      return base + bonus;
     }
     return (p.def || 70) * 0.7 + (p.ovr || 75) * 0.3;
   }

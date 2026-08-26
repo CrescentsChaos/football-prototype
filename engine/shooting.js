@@ -8,7 +8,20 @@
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'fin', 70) - 70) / 100) * 0.5;
     if (hasSkill(p, 'Phenomenal Finishing')) edge += 0.06;
-    if (hasSkill(p, 'First-time Shot') || hasSkill(p, 'First-time Shor')) edge += 0.02;
+    if (hasSkill(p, 'First-time Shot')) edge += 0.02;
+    if (hasSkill(p, 'Acrobatic Finishing')) edge += 0.045;
+    if (hasSkill(p, 'Low Screamer')) edge += 0.03;
+    if (hasSkill(p, 'Chip Shot Control')) edge += 0.02;
+    if (hasSkill(p, 'Long Range Shooting')) edge += 0.02;
+    // Super-Sub: a real lift once the player has actually come off the
+    // bench in the second half — a starter with the skill gets nothing.
+    if (isActingSuperSub(p)) edge += 0.03;
+    // Willpower: gradually sharper finishing the more shots this player has
+    // already had a go at in this match.
+    const m = currentMatch;
+    if (hasSkill(p, 'Willpower') && m && m.playerMatchStats && m.playerMatchStats[p.id]) {
+      edge += Math.min(0.08, (m.playerMatchStats[p.id].shots || 0) * 0.012);
+    }
     // Box-focused playstyles get a distinct finishing edge on top of raw
     // finishing rating, so their identity shows up beyond the stat sheet.
     if (hasStyle(p, 'Fox in the Box')) edge += 0.04;
@@ -27,10 +40,16 @@
 /*@CHUNK:c0035:END*/
 
 /*@CHUNK:c0036:START*/
-  function aerialSkill(p) {
+  // isDefensiveContext: true when this call represents a defender heading
+  // the ball away in/near their own box (corner/goal-kick defending) — that's
+  // specifically what Aerial Fort covers, as opposed to an attacker winning
+  // a header at the other end.
+  function aerialSkill(p, isDefensiveContext) {
     if (!p || !p.expandedAttrs) return 0.5;
     let v = xattr(p, 'head', 60) / 100;
     if (hasSkill(p, 'Aerial Superiority') || hasSkill(p, 'Heading')) v += 0.12;
+    if (hasSkill(p, 'Bullet Header')) v += 0.06;
+    if (isDefensiveContext && hasSkill(p, 'Aerial Fort')) v += 0.08;
     // A Target Man's whole game is built around winning the aerial duel;
     // defensively-anchored styles also read the flight of a long ball well.
     if (hasStyle(p, 'Target Man')) v += 0.1;
@@ -49,6 +68,7 @@
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'place_kick', 70) - 70) / 100) * 0.35;
     if (hasSkill(p, 'Penalty Specialist')) edge += 0.08;
+    if (hasSkill(p, 'Chip Shot Control')) edge += 0.02;
     if (hasStyle(p, 'Fox in the Box') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
     return edge;
   }
@@ -62,9 +82,11 @@
   function fkTakerEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'curl', 70) - 70) / 200) + ((xattr(p, 'place_kick', 70) - 70) / 300);
-    if (hasSkill(p, 'Long Range Curler') || hasSkill(p, 'Long-range Curler')) edge += 0.05;
+    if (hasSkill(p, 'Long Range Curler')) edge += 0.05;
     if (hasSkill(p, 'Knuckle Shot')) edge += 0.04;
     if (hasSkill(p, 'Dipping Shot')) edge += 0.03;
+    if (hasSkill(p, 'Blitz Curler')) edge += 0.03;
+    if (hasSkill(p, 'Outside Curler')) edge += 0.02;
     if (hasStyle(p, 'Creative Playmaker') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
     if (hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Orchestrator')) edge += 0.02;
     return edge;
@@ -79,8 +101,11 @@
   function dribbleSuccessEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'dribb', 70) - 70) / 100) * 0.4;
-    const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero'];
+    const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero', 'Cut Behind & Turn', 'Inside Bounce'];
     if (skillMoves.some((s) => hasSkill(p, s))) edge += 0.08;
+    if (hasSkill(p, 'Momentum Dribbling')) edge += 0.03;
+    if (hasSkill(p, 'Magnetic Feet')) edge += 0.03;
+    if (hasSkill(p, 'Acceleration Burst')) edge += 0.02;
     if (hasStyle(p, 'Prolific Winger') || hasStyle(p, 'Inside Forward')) edge += 0.04;
     if (hasStyle(p, 'Roaming Flank') || hasStyle(p, 'Dummy Runner')) edge += 0.03;
     if (hasStyle(p, 'Creative Playmaker')) edge += 0.02;
@@ -532,12 +557,15 @@
   // long-range effort; a header off a cross has a lower ceiling but a
   // distinct conversion curve of its own).
   const CHANCE_TYPE_PROFILE = {
-    openplay:    { baseOnTarget: 0.40, baseXg: 0.09, headerWeight: 0 },
-    throughball: { baseOnTarget: 0.50, baseXg: 0.17, headerWeight: 0 },
-    cross:       { baseOnTarget: 0.44, baseXg: 0.13, headerWeight: 0.72 },
-    dribble:     { baseOnTarget: 0.47, baseXg: 0.15, headerWeight: 0 },
-    longshot:    { baseOnTarget: 0.30, baseXg: 0.05, headerWeight: 0 },
-    counter:     { baseOnTarget: 0.49, baseXg: 0.18, headerWeight: 0 }
+    // baseOnTarget values scaled down from the original set (roughly ×0.85)
+    // as part of the wider conversion-rate retune below — see resolveShot()
+    // for the full explanation of why these needed to come down.
+    openplay:    { baseOnTarget: 0.34, baseXg: 0.08, headerWeight: 0 },
+    throughball: { baseOnTarget: 0.42, baseXg: 0.15, headerWeight: 0 },
+    cross:       { baseOnTarget: 0.37, baseXg: 0.11, headerWeight: 0.72 },
+    dribble:     { baseOnTarget: 0.40, baseXg: 0.13, headerWeight: 0 },
+    longshot:    { baseOnTarget: 0.24, baseXg: 0.045, headerWeight: 0 },
+    counter:     { baseOnTarget: 0.42, baseXg: 0.16, headerWeight: 0 }
   };
 
   // ===== GK phase (called once a shot is confirmed on target) =====
@@ -556,11 +584,12 @@
     // ---- Shots phase: shot quality drawn straight from the shooter's own
     // finishing-relevant attributes and playstyle edges.
     let shotQuality = isHeader
-      ? aerialSkill(shooter)
+      ? aerialSkill(shooter, false)
       : Math.max(0.05, Math.min(0.98,
           ((shooter.att || 70) * 0.42 + (shooter.tec || 70) * 0.33 + (shooter.ovr || 75) * 0.15 + (shooter.pac || 70) * 0.10) / 100
           + finishingEdge(shooter)
-          + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)));
+          + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)
+          + (chanceType === 'longshot' ? fkTakerEdge(shooter) * 0.6 : 0)));
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
@@ -586,7 +615,13 @@
     }
 
     const defAvg = calcTeamStrength(defTeam).def / 100;
-    const onTargetChance = Math.min(0.72, Math.max(0.08, profile.baseOnTarget + shotQuality * 0.42 - defAvg * 0.22 + (opts.onTargetBonus || 0)));
+    // Retuned so a full shot -> goal pipeline lands close to real-world
+    // conversion (~33% of shots on target actually score, ~10% of all
+    // shots become goals) instead of the old formula's ~48%/~22%, which
+    // was producing far more goals — and far fewer clean sheets — than a
+    // real match. Defensive quality now also weighs more heavily against
+    // the shot getting on target in the first place.
+    const onTargetChance = Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
       addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
@@ -601,7 +636,7 @@
     // ===== GK phase =====
     const gk = pickPlayer(defTeam, ['GK']);
     const gkSkill = Math.max(0.05, Math.min(0.98, (gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(gk)));
-    const saveChance = Math.min(0.92, Math.max(0.28, 0.42 + gkSkill * 0.42 - shotQuality * 0.28 - (isHeader ? 0.03 : 0)));
+    const saveChance = Math.min(0.94, Math.max(0.34, 0.56 + gkSkill * 0.38 - shotQuality * 0.24 - (isHeader ? 0.03 : 0)));
     if (seededRandom() < saveChance) {
       if (gk) {
         defTeam.stats.saves++;
@@ -697,11 +732,11 @@
     let chance = BASE_CHANCE[routine] || 0.05;
     if (zonal && (routine === 'farpost' || routine === 'edge')) chance *= 0.82;
     if (!zonal && (routine === 'nearpost' || routine === 'crowd')) chance *= 0.82;
-    const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p) * 2);
-    if (blocker && aerialSkill(blocker) > 0.68) chance *= 0.85;
+    const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p, true) * 2);
+    if (blocker && aerialSkill(blocker, true) > 0.68) chance *= 0.85;
 
     if (seededRandom() >= chance) return;
-    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p) * 2);
+    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2);
     if (!scorer) return;
     attTeam.stats.shots++;
     attTeam.stats.shotsOn++;

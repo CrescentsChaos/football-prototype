@@ -198,6 +198,7 @@
       events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
       goals: JSON.parse(JSON.stringify(m.goalList || [])),
       ratings: allStats,
+      motmId: m.motmId || null,
       finished: true
     };
   }
@@ -376,7 +377,10 @@
   // for the per-player match log and anywhere else a competition label is
   // needed. Falls back to "Friendly" for a plain Kick Off match.
   function matchCompetitionLabel(m) {
-    if (tournament) return tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    if (tournament) {
+      if (tournament.competitionName) return tournament.competitionName;
+      return tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    }
     if (currentSeasonComp && currentSeasonComp.name) return currentSeasonComp.name;
     if (m && m.countForLeaderboard) return 'Cup';
     return 'Friendly';
@@ -418,6 +422,8 @@
     playerMatchLog[player.id].unshift({
       opponent: opponentTeam ? opponentTeam.name : '—',
       opponentShort: opponentTeam ? (opponentTeam.short || opponentTeam.name) : '—',
+      opponentLogo: opponentTeam ? (opponentTeam.logo || null) : null,
+      opponentFlag: opponentTeam ? (opponentTeam.flag || null) : null,
       competition: matchCompetitionLabel(m),
       minutes: minutes,
       goals: ps.goals || 0,
@@ -430,6 +436,30 @@
   }
 
 /*@CHUNK:cp024:END*/
+
+/*@CHUNK:cp024b:START*/
+
+  // Appends this match's line to a team's persistent match log (see
+  // teamMatchLog in ui/teamUI.js). Called once per side at full time, right
+  // after both players' match logs are recorded, so the two stay in sync.
+  function recordTeamMatchLog(m, team, opponentTeam, scoreFor, scoreAgainst) {
+    if (!team || !opponentTeam) return;
+    if (!teamMatchLog[team.id]) teamMatchLog[team.id] = [];
+    const result = scoreFor > scoreAgainst ? 'W' : scoreFor < scoreAgainst ? 'L' : 'D';
+    teamMatchLog[team.id].unshift({
+      opponent: opponentTeam.name || '—',
+      opponentShort: opponentTeam.short || opponentTeam.name || '—',
+      opponentLogo: opponentTeam.logo || null,
+      opponentFlag: opponentTeam.flag || null,
+      competition: matchCompetitionLabel(m),
+      scoreFor: scoreFor,
+      scoreAgainst: scoreAgainst,
+      result: result
+    });
+    if (teamMatchLog[team.id].length > 30) teamMatchLog[team.id].length = 30;
+  }
+
+/*@CHUNK:cp024b:END*/
 
 /*@CHUNK:c0185:START*/
 
@@ -700,6 +730,74 @@
 
 /*@CHUNK:c0198:END*/
 
+/*@CHUNK:c0198a:START*/
+
+  // ========== CONTEXTUAL ADDED TIME ==========
+  // Real stoppage time isn't a flat random number — the fourth official
+  // builds it up from what actually happened in the half: ball retrieved
+  // from the net and the restart after every goal, the walk to the technical
+  // area for every substitution, treatment/stretcher time for injuries, the
+  // referee jogging to the pitchside monitor (or waiting on a check) for
+  // every VAR review, cards taking a moment to brandish and log, and a
+  // time-wasting allowance when fouls pile up late in the half (a leading
+  // side "managing the clock"). This scans the half's own event log so two
+  // otherwise-identical matches with different incident counts get
+  // different, explainable stoppage totals instead of the same dice roll.
+/*@CHUNK:c0198a:END*/
+
+/*@CHUNK:c0198b:START*/
+  function computeAddedTime(m, fromMin, toMin) {
+    const evs = (m.events || []).filter(e => e.minute >= fromMin && e.minute <= toMin);
+    const count = (type) => evs.filter(e => e.type === type).length;
+    const goals = count('goal');
+    const subs = count('sub');
+    const injuries = count('injury');
+    const varChecks = count('var');
+    const cards = count('yellow') + count('red');
+    // Late fouls/handballs (closing quarter of the half) read as a proxy for
+    // a team managing — or wasting — the clock rather than genuine 50-50s.
+    const lateWindow = Math.max(fromMin, toMin - 15);
+    const lateFouls = evs.filter(e => (e.type === 'foul' || e.type === 'handball') && e.minute >= lateWindow).length;
+    const lateCards = evs.filter(e => (e.type === 'yellow' || e.type === 'red') && e.minute >= lateWindow).length;
+
+    const goalTime = goals * 0.5;                       // ball back to center circle + restart
+    const celebrationTime = goals * 0.45 + evs.filter(e => e.type === 'goal' && e.minute >= lateWindow).length * 0.25; // mobbed-by-teammates time, longer for late/dramatic goals
+    const subTime = subs * 0.4;                         // walk-off/walk-on + board held up
+    const injuryTime = injuries * 1.6;                   // treatment or stretcher
+    const varTime = varChecks * 1.1;                     // review + pitchside monitor
+    const cardTime = cards * 0.15;                       // brandishing + logging the name
+    const timeWastingTime = lateFouls * 0.25 + lateCards * 0.2; // clock management called out by the ref
+
+    const raw = goalTime + celebrationTime + subTime + injuryTime + varTime + cardTime + timeWastingTime;
+    const minutes = Math.max(1, Math.min(11, Math.round(raw)));
+    return {
+      minutes,
+      breakdown: { goals, subs, injuries, var: varChecks, cards, timeWasting: lateFouls + lateCards }
+    };
+  }
+/*@CHUNK:c0198b:END*/
+
+/*@CHUNK:c0198c:START*/
+
+  // Human-readable rundown of what built up a stoppage-time total, used in
+  // the announcement event so the extra minutes feel earned rather than
+  // arbitrary.
+/*@CHUNK:c0198c:END*/
+
+/*@CHUNK:c0198d:START*/
+  function describeAddedTime(added) {
+    const b = added.breakdown;
+    const parts = [];
+    if (b.goals) parts.push(b.goals + ' goal celebration' + (b.goals > 1 ? 's' : ''));
+    if (b.subs) parts.push(b.subs + ' substitution' + (b.subs > 1 ? 's' : ''));
+    if (b.injuries) parts.push(b.injuries + ' injury stoppage' + (b.injuries > 1 ? 's' : ''));
+    if (b.var) parts.push(b.var + ' VAR check' + (b.var > 1 ? 's' : ''));
+    if (b.cards) parts.push(b.cards + ' card' + (b.cards > 1 ? 's' : ''));
+    if (b.timeWasting) parts.push('time-wasting');
+    return parts.length ? parts.join(', ') : 'general stoppages';
+  }
+/*@CHUNK:c0198d:END*/
+
 /*@CHUNK:c0199:START*/
   function tick(silent) {
     if (!currentMatch || currentMatch.finished) return;
@@ -724,7 +822,11 @@
       addEvent(46, 'whistle', 'Second half begins', null);
     }
     if (m.minute >= 90 && !m.inET && !m.inPens && !m._awaitingET) {
-      if (!m._stoppage) m._stoppage = 1 + Math.floor(seededRandom() * 5);
+      if (!m._stoppage) {
+        const added = computeAddedTime(m, 46, 90);
+        m._stoppage = added.minutes;
+        addEvent(90, 'whistle', `📋 ${added.minutes} minute${added.minutes === 1 ? '' : 's'} of stoppage time signalled: ${describeAddedTime(added)}`, null);
+      }
       if (m.minute >= 90 + m._stoppage) {
         const drawn = m.home.score === m.away.score;
         if (drawn && (m.allowET || m.allowPens)) {
@@ -842,7 +944,15 @@
     const defSide = side === 'home' ? 'away' : 'home';
     const attTeam = m[side], defTeam = m[defSide];
     const roll = seededRandom();
-    if (roll < 0.20) {
+    // Roll shares below were rebalanced to bring fouls/cards/handballs down
+    // to realistic per-match volume: free-kick, handball, and VAR-review
+    // shares are all cut well back from their original width (they were
+    // independently stacking on top of the turnover-based fouls in
+    // transitions.js and producing far more cards/reds than a real match),
+    // with the freed-up probability mass handed to the non-foul texture
+    // events (throw-ins/goal-kicks/misc) so the overall "something happens"
+    // rate this function fires at is unchanged.
+    if (roll < 0.10) {
       // Direct free-kick — always the consequence of an actual, logged foul
       // (never conjured out of nowhere). The fouler is picked from the
       // defending side committing a midfield/wide challenge, resolveFoul
@@ -861,21 +971,22 @@
           resolveFreeKickRoutine(side, defSide, closeRange);
         }
       }
-    } else if (roll < 0.30) {
+    } else if (roll < 0.27) {
       // Throw-in — normal, long, or a tactical retaining throw. Whichever
       // side is more naturally in possession here is picked at random
       // (the possession pipeline above already decides the headline
       // sequence each minute, so this is deliberately independent texture).
       resolveThrowIn(seededRandom() < 0.5 ? side : defSide);
-    } else if (roll < 0.40) {
+    } else if (roll < 0.44) {
       // Goal kick — taken by the side that was defending this passage,
       // short/medium/long distribution via resolveGoalKick (engine/setpieces.js).
       resolveGoalKick(defSide);
-    } else if (roll < 0.56) {
-      // Handball — the vast majority are just a regular foul; only a small
-      // share are actually given as a penalty. The commentary now always
-      // matches what's actually awarded instead of asserting a penalty and
-      // then only sometimes delivering one.
+    } else if (roll < 0.49) {
+      // Handball — genuinely rare in a real match (most matches see zero or
+      // one shout), and the vast majority of shouts are just a regular
+      // foul; only a small share are actually given as a penalty. The
+      // commentary always matches what's actually awarded instead of
+      // asserting a penalty and then only sometimes delivering one.
       const p = pickPlayer(defTeam, ['CB', 'RB', 'LB', 'CDM', 'ST']);
       if (p) {
         const nearBox = seededRandom() < 0.45;
@@ -888,13 +999,15 @@
           resolveFoul(defSide, side, p, null, false);
         }
       }
-    } else if (roll < 0.68) {
-      // VAR — red-card review. A card given after review still traces back
-      // to a real foul/challenge that happened on the pitch, so it counts
-      // toward fouls (and the 'cards' bucket) exactly like any other card.
+    } else if (roll < 0.55) {
+      // VAR — red-card review, most of which correctly confirm there's no
+      // red. The straight-red outcome is now a genuine rarity (a real
+      // match seeing a VAR-overturned red is a notable, not routine,
+      // event) and still runs through the same card bookkeeping as any
+      // other red so fouls/cards stats stay consistent.
       const player = pickPlayer(defTeam, ['CB', 'ST', 'CDM', 'CM']);
       addEvent(m.minute, 'var', `📺 VAR checking possible red card (${defTeam.team.short})...`, defSide);
-      if (player && seededRandom() < 0.16) {
+      if (player && seededRandom() < 0.05) {
         defTeam.stats.fouls++;
         if (!m.foulCounts) m.foulCounts = { home: {}, away: {} };
         m.foulCounts[defSide][player.id] = (m.foulCounts[defSide][player.id] || 0) + 1;
@@ -914,7 +1027,7 @@
           `VAR: On-field decision stands — no red card for ${player ? player.name : 'the defender'}`
         ];
         addEvent(m.minute, 'var', noRedLines[Math.floor(seededRandom() * noRedLines.length)], defSide);
-        if (player && seededRandom() < 0.5 && (m.cards[defSide][player.id] || 0) < 1) {
+        if (player && seededRandom() < 0.35 && (m.cards[defSide][player.id] || 0) < 1) {
           m.cards[defSide][player.id] = (m.cards[defSide][player.id] || 0) + 1;
           defTeam.stats.yellows++;
           recordStat('yellows', player, defTeam.team);
@@ -1130,6 +1243,10 @@
     }
     // Compute ratings for everyone who played, then MOTM = highest rating
     if (!m.playerMatchStats) m.playerMatchStats = {};
+    // Flag this match as a "big game" (knockout-stage/final, or two top-tier
+    // sides going at it) once, up front, so every recordRating() call below
+    // for this match consistently feeds the bigGames award-scoring bucket.
+    m.isBigGame = isBigGameContext(m);
     const allOnPitch = [...(m.home.squad.starting||[]), ...(m.away.squad.starting||[])];
     // Include subs who came on
     const onIds = new Set([...(m.homeOnPitch||[]), ...(m.awayOnPitch||[])]);
@@ -1203,7 +1320,14 @@
       const playerObj = [...(m.home.squad.all||[]), ...(m.away.squad.all||[])].find(p => p.id === best.id) || best;
       recordStat('motm', playerObj, team);
       addEvent(90, 'motm', `Player of the Match: <span class="player">${best.name}</span> (${best.rating.toFixed(1)})`, null);
+      // Stash the MOTM's player id on the match itself so any ratings list
+      // (live post-match panel, match report modal) can pick them out and
+      // render their rating badge in the MOTM color — see renderRatingRow()
+      // in ui/matchUI.js.
+      m.motmId = best.id;
     }
+    recordTeamMatchLog(m, m.home.team, m.away.team, m.home.score, m.away.score);
+    recordTeamMatchLog(m, m.away.team, m.home.team, m.away.score, m.home.score);
     /* ratings live in lineup */ renderLineups();
     globalMatchDay++;
     // Progress injury/suspension countdowns for both squads. A match only counts

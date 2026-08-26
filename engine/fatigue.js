@@ -43,7 +43,13 @@
     const roleLoad = WIDE_SLOTS.has(slot) ? 1.25 : line === 'MID' ? 1.15 : line === 'FWD' ? 1.05 : 0.85;
     const phyFactor = Math.max(0.65, Math.min(1.35, (100 - (p.phy || 70)) / 45));
     const tacFactor = tac === 'press' ? 1.35 : tac === 'attack' ? 1.15 : tac === 'defend' ? 0.8 : 1.0;
-    return 0.62 * roleLoad * phyFactor * tacFactor;
+    let rate = 0.62 * roleLoad * phyFactor * tacFactor;
+    // Fighting Spirit and Track Back both describe a player who holds his
+    // intensity/work-rate up under fatigue and pressure — modeled as a
+    // genuinely slower stamina drain rather than just a late-game stat bump.
+    if (hasSkill(p, 'Fighting Spirit')) rate *= 0.85;
+    if (hasSkill(p, 'Track Back')) rate *= 0.94;
+    return rate;
   }
 /*@CHUNK:cfat04:END*/
 
@@ -60,12 +66,18 @@
       const tac = (m.tactics && m.tactics[side]) || 'balanced';
       const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
       const all = (team.squad && team.squad.all) || [];
+      // Captaincy: a captain on the pitch takes the edge off the whole
+      // team's fatigue, not just his own — real captains manage tempo and
+      // keep the squad's intensity honest through a long match.
+      const captainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy'));
       onIds.forEach(id => {
         const p = all.find(x => x.id === id);
         if (!p) return;
         if (!fat[side][id]) fat[side][id] = { stamina: 100 };
         const rec = fat[side][id];
-        rec.stamina = Math.max(8, rec.stamina - fatigueDrainRate(p, tac));
+        let drain = fatigueDrainRate(p, tac);
+        if (captainOnPitch) drain *= 0.93;
+        rec.stamina = Math.max(8, rec.stamina - drain);
       });
     });
   }

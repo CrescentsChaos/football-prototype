@@ -6,7 +6,7 @@
   function gkReflexEdge(gk) {
     if (!gk || !gk.expandedAttrs) return 0;
     let edge = ((xattr(gk, 'gk_reflex', 75) - 75) / 100) * 0.5;
-    if (hasSkill(gk, 'Acrobatic Clear')) edge += 0.05;
+    if (hasSkill(gk, 'Acrobatic Clearance')) edge += 0.05;
     return edge;
   }
 /*@CHUNK:c0038:END*/

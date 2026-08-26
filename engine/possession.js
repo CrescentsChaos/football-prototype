@@ -50,6 +50,11 @@
 
     let carrier = pickPlayer(attTeam, ZONE_POS_MAP['DEF_' + channel]) || pickPlayer(attTeam, ['CB', 'GK']);
     if (!carrier) return;
+    // Attack Trigger: while this player has the ball, the whole team reads
+    // the attacking picture better — a small boost to both finding a
+    // team-mate and winning the ball back under pressure for as long as
+    // they're the one carrying the move forward.
+    const attackTriggerBonus = hasSkill(carrier, 'Attack Trigger') ? 0.025 : 0;
 
     for (let i = 0; i < 2; i++) { // DEF->MID, then MID->ATT
       const fromThird = PITCH_THIRDS[i], toThird = PITCH_THIRDS[i + 1];
@@ -64,7 +69,7 @@
       const passerSkill = passingAbility(carrier);
       const marker = pickPlayer(defTeam, mirrorDefenderPos(targetZone));
       const pressure = marker ? defensivePressure(marker) : 60;
-      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta;
+      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus;
       if (tac === 'attack') passChance -= 0.03;
       if (tac === 'press') passChance -= 0.015;
       if (defTac === 'press') passChance -= 0.05;
@@ -79,7 +84,7 @@
       // ===== Duels phase: even a completed pass can be won back under =====
       // ===== immediate pressure (a 1v1 press right as the ball arrives).
       const duelChance = Math.max(0.35, Math.min(0.95,
-        0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0)));
+        0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0) + attackTriggerBonus));
       if (seededRandom() >= duelChance) {
         resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel');
         return;
@@ -109,12 +114,15 @@
       if (preferred.length) pool = preferred;
     }
     if (!pool.length) return null;
-    // Weight selection toward higher ovr / relevant attrs (mild curve — this
+    // Weight selection toward higher-quality players (mild curve — this
     // path covers secondary events like corners/fouls, so quality should
     // nudge things without dominating the way it does for the main
-    // goal/assist picker above).
+    // goal/assist picker above). Specific attributes (att/tec) outweigh the
+    // single overall number, same principle as the main picker below —
+    // a player's actual finishing/technical ability should matter more than
+    // the one flattened rating.
     const weights = pool.map(p => {
-      const composite = (p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2;
+      const composite = (p.att || 70) * 0.6 + (p.tec || 70) * 0.4 + (p.ovr || 70) * 0.5;
       let w = Math.pow(Math.max(composite, 40) / 92, 1.4) * 92;
       return Math.max(5, w);
     });
@@ -168,8 +176,11 @@
       // a season — like real-world Golden Boot races — without ever reducing
       // a lesser player's chance to zero on any single kick. This is
       // symmetric for every player regardless of club, so it favors quality,
-      // not any particular team.
-      const composite = (p.ovr || 70) * 0.5 + (p.att || 70) * 0.35 + (p.tec || 70) * 0.15;
+      // not any particular team. Att + tec (a player's actual finishing and
+      // technical ability) together outweigh the flat ovr number — a
+      // specialist finisher should out-score a jack-of-all-trades with the
+      // same overall rating, not just whoever has the bigger single number.
+      const composite = (p.att || 70) * 0.45 + (p.tec || 70) * 0.25 + (p.ovr || 70) * 0.30;
       const w = Math.pow(Math.max(composite, 30) / 70, 2.2) * 100 * roleW;
       return Math.max(1, w);
     });

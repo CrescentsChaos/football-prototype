@@ -88,7 +88,25 @@
   function passingAbility(p) {
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.low_pass, p.expandedAttrs.lofted_pass, p.expandedAttrs.ball_con, p.expandedAttrs.tight_pos].filter(v => typeof v === 'number');
-      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35);
+      let bonus = 0;
+      if (hasSkill(p, 'Through Passing')) bonus += 2.5;
+      if (hasSkill(p, 'Weighted Pass')) bonus += 2;
+      if (hasSkill(p, 'Outside Curler')) bonus += 1.5;
+      if (hasSkill(p, 'Low Lofted Pass')) bonus += 1.5;
+      if (hasSkill(p, 'One Touch Pass')) bonus += 2;
+      if (hasSkill(p, 'Heel Trick')) bonus += 1;
+      if (hasSkill(p, 'No Look Pass')) bonus += 1;
+      if (hasSkill(p, 'Rabona')) bonus += 1;
+      if (hasSkill(p, 'Phenomenal Pass')) bonus += 2.5;
+      if (hasSkill(p, 'Visionary Pass')) bonus += 2;
+      if (hasSkill(p, 'Pinpoint Crossing') || hasSkill(p, 'Edged Crossing')) bonus += 1.5;
+      // Game-Changing Pass: sharper distribution specifically when this
+      // player's team needs to force the issue — drawing or losing in the
+      // second half.
+      if (hasSkill(p, 'Game-Changing Pass') && playerTeamTrailingOrDrawingSecondHalf(p)) bonus += 3;
+      if (isActingSuperSub(p)) bonus += 2;
+      return base + bonus;
     }
     return (p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35;
   }
@@ -98,7 +116,14 @@
   function carryingAbility(p) {
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.dribb, p.expandedAttrs.ball_con, p.expandedAttrs.bal, p.expandedAttrs.spd].filter(v => typeof v === 'number');
-      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2);
+      let bonus = 0;
+      if (hasSkill(p, 'Momentum Dribbling')) bonus += 2.5;
+      if (hasSkill(p, 'Magnetic Feet')) bonus += 2.5;
+      if (hasSkill(p, 'Acceleration Burst')) bonus += 2;
+      if (hasSkill(p, 'Attacking Surge')) bonus += 1.5;
+      if (isActingSuperSub(p)) bonus += 1.5;
+      return base + bonus;
     }
     return (p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2;
   }
@@ -143,6 +168,14 @@
     }
     if (!shooter) shooter = carrier;
 
+    // Extra chance-quality edge from the carrier's own passing/crossing
+    // flair on this specific delivery — on top of whatever the eventual
+    // shooter brings to the shot itself (see finishingEdge et al).
+    let creationQualityBonus = 0;
+    if (hasSkill(carrier, 'Visionary Pass') || hasSkill(carrier, 'Phenomenal Pass')) creationQualityBonus += 0.03;
+    if (chanceType === 'cross' && (hasSkill(carrier, 'Pinpoint Crossing') || hasSkill(carrier, 'Edged Crossing'))) creationQualityBonus += 0.04;
+    if (hasSkill(carrier, 'No Look Pass') || hasSkill(carrier, 'Heel Trick') || hasSkill(carrier, 'Rabona')) creationQualityBonus += 0.015;
+
     // A through ball is a genuine forward pass into space beyond the
     // defence — the one chance type actively judged for offside before the
     // shot ever happens. A flag here stops the passage immediately, the
@@ -157,6 +190,6 @@
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
     m.playerMatchStats[shooter.id].shots++;
-    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null });
+    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null, qualityBonus: creationQualityBonus });
   }
 /*@CHUNK:c0215:END*/

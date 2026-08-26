@@ -105,6 +105,12 @@
         const inPlayer = candidates[Math.floor(seededRandom() * Math.min(3, candidates.length))];
         const idx = onPitchIds.indexOf(injured.id);
         if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+        // Inherit the injured player's exact pitch slot (not the bench
+        // player's own natural position, which is what inPlayer.slot still
+        // holds from squad selection) — same fix as the other substitution
+        // paths in engine/tactics.js, and for the same reason: it's what
+        // keeps the pitch rendering's formation-slot matching correct.
+        inPlayer.slot = injured.slot || (injured.pos || ['CM'])[0];
         markLeftPitch(m, side, injured.id);
         resetFatigueFor(m, side, inPlayer.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;

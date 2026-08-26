@@ -27,7 +27,7 @@
       ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
       : `Foul by <span class="player">${fouler.name}</span>`;
 
-    if (nearBox && (forcePenalty || seededRandom() < 0.09)) {
+    if (nearBox && (forcePenalty || seededRandom() < 0.065)) {
       addEvent(m.minute, 'foul', foulText + ' — inside the area!', defendingSide);
       const taker = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], PEN_TAKER_ROLE_WEIGHT) || victim;
       if (taker) {
@@ -65,8 +65,14 @@
       return { outcome: 'penalty' };
     }
 
-    let yellowChance = Math.min(0.72, 0.08 * aggression + (foulCount - 1) * 0.14 + (alreadyYellow ? 0.12 : 0) + (foulCount >= 3 ? 0.12 : 0));
-    const straightRedChance = 0.004 * aggression;
+    // Realistic discipline curve: a single, isolated foul is very rarely
+    // carded (referees give plenty of "just a foul" outcomes) — cards
+    // escalate with genuine repeat/reckless fouling rather than being a
+    // near-coinflip from the first challenge onward. Tuned so a match
+    // produces on the order of 2-4 yellows combined and a red roughly once
+    // every 3-4 matches, matching real-world discipline rates.
+    let yellowChance = Math.min(0.55, 0.045 * aggression + (foulCount - 1) * 0.09 + (alreadyYellow ? 0.10 : 0) + (foulCount >= 3 ? 0.08 : 0));
+    const straightRedChance = 0.0016 * aggression;
     const roll = seededRandom();
     if (roll < straightRedChance && !alreadyYellow) {
       defTeam.stats.reds++;
