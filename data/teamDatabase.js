@@ -17,8 +17,22 @@
       const og1 = document.createElement('optgroup'); og1.label = g.label;
       const og2 = document.createElement('optgroup'); og2.label = g.label;
       g.teams.forEach(t => {
-        og1.appendChild(new Option((t.flag || '') + ' ' + t.name, t.id));
-        og2.appendChild(new Option((t.flag || '') + ' ' + t.name, t.id));
+        // Plain flag+name stays as the native <option> text (used for
+        // screen readers / the hidden fallback <select>) — the searchable
+        // dropdown panel (see enhanceSelect() in ui/matchUI.js) reads these
+        // data attributes instead so it can show the team's actual logo,
+        // falling back to the flag only when no logo is set.
+        const label = (t.flag || '') + ' ' + t.name;
+        const opt1 = new Option(label, t.id);
+        opt1.dataset.logo = t.logo || '';
+        opt1.dataset.flag = t.flag || '';
+        opt1.dataset.name = t.name;
+        const opt2 = new Option(label, t.id);
+        opt2.dataset.logo = t.logo || '';
+        opt2.dataset.flag = t.flag || '';
+        opt2.dataset.name = t.name;
+        og1.appendChild(opt1);
+        og2.appendChild(opt2);
       });
       home.appendChild(og1); away.appendChild(og2);
     });

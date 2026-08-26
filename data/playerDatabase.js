@@ -26,7 +26,7 @@
 
 /*@CHUNK:c0011:START*/
   function attrPosGroup(posArr) {
-    const p = (posArr && posArr[0]) || 'CM';
+    const p = canonPos((posArr && posArr[0]) || 'CM');
     if (p === 'GK') return 'GK';
     if (p === 'CB') return 'CB';
     if (['RB', 'LB', 'RWB', 'LWB'].includes(p)) return 'FB';
@@ -34,8 +34,8 @@
     if (p === 'CM') return 'CM';
     if (p === 'CAM') return 'CAM';
     if (['RM', 'LM'].includes(p)) return 'WIDE_MID';
-    if (['RW', 'LW', 'LWF', 'RWF'].includes(p)) return 'WINGER';
-    if (['ST', 'CF', 'SS'].includes(p)) return 'FWD';
+    if (['RW', 'LW'].includes(p)) return 'WINGER';
+    if (p === 'ST') return 'FWD';
     return 'CM';
   }
 /*@CHUNK:c0011:END*/
@@ -342,6 +342,33 @@
   }
 /*@CHUNK:c0025:END*/
 
+/*@CHUNK:c0025b:START*/
+  // ===== eFootball-style overall boost =====
+  // A flat positional weighted-average (weightedOverall above) treats every
+  // stat as interchangeable, so a genuine standout attribute gets diluted
+  // into the mean instead of standing out — nothing in a plain average can
+  // ever land near the top of the scale. eFootball's overall calc instead
+  // leans the final number toward a player's best stats, so a truly special
+  // attribute pulls the whole rating up with it. OVERALL_BOOST_LEAN controls
+  // how much of the gap between the flat average and the player's peak stat
+  // gets folded back in — 0 would be a pure average (old behavior), 1 would
+  // just be "OVR = best stat". Only expanded-attribute (enhanced) players
+  // run through this; everyone else keeps the plain teams.json number.
+  const OVERALL_BOOST_LEAN = 0.38;
+  const OVERALL_CAP = 100;
+  const OVERALL_FLOOR = 40;
+  // Non-expanded ("regular") players are scaled down relative to the
+  // enhanced/expanded-attribute roster so the boosted players read as
+  // genuinely special rather than everyone converging on the same numbers.
+  const REGULAR_OVR_MULTIPLIER = 0.95;
+
+  function efootballBoostedOverall(derived, posArr) {
+    const flatAvg = weightedOverall(derived, posArr);
+    const peak = Math.max(derived.att, derived.def, derived.pac, derived.phy, derived.tec);
+    return flatAvg + (peak - flatAvg) * OVERALL_BOOST_LEAN;
+  }
+/*@CHUNK:c0025b:END*/
+
 /*@CHUNK:c0028:START*/
 
   // Applies player-attributes.json to every matching player on every team.
@@ -354,11 +381,26 @@
 
 /*@CHUNK:c0029:START*/
   function applyExpandedPlayerAttributes() {
-    if (!playerAttributesData || !Object.keys(playerAttributesData).length) return;
+    const hasExpandedData = !!(playerAttributesData && Object.keys(playerAttributesData).length);
     allTeams.forEach((team) => {
       (team.players || []).forEach((p) => {
-        const rawAttr = playerAttributesData[p.id];
-        if (!rawAttr) return;
+        const rawAttr = hasExpandedData ? playerAttributesData[p.id] : null;
+        if (!rawAttr) {
+          // Regular (non-enhanced) player: no expanded attribute sheet, so
+          // they don't get the eFootball-style peak-stat boost below. To
+          // keep enhanced players reading as genuinely special rather than
+          // everyone converging on similar numbers, regular players are
+          // scaled down a flat 5% off their original teams.json overall.
+          // Always derives from p.rawOvr (captured once at load, before any
+          // system here touches p.ovr) so this can never compound across
+          // repeated calls or save/reload sessions.
+          const source = (typeof p.rawOvr === 'number') ? p.rawOvr : (p.baseOvr || p.ovr || 70);
+          const scaledBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(source * REGULAR_OVR_MULTIPLIER)));
+          p.baseOvr = scaledBase;
+          p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(scaledBase + (p.form || 0))));
+          p.attrBoosted = false;
+          return;
+        }
         const posArr = (rawAttr.pos && rawAttr.pos.length) ? rawAttr.pos : (p.pos || ['CM']);
         const isGK = posArr[0] === 'GK';
         const teamStyle = getManagerPlaystyle(team);
@@ -379,10 +421,14 @@
         // toward their overall here than the generic 5-stat blend alone
         // would give them.
         const signatureBonus = styleSignatureBonus(attr, attr.playstyle, isGK);
-        const base = weightedOverall(derived, posArr) + signatureBonus;
-        const boostedBase = Math.max(40, Math.min(99, base + affinity));
+        // eFootball-style boost: lean the flat weighted average toward the
+        // player's peak stat instead of just averaging it away, then layer
+        // the signature/affinity bonuses on top. Cap raised to 100 (was 99)
+        // so a truly elite enhanced player can actually reach a perfect OVR.
+        const base = efootballBoostedOverall(derived, posArr) + signatureBonus;
+        const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base + affinity)));
         p.baseOvr = boostedBase;
-        p.ovr = Math.max(40, Math.min(99, Math.round(boostedBase + (p.form || 0))));
+        p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(boostedBase + (p.form || 0))));
         p.expandedAttrs = attr;
         p.attrBoosted = true;
         p.affinityBonus = affinity;
@@ -410,8 +456,38 @@
 /*@CHUNK:c0030:END*/
 
 /*@CHUNK:c0031:START*/
+  // player-attributes.json is hand-authored data and carries real-world
+  // inconsistency in how a skill name is spelled/punctuated ("First-time
+  // Shor" instead of "Shot", "GK Direct Throw" instead of "GK Long Throws",
+  // "Long-Range Curler" vs "Long-range Curler", etc). hasSkill() normalizes
+  // both sides of the comparison (lowercase, strip all non-alphanumerics)
+  // so spacing/hyphen/case differences always match, and a small alias
+  // table on top catches the genuine misspellings/synonyms that
+  // normalization alone can't fix. This is the single source of truth every
+  // skill-gated gameplay hook below reads through, so fixing a name here
+  // fixes it everywhere at once.
+  function normSkillKey(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+  const SKILL_NAME_ALIASES = {
+    'firsttimeshor': 'firsttimeshot',
+    'acrobaticclear': 'acrobaticclearance',
+    'acromaticfinishing': 'acrobaticfinishing',
+    'aerialforte': 'aerialfort',
+    'gkdirectthrow': 'gklongthrows',
+    'gklongthrow': 'gklongthrows',
+    'longthrow': 'longthrows',
+    'risingshots': 'risingshot',
+    'longrangeshor': 'longrangeshooting'
+  };
+  function canonSkillKey(s) {
+    const k = normSkillKey(s);
+    return SKILL_NAME_ALIASES[k] || k;
+  }
   function hasSkill(p, skillName) {
-    return !!(p && p.expandedAttrs && (p.expandedAttrs.skills || []).includes(skillName));
+    if (!p || !p.expandedAttrs) return false;
+    const target = canonSkillKey(skillName);
+    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
   }
 /*@CHUNK:c0031:END*/
 
@@ -421,6 +497,50 @@
     return typeof v === 'number' ? v : fallback;
   }
 /*@CHUNK:c0032:END*/
+
+/*@CHUNK:c0032b:START*/
+  // ===== Match-state context helpers for the game-state-gated skills =====
+  // (Fortress, Game-Changing Pass, GK Spirit Roar, Super-Sub) — all of them
+  // key off which side a player is on, whether their team is currently
+  // ahead/behind, and (for Super-Sub) when they came off the bench. Centralized
+  // here so every engine file that needs match-state context reads it the same way.
+  function playerSideData(p) {
+    const m = currentMatch;
+    if (!m || !p) return null;
+    const inHome = ((m.home.squad && m.home.squad.all) || []).some((x) => x.id === p.id);
+    return { m, side: inHome ? m.home : m.away, opp: inHome ? m.away : m.home, sideKey: inHome ? 'home' : 'away' };
+  }
+  function playerTeamLeadingSecondHalf(p) {
+    const ctx = playerSideData(p);
+    if (!ctx || ctx.m.minute < 46) return false;
+    return (ctx.side.score || 0) > (ctx.opp.score || 0);
+  }
+  function playerTeamTrailingOrDrawingSecondHalf(p) {
+    const ctx = playerSideData(p);
+    if (!ctx || ctx.m.minute < 46) return false;
+    return (ctx.side.score || 0) <= (ctx.opp.score || 0);
+  }
+  // True if the goalkeeper currently on pitch for this player's own team has
+  // the given skill (used for GK Directing Defense / GK Spirit Roar, whose
+  // effect is on the team's defenders, not the keeper's own actions).
+  function teamGkHasSkill(p, skillName) {
+    const ctx = playerSideData(p);
+    if (!ctx) return false;
+    const ids = ctx.sideKey === 'home' ? ctx.m.homeOnPitch : ctx.m.awayOnPitch;
+    const gk = ((ctx.side.squad && ctx.side.squad.all) || []).find((x) => ids.includes(x.id) && (x.slot || (x.pos || [])[0]) === 'GK');
+    return !!gk && hasSkill(gk, skillName);
+  }
+  // Super-Sub: only "active" once the player has actually come on as a
+  // substitute in the second half — a starter with the skill on their sheet
+  // gets no bonus from it.
+  function isActingSuperSub(p) {
+    if (!p || !hasSkill(p, 'Super-Sub')) return false;
+    const ctx = playerSideData(p);
+    if (!ctx || !ctx.m.subLog) return false;
+    const log = ctx.m.subLog[ctx.sideKey] && ctx.m.subLog[ctx.sideKey][p.id];
+    return !!(log && log.inMin != null && log.inMin >= 45);
+  }
+/*@CHUNK:c0032b:END*/
 
 /*@CHUNK:c0298:START*/
   function persistPlayerForms() {
