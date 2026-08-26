@@ -1849,7 +1849,15 @@ var App = (() => {
     const live = document.getElementById('match-live');
     if (setup) setup.style.display = 'block';
     if (live) live.style.display = 'none';
-    // Plain Kick Off from Home — not linked to any tournament or season fixture
+    // Plain Kick Off from Home — not linked to any tournament or season fixture.
+    // `tournament` must be cleared here too (not just the fixture-index flags
+    // below): matchCompetitionLabel() checks `tournament` first when labelling
+    // a completed match for the player/team match logs, so a stale tournament
+    // object left over from a previous tournament run (only ever cleared by
+    // resetTournament(), never just by navigating away) caused every
+    // "friendly" match played afterward to be mislabelled with the old
+    // tournament's name instead of falling through to "Friendly".
+    tournament = null;
     window._tourFixtureIdx = null;
     window._uclFixtureIdx = null;
     window._koRoundIdx = null;
