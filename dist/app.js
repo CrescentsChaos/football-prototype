@@ -6006,19 +6006,38 @@ var App = (() => {
         let c = coords[idx] || [50, 50];
         let x = c[0], y = c[1];
         // Collision avoidance: name labels are wider than the dot, so push
-        // apart mostly along x (weighted distance) with a bigger minimum gap
-        // and more iterations than a simple circle-only check. Labels always
-        // sit below the dot (no more flipping above on crowded rows) —
-        // spacing is handled here instead so names don't need to jump around.
-        for (let t = 0; t < 10; t++) {
-          const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 19);
-          if (!hit) break;
-          x += (x >= hit.x ? 1 : -1) * 8 + (t % 2 ? 2 : -2);
-          y += (t % 3 === 0 ? 1 : -1) * 3;
-          x = Math.max(8, Math.min(92, x));
-          y = Math.max(7, Math.min(92, y));
+        // apart when two dots sit too close together (weighted distance,
+        // since labels overflow horizontally more than vertically).
+        //
+        // Two things were wrong with the previous version, and together
+        // they visibly warped most formations' shapes (4-3-3, 4-1-4-1,
+        // every back-three/back-five system, etc.):
+        //  1. It pushed a dot toward/away from whichever neighbor it
+        //     happened to collide with, rather than away from the pitch's
+        //     own center line — for a symmetric formation (e.g. a central
+        //     CDM sitting between two wide CMs) this dragged the CENTER
+        //     player sideways into one teammate's territory instead of
+        //     nudging outward, breaking left/right symmetry.
+        //  2. It also jittered players vertically, which pulled the
+        //     center-back of every back-three formation out of its
+        //     designed deeper "sweeper" spot and flattened the back line.
+        // The fix: only ever push horizontally, and always outward from
+        // pitch-center (x=50) based on the dot's OWN side — so a nudge
+        // preserves the formation's shape/symmetry instead of distorting
+        // it. The goalkeeper is also excluded from the check entirely: it
+        // sits alone at the byline and its designed proximity to a deep
+        // center-back (intentional in back-three systems) was being
+        // mistaken for a dot overlap.
+        if (idx !== 0) {
+          for (let t = 0; t < 8; t++) {
+            const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 16);
+            if (!hit) break;
+            const dir = (x - 50) >= 0 ? 1 : -1;
+            x += dir * 4;
+            x = Math.max(8, Math.min(92, x));
+          }
         }
-        used.push({ x, y });
+        if (idx !== 0) used.push({ x, y });
 
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
         dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
@@ -8386,21 +8405,28 @@ var App = (() => {
   }
 
   function renderTournamentPodium() {
+    // Lives inside the "Tournament Stats" card (#tour-leaderboard-mini),
+    // above the awards row, rather than as its own block above the bracket
+    // — keeps every end-of-tournament summary (standings, awards, stat
+    // leaders) together in one place instead of scattered across the page.
     let el = document.getElementById('tour-podium');
     if (!el) {
-      const bracket = document.getElementById('bracket');
-      if (bracket) {
+      const statsCard = document.getElementById('tour-leaderboard-mini');
+      const awards = document.getElementById('tour-awards');
+      if (statsCard) {
         el = document.createElement('div');
         el.id = 'tour-podium';
-        bracket.parentNode.insertBefore(el, bracket);
+        if (awards) statsCard.insertBefore(el, awards);
+        else statsCard.appendChild(el);
       }
     }
     if (!el || !tournament || !tournament.champion) return;
     const first = tournament.champion;
     const second = tournament.runnersUp;
     const third = tournament.thirdPlace;
+    const tName = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
     el.innerHTML = `
-      <div class="card-title">Final Standings</div>
+      <div class="card-title">${trophyMark(tName, 28)} Final Standings</div>
       <div class="podium">
         <div class="podium-place">
           <div class="place-num">2</div>
@@ -8575,6 +8601,7 @@ var App = (() => {
       assignTournamentAwards();
       renderTournamentAwards();
       renderTournamentLeaderboard();
+      if (tournament.champion) renderTournamentPodium();
     } catch (e) { console.warn(e); }
   }
 
@@ -11167,6 +11194,22 @@ try { window.App = App; } catch (e) {}
     return items;
   }
 
+  // Local mirror of teamMark() (defined inside the main App closure in
+  // ui/playerUI.js, and NOT reachable from this separate IIFE — calling the
+  // real teamMark() here throws "teamMark is not defined" and silently
+  // aborts renderOptions(), which is why searching/opening the team
+  // dropdowns showed no results at all). Kept intentionally identical to
+  // teamMark()'s output (logo image with flag-emoji fallback) so the two
+  // never visually diverge.
+  function ssTeamMark(logo, flag, size) {
+    size = size || 22;
+    const f = flag || '⚽';
+    if (logo) {
+      const src = 'assets/logos/' + logo;
+      return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px"><img src="${src}" alt="" loading="lazy" onerror="this.parentElement.textContent='${f}'"></span>`;
+    }
+    return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px">${f}</span>`;
+  }
   function enhanceSelect(select) {
     if (!select || select.dataset.ssEnhanced || select.closest('.ss-wrap')) return;
     select.dataset.ssEnhanced = '1';
@@ -11224,7 +11267,7 @@ try { window.App = App; } catch (e) {}
         // else in the app, via teamMark()) instead of just the flag
         // character baked into the plain option text.
         const rowLabel = isTeamSelect
-          ? `${teamMark({ logo: i.logo, flag: i.flag }, 18)} <span>${i.name || i.label}</span>`
+          ? `${ssTeamMark(i.logo, i.flag, 18)} <span>${i.name || i.label}</span>`
           : i.label;
         html += `<div class="ss-option${sel}" data-value="${String(i.value).replace(/"/g, '&quot;')}" role="option">${rowLabel}</div>`;
       });
