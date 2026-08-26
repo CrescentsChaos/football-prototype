@@ -80,32 +80,140 @@
 /*@CHUNK:c0314:END*/
 
 /*@CHUNK:c0315:START*/
-  function computeBallonRanking(statsSource) {
-    const src = statsSource || stats;
-    const MIN_APPS = BALLON_MIN_APPS;
+
+  // Holistic "best player" scoring shared by the Ballon d'Or ranking (season/
+  // global `stats`) and the tournament Golden Ball (`tournamentStats`) — a
+  // real MVP vote isn't just "who scored/rated highest", it weighs where
+  // those numbers came from. Folds in:
+  //  - individual statistics: raw production (goals/assists/MOTM/saves/
+  //    clean sheets/Puskas contenders) plus overall match rating quality.
+  //  - domestic performance: rating quality sustained across a league campaign.
+  //  - continental performance: the season's Champions League run (or a
+  //    standalone Champions League tournament), weighted above domestic
+  //    since continental football carries more real-world Ballon d'Or weight.
+  //  - international performance: a World Cup run, weighted highest of all —
+  //    a big international tournament moves the needle more than a single
+  //    club season ever does.
+  //  - trophies: lifting a league title, continental trophy, or international
+  //    trophy with the squad that season, plus a small nod to past individual
+  //    silverware (established quality/reputation).
+  //  - consistency: low match-to-match rating variance at a genuinely good
+  //    level, not just one or two standout performances propping up an average.
+  //  - big games: how a player performed specifically in knockout-stage/final
+  //    fixtures and clashes against other top sides, not just accumulated bulk.
+  function computeContextualPlayerScores(baseStats, minApps) {
+    const src = baseStats || stats;
+    const MIN_APPS = minApps || BALLON_MIN_APPS;
     const scores = {};
     const ensure = (p) => {
-      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0 };
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, pts: 0, goals: 0, assists: 0, motm: 0, avg: 0, apps: 0, noms: 0, trophyPts: 0, consistency: 0, bigGamePts: 0 };
       return scores[p.id];
     };
+
+    // ---- Individual statistics ----
     Object.values(src.ratings || {}).forEach(p => {
       const e = ensure(p);
       e.apps = p.count || 0;
       e.avg = p.avg || 0;
     });
-    Object.values(src.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 4; });
-    Object.values(src.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.5; });
-    Object.values(src.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 5; });
-    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.35; });
-    Object.values(src.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 2; });
-    Object.values(src.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.5; });
+    Object.values(src.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 3.2; });
+    Object.values(src.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.1; });
+    Object.values(src.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 3.6; });
+    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.3; });
+    Object.values(src.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.6; });
+    Object.values(src.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.2; });
     Object.values(scores).forEach(e => {
-      if (e.apps >= MIN_APPS && e.avg > 0) {
-        e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
-      } else if (e.apps > 0 && e.apps < MIN_APPS) {
-        e.pts += e.avg * 0.15;
+      if (e.apps >= MIN_APPS && e.avg > 0) e.pts += e.avg * Math.min(e.apps, 15) * 0.65;
+      else if (e.apps > 0 && e.apps < MIN_APPS) e.pts += e.avg * 0.12;
+    });
+
+    // ---- Domestic performance (league campaign quality) ----
+    if (season && Array.isArray(season.leagues)) {
+      season.leagues.forEach(lg => {
+        if (!lg.stats) return;
+        Object.values(lg.stats.ratings || {}).forEach(p => {
+          const e = ensure(p);
+          if (p.count >= 3 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 20) * 0.35;
+        });
+        Object.values(lg.stats.goals || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.6; });
+        Object.values(lg.stats.assists || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.4; });
+      });
+    }
+
+    // ---- Continental performance (season UCL run, or a standalone UCL tournament) ----
+    if (season && season.ucl && season.ucl.stats) {
+      Object.values(season.ucl.stats.ratings || {}).forEach(p => {
+        const e = ensure(p);
+        if (p.count >= 2 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 13) * 0.55;
+      });
+      Object.values(season.ucl.stats.goals || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.3; });
+      Object.values(season.ucl.stats.assists || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.9; });
+    }
+    if (tournament && tournament.type === 'ucl' && tournamentStats && tournamentStats !== src) {
+      Object.values(tournamentStats.ratings || {}).forEach(p => {
+        const e = ensure(p);
+        if (p.count >= 2 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 13) * 0.55;
+      });
+    }
+
+    // ---- International performance (World Cup — highest single-tournament weight) ----
+    if (tournament && tournament.type === 'worldcup' && tournamentStats) {
+      Object.values(tournamentStats.ratings || {}).forEach(p => {
+        const e = ensure(p);
+        if (p.count >= 2 && p.avg > 0) e.pts += p.avg * Math.min(p.count, 7) * 0.9;
+      });
+      Object.values(tournamentStats.goals || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.6; });
+      Object.values(tournamentStats.assists || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.1; });
+    }
+
+    // ---- Big games (knockout-stage/final fixtures and top-vs-top clashes) ----
+    const bigGameSources = [
+      src.bigGames,
+      season && season.ucl && season.ucl.stats && season.ucl.stats.bigGames,
+      tournamentStats && tournamentStats !== src && tournamentStats.bigGames
+    ];
+    bigGameSources.forEach(bg => {
+      if (!bg) return;
+      Object.values(bg).forEach(p => {
+        const e = ensure(p);
+        if (p.count > 0 && p.avg > 0) { e.pts += p.avg * Math.min(p.count, 10) * 0.5; e.bigGamePts = Math.round(e.bigGamePts + p.avg * Math.min(p.count, 10) * 0.5); }
+      });
+    });
+
+    // ---- Trophies (team success this season/tournament + individual pedigree) ----
+    Object.values(scores).forEach(e => {
+      const aff = findPlayerTeams(e.id) || {};
+      let trophyPts = 0;
+      if (season && Array.isArray(season.leagues)) {
+        season.leagues.forEach(lg => { if (lg.champion && aff.club === lg.champion.name) trophyPts += 3; });
+        if (season.ucl && season.ucl.champion && aff.club === season.ucl.champion.name) trophyPts += 5;
+      }
+      if (tournament && tournament.champion) {
+        if (tournament.type === 'worldcup' && aff.national === tournament.champion.name) trophyPts += 6;
+        if (tournament.type === 'ucl' && aff.club === tournament.champion.name) trophyPts += 5;
+      }
+      const pastIndividual = (trophies || []).filter(t => t.player === e.name).length;
+      trophyPts += Math.min(pastIndividual, 5) * 0.4;
+      e.pts += trophyPts;
+      e.trophyPts = Math.round(trophyPts * 10) / 10;
+    });
+
+    // ---- Consistency (steady quality across recent appearances, not one hot streak) ----
+    Object.values(scores).forEach(e => {
+      const rEntry = (src.ratings || {})[e.id];
+      const recent = rEntry && rEntry.recent;
+      if (recent && recent.length >= 5) {
+        const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
+        const variance = recent.reduce((a, b) => a + (b - mean) * (b - mean), 0) / recent.length;
+        const stdev = Math.sqrt(variance);
+        const consistencyBonus = mean >= 6.3 ? Math.max(0, 2.4 - stdev) * 1.1 : 0;
+        e.pts += consistencyBonus;
+        e.consistency = Math.round(consistencyBonus * 10) / 10;
       }
     });
+
+    // ---- Award-show nomination bonus: a genuine contender shows up across ----
+    // ---- multiple individual categories, not just one ----
     const awardLeaders = {
       goldenboot: new Set(Object.values(src.goals || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
       assists: new Set(Object.values(src.assists || {}).sort((a,b)=>b.count-a.count).slice(0,50).map(p=>p.id)),
@@ -117,14 +225,24 @@
       let noms = 0;
       Object.values(awardLeaders).forEach(set => { if (set.has(e.id)) noms++; });
       e.noms = noms;
-      if (noms >= 2) e.pts += (noms - 1) * 1.4;
+      if (noms >= 2) e.pts += (noms - 1) * 1.2;
     });
+
+    return scores;
+  }
+/*@CHUNK:c0315:END*/
+
+/*@CHUNK:c0315b:START*/
+  function computeBallonRanking(statsSource) {
+    const src = statsSource || stats;
+    const MIN_APPS = BALLON_MIN_APPS;
+    const scores = computeContextualPlayerScores(src, MIN_APPS);
     return Object.values(scores)
       .filter(p => p.pts > 0 && (p.apps >= MIN_APPS || p.goals + p.assists + p.motm >= 3))
       .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
       .slice(0, 50);
   }
-/*@CHUNK:c0315:END*/
+/*@CHUNK:c0315b:END*/
 
 /*@CHUNK:c0316:START*/
 
@@ -148,12 +266,12 @@
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {} };
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
     // otherwise this would wipe that tournament's own live leaderboard mid-run.
     if (!tournament || tournament.champion) {
-      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
     }
     saveStats();
   }
@@ -229,6 +347,7 @@
       ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
       ok = safeSetItem('apexPlayerMatchLog', JSON.stringify(playerMatchLog)) && ok;
+      ok = safeSetItem('apexTeamMatchLog', JSON.stringify(teamMatchLog)) && ok;
     } catch(e) { ok = false; }
     return ok;
   }
@@ -250,6 +369,8 @@
       if (md) globalMatchDay = parseInt(md, 10) || 1;
       const pml = localStorage.getItem('apexPlayerMatchLog');
       if (pml) playerMatchLog = JSON.parse(pml);
+      const tml = localStorage.getItem('apexTeamMatchLog');
+      if (tml) teamMatchLog = JSON.parse(tml);
     } catch(e) {}
   }
 /*@CHUNK:c0326:END*/
@@ -330,13 +451,13 @@
     const live = document.getElementById('tournament-live');
     if (setup) setup.style.display = 'none';
     if (live) live.style.display = 'block';
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || TOURNAMENT_FORMATS.worldcup;
     const title = document.getElementById('tournament-title');
     const desc = document.getElementById('tournament-desc');
-    const isWC = tournamentType === 'worldcup';
-    if (title) title.textContent = isWC ? 'World Cup Setup' : 'Champions League Setup';
-    if (desc) desc.textContent = isWC
-      ? 'Select national teams. Supports groups (up to 48 teams, World Cup style).'
-      : 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.';
+    if (title) title.textContent = cfg.name + ' Setup';
+    if (desc) desc.textContent = cfg.desc;
+    const select = document.getElementById('tour-format-select');
+    if (select) select.value = tournamentType;
     try {
       if (tournament.format === 'league') { renderUCLLeague(); renderUCLFixtures(); }
       else { renderGroups(); }
@@ -464,6 +585,7 @@
       data.apexMatchDay = String(globalMatchDay);
       data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
       data.apexPlayerMatchLog = JSON.stringify(playerMatchLog);
+      data.apexTeamMatchLog = JSON.stringify(teamMatchLog);
     } catch (e) {}
     return data;
   }
@@ -922,7 +1044,7 @@
       stats: blankCompStats()
     };
 
-    season = { year: 1, week: 0, leagues, ucl };
+    season = { year: 1, week: 0, daySlot: 0, leagues, ucl };
     seasonActiveTab = 'epl';
     seasonActiveSubTab = 'table';
     renderSeasonDashboard();
@@ -1066,11 +1188,23 @@
 /*@CHUNK:c0547:START*/
   function computeSeasonWeek(s) {
     if (!s || !s.leagues) return 0;
-    const rounds = seasonCompEntries(s).map(({ comp }) => {
-      if (!comp) return 0;
-      return comp.finished ? comp.rounds.length : comp.currentRound;
+    // A finished competition's currentRound stops moving forever, and so
+    // does the UCL's once it leaves its league phase for the knockout
+    // bracket (progress from there is tracked via the bracket, not
+    // currentRound) — neither should ever act as a floor on the
+    // season-wide matchday count, or the very first competition to reach
+    // either state permanently freezes every other competition that's
+    // still progressing.
+    const active = seasonCompEntries(s).filter(({ key, comp }) => {
+      if (!comp || comp.finished) return false;
+      if (key === 'ucl' && comp.stage !== 'league') return false;
+      return true;
     });
-    return rounds.length ? Math.min(...rounds) : 0;
+    if (!active.length) {
+      const finalRounds = seasonCompEntries(s).map(({ comp }) => comp ? comp.rounds.length : 0);
+      return finalRounds.length ? Math.max(...finalRounds) : 0;
+    }
+    return Math.min(...active.map(({ comp }) => comp.currentRound));
   }
 /*@CHUNK:c0547:END*/
 
@@ -1113,11 +1247,30 @@
 /*@CHUNK:c0547d:START*/
   // Whether `comp` is allowed to simulate/play a fixture right now — false
   // if it has already completed the current global matchday and is simply
-  // waiting on slower competitions to catch up before the day can turn over.
+  // waiting on slower competitions to catch up before the day can turn over,
+  // OR if today's fixture-congestion slot belongs to a different competition
+  // (e.g. it's a UCL day, so the domestic leagues sit idle until the cycle
+  // comes back round to them).
   function seasonCompCanPlayNow(key, comp) {
     if (!season || !comp || comp.finished) return false;
     if (key === 'ucl' && comp.stage !== 'league') return true;
+    const slot = currentCongestionSlot();
+    if (!seasonKeysForCongestionComp(slot.comp).includes(key)) return false;
     return comp.currentRound <= computeSeasonWeek(season);
+  }
+
+  // Human-readable reason a fixture can't be played right now, for the
+  // toasts in simSeasonFixture/playSeasonFixture — distinguishes "it's not
+  // this competition's day yet" from "the matchday itself isn't finished".
+  function seasonBlockedFixtureMessage(compKey) {
+    const slot = currentCongestionSlot();
+    const eligible = seasonKeysForCongestionComp(slot.comp);
+    if (!eligible.includes(compKey)) {
+      return "It's " + slot.day + " — " + slot.comp + " fixtures only today. Simulate today's matches first to move on.";
+    }
+    const due = seasonMatchesDue();
+    return 'Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
+      due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first';
   }
 /*@CHUNK:c0547d:END*/
 
@@ -1169,7 +1322,7 @@
     // Keep the season-wide Matchday counter in sync — this is the fix for
     // live/instant single-fixture play never advancing it (only the bulk
     // "Simulate Matchday" actions used to update it directly).
-    if (season) season.week = computeSeasonWeek(season);
+    if (season) { season.week = computeSeasonWeek(season); advanceCongestionSlotIfComplete(); }
     finalizeSeasonIfComplete();
   }
 /*@CHUNK:c0549:END*/
@@ -1186,9 +1339,7 @@
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
-      const due = seasonMatchesDue();
-      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
-        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
+      toast(seasonBlockedFixtureMessage(compKey));
       return;
     }
     const round = comp.rounds[comp.currentRound];
@@ -1226,9 +1377,7 @@
     const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
-      const due = seasonMatchesDue();
-      toast('Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
-        due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first');
+      toast(seasonBlockedFixtureMessage(compKey));
       return;
     }
     const round = comp.rounds[comp.currentRound];
@@ -1290,11 +1439,20 @@
       // UCL, moved into its knockout stage) is left alone so the day only
       // turns over once literally everything due has been played.
       const targetIdx = computeSeasonWeek(season);
+      const eligibleKeys = new Set(seasonKeysForCongestionComp(currentCongestionSlot().comp));
       seasonCompEntries().forEach(({ key, comp }) => {
+        if (!comp || comp.finished) return;
+        // Knockout ties (QF/SF/Final) are one-off weeks outside the normal
+        // matchday cadence and congestion cycle entirely, so they must be
+        // checked — and simulated — before the matchday/congestion gates
+        // below, not filtered out by them.
+        if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); return; }
         if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+        if (!eligibleKeys.has(key)) return; // not today's competition
         if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
       });
       season.week = computeSeasonWeek(season);
+      advanceCongestionSlotIfComplete();
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
       persistAll();
@@ -1310,22 +1468,45 @@
 /*@CHUNK:c0559:START*/
   function simulateSeasonToEnd() {
     if (!season) return;
-    withLoading('Simulating rest of season…', function() {
+    // Rough denominator for the progress bar: the most matchdays any single
+    // still-active competition has left. Not exact (competitions advance at
+    // different rates and some weeks skip a competition entirely), but a
+    // reasonable estimate that self-corrects as remaining rounds shrink.
+    const estimatedWeeks = Math.max(1, ...seasonCompEntries()
+      .map(({ comp }) => (comp && !comp.finished) ? Math.max(0, comp.rounds.length - comp.currentRound) : 0));
+    withLoadingProgress('Simulating rest of season…', async function() {
       let safety = 0;
+      const startTime = Date.now();
+      // "Simulate to End" fast-forwards past the fixture-congestion cadence
+      // on purpose — it's a bulk skip-ahead action, not a day-by-day play
+      // session, so every competition due for the matchday plays regardless
+      // of whose day it is in the congestion cycle.
       while (!seasonIsComplete() && safety < 1000) {
         const targetIdx = computeSeasonWeek(season);
         let playedSomething = false;
         seasonCompEntries().forEach(({ key, comp }) => {
+          if (!comp || comp.finished) return;
+          // Knockout ties must be checked — and simulated — before the
+          // matchday gate below, since seasonCompDoneWithMatchday treats
+          // them as "done with the matchday" (correctly, so they don't
+          // block the domestic leagues) but that's not the same as "don't
+          // simulate them"; without this they'd never advance in a bulk
+          // sim and the season would never actually finish.
+          if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); playedSomething = true; return; }
           if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
           if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
           playedSomething = true;
         });
         season.week = computeSeasonWeek(season);
         safety++;
+        updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
+        await simTick();
         // Safety valve: if a pass through every competition made no
         // progress at all, stop rather than spin forever.
         if (!playedSomething) break;
       }
+      updateLoadingProgress(estimatedWeeks, estimatedWeeks, startTime);
+      advanceCongestionSlotIfComplete();
       finalizeSeasonIfComplete();
       renderSeasonDashboard();
       persistAll();
@@ -1362,7 +1543,7 @@
     const uclRounds = [];
     for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
     season = {
-      year, week: 0, leagues,
+      year, week: 0, daySlot: 0, leagues,
       ucl: { key: 'ucl', name: 'Champions League', teams: uclTeams, table: uclTeams.map(blankSeasonRow),
         rounds: uclRounds, currentRound: 0, matchesPerTeam, stage: 'league', bracketSize: null,
         knockout: { qf: null, sf: null, final: null }, champion: null, finished: false,

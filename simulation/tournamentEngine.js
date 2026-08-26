@@ -5,17 +5,24 @@
 /*@CHUNK:c0359:START*/
   function startTournament() {
     const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
-    if (selected.length < 4) { toast('Select at least 4 teams'); return; }
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || TOURNAMENT_FORMATS.worldcup;
+    // Straight-knockout formats (domestic cups, Super Cups) only need a
+    // power-of-2 field as small as 2 (a one-off Super Cup match); every
+    // other engine still needs the original minimum of 4.
+    const minTeams = cfg.engine === 'knockout' ? 2 : 4;
+    if (selected.length < minTeams) { toast('Select at least ' + minTeams + ' teams'); return; }
 
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
 
-    if (tournamentType === 'ucl') {
+    if (cfg.engine === 'league') {
       startUCLTournament(selected);
+    } else if (cfg.engine === 'knockout') {
+      startKnockoutTournament(selected);
     } else {
       startWorldCupTournament(selected);
     }
@@ -40,7 +47,9 @@
     // Prefer 36; if fewer, use largest even count >= 8 (scale format)
     if (teams.length >= 36) teams = teams.slice(0, 36);
     else if (teams.length % 2 === 1) teams = teams.slice(0, teams.length - 1);
-    if (teams.length < 8) { toast('Champions League needs at least 8 clubs (36 ideal)'); return; }
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
+    const compName = cfg.name || 'Champions League';
+    if (teams.length < 8) { toast(compName + ' needs at least 8 clubs (36 ideal)'); return; }
 
     const league = teams.map(t => ({
       team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
@@ -59,7 +68,9 @@
       knockout: [],
       groups: [],
       champion: null,
-      matchesPerTeam
+      matchesPerTeam,
+      competition: tournamentType,
+      competitionName: compName
     };
 
     renderUCLLeague();
@@ -69,7 +80,7 @@
     if (bracket) bracket.innerHTML = '<p style="color:var(--text-muted)">Playoffs & knockout appear after the league phase.</p>';
     const btn = document.getElementById('btn-sim-round');
     if (btn) btn.textContent = 'Simulate League Round';
-    toast('UCL league phase: ' + teams.length + ' teams, ' + fixtures.length + ' matches');
+    toast(compName + ' league phase: ' + teams.length + ' teams, ' + fixtures.length + ' matches');
   }
 /*@CHUNK:c0363:END*/
 
@@ -342,11 +353,11 @@
 /*@CHUNK:c0389:START*/
   function simAllTournament() {
     if (!tournament) return;
-    withLoading('Simulating full tournament…', function() {
-      _simAllTournamentWork();
+    withLoadingProgress('Simulating full tournament…', async function() {
+      await _simAllTournamentWork();
       // setChampion()/simPlayoffTie() already persist on the paths that hit
       // them, but not every branch above does (e.g. group-stage fixtures
-      // simulated directly in the forEach) — persist unconditionally so a
+      // simulated directly in the loop) — persist unconditionally so a
       // full-tournament bulk sim is always saved immediately.
       persistAll();
       saveStats();
@@ -356,30 +367,50 @@
 
 /*@CHUNK:c0390:START*/
 
+  // Rough remaining-match count for a single-elimination bracket, used only
+  // to size the "Simulate All" progress bar denominator — counts the
+  // current round's unplayed ties plus a geometric estimate of every round
+  // still to come (N + N/2 + N/4 + … + 1).
+  function estimateRemainingKnockoutMatches(knockout) {
+    if (!knockout || !knockout.length) return 0;
+    const round = knockout[knockout.length - 1];
+    let n = (round && round.matches) ? round.matches.filter(m => !m.played && m.home && m.away).length : 0;
+    let total = 0;
+    while (n >= 1) { total += n; if (n === 1) break; n = Math.floor(n / 2); }
+    return total;
+  }
 /*@CHUNK:c0390:END*/
 
 /*@CHUNK:c0391:START*/
-  function _simAllTournamentWork() {
+  async function _simAllTournamentWork() {
     if (!tournament) return;
     const updateLoading = (msg) => {
       const t = document.getElementById('loading-text');
       if (t) t.textContent = msg;
     };
+    const startTime = Date.now();
+    let done = 0;
 
     // ========== UCL / League format ==========
     if (tournament.format === 'league' || tournament.type === 'ucl') {
+      const unplayedFixtures = (tournament.fixtures || []).filter(f => !f.played);
+      const unplayedPlayoff = (tournament.playoff || []).filter(p => !p.played);
+      const total = unplayedFixtures.length + unplayedPlayoff.length
+        + estimateRemainingKnockoutMatches(tournament.knockout);
+      updateLoadingProgress(0, Math.max(total, 1), startTime);
+
       updateLoading('Simulating league phase…');
-      (tournament.fixtures || []).forEach((f) => {
-        if (f.played) return;
+      for (const f of unplayedFixtures) {
         const home = getTeam(f.home), away = getTeam(f.away);
-        if (!home || !away) return;
+        if (!home || !away) continue;
         const result = simQuickMatch(home, away, { countForLeaderboard: true });
         f.played = true;
         f.homeScore = result.home;
         f.awayScore = result.away;
         f.report = result.report;
         applyLeagueResult(f.home, f.away, result.home, result.away);
-      });
+        done++; updateLoadingProgress(done, total, startTime); await simTick();
+      }
 
       if (tournament.stage === 'league' || !tournament.playoff) {
         try { advanceUCLFromLeague(); } catch (e) { console.warn(e); }
@@ -387,11 +418,12 @@
 
       updateLoading('Simulating playoffs…');
       if (tournament.playoff && tournament.playoff.length) {
-        tournament.playoff.forEach((p, i) => {
-          if (!p.played) {
+        for (let i = 0; i < tournament.playoff.length; i++) {
+          if (!tournament.playoff[i].played) {
             try { simPlayoffTie(i); } catch (e) { console.warn(e); }
+            done++; updateLoadingProgress(done, total, startTime); await simTick();
           }
-        });
+        }
         if (tournament.stage === 'playoff' || tournament.playoff.every(p => p.played)) {
           try { finishUCLPlayoffs(); } catch (e) { console.warn(e); }
         }
@@ -406,11 +438,12 @@
         if (!round || !round.matches) break;
         const isFinal = round.name === 'Final' || round.matches.length === 1;
 
-        round.matches.forEach((m) => {
-          if (m.played || !m.home || !m.away) return;
+        for (const m of round.matches) {
+          if (m.played || !m.home || !m.away) continue;
           if (isFinal || m.twoLeg === false) simSingleFinal(m);
           else simTwoLegTie(m);
-        });
+          done++; updateLoadingProgress(done, total, startTime); await simTick();
+        }
 
         // If any still unplayed, stop this iteration
         if (round.matches.some(m => !m.played && m.home && m.away)) break;
@@ -451,6 +484,7 @@
         }
       }
 
+      updateLoadingProgress(Math.max(total, 1), Math.max(total, 1), startTime);
       assignTournamentAwards();
       try { renderUCLLeague(); } catch (e) {}
       try { renderBracket(); } catch (e) {}
@@ -458,7 +492,7 @@
       if (tournament.champion) {
         const stageTitle = document.getElementById('tour-stage-title');
         if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
-        toast(tournament.champion.name + ' win the Champions League!');
+        toast(tournament.champion.name + ' win the ' + (tournament.competitionName || 'Champions League') + '!');
       } else {
         toast('Tournament simulation finished');
       }
@@ -466,28 +500,41 @@
     }
 
     // ========== World Cup path ==========
+    const unplayedGroupFixtures = (tournament.fixtures || []).filter(f => !f.played);
+    // Knockout bracket doesn't exist yet at this point (it's built by
+    // advanceToKnockout() once groups finish), so estimate its match count
+    // from the qualifier count instead: a single-elim bracket of Q teams
+    // plays exactly Q-1 matches.
+    const qualifierEstimate = tournament.knockout && tournament.knockout.length
+      ? 0 : (tournament.groups || []).length * 2;
+    const knockoutEstimate = tournament.knockout && tournament.knockout.length
+      ? estimateRemainingKnockoutMatches(tournament.knockout)
+      : Math.max(0, qualifierEstimate - 1);
+    const total = unplayedGroupFixtures.length + knockoutEstimate;
+    updateLoadingProgress(0, Math.max(total, 1), startTime);
+
     updateLoading('Simulating group stage…');
-    (tournament.fixtures || []).forEach((f) => {
-      if (f.played) return;
+    for (const f of unplayedGroupFixtures) {
       const home = getTeam(f.home), away = getTeam(f.away);
-      if (!home || !away) return;
+      if (!home || !away) continue;
       const result = simQuickMatch(home, away, { countForLeaderboard: true });
       f.played = true;
       f.homeScore = result.home;
       f.awayScore = result.away;
       f.report = result.report;
       const g = tournament.groups && tournament.groups[f.group];
-      if (!g) return;
+      done++; updateLoadingProgress(done, total, startTime); await simTick();
+      if (!g) continue;
       const ht = g.teams.find(t => t.team.id === f.home);
       const at = g.teams.find(t => t.team.id === f.away);
-      if (!ht || !at) return;
+      if (!ht || !at) continue;
       ht.played++; at.played++;
       ht.gf += result.home; ht.ga += result.away;
       at.gf += result.away; at.ga += result.home;
       if (result.home > result.away) { ht.won++; ht.pts += 3; at.lost++; }
       else if (result.away > result.home) { at.won++; at.pts += 3; ht.lost++; }
       else { ht.drawn++; at.drawn++; ht.pts++; at.pts++; }
-    });
+    }
 
     if (!tournament.champion && tournament.stage !== 'knockout' && tournament.stage !== 'complete') {
       updateLoading('Advancing to knockout…');
@@ -503,8 +550,8 @@
       const round = tournament.knockout[ri];
       if (!round || !round.matches) break;
 
-      round.matches.forEach((m) => {
-        if (m.played || !m.home || !m.away) return;
+      for (const m of round.matches) {
+        if (m.played || !m.home || !m.away) continue;
         const result = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true, countForLeaderboard: true });
         m.homeScore = result.home;
         m.awayScore = result.away;
@@ -519,7 +566,8 @@
           m.penalties = true;
           m.winner = seededRandom() < 0.5 ? m.home : m.away;
         }
-      });
+        done++; updateLoadingProgress(done, total, startTime); await simTick();
+      }
 
       if (round.matches.some(m => m.home && m.away && !m.played)) break;
 
@@ -551,6 +599,7 @@
       }
     }
 
+    updateLoadingProgress(Math.max(total, 1), Math.max(total, 1), startTime);
     tournament.stage = tournament.champion ? 'complete' : (tournament.knockout && tournament.knockout.length ? 'knockout' : tournament.stage);
     assignTournamentAwards();
     try { renderGroups(); } catch (e) {}
@@ -1137,7 +1186,7 @@
       }
     }
     assignTournamentAwards();
-    const tName = tournament.type === 'worldcup' ? 'World Cup' : 'Champions League';
+    const tName = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
     const runExtra = { category: 'tournament', run: tournament._runId || Date.now() };
     pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
     pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
@@ -1168,40 +1217,14 @@
       .filter(x => (x.count || 0) > 0)
       .sort((a,b) => b.avg - a.avg || b.count - a.count);
 
-    // Golden Ball: a composite of G+A, average rating, MOTM count and "award show"
-    // presence across the other individual categories — not rating alone — so a
-    // quiet-but-consistent passer can't out-rank a genuine standout performer.
-    const goldenScores = {};
-    const ensureG = (p) => {
-      if (!goldenScores[p.id]) goldenScores[p.id] = { id: p.id, name: p.name, team: p.team, count: 0, avg: 0, apps: 0, pts: 0, goals: 0, assists: 0, motm: 0 };
-      return goldenScores[p.id];
-    };
-    goals.forEach(p => { const e = ensureG(p); e.goals = p.count; e.pts += p.count * 4; });
-    assists.forEach(p => { const e = ensureG(p); e.assists = p.count; e.pts += p.count * 2.5; });
-    motm.forEach(p => { const e = ensureG(p); e.motm = p.count; e.pts += p.count * 5; });
-    cleanSheets.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
-    puskas.forEach(p => { const e = ensureG(p); e.pts += p.count * 1.5; });
-    Object.values(tournamentStats.ratings || {}).forEach(p => {
-      const e = ensureG(p);
-      e.apps = p.count || 0;
-      e.avg = p.avg || 0;
-      if (e.apps >= 3 && e.avg > 0) e.pts += e.avg * Math.min(e.apps, 15) * 0.9;
-      else if (e.apps > 0) e.pts += e.avg * 0.15;
-    });
-    // Award-show-appearance bonus: nominee across multiple individual tournament awards
-    const topSets = {
-      goldenboot: new Set(goals.slice(0,10).map(p=>p.id)),
-      assists: new Set(assists.slice(0,10).map(p=>p.id)),
-      motm: new Set(motm.slice(0,10).map(p=>p.id)),
-      glove: new Set(saves.slice(0,10).map(p=>p.id)),
-      puskas: new Set(puskas.slice(0,10).map(p=>p.id))
-    };
-    Object.values(goldenScores).forEach(e => {
-      let noms = 0;
-      Object.values(topSets).forEach(set => { if (set.has(e.id)) noms++; });
-      if (noms >= 2) e.pts += (noms - 1) * 1.4;
-      e.count = Math.round(e.pts);
-    });
+    // Golden Ball: the same holistic "best player" scoring as the Ballon
+    // d'Or (domestic/continental/international context, trophies, consistency,
+    // big-game performances) run against this tournament's own stat bucket —
+    // not just G+A and average rating, so a quiet-but-consistent passer can't
+    // out-rank a genuine standout, and a genuine standout still needs more
+    // than one big night to top a player who was excellent throughout.
+    const goldenScores = computeContextualPlayerScores(tournamentStats, 3);
+    Object.values(goldenScores).forEach(e => { e.count = Math.round(e.pts); });
     const goldenBallData = Object.values(goldenScores)
       .filter(e => e.pts > 0 && (e.apps >= 3 || e.goals + e.assists + e.motm >= 3))
       .sort((a,b) => b.pts - a.pts || b.apps - a.apps);

@@ -20,7 +20,11 @@
         }))
       });
     }
-    tournament = { type: 'worldcup', format: 'groups', groups, knockout: [], stage: 'groups', fixtures: [], champion: null, playoff: [] };
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
+    tournament = {
+      type: 'worldcup', format: 'groups', groups, knockout: [], stage: 'groups', fixtures: [], champion: null, playoff: [],
+      competition: tournamentType, competitionName: cfg.name || 'World Cup'
+    };
     generateGroupFixtures();
     renderGroups();
     const stageTitle = document.getElementById('tour-stage-title');
