@@ -388,7 +388,13 @@ var App = (() => {
     const roleLoad = WIDE_SLOTS.has(slot) ? 1.25 : line === 'MID' ? 1.15 : line === 'FWD' ? 1.05 : 0.85;
     const phyFactor = Math.max(0.65, Math.min(1.35, (100 - (p.phy || 70)) / 45));
     const tacFactor = tac === 'press' ? 1.35 : tac === 'attack' ? 1.15 : tac === 'defend' ? 0.8 : 1.0;
-    return 0.62 * roleLoad * phyFactor * tacFactor;
+    let rate = 0.62 * roleLoad * phyFactor * tacFactor;
+    // Fighting Spirit and Track Back both describe a player who holds his
+    // intensity/work-rate up under fatigue and pressure — modeled as a
+    // genuinely slower stamina drain rather than just a late-game stat bump.
+    if (hasSkill(p, 'Fighting Spirit')) rate *= 0.85;
+    if (hasSkill(p, 'Track Back')) rate *= 0.94;
+    return rate;
   }
   // Runs once per simulated minute for both sides — drains everyone
   // currently on the pitch. Floors out at 8 rather than 0 so an exhausted
@@ -402,12 +408,18 @@ var App = (() => {
       const tac = (m.tactics && m.tactics[side]) || 'balanced';
       const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
       const all = (team.squad && team.squad.all) || [];
+      // Captaincy: a captain on the pitch takes the edge off the whole
+      // team's fatigue, not just his own — real captains manage tempo and
+      // keep the squad's intensity honest through a long match.
+      const captainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy'));
       onIds.forEach(id => {
         const p = all.find(x => x.id === id);
         if (!p) return;
         if (!fat[side][id]) fat[side][id] = { stamina: 100 };
         const rec = fat[side][id];
-        rec.stamina = Math.max(8, rec.stamina - fatigueDrainRate(p, tac));
+        let drain = fatigueDrainRate(p, tac);
+        if (captainOnPitch) drain *= 0.93;
+        rec.stamina = Math.max(8, rec.stamina - drain);
       });
     });
   }
@@ -586,7 +598,7 @@ var App = (() => {
   // around to take it, and the game state. Corners get equivalent
   // treatment in resolveCorner() (engine/shooting.js).
   function pickFreeKickRoutine(attTeam, closeRange) {
-    const hasCrosser = (attTeam.squad.all || []).some(p => hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Prolific Winger'));
+    const hasCrosser = (attTeam.squad.all || []).some(p => hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Prolific Winger') || hasSkill(p, 'Pinpoint Crossing') || hasSkill(p, 'Edged Crossing'));
     const m = currentMatch;
     const diff = m ? (attTeam.score || 0) - (m[attTeam === m.home ? 'away' : 'home'].score || 0) : 0;
     const urgent = m && m.minute >= 75 && diff < 0;
@@ -654,8 +666,9 @@ var App = (() => {
       // Whipped delivery into the box — resolved like a low-key corner
       // (aerial duel for a specific target), not a guaranteed chance.
       addEvent(m.minute, 'whistle', `<span class="player">${taker.name}</span> whips the free-kick into the box`, attackingSide);
-      if (seededRandom() < 0.075) {
-        const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p) * 2, taker.id);
+      const crossChance = 0.075 + (hasSkill(taker, 'Pinpoint Crossing') || hasSkill(taker, 'Edged Crossing') ? 0.02 : 0);
+      if (seededRandom() < crossChance) {
+        const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p, false) * 2, taker.id);
         if (scorer) {
           attTeam.stats.shots++; attTeam.stats.shotsOn++; attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
@@ -725,12 +738,13 @@ var App = (() => {
     const oppSide = side === 'home' ? 'away' : 'home';
     const thrower = pickPlayer(team, ['RB', 'LB', 'RWB', 'LWB', 'CB']);
     if (!thrower) return;
-    const longThrowSpecialist = (thrower.phy || 70) >= 80 || hasStyle(thrower, 'Long Throw');
+    const longThrowSpecialist = (thrower.phy || 70) >= 80 || hasStyle(thrower, 'Long Throw') || hasSkill(thrower, 'Long Throws');
     const roll = seededRandom();
     if (longThrowSpecialist && roll < 0.3) {
       addEvent(m.minute, 'whistle', `Long throw hurled into the box by <span class="player">${thrower.name}</span> (${team.team.short})`, side);
-      if (seededRandom() < 0.035) {
-        const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p) * 2, thrower.id);
+      const flickOnChance = 0.035 + (hasSkill(thrower, 'Long Throws') ? 0.01 : 0);
+      if (seededRandom() < flickOnChance) {
+        const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p, false) * 2, thrower.id);
         if (scorer) {
           team.stats.shots++; team.stats.shotsOn++; team.score++;
           recordStat('goals', scorer, team.team);
@@ -770,9 +784,24 @@ var App = (() => {
     const gk = pickPlayer(team, ['GK']);
     if (!gk) return;
     const tac = (m.tactics && m.tactics[side]) || 'balanced';
-    const buildFromBack = (gk.tec || 70) >= 78 && tac !== 'defend';
+    // GK Low Punt sharpens exactly the short/medium distribution this
+    // build-from-back check is gating, so a keeper with the skill can
+    // credibly play out from the back even without elite raw tec.
+    const buildFromBack = ((gk.tec || 70) >= 78 || hasSkill(gk, 'GK Low Punt')) && tac !== 'defend';
     const roll = seededRandom();
     if (!m.playerMatchStats) m.playerMatchStats = {};
+    // GK Long Throws: an entirely separate, quicker distribution option
+    // straight out of the keeper's hands to a winger, bypassing the
+    // punt/rollout choice altogether.
+    if (hasSkill(gk, 'GK Long Throws') && roll < 0.18) {
+      addEvent(m.minute, 'whistle', `<span class="player">${gk.name}</span> skips the goal-kick and launches a long throw straight down the line`, side);
+      if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+      m.playerMatchStats[gk.id].passes = (m.playerMatchStats[gk.id].passes || 0) + 1;
+      m.playerMatchStats[gk.id].passesCompleted = (m.playerMatchStats[gk.id].passesCompleted || 0) + 1;
+      const receiver = pickPlayer(team, ['RM', 'LM', 'RW', 'LW', 'CM']);
+      if (receiver && seededRandom() < 0.16) resolveChanceCreation(side, oppSide, receiver, seededRandom() < 0.5 ? 'L' : 'R');
+      return;
+    }
     if (buildFromBack && roll < 0.4) {
       addEvent(m.minute, 'pass', `Short rollout from <span class="player">${gk.name}</span> — ${team.team.short} build from the back`, side);
       if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
@@ -780,10 +809,20 @@ var App = (() => {
       m.playerMatchStats[gk.id].passesCompleted = (m.playerMatchStats[gk.id].passesCompleted || 0) + 1;
     } else if (roll < 0.75) {
       addEvent(m.minute, 'pass', `<span class="player">${gk.name}</span> chips the goal-kick out to midfield`, side);
+      // GK Low Punt: a genuinely well-placed medium ball occasionally
+      // sticks well enough to spring an immediate chance.
+      if (hasSkill(gk, 'GK Low Punt') && seededRandom() < 0.12) {
+        const receiver = pickPlayer(team, ['CM', 'CAM'], gk.id);
+        if (receiver) resolveChanceCreation(side, oppSide, receiver, 'C');
+      }
     } else {
-      const target = pickPlayerCustomWeighted(team, ['ST', 'CB'], (p) => aerialSkill(p) * 2);
-      const defender = pickPlayerCustomWeighted(oppTeam, ['CB'], (p) => aerialSkill(p) * 2);
-      const won = target && (!defender || aerialSkill(target) + seededRandom() * 0.3 > aerialSkill(defender) + seededRandom() * 0.3);
+      const target = pickPlayerCustomWeighted(team, ['ST', 'CB'], (p) => aerialSkill(p, false) * 2);
+      const defender = pickPlayerCustomWeighted(oppTeam, ['CB'], (p) => aerialSkill(p, true) * 2);
+      // GK High Punt: a sharper, more accurate long punt gives the target a
+      // genuinely better sight of winning the header, not just a coin-flip
+      // against whoever the defence puts up.
+      const puntEdge = hasSkill(gk, 'GK High Punt') ? 0.08 : 0;
+      const won = target && (!defender || aerialSkill(target, false) + puntEdge + seededRandom() * 0.3 > aerialSkill(defender, true) + seededRandom() * 0.3);
       addEvent(m.minute, 'whistle', (won && target)
         ? `Long punt from <span class="player">${gk.name}</span> — <span class="player">${target.name}</span> wins the aerial duel`
         : `Long punt from <span class="player">${gk.name}</span> — ${oppTeam.team.short} win the header back`, side);
@@ -1392,12 +1431,83 @@ var App = (() => {
   // returns a neutral value (0 bonus, or a multiplier that reduces to the
   // pre-existing behaviour) when a player has no expanded sheet, so nothing
   // about the old system changes for anyone else.
+  // player-attributes.json is hand-authored data and carries real-world
+  // inconsistency in how a skill name is spelled/punctuated ("First-time
+  // Shor" instead of "Shot", "GK Direct Throw" instead of "GK Long Throws",
+  // "Long-Range Curler" vs "Long-range Curler", etc). hasSkill() normalizes
+  // both sides of the comparison (lowercase, strip all non-alphanumerics)
+  // so spacing/hyphen/case differences always match, and a small alias
+  // table on top catches the genuine misspellings/synonyms that
+  // normalization alone can't fix. This is the single source of truth every
+  // skill-gated gameplay hook below reads through, so fixing a name here
+  // fixes it everywhere at once.
+  function normSkillKey(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+  const SKILL_NAME_ALIASES = {
+    'firsttimeshor': 'firsttimeshot',
+    'acrobaticclear': 'acrobaticclearance',
+    'acromaticfinishing': 'acrobaticfinishing',
+    'aerialforte': 'aerialfort',
+    'gkdirectthrow': 'gklongthrows',
+    'gklongthrow': 'gklongthrows',
+    'longthrow': 'longthrows',
+    'risingshots': 'risingshot',
+    'longrangeshor': 'longrangeshooting'
+  };
+  function canonSkillKey(s) {
+    const k = normSkillKey(s);
+    return SKILL_NAME_ALIASES[k] || k;
+  }
   function hasSkill(p, skillName) {
-    return !!(p && p.expandedAttrs && (p.expandedAttrs.skills || []).includes(skillName));
+    if (!p || !p.expandedAttrs) return false;
+    const target = canonSkillKey(skillName);
+    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
   }
   function xattr(p, key, fallback) {
     const v = p && p.expandedAttrs && p.expandedAttrs[key];
     return typeof v === 'number' ? v : fallback;
+  }
+  // ===== Match-state context helpers for the game-state-gated skills =====
+  // (Fortress, Game-Changing Pass, GK Spirit Roar, Super-Sub) — all of them
+  // key off which side a player is on, whether their team is currently
+  // ahead/behind, and (for Super-Sub) when they came off the bench. Centralized
+  // here so every engine file that needs match-state context reads it the same way.
+  function playerSideData(p) {
+    const m = currentMatch;
+    if (!m || !p) return null;
+    const inHome = ((m.home.squad && m.home.squad.all) || []).some((x) => x.id === p.id);
+    return { m, side: inHome ? m.home : m.away, opp: inHome ? m.away : m.home, sideKey: inHome ? 'home' : 'away' };
+  }
+  function playerTeamLeadingSecondHalf(p) {
+    const ctx = playerSideData(p);
+    if (!ctx || ctx.m.minute < 46) return false;
+    return (ctx.side.score || 0) > (ctx.opp.score || 0);
+  }
+  function playerTeamTrailingOrDrawingSecondHalf(p) {
+    const ctx = playerSideData(p);
+    if (!ctx || ctx.m.minute < 46) return false;
+    return (ctx.side.score || 0) <= (ctx.opp.score || 0);
+  }
+  // True if the goalkeeper currently on pitch for this player's own team has
+  // the given skill (used for GK Directing Defense / GK Spirit Roar, whose
+  // effect is on the team's defenders, not the keeper's own actions).
+  function teamGkHasSkill(p, skillName) {
+    const ctx = playerSideData(p);
+    if (!ctx) return false;
+    const ids = ctx.sideKey === 'home' ? ctx.m.homeOnPitch : ctx.m.awayOnPitch;
+    const gk = ((ctx.side.squad && ctx.side.squad.all) || []).find((x) => ids.includes(x.id) && (x.slot || (x.pos || [])[0]) === 'GK');
+    return !!gk && hasSkill(gk, skillName);
+  }
+  // Super-Sub: only "active" once the player has actually come on as a
+  // substitute in the second half — a starter with the skill on their sheet
+  // gets no bonus from it.
+  function isActingSuperSub(p) {
+    if (!p || !hasSkill(p, 'Super-Sub')) return false;
+    const ctx = playerSideData(p);
+    if (!ctx || !ctx.m.subLog) return false;
+    const log = ctx.m.subLog[ctx.sideKey] && ctx.m.subLog[ctx.sideKey][p.id];
+    return !!(log && log.inMin != null && log.inMin >= 45);
   }
   // Extra shot-quality nudge (roughly ±0.15) from finishing-specific traits
   // a flat att/tec/ovr blend can't see on its own.
@@ -1405,7 +1515,20 @@ var App = (() => {
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'fin', 70) - 70) / 100) * 0.5;
     if (hasSkill(p, 'Phenomenal Finishing')) edge += 0.06;
-    if (hasSkill(p, 'First-time Shot') || hasSkill(p, 'First-time Shor')) edge += 0.02;
+    if (hasSkill(p, 'First-time Shot')) edge += 0.02;
+    if (hasSkill(p, 'Acrobatic Finishing')) edge += 0.045;
+    if (hasSkill(p, 'Low Screamer')) edge += 0.03;
+    if (hasSkill(p, 'Chip Shot Control')) edge += 0.02;
+    if (hasSkill(p, 'Long Range Shooting')) edge += 0.02;
+    // Super-Sub: a real lift once the player has actually come off the
+    // bench in the second half — a starter with the skill gets nothing.
+    if (isActingSuperSub(p)) edge += 0.03;
+    // Willpower: gradually sharper finishing the more shots this player has
+    // already had a go at in this match.
+    const m = currentMatch;
+    if (hasSkill(p, 'Willpower') && m && m.playerMatchStats && m.playerMatchStats[p.id]) {
+      edge += Math.min(0.08, (m.playerMatchStats[p.id].shots || 0) * 0.012);
+    }
     // Box-focused playstyles get a distinct finishing edge on top of raw
     // finishing rating, so their identity shows up beyond the stat sheet.
     if (hasStyle(p, 'Fox in the Box')) edge += 0.04;
@@ -1418,10 +1541,16 @@ var App = (() => {
   // Aerial ability, 0.05-0.98 — used both to weight who wins headed chances
   // and to nudge conversion once they do. Defaults to a neutral 0.5 (so
   // multiplying by 2 elsewhere reduces to "no change") for non-expanded players.
-  function aerialSkill(p) {
+  // isDefensiveContext: true when this call represents a defender heading
+  // the ball away in/near their own box (corner/goal-kick defending) — that's
+  // specifically what Aerial Fort covers, as opposed to an attacker winning
+  // a header at the other end.
+  function aerialSkill(p, isDefensiveContext) {
     if (!p || !p.expandedAttrs) return 0.5;
     let v = xattr(p, 'head', 60) / 100;
     if (hasSkill(p, 'Aerial Superiority') || hasSkill(p, 'Heading')) v += 0.12;
+    if (hasSkill(p, 'Bullet Header')) v += 0.06;
+    if (isDefensiveContext && hasSkill(p, 'Aerial Fort')) v += 0.08;
     // A Target Man's whole game is built around winning the aerial duel;
     // defensively-anchored styles also read the flight of a long ball well.
     if (hasStyle(p, 'Target Man')) v += 0.1;
@@ -1432,7 +1561,7 @@ var App = (() => {
   function gkReflexEdge(gk) {
     if (!gk || !gk.expandedAttrs) return 0;
     let edge = ((xattr(gk, 'gk_reflex', 75) - 75) / 100) * 0.5;
-    if (hasSkill(gk, 'Acrobatic Clear')) edge += 0.05;
+    if (hasSkill(gk, 'Acrobatic Clearance')) edge += 0.05;
     return edge;
   }
   // Penalty-kick edges: taker's placement + specialist skill; keeper's
@@ -1441,6 +1570,7 @@ var App = (() => {
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'place_kick', 70) - 70) / 100) * 0.35;
     if (hasSkill(p, 'Penalty Specialist')) edge += 0.08;
+    if (hasSkill(p, 'Chip Shot Control')) edge += 0.02;
     if (hasStyle(p, 'Fox in the Box') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
     return edge;
   }
@@ -1454,9 +1584,11 @@ var App = (() => {
   function fkTakerEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'curl', 70) - 70) / 200) + ((xattr(p, 'place_kick', 70) - 70) / 300);
-    if (hasSkill(p, 'Long Range Curler') || hasSkill(p, 'Long-range Curler')) edge += 0.05;
+    if (hasSkill(p, 'Long Range Curler')) edge += 0.05;
     if (hasSkill(p, 'Knuckle Shot')) edge += 0.04;
     if (hasSkill(p, 'Dipping Shot')) edge += 0.03;
+    if (hasSkill(p, 'Blitz Curler')) edge += 0.03;
+    if (hasSkill(p, 'Outside Curler')) edge += 0.02;
     if (hasStyle(p, 'Creative Playmaker') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
     if (hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Orchestrator')) edge += 0.02;
     return edge;
@@ -1465,8 +1597,11 @@ var App = (() => {
   function dribbleSuccessEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
     let edge = ((xattr(p, 'dribb', 70) - 70) / 100) * 0.4;
-    const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero'];
+    const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero', 'Cut Behind & Turn', 'Inside Bounce'];
     if (skillMoves.some((s) => hasSkill(p, s))) edge += 0.08;
+    if (hasSkill(p, 'Momentum Dribbling')) edge += 0.03;
+    if (hasSkill(p, 'Magnetic Feet')) edge += 0.03;
+    if (hasSkill(p, 'Acceleration Burst')) edge += 0.02;
     if (hasStyle(p, 'Prolific Winger') || hasStyle(p, 'Inside Forward')) edge += 0.04;
     if (hasStyle(p, 'Roaming Flank') || hasStyle(p, 'Dummy Runner')) edge += 0.03;
     if (hasStyle(p, 'Creative Playmaker')) edge += 0.02;
@@ -1482,6 +1617,12 @@ var App = (() => {
     if (hasSkill(p, 'Interception')) { chance += 0.006; interceptBias += 0.15; }
     if (hasSkill(p, 'Man Marking')) chance += 0.006;
     if (hasSkill(p, 'Blocker')) chance += 0.006;
+    if (hasSkill(p, 'Track Back')) chance += 0.006;
+    if (hasSkill(p, 'Long Reach Tackle')) chance += 0.007;
+    // Shadow Hunt: a defender who reads a ball played into the space behind
+    // them and reacts before it becomes a real chance — biases toward a
+    // clean interception rather than a late/rash tackle.
+    if (hasSkill(p, 'Shadow Hunt')) { chance += 0.005; interceptBias += 0.08; }
     // Destroyer/Anchor Man actively hunt the ball; Build Up and Box-to-Box
     // read the game well enough to time a challenge, but less aggressively.
     if (hasStyle(p, 'Destroyer')) { chance += 0.012; interceptBias += 0.05; }
@@ -3886,21 +4027,58 @@ var App = (() => {
   function passingAbility(p) {
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.low_pass, p.expandedAttrs.lofted_pass, p.expandedAttrs.ball_con, p.expandedAttrs.tight_pos].filter(v => typeof v === 'number');
-      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35);
+      let bonus = 0;
+      if (hasSkill(p, 'Through Passing')) bonus += 2.5;
+      if (hasSkill(p, 'Weighted Pass')) bonus += 2;
+      if (hasSkill(p, 'Outside Curler')) bonus += 1.5;
+      if (hasSkill(p, 'Low Lofted Pass')) bonus += 1.5;
+      if (hasSkill(p, 'One Touch Pass')) bonus += 2;
+      if (hasSkill(p, 'Heel Trick')) bonus += 1;
+      if (hasSkill(p, 'No Look Pass')) bonus += 1;
+      if (hasSkill(p, 'Rabona')) bonus += 1;
+      if (hasSkill(p, 'Phenomenal Pass')) bonus += 2.5;
+      if (hasSkill(p, 'Visionary Pass')) bonus += 2;
+      if (hasSkill(p, 'Pinpoint Crossing') || hasSkill(p, 'Edged Crossing')) bonus += 1.5;
+      // Game-Changing Pass: sharper distribution specifically when this
+      // player's team needs to force the issue — drawing or losing in the
+      // second half.
+      if (hasSkill(p, 'Game-Changing Pass') && playerTeamTrailingOrDrawingSecondHalf(p)) bonus += 3;
+      if (isActingSuperSub(p)) bonus += 2;
+      return base + bonus;
     }
     return (p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35;
   }
   function defensivePressure(p) {
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.def_awr, p.expandedAttrs.def_eng, p.expandedAttrs.tack, p.expandedAttrs.aggr].filter(v => typeof v === 'number');
-      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.def || 70) * 0.7 + (p.ovr || 75) * 0.3);
+      let bonus = 0;
+      if (hasSkill(p, 'Track Back')) bonus += 1.5;
+      if (hasSkill(p, 'Long Reach Tackle')) bonus += 1.5;
+      // Fortress: this player's whole side defends better once they're
+      // ahead in the second half.
+      if (hasSkill(p, 'Fortress') && playerTeamLeadingSecondHalf(p)) bonus += 3;
+      // GK Directing Defense / GK Spirit Roar: the team's own keeper
+      // organizing (or roaring on) the back line lifts every defender in
+      // front of him, not just his own shot-stopping.
+      if (teamGkHasSkill(p, 'GK Directing Defense')) bonus += 1.5;
+      if (teamGkHasSkill(p, 'GK Spirit Roar') && playerTeamLeadingSecondHalf(p)) bonus += 2;
+      return base + bonus;
     }
     return (p.def || 70) * 0.7 + (p.ovr || 75) * 0.3;
   }
   function carryingAbility(p) {
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.dribb, p.expandedAttrs.ball_con, p.expandedAttrs.bal, p.expandedAttrs.spd].filter(v => typeof v === 'number');
-      if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2);
+      let bonus = 0;
+      if (hasSkill(p, 'Momentum Dribbling')) bonus += 2.5;
+      if (hasSkill(p, 'Magnetic Feet')) bonus += 2.5;
+      if (hasSkill(p, 'Acceleration Burst')) bonus += 2;
+      if (hasSkill(p, 'Attacking Surge')) bonus += 1.5;
+      if (isActingSuperSub(p)) bonus += 1.5;
+      return base + bonus;
     }
     return (p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2;
   }
@@ -3931,11 +4109,12 @@ var App = (() => {
     // ---- Shots phase: shot quality drawn straight from the shooter's own
     // finishing-relevant attributes and playstyle edges.
     let shotQuality = isHeader
-      ? aerialSkill(shooter)
+      ? aerialSkill(shooter, false)
       : Math.max(0.05, Math.min(0.98,
           ((shooter.att || 70) * 0.42 + (shooter.tec || 70) * 0.33 + (shooter.ovr || 75) * 0.15 + (shooter.pac || 70) * 0.10) / 100
           + finishingEdge(shooter)
-          + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)));
+          + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)
+          + (chanceType === 'longshot' ? fkTakerEdge(shooter) * 0.6 : 0)));
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
@@ -4066,11 +4245,11 @@ var App = (() => {
     let chance = BASE_CHANCE[routine] || 0.05;
     if (zonal && (routine === 'farpost' || routine === 'edge')) chance *= 0.82;
     if (!zonal && (routine === 'nearpost' || routine === 'crowd')) chance *= 0.82;
-    const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p) * 2);
-    if (blocker && aerialSkill(blocker) > 0.68) chance *= 0.85;
+    const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p, true) * 2);
+    if (blocker && aerialSkill(blocker, true) > 0.68) chance *= 0.85;
 
     if (seededRandom() >= chance) return;
-    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p) * 2);
+    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2);
     if (!scorer) return;
     attTeam.stats.shots++;
     attTeam.stats.shotsOn++;
@@ -4127,6 +4306,14 @@ var App = (() => {
     }
     if (!shooter) shooter = carrier;
 
+    // Extra chance-quality edge from the carrier's own passing/crossing
+    // flair on this specific delivery — on top of whatever the eventual
+    // shooter brings to the shot itself (see finishingEdge et al).
+    let creationQualityBonus = 0;
+    if (hasSkill(carrier, 'Visionary Pass') || hasSkill(carrier, 'Phenomenal Pass')) creationQualityBonus += 0.03;
+    if (chanceType === 'cross' && (hasSkill(carrier, 'Pinpoint Crossing') || hasSkill(carrier, 'Edged Crossing'))) creationQualityBonus += 0.04;
+    if (hasSkill(carrier, 'No Look Pass') || hasSkill(carrier, 'Heel Trick') || hasSkill(carrier, 'Rabona')) creationQualityBonus += 0.015;
+
     // A through ball is a genuine forward pass into space beyond the
     // defence — the one chance type actively judged for offside before the
     // shot ever happens. A flag here stops the passage immediately, the
@@ -4141,7 +4328,7 @@ var App = (() => {
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
     m.playerMatchStats[shooter.id].shots++;
-    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null });
+    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null, qualityBonus: creationQualityBonus });
   }
 
   // ===== Fouls / cards (reached from a lost duel or lost pass) =====
@@ -4273,8 +4460,12 @@ var App = (() => {
     const ps = m.playerMatchStats[defenderPlayer.id];
 
     // A mistimed challenge trying to win the ball back becomes a foul.
+    // Gamesmanship: the attacker being challenged is the one who's good at
+    // winning free-kicks off contact, so a defender up against one commits
+    // a few more fouls trying to dispossess them.
     const aggression = 1 + Math.max(0, (75 - (defenderPlayer.def || 70)) / 80) + Math.max(0, ((defenderPlayer.phy || 70) - 80) / 100);
-    const foulChance = 0.09 * aggression * (kind === 'duel' ? 1.3 : 0.75);
+    let foulChance = 0.09 * aggression * (kind === 'duel' ? 1.3 : 0.75);
+    if (contestedPlayer && hasSkill(contestedPlayer, 'Gamesmanship')) foulChance *= 1.25;
     if (seededRandom() < foulChance) {
       resolveFoul(defendingSide, attackingSide, defenderPlayer, contestedPlayer, toThird === 'ATT');
       return;
@@ -4304,7 +4495,14 @@ var App = (() => {
     // ===== Transitions phase: does the side that just won it break quickly? =====
     const defMods = getPlaystyleMods(defTeam.team);
     const spaceFactor = fromThird === 'ATT' ? 1.3 : fromThird === 'MID' ? 1.0 : 0.55;
-    const counterProb = Math.max(0.03, Math.min(0.55, 0.08 * defMods.counterBonus * spaceFactor + ((defenderPlayer.pac || 70) - 70) / 320));
+    // Acceleration Burst (explosive from a standing start) and Attacking
+    // Surge (extra pace once the break is on into the opponent's half) both
+    // make the player who's just won the ball more likely to actually spring
+    // a fast break with it, on top of their raw pace.
+    let counterSkillBonus = 0;
+    if (hasSkill(defenderPlayer, 'Acceleration Burst')) counterSkillBonus += 0.03;
+    if (hasSkill(defenderPlayer, 'Attacking Surge')) counterSkillBonus += 0.02;
+    const counterProb = Math.max(0.03, Math.min(0.55, 0.08 * defMods.counterBonus * spaceFactor + ((defenderPlayer.pac || 70) - 70) / 320 + counterSkillBonus));
     if (seededRandom() < counterProb) runFastBreak(defendingSide, attackingSide);
   }
 
@@ -4328,6 +4526,11 @@ var App = (() => {
 
     let carrier = pickPlayer(attTeam, ZONE_POS_MAP['DEF_' + channel]) || pickPlayer(attTeam, ['CB', 'GK']);
     if (!carrier) return;
+    // Attack Trigger: while this player has the ball, the whole team reads
+    // the attacking picture better — a small boost to both finding a
+    // team-mate and winning the ball back under pressure for as long as
+    // they're the one carrying the move forward.
+    const attackTriggerBonus = hasSkill(carrier, 'Attack Trigger') ? 0.025 : 0;
 
     for (let i = 0; i < 2; i++) { // DEF->MID, then MID->ATT
       const fromThird = PITCH_THIRDS[i], toThird = PITCH_THIRDS[i + 1];
@@ -4342,7 +4545,7 @@ var App = (() => {
       const passerSkill = passingAbility(carrier);
       const marker = pickPlayer(defTeam, mirrorDefenderPos(targetZone));
       const pressure = marker ? defensivePressure(marker) : 60;
-      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta;
+      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus;
       if (tac === 'attack') passChance -= 0.03;
       if (tac === 'press') passChance -= 0.015;
       if (defTac === 'press') passChance -= 0.05;
@@ -4357,7 +4560,7 @@ var App = (() => {
       // ===== Duels phase: even a completed pass can be won back under =====
       // ===== immediate pressure (a 1v1 press right as the ball arrives).
       const duelChance = Math.max(0.35, Math.min(0.95,
-        0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0)));
+        0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0) + attackTriggerBonus));
       if (seededRandom() >= duelChance) {
         resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel');
         return;
@@ -4653,12 +4856,15 @@ var App = (() => {
       if (preferred.length) pool = preferred;
     }
     if (!pool.length) return null;
-    // Weight selection toward higher ovr / relevant attrs (mild curve — this
+    // Weight selection toward higher-quality players (mild curve — this
     // path covers secondary events like corners/fouls, so quality should
     // nudge things without dominating the way it does for the main
-    // goal/assist picker above).
+    // goal/assist picker above). Specific attributes (att/tec) outweigh the
+    // single overall number, same principle as the main picker below —
+    // a player's actual finishing/technical ability should matter more than
+    // the one flattened rating.
     const weights = pool.map(p => {
-      const composite = (p.ovr || 70) + (p.att || 70) * 0.3 + (p.tec || 70) * 0.2;
+      const composite = (p.att || 70) * 0.6 + (p.tec || 70) * 0.4 + (p.ovr || 70) * 0.5;
       let w = Math.pow(Math.max(composite, 40) / 92, 1.4) * 92;
       return Math.max(5, w);
     });
@@ -4706,8 +4912,11 @@ var App = (() => {
       // a season — like real-world Golden Boot races — without ever reducing
       // a lesser player's chance to zero on any single kick. This is
       // symmetric for every player regardless of club, so it favors quality,
-      // not any particular team.
-      const composite = (p.ovr || 70) * 0.5 + (p.att || 70) * 0.35 + (p.tec || 70) * 0.15;
+      // not any particular team. Att + tec (a player's actual finishing and
+      // technical ability) together outweigh the flat ovr number — a
+      // specialist finisher should out-score a jack-of-all-trades with the
+      // same overall rating, not just whoever has the bigger single number.
+      const composite = (p.att || 70) * 0.45 + (p.tec || 70) * 0.25 + (p.ovr || 70) * 0.30;
       const w = Math.pow(Math.max(composite, 30) / 70, 2.2) * 100 * roleW;
       return Math.max(1, w);
     });
