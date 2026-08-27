@@ -152,19 +152,17 @@ var App = (() => {
   const FORMATIONS = {
     '4-3-3': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CDM','CM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
-      '4-3-3(cf)': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CDM','CM','RW','CF','LW'],
-      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
-    '4-4-2': { name: '4-4-2', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','CF','ST'],
+    '4-4-2': { name: '4-4-2', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,50],[42,50],[18,48],[58,20],[42,20]] },
     '4-2-3-1': { name: '4-2-3-1', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[78,30],[22,30],[50,16]] },
-    '3-5-2': { name: '3-5-2', slots: ['GK','CB','CB','CB','RWB','CM','CM','CM','LWB','ST','CF'],
+    '3-5-2': { name: '3-5-2', slots: ['GK','CB','CB','CB','RB','CM','CM','CM','LB','ST','ST'],
       coords: [[50,92],[68,75],[50,78],[32,75],[88,55],[62,48],[50,50],[38,48],[12,55],[58,20],[42,20]] },
     '4-5-1': { name: '4-5-1', slots: ['GK','RB','CB','CB','LB','RM','CM','CDM','CM','LM','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,45],[62,48],[50,55],[38,48],[18,45],[50,18]] },
     '3-4-3': { name: '3-4-3', slots: ['GK','CB','CB','CB','RM','CM','CM','LM','RW','ST','LW'],
       coords: [[50,92],[68,75],[50,78],[32,75],[82,50],[58,48],[42,48],[18,50],[78,25],[50,16],[22,25]] },
-    '5-3-2': { name: '5-3-2', slots: ['GK','RB','CB','CB','CB','LB','CM','CM','CM','ST','CF'],
+    '5-3-2': { name: '5-3-2', slots: ['GK','RB','CB','CB','CB','LB','CM','CM','CM','ST','ST'],
       coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[62,48],[50,50],[38,48],[58,20],[42,20]] },
     '4-1-4-1': { name: '4-1-4-1', slots: ['GK','RB','CB','CB','LB','CDM','RM','CM','CM','LM','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[82,42],[58,45],[42,45],[18,42],[50,16]] },
@@ -176,7 +174,7 @@ var App = (() => {
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,52],[42,52],[18,48],[50,32],[50,16]] },
     '5-4-1': { name: '5-4-1', slots: ['GK','RB','CB','CB','CB','LB','CM','CDM','CDM','CM','ST'],
       coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[80,45],[58,50],[42,50],[20,45],[50,18]] },
-    '4-1-2-1-2': { name: '4-1-2-1-2 (Diamond)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','CAM','ST','CF'],
+    '4-1-2-1-2': { name: '4-1-2-1-2 (Diamond)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','CAM','ST','ST'],
       coords: [[50,92],[80,72],[62,75],[38,75],[20,72],[50,60],[66,46],[34,46],[50,32],[58,16],[42,16]] },
     '4-2-2-2': { name: '4-2-2-2', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','CAM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[60,55],[40,55],[70,35],[30,35],[58,16],[42,16]] },
@@ -184,15 +182,15 @@ var App = (() => {
       coords: [[50,92],[68,75],[50,78],[32,75],[50,58],[82,42],[60,44],[40,44],[18,42],[58,18],[42,18]] },
     '4-1-3-2': { name: '4-1-3-2', slots: ['GK','RB','CB','CB','LB','CDM','RM','CAM','LM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[78,42],[50,40],[22,42],[58,18],[42,18]] },
-    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','CF','LW'],
+    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[75,22],[50,34],[25,22]] },
     '4-3-3-cdm': { name: '4-3-3 (Holding)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,55],[64,45],[36,45],[78,28],[50,16],[22,28]] },
     '4-3-3-cam': { name: '4-3-3 (Attack)', slots: ['GK','RB','CB','CB','LB','CM','CM','CAM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[38,52],[50,38],[78,22],[50,14],[22,22]] },
-    '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','CF'],
+    '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[66,26],[34,26],[50,16]] },
-    '5-3-2-attack': { name: '5-3-2 (Attack)', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','CF'],
+    '5-3-2-attack': { name: '5-3-2 (Attack)', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','ST'],
       coords: [[50,92],[88,62],[68,72],[50,75],[32,72],[12,62],[62,45],[50,48],[38,45],[58,18],[42,18]] }
   };
 
@@ -204,13 +202,6 @@ var App = (() => {
     // Several FORMATIONS entries use 'CF' as a distinct slot label from
     // 'ST' (e.g. 4-4-2, 3-5-2, the False 9 shape) even though a player's
     // own position data is always canonicalized to 'ST' — see
-    // normalizePlayerPos()/POS_ALIASES below, where CF -> ST. Without this
-    // entry, canPlay() has no compatibility list for the 'CF' slot at all
-    // (falls back to requiring the literal string 'CF', which no
-    // normalized player position ever is), so a 'CF' slot could never be
-    // filled by anyone — treat it exactly like 'ST' here so it isn't a
-    // slot no player can ever be considered comfortable in.
-    CF: ['ST','RW','LW','CAM','CF','SS']
   };
 
   // Sensible in-slot role changes for the squad builder — tapping a
