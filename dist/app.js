@@ -152,7 +152,6 @@ var App = (() => {
   const FORMATIONS = {
     '4-3-3': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CDM','CM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
-      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
     '4-4-2': { name: '4-4-2', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,50],[42,50],[18,48],[58,20],[42,20]] },
     '4-2-3-1': { name: '4-2-3-1', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
@@ -199,7 +198,7 @@ var App = (() => {
     GK: ['GK'], CB: ['CB','RB','LB'], RB: ['RB','CB','RWB','RM'], LB: ['LB','CB','LWB','LM'],
     RWB: ['RWB','RB','RM'], LWB: ['LWB','LB','LM'], CDM: ['CDM','CM','CB'], CM: ['CM','CDM','CAM'],
     CAM: ['CAM','CM','RW','LW','ST','CMF'], RM: ['RM','RW','RWB','CM'], LM: ['LM','LW','LWB','CM'],
-    RW: ['RW','RM','ST','CAM',], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
+    RW: ['RW','RM','ST','CAM'], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
   };
 
   // Different data sources (teams.json, player-attributes.json) name the
