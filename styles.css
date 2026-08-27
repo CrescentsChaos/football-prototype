@@ -1384,6 +1384,21 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   color: var(--cyan);
 }
 .li-icon { font-size: 0.72rem; line-height: 1; }
+.captain-armband {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  font-family: var(--display);
+  color: var(--bg-0);
+  background: var(--gold);
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-left: 4px;
+}
 .li-sub {
   font-size: 0.68rem;
   font-weight: 700;
