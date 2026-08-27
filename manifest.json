@@ -154,6 +154,27 @@
     "label": "func:resolveGoalKick"
   },
   {
+    "id": "cmr01",
+    "file": "engine/matchRoles.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "cmr02",
+    "file": "engine/matchRoles.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:assignMatchRoles"
+  },
+  {
+    "id": "cmr03",
+    "file": "engine/matchRoles.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:roleBadgesHTML"
+  },
+  {
     "id": "c0001",
     "file": "engine/tactics.js",
     "start": 171,

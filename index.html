@@ -109,18 +109,6 @@
               <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('away')">⚙️ Squad Builder</button>
             </div>
           </div>
-          <div id="squad-builder-panel" class="squad-builder" style="display:none;margin-top:16px">
-            <div class="card-title" id="sb-title">Squad Builder</div>
-            <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:10px">Assign each formation slot, then tick bench players. No duplicates allowed.</p>
-            <div id="sb-slots" class="sb-slots"></div>
-            <div class="card-title" style="margin-top:14px">Bench</div>
-            <div id="sb-bench" class="sb-bench"></div>
-            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" onclick="App.saveSquadBuilder()">Save Lineup</button>
-              <button class="btn btn-secondary btn-sm" onclick="App.autoFillSquadBuilder()">Auto-fill Best XI</button>
-              <button class="btn btn-secondary btn-sm" onclick="App.closeSquadBuilder()">Close</button>
-            </div>
-          </div>
           <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-top:12px">
             <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
               <input type="checkbox" id="opt-et" style="accent-color:var(--accent-gold);width:16px;height:16px"> Extra Time if draw
@@ -188,6 +176,56 @@
         <div class="back-tour-btn" id="back-to-tournament" style="display:none">
           <button class="btn btn-primary" onclick="App.returnToTournament()">← Back to Tournament</button>
         </div>
+      </div>
+    </section>
+
+    <!-- SQUAD BUILDER (full-page lineup & formation editor) -->
+    <section id="view-squadbuilder" class="view sb-page">
+      <div class="sb-page-header">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="App.closeSquadBuilder()">← Back</button>
+        <div class="sb-page-title" id="sb-page-title">Squad Builder</div>
+        <div class="sb-side-switch">
+          <button type="button" class="btn btn-secondary btn-sm" id="sb-side-home-btn" onclick="App.sbSwitchSide()">HOME</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="sb-side-away-btn" onclick="App.sbSwitchSide()">AWAY</button>
+        </div>
+      </div>
+
+      <div class="sb-toolbar">
+        <label class="sb-toolbar-label" for="sb-formation-select">Formation</label>
+        <select id="sb-formation-select" class="formation-select" onchange="App.sbSelectFormationPreset(this.value)" aria-label="Formation preset"></select>
+        <button type="button" class="btn btn-secondary btn-sm" id="sb-edit-mode-btn" onclick="App.sbToggleEditMode()">✥ Edit Formation Shape</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="App.sbResetFormationShape()">↺ Reset Shape</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="App.autoFillSquadBuilder()">⚡ Auto-fill Best XI</button>
+      </div>
+      <p class="sb-hint" id="sb-hint">Drag a player onto the pitch, bench or reserves to place them — or tap a player, then tap where they should go.</p>
+
+      <div class="sb-layout">
+        <div class="sb-pitch-col">
+          <div id="sb-pitch" class="mini-pitch sb-pitch"></div>
+          <div class="sb-counts" id="sb-counts"></div>
+          <div id="sb-picker" class="sb-picker" style="display:none"></div>
+        </div>
+        <div class="sb-panel-col">
+          <div class="sb-tabs">
+            <button type="button" class="sb-tab active" data-sb-tab="bench" onclick="App.sbSwitchTab('bench')">Substitutes</button>
+            <button type="button" class="sb-tab" data-sb-tab="reserves" onclick="App.sbSwitchTab('reserves')">Reserves</button>
+            <button type="button" class="sb-tab" data-sb-tab="roles" onclick="App.sbSwitchTab('roles')">Match Roles</button>
+          </div>
+          <div class="sb-tab-panel" id="sb-tab-bench" data-sb-drop="bench" onpointerdown="App.sbZoneGrab(event,'bench')">
+            <div id="sb-bench-list" class="sb-chip-list"></div>
+          </div>
+          <div class="sb-tab-panel" id="sb-tab-reserves" style="display:none" data-sb-drop="reserve" onpointerdown="App.sbZoneGrab(event,'reserve')">
+            <div id="sb-reserves-list" class="sb-chip-list"></div>
+          </div>
+          <div class="sb-tab-panel" id="sb-tab-roles" style="display:none">
+            <div id="sb-roles" class="sb-roles"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sb-actions">
+        <button class="btn btn-primary" onclick="App.saveSquadBuilder()">💾 Save Lineup</button>
+        <button class="btn btn-secondary" onclick="App.closeSquadBuilder()">Cancel</button>
       </div>
     </section>
 
