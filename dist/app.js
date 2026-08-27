@@ -620,7 +620,15 @@ var App = (() => {
     const m = currentMatch;
     if (!m) return;
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
-    const taker = pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
+    // Close-range effort calls for the Short Free Kick specialist; a
+    // longer-distance dead ball calls for the Long Free Kick specialist
+    // (more Kicking Power / Lofted Pass in the formula). Falls back to the
+    // generic weighted pick if the designated taker isn't on the pitch.
+    const onPitchIds = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const designatedTaker = attTeam.roles && (closeRange ? attTeam.roles.shortFreeKick : attTeam.roles.longFreeKick);
+    const taker = (designatedTaker && onPitchIds.includes(designatedTaker.id))
+      ? designatedTaker
+      : pickPlayer(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW']);
     if (!taker) return;
     if (!m.playerMatchStats) m.playerMatchStats = {};
     const routine = pickFreeKickRoutine(attTeam, closeRange);
@@ -833,6 +841,132 @@ var App = (() => {
         if (receiver) resolveChanceCreation(side, oppSide, receiver, 'C');
       }
     }
+  }
+
+  // ===================================================================
+  // ======================== PRE-MATCH ROLES ===========================
+  // ===================================================================
+  // Assigns real, named players to key match/set-piece duties before
+  // kickoff — captain, short/long free-kick takers, penalty taker, left/
+  // right corner takers, and the trio of aerial targets sent forward for
+  // the team's own corners. Computed once per side (from the starting XI)
+  // right after squads are built, using the same expanded-attribute sheet
+  // (xattr/hasSkill) every other gameplay hook reads from — every formula
+  // below defaults to a neutral rating when a squad has no expanded data,
+  // so nothing breaks for a non-enhanced team. Consumed by
+  // resolveFreeKickRoutine(), resolveCorner(), the in-game/shootout
+  // penalty pickers, and the pre-match lineup display, so the same named
+  // player shows up on screen and actually gets sent to take the kick
+  // instead of a fresh random pick every time.
+  function _roleWeighted(p, weights) {
+    if (!p) return -Infinity;
+    let score = 0;
+    for (const key in weights) score += xattr(p, key, 65) * weights[key];
+    return score;
+  }
+
+  function _roleSkillBonus(p, skills, amount) {
+    if (!p) return 0;
+    amount = amount || 5;
+    return skills.reduce((sum, s) => sum + (hasSkill(p, s) ? amount : 0), 0);
+  }
+
+  function _roleHeightScore(p) {
+    const cm = (p && p.expandedAttrs && typeof p.expandedAttrs.height_cm === 'number') ? p.expandedAttrs.height_cm : 178;
+    return Math.max(0, Math.min(100, (cm - 165) * 2.2));
+  }
+
+  function _roleFoot(p) {
+    return (p && p.expandedAttrs && p.expandedAttrs.preferred_foot) || 'Right';
+  }
+
+  function _bestForRole(pool, scoreFn, excludeIds) {
+    let best = null, bestScore = -Infinity;
+    (pool || []).forEach((p) => {
+      if (excludeIds && excludeIds.has(p.id)) return;
+      const s = scoreFn(p);
+      if (s > bestScore) { bestScore = s; best = p; }
+    });
+    return best;
+  }
+
+  // Computes and returns the full role set for one side (m.home / m.away)
+  // straight from its starting XI. Called once per side at match start —
+  // never mutates anything on the players themselves.
+  function assignMatchRoles(side) {
+    const squad = side && side.squad;
+    const starting = (squad && squad.starting) || [];
+    if (!starting.length) return null;
+    const outfield = starting.filter((p) => (p.pos || [])[0] !== 'GK');
+    const pool = outfield.length ? outfield : starting;
+
+    // Captain — Captaincy is the deciding factor; overall ability is only
+    // a tiebreaker when nobody (or several players) carry the trait.
+    const captain = _bestForRole(starting, (p) => (hasSkill(p, 'Captaincy') ? 500 : 0) + (p.ovr || 70));
+
+    // Short Free Kick — closer-range direct effort: Set Piece Taking
+    // leads, Curl/Kicking Power support it, Finishing and weak-foot
+    // reliability round it out.
+    const shortFreeKick = _bestForRole(pool, (p) =>
+      _roleWeighted(p, { place_kick: 1.0, curl: 0.55, kick_pwr: 0.3, fin: 0.15, 'weak foot': 0.15 })
+      + _roleSkillBonus(p, ['Knuckle Shot', 'Dipping Shot', 'Chip Shot Control', 'First-time Shot'], 4));
+
+    // Long Free Kick — same base skill, but Kicking Power and Lofted Pass
+    // matter more as the distance to goal grows.
+    const longFreeKick = _bestForRole(pool, (p) =>
+      _roleWeighted(p, { place_kick: 1.0, curl: 0.55, kick_pwr: 0.55, lofted_pass: 0.3, 'weak foot': 0.15 })
+      + _roleSkillBonus(p, ['Long-range Curler', 'Blitz Curler', 'Long Range Shooting', 'Outside Curler'], 4));
+
+    // Penalty — Set Piece Taking and Finishing lead, Kicking Power and
+    // Curl help with placement, Penalty Specialist is a big flat edge.
+    const penalty = _bestForRole(pool, (p) =>
+      _roleWeighted(p, { place_kick: 1.0, fin: 0.5, kick_pwr: 0.35, curl: 0.2, 'weak foot': 0.15 })
+      + _roleSkillBonus(p, ['Penalty Specialist'], 10)
+      + _roleSkillBonus(p, ['Chip Shot Control'], 3)) || captain;
+
+    // Corners — Set Piece Taking, Curl and Lofted Pass drive delivery
+    // quality; foot preference nudges toward the swing each side naturally
+    // produces (a right-footer for an in-swinging left corner, and a
+    // left-footer for an in-swinging right corner).
+    const cornerBase = (p) => _roleWeighted(p, { place_kick: 1.0, curl: 0.55, lofted_pass: 0.4, kick_pwr: 0.2, 'weak foot': 0.15 })
+      + _roleSkillBonus(p, ['Pinpoint Crossing', 'Edged Crossing'], 4);
+    const leftCorner = _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Right' ? 4 : -1));
+    const rightCorner = _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Left' ? 4 : -1));
+
+    // 3 corner-box attackers — the aerial targets pushed forward for the
+    // team's own corners: Heading, Jump and Physical Contact lead, Height
+    // and Offensive Awareness support, Finishing rounds it out since
+    // these are usually the ones getting the actual shot.
+    const attackerScore = (p) => _roleWeighted(p, { head: 1.0, jmp: 0.7, phy_con: 0.6, off_awr: 0.35, fin: 0.25 })
+      + _roleHeightScore(p) * 0.15
+      + _roleSkillBonus(p, ['Heading', 'Bullet Header', 'Aerial Superiority', 'Aerial Fort'], 5);
+    const cornerAttackers = [];
+    const usedIds = new Set();
+    for (let i = 0; i < 3; i++) {
+      const pick = _bestForRole(pool, attackerScore, usedIds);
+      if (!pick) break;
+      cornerAttackers.push(pick);
+      usedIds.add(pick.id);
+    }
+
+    return { captain, shortFreeKick, longFreeKick, penalty, leftCorner, rightCorner, cornerAttackers };
+  }
+  // Small HTML badges for the lineup list — captain armband plus icons for
+  // whichever set-piece duties this player has been assigned for their
+  // side. Purely cosmetic/read-only; safe to call for any player on the
+  // sheet, starter or sub.
+  function roleBadgesHTML(p, side) {
+    const m = currentMatch;
+    const roles = m && m[side] && m[side].roles;
+    if (!roles || !p) return '';
+    let out = '';
+    if (roles.captain && roles.captain.id === p.id) out += '<span class="captain-armband" title="Captain">C</span>';
+    if (roles.penalty && roles.penalty.id === p.id) out += '<span class="li-icon" title="Penalty taker">🎯</span>';
+    const isFk = (roles.shortFreeKick && roles.shortFreeKick.id === p.id) || (roles.longFreeKick && roles.longFreeKick.id === p.id);
+    if (isFk) out += '<span class="li-icon" title="Free-kick taker">🦶</span>';
+    const isCk = (roles.leftCorner && roles.leftCorner.id === p.id) || (roles.rightCorner && roles.rightCorner.id === p.id);
+    if (isCk) out += '<span class="li-icon" title="Corner taker">🚩</span>';
+    return out;
   }
   function formationShape(formationKey) {
     const key = formationKey || '4-3-3';
@@ -2623,6 +2757,8 @@ var App = (() => {
       playerMatchStats: {},
       goalList: []
     };
+    currentMatch.home.roles = assignMatchRoles(currentMatch.home);
+    currentMatch.away.roles = assignMatchRoles(currentMatch.away);
     // Opening tactical instructions now come from the matchup, not a flat
     // "balanced" default every time: a clear underdog tends to sit in and
     // be harder to break down, a clear favourite tends to push on, and a
@@ -2765,9 +2901,10 @@ var App = (() => {
 
     // Order the takers list so recognised penalty takers (strikers/wingers, then
     // attacking mids) step up before defenders/holding mids, same as real teams do.
-    const penOrderScore = (p) => (p.att || 0) + (PEN_TAKER_ROLE_WEIGHT[p.slot || (p.pos||[])[0]] || 0.4) * 12;
-    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
-    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
+    const penOrderScore = (p, side) => (p.att || 0) + (PEN_TAKER_ROLE_WEIGHT[p.slot || (p.pos||[])[0]] || 0.4) * 12
+      + (side.roles && side.roles.penalty && side.roles.penalty.id === p.id ? 40 : 0);
+    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.home)-penOrderScore(a,m.home));
+    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.away)-penOrderScore(a,m.away));
 
     // Silent/bulk sims (quick-sim, tournament auto-play) still resolve instantly —
     // only a real, on-screen live match animates the shootout kick by kick.
@@ -4325,7 +4462,12 @@ var App = (() => {
     if (blocker && aerialSkill(blocker, true) > 0.68) chance *= 0.85;
 
     if (seededRandom() >= chance) return;
-    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2);
+    // The designated corner-box attackers (Heading/Jump/Physical Contact
+    // formula) are the players actually stationed in the danger areas for
+    // this routine — they're more likely to be the one who gets on the
+    // end of it, not guaranteed, since a corner is still a scramble.
+    const designatedAttackerIds = new Set(((attTeam.roles && attTeam.roles.cornerAttackers) || []).map(p => p.id));
+    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2 * (designatedAttackerIds.has(p.id) ? 1.35 : 1));
     if (!scorer) return;
     attTeam.stats.shots++;
     attTeam.stats.shotsOn++;
@@ -4335,7 +4477,15 @@ var App = (() => {
     if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
     m.playerMatchStats[scorer.id].goals++;
     m.playerMatchStats[scorer.id].xg += 0.24 + seededRandom() * 0.18;
-    const corTaker = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
+    // Out-swinging/far-post-style deliveries are taken from the side that
+    // suits the right-footed/left-footed swing; in-swinging/near-post-style
+    // ones from the other. Falls back to the generic pick if the
+    // designated taker isn't on the pitch or is the scorer themselves.
+    const onPitchIds = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const preferredCornerTaker = attTeam.roles && ((routine === 'outswinger' || routine === 'farpost' || routine === 'edge') ? attTeam.roles.rightCorner : attTeam.roles.leftCorner);
+    const corTaker = (preferredCornerTaker && preferredCornerTaker.id !== scorer.id && onPitchIds.includes(preferredCornerTaker.id))
+      ? preferredCornerTaker
+      : pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
     if (corTaker && seededRandom() < 0.65) {
       recordStat('assists', corTaker, attTeam.team);
       if (!m.playerMatchStats[corTaker.id]) m.playerMatchStats[corTaker.id] = blankPlayerMatchStats(corTaker);
@@ -4433,7 +4583,11 @@ var App = (() => {
 
     if (nearBox && (forcePenalty || seededRandom() < 0.065)) {
       addEvent(m.minute, 'foul', foulText + ' — inside the area!', defendingSide);
-      const taker = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], PEN_TAKER_ROLE_WEIGHT) || victim;
+      const onPitchIds = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const designatedTaker = attTeam.roles && attTeam.roles.penalty;
+      const taker = (designatedTaker && onPitchIds.includes(designatedTaker.id))
+        ? designatedTaker
+        : (pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], PEN_TAKER_ROLE_WEIGHT) || victim);
       if (taker) {
         addEvent(m.minute, 'pen', `Penalty to ${attTeam.team.short}. <span class="player">${taker.name}</span> on the spot.`, attackingSide);
         attTeam.stats.shots++;
@@ -6107,7 +6261,7 @@ var App = (() => {
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
         <span class="player-num">${p.num || ''}</span>
         <span class="player-pos">${pos}</span>
-        <span class="player-name">${playerNameHTML(p)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
+        <span class="player-name">${playerNameHTML(p)}${roleBadgesHTML(p, side)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         ${passInfo}
         <span class="player-icons">${icons}</span>
         ${rating}
@@ -8499,6 +8653,8 @@ var App = (() => {
       inET: false,
       inPens: false
     };
+    currentMatch.home.roles = assignMatchRoles(currentMatch.home);
+    currentMatch.away.roles = assignMatchRoles(currentMatch.away);
 
     let safety = 0;
     while (currentMatch && !currentMatch.finished && safety < 250) {
