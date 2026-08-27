@@ -152,17 +152,19 @@ var App = (() => {
   const FORMATIONS = {
     '4-3-3': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CDM','CM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
-    '4-4-2': { name: '4-4-2', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','ST','ST'],
+      '4-3-3(cf)': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CDM','CM','RW','CF','LW'],
+      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
+    '4-4-2': { name: '4-4-2', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','CF','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,50],[42,50],[18,48],[58,20],[42,20]] },
     '4-2-3-1': { name: '4-2-3-1', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[78,30],[22,30],[50,16]] },
-    '3-5-2': { name: '3-5-2', slots: ['GK','CB','CB','CB','RWB','CM','CM','CM','LWB','ST','ST'],
+    '3-5-2': { name: '3-5-2', slots: ['GK','CB','CB','CB','RWB','CM','CM','CM','LWB','ST','CF'],
       coords: [[50,92],[68,75],[50,78],[32,75],[88,55],[62,48],[50,50],[38,48],[12,55],[58,20],[42,20]] },
     '4-5-1': { name: '4-5-1', slots: ['GK','RB','CB','CB','LB','RM','CM','CDM','CM','LM','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,45],[62,48],[50,55],[38,48],[18,45],[50,18]] },
     '3-4-3': { name: '3-4-3', slots: ['GK','CB','CB','CB','RM','CM','CM','LM','RW','ST','LW'],
       coords: [[50,92],[68,75],[50,78],[32,75],[82,50],[58,48],[42,48],[18,50],[78,25],[50,16],[22,25]] },
-    '5-3-2': { name: '5-3-2', slots: ['GK','RB','CB','CB','CB','LB','CM','CM','CM','ST','ST'],
+    '5-3-2': { name: '5-3-2', slots: ['GK','RB','CB','CB','CB','LB','CM','CM','CM','ST','CF'],
       coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[62,48],[50,50],[38,48],[58,20],[42,20]] },
     '4-1-4-1': { name: '4-1-4-1', slots: ['GK','RB','CB','CB','LB','CDM','RM','CM','CM','LM','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[82,42],[58,45],[42,45],[18,42],[50,16]] },
@@ -174,7 +176,7 @@ var App = (() => {
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,52],[42,52],[18,48],[50,32],[50,16]] },
     '5-4-1': { name: '5-4-1', slots: ['GK','RB','CB','CB','CB','LB','CM','CDM','CDM','CM','ST'],
       coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[80,45],[58,50],[42,50],[20,45],[50,18]] },
-    '4-1-2-1-2': { name: '4-1-2-1-2 (Diamond)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','CAM','ST','ST'],
+    '4-1-2-1-2': { name: '4-1-2-1-2 (Diamond)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','CAM','ST','CF'],
       coords: [[50,92],[80,72],[62,75],[38,75],[20,72],[50,60],[66,46],[34,46],[50,32],[58,16],[42,16]] },
     '4-2-2-2': { name: '4-2-2-2', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','CAM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[60,55],[40,55],[70,35],[30,35],[58,16],[42,16]] },
@@ -182,23 +184,23 @@ var App = (() => {
       coords: [[50,92],[68,75],[50,78],[32,75],[50,58],[82,42],[60,44],[40,44],[18,42],[58,18],[42,18]] },
     '4-1-3-2': { name: '4-1-3-2', slots: ['GK','RB','CB','CB','LB','CDM','RM','CAM','LM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[78,42],[50,40],[22,42],[58,18],[42,18]] },
-    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
+    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','CF','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[75,22],[50,34],[25,22]] },
     '4-3-3-cdm': { name: '4-3-3 (Holding)', slots: ['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,55],[64,45],[36,45],[78,28],[50,16],[22,28]] },
     '4-3-3-cam': { name: '4-3-3 (Attack)', slots: ['GK','RB','CB','CB','LB','CM','CM','CAM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[38,52],[50,38],[78,22],[50,14],[22,22]] },
-    '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
+    '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','CF'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[66,26],[34,26],[50,16]] },
-    '5-3-2-attack': { name: '5-3-2 (Attack)', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','ST'],
+    '5-3-2-attack': { name: '5-3-2 (Attack)', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','CF'],
       coords: [[50,92],[88,62],[68,72],[50,75],[32,72],[12,62],[62,45],[50,48],[38,45],[58,18],[42,18]] }
   };
 
   const POS_COMPAT = {
     GK: ['GK'], CB: ['CB','RB','LB'], RB: ['RB','CB','RWB','RM'], LB: ['LB','CB','LWB','LM'],
     RWB: ['RWB','RB','RM'], LWB: ['LWB','LB','LM'], CDM: ['CDM','CM','CB'], CM: ['CM','CDM','CAM'],
-    CAM: ['CAM','CM','RW','LW','ST','CMF'], RM: ['RM','RW','RWB','CM'], LM: ['LM','LW','LWB','CM'],
-    RW: ['RW','RM','ST','CAM'], LW: ['LW','LM','ST','CAM'], ST: ['ST','RW','LW','CAM']
+    CAM: ['CAM','CM','RW','LW','ST','CMF','SS'], RM: ['RM','RW','RWB','CM','RMF'], LM: ['LM','LW','LWB','CM','LMF'],
+    RW: ['RW','RM','ST','CAM','RWF'], LW: ['LW','LM','ST','CAM','LWF'], ST: ['ST','RW','LW','CAM','CF','SS']
   };
 
   // Different data sources (teams.json, player-attributes.json) name the
@@ -898,26 +900,41 @@ var App = (() => {
     const outfield = starting.filter((p) => (p.pos || [])[0] !== 'GK');
     const pool = outfield.length ? outfield : starting;
 
+    // Manual overrides — set from the Squad Builder's Match Roles panel
+    // (see sbSetRole()/saveSquadBuilder() in ui/teamUI.js) and carried on
+    // squad.manualRoles as { roleKey: playerId }. Any role left unset (or
+    // pointing at a player who isn't actually in the starting XI) simply
+    // falls through to the same auto-pick logic as before. Corner-box
+    // attackers are always auto-picked — there's no manual override for
+    // those.
+    const manual = (squad && squad.manualRoles) || {};
+    const manualPick = (key) => {
+      const id = manual[key];
+      if (!id) return null;
+      return starting.find((p) => p.id === id) || null;
+    };
+
     // Captain — Captaincy is the deciding factor; overall ability is only
     // a tiebreaker when nobody (or several players) carry the trait.
-    const captain = _bestForRole(starting, (p) => (hasSkill(p, 'Captaincy') ? 500 : 0) + (p.ovr || 70));
+    const captain = manualPick('captain')
+      || _bestForRole(starting, (p) => (hasSkill(p, 'Captaincy') ? 500 : 0) + (p.ovr || 70));
 
     // Short Free Kick — closer-range direct effort: Set Piece Taking
     // leads, Curl/Kicking Power support it, Finishing and weak-foot
     // reliability round it out.
-    const shortFreeKick = _bestForRole(pool, (p) =>
+    const shortFreeKick = manualPick('shortFreeKick') || _bestForRole(pool, (p) =>
       _roleWeighted(p, { place_kick: 1.0, curl: 0.55, kick_pwr: 0.3, fin: 0.15, 'weak foot': 0.15 })
       + _roleSkillBonus(p, ['Knuckle Shot', 'Dipping Shot', 'Chip Shot Control', 'First-time Shot'], 4));
 
     // Long Free Kick — same base skill, but Kicking Power and Lofted Pass
     // matter more as the distance to goal grows.
-    const longFreeKick = _bestForRole(pool, (p) =>
+    const longFreeKick = manualPick('longFreeKick') || _bestForRole(pool, (p) =>
       _roleWeighted(p, { place_kick: 1.0, curl: 0.55, kick_pwr: 0.55, lofted_pass: 0.3, 'weak foot': 0.15 })
       + _roleSkillBonus(p, ['Long-range Curler', 'Blitz Curler', 'Long Range Shooting', 'Outside Curler'], 4));
 
     // Penalty — Set Piece Taking and Finishing lead, Kicking Power and
     // Curl help with placement, Penalty Specialist is a big flat edge.
-    const penalty = _bestForRole(pool, (p) =>
+    const penalty = manualPick('penalty') || _bestForRole(pool, (p) =>
       _roleWeighted(p, { place_kick: 1.0, fin: 0.5, kick_pwr: 0.35, curl: 0.2, 'weak foot': 0.15 })
       + _roleSkillBonus(p, ['Penalty Specialist'], 10)
       + _roleSkillBonus(p, ['Chip Shot Control'], 3)) || captain;
@@ -928,8 +945,8 @@ var App = (() => {
     // left-footer for an in-swinging right corner).
     const cornerBase = (p) => _roleWeighted(p, { place_kick: 1.0, curl: 0.55, lofted_pass: 0.4, kick_pwr: 0.2, 'weak foot': 0.15 })
       + _roleSkillBonus(p, ['Pinpoint Crossing', 'Edged Crossing'], 4);
-    const leftCorner = _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Right' ? 4 : -1));
-    const rightCorner = _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Left' ? 4 : -1));
+    const leftCorner = manualPick('leftCorner') || _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Right' ? 4 : -1));
+    const rightCorner = manualPick('rightCorner') || _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Left' ? 4 : -1));
 
     // 3 corner-box attackers — the aerial targets pushed forward for the
     // team's own corners: Heading, Jump and Physical Contact lead, Height
@@ -2500,104 +2517,243 @@ var App = (() => {
     return a;
   }
 
-
+  // ===================================================================
+  // ===================== SQUAD BUILDER (full page) =====================
+  // ===================================================================
+  // The Squad Builder is a dedicated full-page lineup/formation editor
+  // (view-squadbuilder in index.html), opened per-side from the Match
+  // Setup screen. sbDraft below is the in-progress editing state for
+  // whichever side (home/away) is currently open; it is discarded on
+  // close/save. customLineups[side] is the *saved* result — a squad
+  // object (same shape buildSquad() returns) plus manualRoles/
+  // customCoords — consumed by startMatch() in engine/matchEngine.js
+  // exactly like an auto-built squad, so nothing downstream needs to
+  // know a lineup was hand-built.
   let customLineups = { home: null, away: null };
   let sbSide = null;
   let sbDraft = null;
+  // Active pointer-drag (player) / coordinate-drag (formation marker) —
+  // module-level so the document-level pointermove/pointerup listeners
+  // added in sbGrab()/sbCoordMove-family can find them.
+  let sbDrag = null;
+  let sbCoordDrag = null;
+  let sbGhostEl = null;
 
   function onFormationChange(side) {
     if (customLineups[side]) customLineups[side] = null;
   }
+  // Finds where a player currently sits in the in-progress draft — a
+  // starting slot, the bench, or (implicitly) the reserves, since reserve
+  // players aren't tracked in any set of their own; anyone not in slots
+  // or bench simply *is* a reserve. Returns a small "location" object in
+  // the same shape sbGrab()/sbPlacePlayer() pass around everywhere.
+  function sbLocateInDraft(playerId) {
+    for (const k in sbDraft.slots) {
+      if (sbDraft.slots[k] === playerId) return { kind: 'slot', id: playerId, slotIdx: +k };
+    }
+    if (sbDraft.bench.has(playerId)) return { kind: 'bench', id: playerId };
+    return { kind: 'reserve', id: playerId };
+  }
 
+  // The single move operation behind every interaction in the builder —
+  // dragging, tapping-to-place, and the fallback slot picker all funnel
+  // through here. Moving a player onto an occupied starting slot swaps
+  // the two (the displaced starter lands wherever the incoming player
+  // came from — their old slot, the bench, or the bench if they were a
+  // reserve, since a starter can never be left with nowhere to go).
+  // Moving onto the bench or into reserves just detaches them from
+  // wherever they were.
+  function sbPlacePlayer(source, destKind, destSlotIdx) {
+    if (!sbDraft || !source || !source.id) return;
+    if (destKind === 'slot' && source.kind === 'slot' && source.slotIdx === destSlotIdx) return;
+    if (destKind === 'bench' && source.kind === 'bench') return;
+    if (destKind === 'reserve' && source.kind === 'reserve') return;
+
+    if (destKind === 'bench' && !sbDraft.bench.has(source.id) && sbDraft.bench.size >= 14) {
+      toast('Max 14 substitutes');
+      return;
+    }
+
+    // Detach the moving player from their current spot first.
+    if (source.kind === 'slot') delete sbDraft.slots[source.slotIdx];
+    if (source.kind === 'bench') sbDraft.bench.delete(source.id);
+
+    if (destKind === 'slot') {
+      const occupantId = sbDraft.slots[destSlotIdx];
+      if (occupantId && occupantId !== source.id) {
+        if (source.kind === 'slot') sbDraft.slots[source.slotIdx] = occupantId; // swap
+        else sbDraft.bench.add(occupantId); // displaced starter goes to the bench
+      }
+      sbDraft.slots[destSlotIdx] = source.id;
+      sbDraft.bench.delete(source.id);
+    } else if (destKind === 'bench') {
+      sbDraft.bench.add(source.id);
+    }
+    // destKind === 'reserve': already detached above, nothing further to do.
+  }
   function openSquadBuilder(side) {
     try {
-    sbSide = side;
-    const teamSel = document.getElementById(side + '-team');
-    const formSel = document.getElementById(side + '-formation');
-    const teamId = teamSel && teamSel.value;
-    const formKey = (formSel && formSel.value) || '4-3-3';
-    const team = getTeam(teamId);
-    if (!team) { toast('Select a team first'); return; }
-    const panel = document.getElementById('squad-builder-panel');
-    if (!panel) { toast('Squad builder UI missing — re-upload index.html'); return; }
+      sbSide = side;
+      const teamSel = document.getElementById(side + '-team');
+      const formSel = document.getElementById(side + '-formation');
+      const teamId = teamSel && teamSel.value;
+      const formKey = (formSel && formSel.value) || '4-3-3';
+      const team = getTeam(teamId);
+      if (!team) { toast('Select a team first'); return; }
 
-    const formation = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
-    const players = [];
-    const seenP = new Set();
-    (team.players || []).forEach(p => {
-      if (p && p.id && !seenP.has(p.id)) { seenP.add(p.id); players.push(p); }
-    });
-    let slots = {};
-    let bench = new Set();
-    if (customLineups[side] && customLineups[side].formation === formKey) {
-      customLineups[side].starting.forEach((p, i) => { slots[i] = p.id; });
-      (customLineups[side].subs || []).forEach(p => bench.add(p.id));
-    } else {
-      const auto = buildSquad(team, formKey);
-      auto.starting.forEach((p, i) => { slots[i] = p.id; });
-      (auto.subs || []).slice(0, 9).forEach(p => bench.add(p.id));
-    }
-    sbDraft = { team: team, formation: formKey, slots: slots, bench: bench, players: players };
-    document.getElementById('sb-title').textContent = (side === 'home' ? 'HOME' : 'AWAY') + ' · ' + team.name + ' · ' + formKey;
-    panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    renderSquadBuilderUI();
+      const formation = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
+      const players = [];
+      const seenP = new Set();
+      (team.players || []).forEach(p => {
+        if (p && p.id && !seenP.has(p.id)) { seenP.add(p.id); players.push(p); }
+      });
+
+      let slots = {};
+      let bench = new Set();
+      let roles = {};
+      let coords = formation.coords.map(c => c.slice());
+      const saved = customLineups[side];
+      if (saved && saved.formation === formKey && saved._teamId === team.id) {
+        saved.starting.forEach((p, i) => { slots[i] = p.id; });
+        (saved.subs || []).forEach(p => bench.add(p.id));
+        roles = Object.assign({}, saved.manualRoles || {});
+        if (saved.customCoords) coords = saved.customCoords.map(c => c.slice());
+      } else {
+        const auto = buildSquad(team, formKey);
+        auto.starting.forEach((p, i) => { slots[i] = p.id; });
+        (auto.subs || []).slice(0, 9).forEach(p => bench.add(p.id));
+      }
+
+      sbDraft = { side, team, formation: formKey, slots, bench, roles, players, coords, editMode: 'lineup', selected: null };
+      switchView('squadbuilder');
+      const titleEl = document.getElementById('sb-page-title');
+      if (titleEl) titleEl.textContent = (side === 'home' ? 'HOME' : 'AWAY') + ' · ' + team.name;
+      sbSwitchTab('bench');
+      renderFormationSelect();
+      renderSquadBuilderUI();
     } catch (err) {
       console.error(err);
       toast('Squad builder error: ' + (err && err.message ? err.message : err));
     }
   }
+  // Lets the person hop between editing the home and away lineups without
+  // leaving the page — re-runs openSquadBuilder() for the other side,
+  // picking up its own saved/auto lineup exactly as opening it fresh
+  // would. Any unsaved change on the side being left behind is dropped,
+  // same as tapping Cancel.
+  function sbSwitchSide() {
+    if (!sbDraft) return;
+    openSquadBuilder(sbDraft.side === 'home' ? 'away' : 'home');
+  }
 
+  function sbSwitchTab(tab) {
+    document.querySelectorAll('.sb-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.sbTab === tab); });
+    document.querySelectorAll('.sb-tab-panel').forEach(function(p) { p.style.display = 'none'; });
+    const panel = document.getElementById('sb-tab-' + tab);
+    if (panel) panel.style.display = 'block';
+  }
   function getUsedInDraft() {
     const used = new Set(Object.values(sbDraft.slots).filter(Boolean));
     sbDraft.bench.forEach(function(id) { used.add(id); });
     return used;
   }
-
-  function renderSquadBuilderUI() {
+  function renderSquadBuilderSideButtons() {
     if (!sbDraft) return;
-    const slotsEl = document.getElementById('sb-slots');
-    const benchEl = document.getElementById('sb-bench');
-    if (!slotsEl || !benchEl) return;
-    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
-    const used = getUsedInDraft();
-
-    slotsEl.innerHTML = formation.slots.map(function(slot, i) {
-      const selectedId = sbDraft.slots[i] || '';
-      const selectedP = sbDraft.players.find(function(p) { return p.id === selectedId; });
-      const label = selectedP
-        ? (selectedP.num || '?') + ' · ' + selectedP.name + ' · ' + selectedP.ovr
-        : 'Tap to pick ' + slot;
-      return '<div class="sb-slot' + (selectedId ? ' filled' : '') + '">' +
-        '<label>' + slot + '</label>' +
-        '<button type="button" class="sb-pick-btn" onclick="App.openSlotPicker(' + i + ')">' + label + '</button>' +
-        (selectedId ? '<button type="button" class="sb-clear-btn" onclick="App.setSquadSlot(' + i + ',\'\')">✕</button>' : '') +
-        '</div>';
-    }).join('');
-
-    // Picker panel
-    let picker = document.getElementById('sb-picker');
-    if (!picker) {
-      picker = document.createElement('div');
-      picker.id = 'sb-picker';
-      picker.className = 'sb-picker';
-      picker.style.display = 'none';
-      slotsEl.parentNode.insertBefore(picker, slotsEl.nextSibling);
-    }
-
-    const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
-    const benchPool = sbDraft.players.filter(function(p) { return !starterIds.has(p.id); });
-    benchEl.innerHTML = benchPool.map(function(p) {
-      const checked = sbDraft.bench.has(p.id);
-      return '<label class="sb-bench-item' + (checked ? ' on' : '') + '">' +
-        '<input type="checkbox"' + (checked ? ' checked' : '') +
-        ' onchange="App.toggleBench(\'' + p.id + '\', this.checked)">' +
-        '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
-        '<span class="sb-bench-name">' + p.name + '</span>' +
-        '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span></label>';
-    }).join('') || '<p style="color:var(--text-3)">No remaining players</p>';
+    const hb = document.getElementById('sb-side-home-btn');
+    const ab = document.getElementById('sb-side-away-btn');
+    if (hb) hb.classList.toggle('sb-side-active', sbDraft.side === 'home');
+    if (ab) ab.classList.toggle('sb-side-active', sbDraft.side === 'away');
   }
 
+  function renderFormationSelect() {
+    const sel = document.getElementById('sb-formation-select');
+    if (!sel || !sbDraft) return;
+    sel.innerHTML = Object.keys(FORMATIONS).map(function(f) {
+      return '<option value="' + f + '">' + FORMATIONS[f].name + '</option>';
+    }).join('');
+    sel.value = sbDraft.formation;
+  }
+  // Master re-render for the whole page — called after essentially every
+  // interaction (drop, tap-to-place, role change, formation swap). The
+  // squad involved is small (~25 players) so a full re-render is cheap;
+  // the one hot path that isn't re-rendered on every tick is dragging
+  // itself (see sbDragMove/sbCoordMove, which move elements directly).
+  function renderSquadBuilderUI() {
+    if (!sbDraft) return;
+    sbDraft._eff = sbEffectiveRoles();
+    renderSquadBuilderSideButtons();
+
+    const editBtn = document.getElementById('sb-edit-mode-btn');
+    if (editBtn) editBtn.textContent = sbDraft.editMode === 'formation' ? '✓ Done Editing Shape' : '✥ Edit Formation Shape';
+    const pitchEl = document.getElementById('sb-pitch');
+    if (pitchEl) pitchEl.classList.toggle('sb-pitch-edit', sbDraft.editMode === 'formation');
+    const hint = document.getElementById('sb-hint');
+    if (hint) {
+      hint.textContent = sbDraft.editMode === 'formation'
+        ? 'Drag the position markers to reshape your formation, then tap "Done Editing Shape".'
+        : 'Drag a player onto the pitch, bench or reserves to place them — or tap a player, then tap where they should go.';
+    }
+
+    renderSquadBuilderPitch();
+
+    const benchEl = document.getElementById('sb-bench-list');
+    if (benchEl) benchEl.innerHTML = renderSquadBuilderBenchHTML();
+    const resEl = document.getElementById('sb-reserves-list');
+    if (resEl) resEl.innerHTML = renderSquadBuilderReserveHTML();
+    const rolesEl = document.getElementById('sb-roles');
+    if (rolesEl) rolesEl.innerHTML = renderSquadBuilderRolesHTML();
+
+    const countsEl = document.getElementById('sb-counts');
+    if (countsEl) {
+      const starters = Object.values(sbDraft.slots).filter(Boolean).length;
+      countsEl.textContent = starters + '/11 starting · ' + sbDraft.bench.size + ' subs · ' +
+        (sbDraft.players.length - starters - sbDraft.bench.size) + ' reserve';
+    }
+    const benchTabBtn = document.querySelector('.sb-tab[data-sb-tab="bench"]');
+    if (benchTabBtn) benchTabBtn.textContent = 'Substitutes (' + sbDraft.bench.size + ')';
+  }
+  // Draws the interactive pitch — same visual language (mini-pitch,
+  // player-dot-style markers) as the live match pitch in
+  // ui/matchUI.js::renderPitch(), so what you build here is recognizably
+  // "the same pitch" you'll see once the match kicks off. In lineup mode
+  // each dot is a player (or an empty "+" placeholder); in formation-edit
+  // mode every dot becomes a draggable position marker labelled by its
+  // slot code, regardless of whether it currently has a player on it.
+  function renderSquadBuilderPitch() {
+    if (!sbDraft) return;
+    const el = document.getElementById('sb-pitch');
+    if (!el) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const slots = formation.slots;
+    const team = sbDraft.team;
+    const primary = team.color || '#1a237e';
+    const secondary = team.secondary || '#ffffff';
+    const editMode = sbDraft.editMode === 'formation';
+
+    let dots = '';
+    slots.forEach(function(slot, idx) {
+      const c = sbDraft.coords[idx] || formation.coords[idx] || [50, 50];
+      const x = c[0], y = c[1];
+      const pid = sbDraft.slots[idx];
+      const p = pid ? sbDraft.players.find(function(pp) { return pp.id === pid; }) : null;
+      const filled = !!p;
+      const isSelected = !editMode && sbDraft.selected && sbDraft.selected.kind === 'slot' && sbDraft.selected.slotIdx === idx;
+      const roleTag = (!editMode && p) ? sbRoleTagHTML(p.id) : '';
+      const avatar = editMode ? '<span class="sb-dot-slot-code">' + slot + '</span>'
+        : (p ? playerAvatarMark(p) : '<span class="sb-dot-plus">+</span>');
+      const label = editMode ? ''
+        : '<span class="dot-label"><span class="dot-num">' + (p ? (p.num || '?') : slot) + '</span>' +
+          '<span class="dot-name">' + (p ? abbreviateName(p.name) : slot) + '</span></span>';
+      const emptyTapHandler = (!filled && !editMode) ? ' onclick="App.sbEmptySlotTap(' + idx + ')"' : '';
+      dots += '<div id="sb-dot-' + idx + '" class="sb-dot' + (filled ? ' filled' : '') + (isSelected ? ' selected' : '') + (editMode ? ' edit-mode' : '') + '"' +
+        ' data-sb-drop="slot" data-slot-idx="' + idx + '"' +
+        ' style="left:' + x + '%;top:' + y + '%;background:' + primary + ';border-color:' + secondary + '"' +
+        ' onpointerdown="event.stopPropagation();App.sbGrab(event,\'slot\',' + idx + ')"' + emptyTapHandler + '>' +
+        '<span class="dot-avatar">' + avatar + '</span>' + roleTag + label +
+        '</div>';
+    });
+    el.innerHTML = '<div class="pitch-label">' + teamMark(team, 16) + ' ' + (team.short || team.name) + ' · ' + formation.name + '</div>' + dots;
+  }
   function openSlotPicker(index) {
     if (!sbDraft) return;
     const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
@@ -2619,56 +2775,263 @@ var App = (() => {
       '<button type="button" class="btn btn-secondary btn-sm" onclick="App.closeSlotPicker()">Close</button></div>' +
       '<div class="sb-picker-list">' + list.map(function(p) {
         const fit = (p.pos || []).includes(slot);
-        return '<button type="button" class="sb-picker-item' + (p.id === selected ? ' selected' : '') + '" onclick="App.setSquadSlot(' + index + ',\'' + p.id + '\');App.closeSlotPicker()">' +
+        return '<button type="button" class="sb-picker-item' + (p.id === selected ? ' selected' : '') + '" onclick="App.setSquadSlot(' + index + ',\'' + p.id + '\')">' +
           '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
           '<span class="sb-bench-name">' + p.name + '</span>' +
           '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
       }).join('') + '</div>';
     picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+  // Combines manual overrides (sbDraft.roles) with the same auto-pick
+  // logic the match engine itself uses (assignMatchRoles(), fed a
+  // lightweight fake "side" built from the current starting XI) so what
+  // shows here — badge on the pitch, "Auto — <name>" hint in the roles
+  // panel — is always exactly what would happen if the role were left on
+  // Auto. Recomputed once per render and cached on sbDraft._eff.
+  function sbEffectiveRoles() {
+    if (!sbDraft) return null;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const startersArr = formation.slots.map(function(slot, i) {
+      const id = sbDraft.slots[i];
+      const p = id ? sbDraft.players.find(function(x) { return x.id === id; }) : null;
+      return p ? Object.assign({}, p, { slot: slot }) : null;
+    }).filter(Boolean);
+    const auto = startersArr.length ? assignMatchRoles({ squad: { starting: startersArr } }) : null;
+    const pick = function(key) {
+      const manualId = (sbDraft.roles || {})[key];
+      if (manualId) {
+        const mp = startersArr.find(function(p) { return p.id === manualId; });
+        if (mp) return mp;
+      }
+      return auto ? auto[key] : null;
+    };
+    return {
+      captain: pick('captain'), penalty: pick('penalty'),
+      shortFreeKick: pick('shortFreeKick'), longFreeKick: pick('longFreeKick'),
+      leftCorner: pick('leftCorner'), rightCorner: pick('rightCorner'),
+      auto: auto, startersArr: startersArr
+    };
+  }
 
+  function sbRoleTagHTML(playerId) {
+    const eff = sbDraft && sbDraft._eff;
+    if (!eff) return '';
+    let out = '';
+    if (eff.captain && eff.captain.id === playerId) out += '<span class="captain-armband" title="Captain">C</span>';
+    if (eff.penalty && eff.penalty.id === playerId) out += '<span class="sb-role-ic" title="Penalty taker">🎯</span>';
+    const isFk = (eff.shortFreeKick && eff.shortFreeKick.id === playerId) || (eff.longFreeKick && eff.longFreeKick.id === playerId);
+    if (isFk) out += '<span class="sb-role-ic" title="Free-kick taker">🦶</span>';
+    const isCk = (eff.leftCorner && eff.leftCorner.id === playerId) || (eff.rightCorner && eff.rightCorner.id === playerId);
+    if (isCk) out += '<span class="sb-role-ic" title="Corner taker">🚩</span>';
+    return out;
+  }
   function closeSlotPicker() {
     const picker = document.getElementById('sb-picker');
     if (picker) { picker.style.display = 'none'; picker.innerHTML = ''; }
   }
+  function sbChipRowHTML(p, kind) {
+    const isSel = sbDraft.selected && sbDraft.selected.id === p.id;
+    const inj = isPlayerInjured(p.id);
+    const susp = isPlayerSuspended(p.id);
+    return '<div class="sb-chip' + (isSel ? ' selected' : '') + '"' +
+      ' onpointerdown="event.stopPropagation();App.sbGrab(event,\'' + kind + '\',\'' + p.id + '\')">' +
+      '<span class="sb-chip-num">' + (p.num || '?') + '</span>' +
+      '<span class="sb-chip-name">' + p.name + (inj ? ' 🩹' : '') + (susp ? ' 🟥' : '') + '</span>' +
+      '<span class="sb-chip-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span>' +
+      sbRoleTagHTML(p.id) +
+      '</div>';
+  }
 
+  function renderSquadBuilderBenchHTML() {
+    const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
+    const benchArr = sbDraft.players.filter(function(p) { return sbDraft.bench.has(p.id) && !starterIds.has(p.id); });
+    benchArr.sort(function(a, b) { return (b.ovr || 0) - (a.ovr || 0); });
+    if (!benchArr.length) return '<p class="sb-empty-hint">Drag starters here to bench them, or drag a reserve up.</p>';
+    return benchArr.map(function(p) { return sbChipRowHTML(p, 'bench'); }).join('');
+  }
 
+  function renderSquadBuilderReserveHTML() {
+    const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
+    const reserveArr = sbDraft.players.filter(function(p) { return !starterIds.has(p.id) && !sbDraft.bench.has(p.id); });
+    reserveArr.sort(function(a, b) { return (b.ovr || 0) - (a.ovr || 0); });
+    if (!reserveArr.length) return '<p class="sb-empty-hint">Everyone is in the matchday squad.</p>';
+    return reserveArr.map(function(p) { return sbChipRowHTML(p, 'reserve'); }).join('');
+  }
   function setSquadSlot(index, playerId) {
     if (!sbDraft) return;
     if (!playerId) {
       delete sbDraft.slots[index];
     } else {
-      Object.keys(sbDraft.slots).forEach(function(k) {
-        if (+k !== index && sbDraft.slots[k] === playerId) delete sbDraft.slots[k];
-      });
-      sbDraft.bench.delete(playerId);
-      sbDraft.slots[index] = playerId;
+      const source = sbLocateInDraft(playerId);
+      sbPlacePlayer(source, 'slot', index);
     }
+    closeSlotPicker();
     renderSquadBuilderUI();
   }
+  function renderSquadBuilderRolesHTML() {
+    if (!sbDraft || !sbDraft._eff) return '';
+    const eff = sbDraft._eff;
+    const starters = eff.startersArr;
+    const roleDefs = [
+      ['captain', 'Captain'], ['penalty', 'Penalty Taker'],
+      ['shortFreeKick', 'Short Free-Kick'], ['longFreeKick', 'Long Free-Kick'],
+      ['leftCorner', 'Left Corner'], ['rightCorner', 'Right Corner']
+    ];
+    if (!starters.length) return '<p class="sb-empty-hint">Fill your starting XI to assign match roles.</p>';
+    return roleDefs.map(function(def) {
+      const key = def[0], label = def[1];
+      const autoP = eff.auto && eff.auto[key];
+      const opts = starters.map(function(p) {
+        return '<option value="' + p.id + '"' + ((sbDraft.roles || {})[key] === p.id ? ' selected' : '') + '>' + p.name + '</option>';
+      }).join('');
+      return '<div class="sb-role-row"><label>' + label + '</label>' +
+        '<select onchange="App.sbSetRole(\'' + key + '\', this.value)">' +
+        '<option value="">Auto' + (autoP ? ' — ' + autoP.name : '') + '</option>' + opts +
+        '</select></div>';
+    }).join('');
+  }
 
-  function toggleBench(playerId, on) {
+  function sbSetRole(key, playerId) {
     if (!sbDraft) return;
-    if (on) {
-      if (Object.values(sbDraft.slots).indexOf(playerId) >= 0) return;
-      if (sbDraft.bench.size >= 14) { toast('Max 14 substitutes'); renderSquadBuilderUI(); return; }
-      sbDraft.bench.add(playerId);
-    } else {
-      sbDraft.bench.delete(playerId);
-    }
+    if (!sbDraft.roles) sbDraft.roles = {};
+    sbDraft.roles[key] = playerId || '';
+    renderSquadBuilderUI();
+  }
+  // Tapping empty pitch/bench/reserve space when a player is already
+  // "selected" (tap-to-place, the touch-friendly alternative to
+  // dragging) drops them there. With nothing selected it's a no-op —
+  // dropping onto a filled slot to trigger a swap is handled by sbGrab's
+  // tap branch instead, since that needs to know *which* player was
+  // tapped.
+  function sbZoneGrab(e, zoneKind) {
+    if (!sbDraft || !sbDraft.selected) return;
+    sbPlacePlayer(sbDraft.selected, zoneKind);
+    sbDraft.selected = null;
     renderSquadBuilderUI();
   }
 
+  function sbEmptySlotTap(idx) {
+    if (!sbDraft) return;
+    if (sbDraft.selected) {
+      sbPlacePlayer(sbDraft.selected, 'slot', idx);
+      sbDraft.selected = null;
+      renderSquadBuilderUI();
+    } else {
+      openSlotPicker(idx);
+    }
+  }
+  // Pointer-based drag & drop, unified for mouse, touch and pen (Pointer
+  // Events). A press-without-moving-far is treated as a *tap* instead of
+  // a drag — see sbDragEnd() — which is what powers the
+  // tap-a-player/tap-a-destination placement flow on phones where a true
+  // drag gesture is fiddlier. In formation-edit mode, grabbing a pitch
+  // dot drags its *coordinates* instead (see sbCoordMove/sbCoordUp).
+  function sbGrab(e, kind, idOrIdx) {
+    if (!sbDraft) return;
+    if (kind === 'slot' && sbDraft.editMode === 'formation') {
+      e.preventDefault();
+      const pitchEl = document.getElementById('sb-pitch');
+      if (!pitchEl) return;
+      sbCoordDrag = { slotIdx: idOrIdx, pitchEl: pitchEl };
+      document.addEventListener('pointermove', sbCoordMove);
+      document.addEventListener('pointerup', sbCoordUp, { once: true });
+      return;
+    }
+    const id = kind === 'slot' ? sbDraft.slots[idOrIdx] : idOrIdx;
+    if (!id) return;
+    const slotIdx = kind === 'slot' ? idOrIdx : undefined;
+    e.preventDefault();
+    const p = sbDraft.players.find(function(x) { return x.id === id; });
+    if (!p) return;
+    sbDrag = { kind: kind, id: id, slotIdx: slotIdx, x0: e.clientX, y0: e.clientY, moved: false, player: p };
+    document.addEventListener('pointermove', sbDragMove);
+    document.addEventListener('pointerup', sbDragEnd, { once: true });
+  }
+
+  function sbDragMove(e) {
+    if (!sbDrag) return;
+    const dx = e.clientX - sbDrag.x0, dy = e.clientY - sbDrag.y0;
+    if (!sbDrag.moved && Math.hypot(dx, dy) > 10) {
+      sbDrag.moved = true;
+      sbCreateGhost(sbDrag.player);
+      document.querySelectorAll('[data-sb-drop]').forEach(function(z) { z.classList.add('sb-dz-active'); });
+    }
+    if (sbDrag.moved) sbMoveGhost(e.clientX, e.clientY);
+  }
+
+  function sbDragEnd(e) {
+    document.removeEventListener('pointermove', sbDragMove);
+    document.querySelectorAll('[data-sb-drop]').forEach(function(z) { z.classList.remove('sb-dz-active'); });
+    if (!sbDrag) return;
+    const drag = sbDrag; sbDrag = null;
+    sbRemoveGhost();
+    if (drag.moved) {
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      const zoneEl = target && target.closest ? target.closest('[data-sb-drop]') : null;
+      if (zoneEl) {
+        const zk = zoneEl.getAttribute('data-sb-drop');
+        if (zk === 'slot') sbPlacePlayer(drag, 'slot', +zoneEl.getAttribute('data-slot-idx'));
+        else sbPlacePlayer(drag, zk);
+      }
+      sbDraft.selected = null;
+    } else if (sbDraft.selected && sbDraft.selected.id === drag.id) {
+      sbDraft.selected = null; // tapping the already-selected chip deselects it
+    } else if (sbDraft.selected) {
+      sbPlacePlayer(sbDraft.selected, drag.kind, drag.slotIdx); // tap-to-place onto this chip's spot (swap)
+      sbDraft.selected = null;
+    } else {
+      sbDraft.selected = { kind: drag.kind, id: drag.id, slotIdx: drag.slotIdx }; // first tap: select
+    }
+    renderSquadBuilderUI();
+  }
   function autoFillSquadBuilder() {
     if (!sbDraft) return;
     const auto = buildSquad(sbDraft.team, sbDraft.formation);
     sbDraft.slots = {};
     auto.starting.forEach(function(p, i) { sbDraft.slots[i] = p.id; });
     sbDraft.bench = new Set(auto.subs.slice(0, 9).map(function(p) { return p.id; }));
+    sbDraft.selected = null;
     renderSquadBuilderUI();
     toast('Best XI auto-filled');
   }
+  // Formation-edit-mode dragging — moves a slot's coordinates rather than
+  // a player. Updates the dot's inline position directly on every
+  // pointermove (cheap DOM write) instead of going through the full
+  // renderSquadBuilderUI() re-render, so reshaping the formation feels
+  // smooth; the full re-render only happens once, on release.
+  function sbCoordMove(e) {
+    if (!sbCoordDrag) return;
+    const rect = sbCoordDrag.pitchEl.getBoundingClientRect();
+    let x = ((e.clientX - rect.left) / rect.width) * 100;
+    let y = ((e.clientY - rect.top) / rect.height) * 100;
+    x = Math.max(4, Math.min(96, x));
+    y = Math.max(4, Math.min(96, y));
+    sbDraft.coords[sbCoordDrag.slotIdx] = [x, y];
+    const dot = document.getElementById('sb-dot-' + sbCoordDrag.slotIdx);
+    if (dot) { dot.style.left = x + '%'; dot.style.top = y + '%'; }
+  }
 
+  function sbCoordUp() {
+    document.removeEventListener('pointermove', sbCoordMove);
+    sbCoordDrag = null;
+  }
+
+  function sbCreateGhost(p) {
+    sbRemoveGhost();
+    const g = document.createElement('div');
+    g.className = 'sb-drag-ghost';
+    g.innerHTML = '<span class="sb-chip-num">' + (p.num || '?') + '</span><span>' + p.name + '</span>';
+    document.body.appendChild(g);
+    sbGhostEl = g;
+  }
+
+  function sbMoveGhost(x, y) {
+    if (sbGhostEl) { sbGhostEl.style.left = x + 'px'; sbGhostEl.style.top = y + 'px'; }
+  }
+
+  function sbRemoveGhost() {
+    if (sbGhostEl) { sbGhostEl.remove(); sbGhostEl = null; }
+  }
   function saveSquadBuilder() {
     if (!sbDraft || !sbSide) return;
     const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
@@ -2692,21 +3055,78 @@ var App = (() => {
         subs.push(Object.assign({}, p, { slot: (p.pos || ['CM'])[0], isStarter: false }));
       }
     });
+    const manualRoles = {};
+    Object.keys(sbDraft.roles || {}).forEach(function(k) {
+      const v = sbDraft.roles[k];
+      if (v && starting.some(function(p) { return p.id === v; })) manualRoles[k] = v;
+    });
     customLineups[sbSide] = {
       starting: starting, subs: subs, formation: sbDraft.formation,
-      all: starting.concat(subs), _teamId: sbDraft.team.id
+      all: starting.concat(subs), _teamId: sbDraft.team.id,
+      manualRoles: manualRoles, customCoords: sbDraft.coords.map(function(c) { return c.slice(); })
     };
     toast((sbSide === 'home' ? 'Home' : 'Away') + ' lineup saved (' + starting.length + '+' + subs.length + ')');
     closeSquadBuilder();
     updateTeamPreview(sbSide);
   }
-
+  // Switching to a different preset formation tries to keep your current
+  // starters on the pitch — each new slot claims the best-fitting player
+  // still unclaimed (exact position first, then anyone compatible, then
+  // highest OVR), same greedy approach engine/tactics.js::
+  // changeFormationLive() uses for an in-match reshape. Anyone the new
+  // shape has no room for drops to the bench rather than falling out of
+  // the squad entirely.
+  function sbSelectFormationPreset(key) {
+    if (!sbDraft || !FORMATIONS[key]) return;
+    const newFormation = FORMATIONS[key];
+    const currentStarters = [];
+    Object.keys(sbDraft.slots).forEach(function(k) {
+      const id = sbDraft.slots[k];
+      const p = sbDraft.players.find(function(x) { return x.id === id; });
+      if (p) currentStarters.push(p);
+    });
+    const used = new Set();
+    const newAssign = {};
+    newFormation.slots.forEach(function(slot, i) {
+      const cand = currentStarters.filter(function(p) { return !used.has(p.id) && canPlay(p, slot); })
+        .sort(function(a, b) {
+          const aFit = (a.pos || []).includes(slot) ? 1 : 0;
+          const bFit = (b.pos || []).includes(slot) ? 1 : 0;
+          if (bFit !== aFit) return bFit - aFit;
+          return (b.ovr || 0) - (a.ovr || 0);
+        });
+      if (cand[0]) { used.add(cand[0].id); newAssign[i] = cand[0].id; }
+    });
+    currentStarters.forEach(function(p) {
+      if (!used.has(p.id)) sbDraft.bench.add(p.id);
+    });
+    sbDraft.formation = key;
+    sbDraft.slots = newAssign;
+    sbDraft.coords = newFormation.coords.map(function(c) { return c.slice(); });
+    sbDraft.selected = null;
+    renderFormationSelect();
+    renderSquadBuilderUI();
+  }
   function closeSquadBuilder() {
-    const panel = document.getElementById('squad-builder-panel');
-    if (panel) panel.style.display = 'none';
     sbDraft = null;
+    sbSide = null;
+    closeSlotPicker();
+    switchView('match');
+  }
+  function sbToggleEditMode() {
+    if (!sbDraft) return;
+    sbDraft.editMode = sbDraft.editMode === 'formation' ? 'lineup' : 'formation';
+    sbDraft.selected = null;
+    renderSquadBuilderUI();
   }
 
+  function sbResetFormationShape() {
+    if (!sbDraft) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    sbDraft.coords = formation.coords.map(function(c) { return c.slice(); });
+    renderSquadBuilderUI();
+    toast('Formation shape reset');
+  }
   function dedupeSquad(sq) {
     const seen = new Set();
     const starting = [];
@@ -6120,7 +6540,12 @@ var App = (() => {
     const drawTeam = (side) => {
       const s = m[side];
       const form = FORMATIONS[s.squad.formation] || FORMATIONS['4-3-3'];
-      const coords = form.coords || [];
+      // A hand-built lineup from the Squad Builder's formation editor may
+      // carry its own custom marker positions (squad.customCoords) rather
+      // than the preset's default coords — see saveSquadBuilder() and
+      // sbResetFormationShape() in ui/teamUI.js. Falls back to the preset
+      // shape for auto-built squads, exactly as before.
+      const coords = s.squad.customCoords || form.coords || [];
       const slots = form.slots || [];
       const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
       const allPlayers = [...(s.squad.starting || []), ...(s.squad.subs || []), ...(s.squad.all || [])];
@@ -11305,9 +11730,11 @@ var App = (() => {
     returnToTournament, showPlayerProfile, showTeamProfile, randomMatch,
     resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile,
     searchTeams, sortTeams, searchTournamentTeams,
-    openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker,
+    openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
     playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
     saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
+    sbSwitchSide, sbSwitchTab, sbSelectFormationPreset, sbToggleEditMode,
+    sbResetFormationShape, sbGrab, sbZoneGrab, sbEmptySlotTap, sbSetRole,
     setTacticsLive, continueToET, continueToPens, skipETAndEnd,
     renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
     simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, showMatchReportLeg,
