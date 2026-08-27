@@ -980,6 +980,13 @@
     "label": "gap"
   },
   {
+    "id": "c0111b",
+    "file": "ui/teamUI.js",
+    "start": 1554,
+    "end": 1554,
+    "label": "func:sbEffectiveSlotCode,openSlotRolePicker,setSquadSlotRole"
+  },
+  {
     "id": "c0112",
     "file": "ui/teamUI.js",
     "start": 1555,
