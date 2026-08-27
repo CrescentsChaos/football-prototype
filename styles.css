@@ -2219,6 +2219,13 @@ select.ss-native {
 .sb-chip-meta { font-size: 0.7rem; color: var(--text-3); }
 .sb-chip .sb-role-ic { position: static; background: none; width: auto; height: auto; }
 .sb-chip .captain-armband { position: static; }
+.sb-chip-move {
+  flex-shrink: 0; background: var(--bg-1); border: 1px solid var(--border);
+  color: var(--text-2); font-family: var(--font); font-size: 0.66rem; font-weight: 700;
+  padding: 4px 8px; border-radius: 20px; cursor: pointer; touch-action: manipulation;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.sb-chip-move:hover, .sb-chip-move:active { border-color: var(--gold); color: var(--gold); }
 .sb-empty-hint { color: var(--text-3); font-size: 0.78rem; text-align: center; padding: 20px 8px; }
 
 /* Match roles panel */
