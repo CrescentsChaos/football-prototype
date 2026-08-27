@@ -1671,7 +1671,8 @@
     {"id":"ita06_22","name":"Filippo Inzaghi","pos":["ST"],"ovr":86,"att":92,"def":20,"phy":70,"pac":82,"tec":76,"num":18},
     {"id":"ita06_23","name":"Vincenzo Iaquinta","pos":["ST","RW"],"ovr":84,"att":86,"def":35,"phy":87,"pac":86,"tec":73,"num":15},
     {"id":"ita06_24","name":"Alessandro Nesta","pos":["CB"],"ovr":94,"att":48,"def":97,"phy":88,"pac":80,"tec":90,"num":13},
-    {"id":"ita06_25","name":"Francesco Totti","pos":["CAM","ST"],"ovr":94,"att":94,"def":30,"phy":84,"pac":78,"tec":97,"num":10}
+    {"id":"ita06_25","name":"Francesco Totti","pos":["CAM","ST"],"ovr":94,"att":94,"def":30,"phy":84,"pac":78,"tec":97,"num":10},
+    {"id":"ita06_26","name":"Paolo Maldini","pos":["CB"],"ovr":95,"att":52,"def":98,"phy":88,"pac":86,"tec":84,"num":3}
   ],
   "manager": {
     "name": "Marcello Lippi",
@@ -6833,7 +6834,7 @@
       "num": 11
     },
     {
-      "id": "eng22",
+      "id": "bar26_27",
       "name": "Anthony Gordon",
       "pos": ["LW", "RW"],
       "ovr": 84,
@@ -7003,7 +7004,7 @@
       "num": 5
     },
     {
-      "id": "fra9",
+      "id": "bar26_23",
       "name": "Jules Koundé",
       "pos": ["CB", "RB"],
       "ovr": 87,
@@ -7727,7 +7728,7 @@
       "num": 13
     },
     {
-      "id": "cro15",
+      "id": "rso27_24",
       "name": "Luka Sučić",
       "pos": ["CM", "CAM", "RW"],
       "ovr": 83,
@@ -21392,15 +21393,15 @@
     {"id":"bar26_95","name":"Héctor Fort","pos":["RB","LB"],"ovr":76,"att":72,"def":74,"phy":70,"pac":82,"tec":76,"num":95},
     {"id":"bar26_2","name":"Roony Bardghji","pos":["RW","RM","CAM"],"ovr":77,"att":76,"def":42,"phy":68,"pac":80,"tec":80,"num":2},
     {"id":"bar26_6","name":"Gavi","pos":["CM","CAM"],"ovr":84,"att":78,"def":78,"phy":82,"pac":78,"tec":85,"num":6},
-    {"id":"bar26_8","name":"Pedri","pos":["CM","CAM"],"ovr":87,"att":82,"def":70,"phy":70,"pac":78,"tec":90,"num":8},
+    {"id":"esp14","name":"Pedri","pos":["CM","CAM"],"ovr":87,"att":82,"def":70,"phy":70,"pac":78,"tec":90,"num":8},
     {"id":"bar26_7","name":"Fermín López","pos":["CAM","CM"],"ovr":81,"att":80,"def":65,"phy":74,"pac":80,"tec":82,"num":7},
     {"id":"bar26_17","name":"Marc Casadó","pos":["CDM","CM"],"ovr":80,"att":70,"def":78,"phy":78,"pac":74,"tec":80,"num":17},
     {"id":"bar26_20","name":"Dani Olmo","pos":["CAM","LW","RW"],"ovr":85,"att":84,"def":52,"phy":70,"pac":80,"tec":88,"num":20},
     {"id":"bar26_21","name":"Frenkie de Jong","pos":["CM","CDM"],"ovr":87,"att":80,"def":78,"phy":78,"pac":80,"tec":89,"num":21},
     {"id":"bar26_22","name":"Marc Bernal","pos":["CDM","CM"],"ovr":76,"att":68,"def":76,"phy":76,"pac":70,"tec":78,"num":22},
-    {"id":"bar26_16_m","name":"Rodri","pos":["CDM","CM"],"ovr":91,"att":78,"def":88,"phy":84,"pac":66,"tec":88,"num":16},
-    {"id":"bar26_10","name":"Lamine Yamal","pos":["RW","RM"],"ovr":89,"att":88,"def":45,"phy":70,"pac":88,"tec":92,"num":10},
-    {"id":"bar26_11","name":"Raphinha","pos":["LW","RW","LM"],"ovr":87,"att":86,"def":55,"phy":76,"pac":88,"tec":86,"num":11},
+    {"id":"esp12","name":"Rodri","pos":["CDM","CM"],"ovr":91,"att":78,"def":88,"phy":84,"pac":66,"tec":88,"num":16},
+    {"id":"esp20","name":"Lamine Yamal","pos":["RW","RM"],"ovr":89,"att":88,"def":45,"phy":70,"pac":88,"tec":92,"num":10},
+    {"id":"bra18","name":"Raphinha","pos":["LW","RW","LM"],"ovr":87,"att":86,"def":55,"phy":76,"pac":88,"tec":86,"num":11},
     {"id":"bar26_14","name":"Karim Adeyemi","pos":["LW","ST","RW"],"ovr":82,"att":82,"def":40,"phy":72,"pac":94,"tec":80,"num":14},
     {"id":"bar26_27","name":"Anthony Gordon","pos":["LW","LM","RW"],"ovr":84,"att":82,"def":50,"phy":76,"pac":90,"tec":82,"num":27},
     {"id":"bar26_74","name":"Jesse Bisiwu","pos":["LW","RW"],"ovr":71,"att":70,"def":35,"phy":60,"pac":84,"tec":76,"num":74}
