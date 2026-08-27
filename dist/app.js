@@ -926,6 +926,57 @@ var App = (() => {
     return best;
   }
 
+  // Shared attribute-weight/skill-bonus tables — the single source of
+  // truth for both the auto-pick scoring below AND roleFitRating() (the
+  // "how good is this player at this role" number shown per-player in the
+  // Squad Builder's Match Roles panel), so the two never drift apart.
+  // Captain isn't included here since its scoring isn't an attribute
+  // blend (see roleFitRating's special case for it).
+  const ROLE_ATTR_WEIGHTS = {
+    shortFreeKick: { place_kick: 1.0, curl: 0.55, kick_pwr: 0.3, fin: 0.15, 'weak foot': 0.15 },
+    longFreeKick: { place_kick: 1.0, curl: 0.55, kick_pwr: 0.55, lofted_pass: 0.3, 'weak foot': 0.15 },
+    penalty: { place_kick: 1.0, fin: 0.5, kick_pwr: 0.35, curl: 0.2, 'weak foot': 0.15 },
+    leftCorner: { place_kick: 1.0, curl: 0.55, lofted_pass: 0.4, kick_pwr: 0.2, 'weak foot': 0.15 },
+    rightCorner: { place_kick: 1.0, curl: 0.55, lofted_pass: 0.4, kick_pwr: 0.2, 'weak foot': 0.15 },
+    cornerAtk1: { head: 1.0, jmp: 0.7, phy_con: 0.6, off_awr: 0.35, fin: 0.25 },
+    cornerAtk2: { head: 1.0, jmp: 0.7, phy_con: 0.6, off_awr: 0.35, fin: 0.25 },
+    cornerAtk3: { head: 1.0, jmp: 0.7, phy_con: 0.6, off_awr: 0.35, fin: 0.25 }
+  };
+  const ROLE_SKILL_BONUSES = {
+    shortFreeKick: ['Knuckle Shot', 'Dipping Shot', 'Chip Shot Control', 'First-time Shot'],
+    longFreeKick: ['Long-range Curler', 'Blitz Curler', 'Long Range Shooting', 'Outside Curler'],
+    penalty: ['Penalty Specialist'],
+    leftCorner: ['Pinpoint Crossing', 'Edged Crossing'],
+    rightCorner: ['Pinpoint Crossing', 'Edged Crossing'],
+    cornerAtk1: ['Heading', 'Bullet Header', 'Aerial Superiority', 'Aerial Fort'],
+    cornerAtk2: ['Heading', 'Bullet Header', 'Aerial Superiority', 'Aerial Fort'],
+    cornerAtk3: ['Heading', 'Bullet Header', 'Aerial Superiority', 'Aerial Fort']
+  };
+
+  // "How good is this player at this role" — a single 1-99, FIFA-card-style
+  // number combining the same attribute weights the auto-picker uses
+  // (as a weighted average, so it stays on a familiar 0-100-ish scale
+  // regardless of how many attributes feed a given role) with a small
+  // flat bump for any of that role's bonus skills. Used purely for
+  // display in the Squad Builder — assignMatchRoles()'s own scoring
+  // above is unaffected by this normalization.
+  function roleFitRating(p, roleKey) {
+    if (!p) return null;
+    if (roleKey === 'captain') {
+      let score = Math.round(p.ovr || 70);
+      if (hasSkill(p, 'Captaincy')) score = Math.min(99, score + 8);
+      return Math.max(1, Math.min(99, score));
+    }
+    const weights = ROLE_ATTR_WEIGHTS[roleKey];
+    if (!weights) return null;
+    let sum = 0, wsum = 0;
+    for (const key in weights) { sum += xattr(p, key, 65) * weights[key]; wsum += weights[key]; }
+    const base = wsum ? sum / wsum : 0;
+    const skills = ROLE_SKILL_BONUSES[roleKey] || [];
+    const bonus = skills.reduce((s, sk) => s + (hasSkill(p, sk) ? 3 : 0), 0);
+    return Math.max(1, Math.min(99, Math.round(base + bonus)));
+  }
+
   // Computes and returns the full role set for one side (m.home / m.away)
   // straight from its starting XI. Called once per side at match start —
   // never mutates anything on the players themselves.
@@ -959,48 +1010,55 @@ var App = (() => {
     // leads, Curl/Kicking Power support it, Finishing and weak-foot
     // reliability round it out.
     const shortFreeKick = manualPick('shortFreeKick') || _bestForRole(pool, (p) =>
-      _roleWeighted(p, { place_kick: 1.0, curl: 0.55, kick_pwr: 0.3, fin: 0.15, 'weak foot': 0.15 })
-      + _roleSkillBonus(p, ['Knuckle Shot', 'Dipping Shot', 'Chip Shot Control', 'First-time Shot'], 4));
+      _roleWeighted(p, ROLE_ATTR_WEIGHTS.shortFreeKick) + _roleSkillBonus(p, ROLE_SKILL_BONUSES.shortFreeKick, 4));
 
     // Long Free Kick — same base skill, but Kicking Power and Lofted Pass
     // matter more as the distance to goal grows.
     const longFreeKick = manualPick('longFreeKick') || _bestForRole(pool, (p) =>
-      _roleWeighted(p, { place_kick: 1.0, curl: 0.55, kick_pwr: 0.55, lofted_pass: 0.3, 'weak foot': 0.15 })
-      + _roleSkillBonus(p, ['Long-range Curler', 'Blitz Curler', 'Long Range Shooting', 'Outside Curler'], 4));
+      _roleWeighted(p, ROLE_ATTR_WEIGHTS.longFreeKick) + _roleSkillBonus(p, ROLE_SKILL_BONUSES.longFreeKick, 4));
 
     // Penalty — Set Piece Taking and Finishing lead, Kicking Power and
     // Curl help with placement, Penalty Specialist is a big flat edge.
     const penalty = manualPick('penalty') || _bestForRole(pool, (p) =>
-      _roleWeighted(p, { place_kick: 1.0, fin: 0.5, kick_pwr: 0.35, curl: 0.2, 'weak foot': 0.15 })
-      + _roleSkillBonus(p, ['Penalty Specialist'], 10)
+      _roleWeighted(p, ROLE_ATTR_WEIGHTS.penalty)
+      + _roleSkillBonus(p, ROLE_SKILL_BONUSES.penalty, 10)
       + _roleSkillBonus(p, ['Chip Shot Control'], 3)) || captain;
 
     // Corners — Set Piece Taking, Curl and Lofted Pass drive delivery
     // quality; foot preference nudges toward the swing each side naturally
     // produces (a right-footer for an in-swinging left corner, and a
     // left-footer for an in-swinging right corner).
-    const cornerBase = (p) => _roleWeighted(p, { place_kick: 1.0, curl: 0.55, lofted_pass: 0.4, kick_pwr: 0.2, 'weak foot': 0.15 })
-      + _roleSkillBonus(p, ['Pinpoint Crossing', 'Edged Crossing'], 4);
+    const cornerBase = (p) => _roleWeighted(p, ROLE_ATTR_WEIGHTS.leftCorner) + _roleSkillBonus(p, ROLE_SKILL_BONUSES.leftCorner, 4);
     const leftCorner = manualPick('leftCorner') || _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Right' ? 4 : -1));
     const rightCorner = manualPick('rightCorner') || _bestForRole(pool, (p) => cornerBase(p) + (_roleFoot(p) === 'Left' ? 4 : -1));
 
     // 3 corner-box attackers — the aerial targets pushed forward for the
     // team's own corners: Heading, Jump and Physical Contact lead, Height
     // and Offensive Awareness support, Finishing rounds it out since
-    // these are usually the ones getting the actual shot.
-    const attackerScore = (p) => _roleWeighted(p, { head: 1.0, jmp: 0.7, phy_con: 0.6, off_awr: 0.35, fin: 0.25 })
+    // these are usually the ones getting the actual shot. Each of the
+    // three slots (cornerAtk1/2/3) can be manually assigned from the
+    // Squad Builder same as any other role — a manual pick fills that
+    // slot outright, and any slots left on auto are filled by the best
+    // remaining eligible player, highest score first.
+    const attackerScore = (p) => _roleWeighted(p, ROLE_ATTR_WEIGHTS.cornerAtk1)
       + _roleHeightScore(p) * 0.15
-      + _roleSkillBonus(p, ['Heading', 'Bullet Header', 'Aerial Superiority', 'Aerial Fort'], 5);
-    const cornerAttackers = [];
+      + _roleSkillBonus(p, ROLE_SKILL_BONUSES.cornerAtk1, 5);
+    const cornerAttackers = [null, null, null];
     const usedIds = new Set();
+    ['cornerAtk1', 'cornerAtk2', 'cornerAtk3'].forEach((key, i) => {
+      const mp = manualPick(key);
+      if (mp && !usedIds.has(mp.id)) { cornerAttackers[i] = mp; usedIds.add(mp.id); }
+    });
     for (let i = 0; i < 3; i++) {
+      if (cornerAttackers[i]) continue;
       const pick = _bestForRole(pool, attackerScore, usedIds);
-      if (!pick) break;
-      cornerAttackers.push(pick);
+      if (!pick) continue;
+      cornerAttackers[i] = pick;
       usedIds.add(pick.id);
     }
+    const cornerAttackersFinal = cornerAttackers.filter(Boolean);
 
-    return { captain, shortFreeKick, longFreeKick, penalty, leftCorner, rightCorner, cornerAttackers };
+    return { captain, shortFreeKick, longFreeKick, penalty, leftCorner, rightCorner, cornerAttackers: cornerAttackersFinal };
   }
   // Small HTML badges for the lineup list — captain armband plus icons for
   // whichever set-piece duties this player has been assigned for their
@@ -1017,6 +1075,8 @@ var App = (() => {
     if (isFk) out += '<span class="li-icon" title="Free-kick taker">🦶</span>';
     const isCk = (roles.leftCorner && roles.leftCorner.id === p.id) || (roles.rightCorner && roles.rightCorner.id === p.id);
     if (isCk) out += '<span class="li-icon" title="Corner taker">🚩</span>';
+    const isCa = (roles.cornerAttackers || []).some((cp) => cp && cp.id === p.id);
+    if (isCa) out += '<span class="li-icon" title="Corner-box attacker">⬆️</span>';
     return out;
   }
   function formationShape(formationKey) {
@@ -2438,7 +2498,18 @@ var App = (() => {
     const mgrLine = mgr ? `<div class="manager-name">${managerAvatarMark(team.manager, 20)} Manager: ${mgr}${style ? ' <span class="playstyle-tag">· ' + style + '</span>' : ''}</div>` : '';
     el.innerHTML = `<span class="team-flag">${teamMark(team, 32)}</span><div><div class="team-name">${team.name}</div>${mgrLine}<div style="font-size:0.8rem;color:var(--text-muted)">${(team.players||[]).length} players</div>${venueLine}</div>`;
     const formSel = document.getElementById(side + '-formation');
-    if (formSel) formSel.value = pickTeamFormation(team);
+    if (formSel) {
+      // If this side has a saved custom lineup for the currently-selected
+      // team, keep the visible formation dropdown in sync with *that*
+      // lineup's formation rather than overwriting it with the team's
+      // computed default — otherwise the dropdown (which startMatch()
+      // reads to decide whether the custom lineup still applies) silently
+      // drifts away from what was actually saved in the Squad Builder,
+      // and the custom lineup gets discarded at kickoff even though it
+      // saved successfully.
+      const custom = customLineups[side];
+      formSel.value = (custom && custom._teamId === team.id) ? custom.formation : pickTeamFormation(team);
+    }
   }
 
   // Picks a formation for a team. If the team has a "formation" key set in
@@ -2712,15 +2783,42 @@ var App = (() => {
     }
     // destKind === 'reserve': already detached above, nothing further to do.
   }
+
+  // One-tap alternatives to dragging a chip between the Substitutes and
+  // Reserves lists — same underlying move as a drag/drop onto that zone,
+  // just addressable directly from a button on the chip itself. No-ops
+  // quietly (via sbPlacePlayer's own guards) if the player is already
+  // where they're being asked to go, or the bench is already full.
+  function sbMoveToReserve(playerId) {
+    if (!sbDraft) return;
+    const source = sbLocateInDraft(playerId);
+    sbPlacePlayer(source, 'reserve');
+    sbDraft.selected = null;
+    renderSquadBuilderUI();
+  }
+
+  function sbMoveToBench(playerId) {
+    if (!sbDraft) return;
+    const source = sbLocateInDraft(playerId);
+    sbPlacePlayer(source, 'bench');
+    sbDraft.selected = null;
+    renderSquadBuilderUI();
+  }
   function openSquadBuilder(side) {
     try {
       sbSide = side;
       const teamSel = document.getElementById(side + '-team');
       const formSel = document.getElementById(side + '-formation');
       const teamId = teamSel && teamSel.value;
-      const formKey = (formSel && formSel.value) || '4-3-3';
       const team = getTeam(teamId);
       if (!team) { toast('Select a team first'); return; }
+
+      // Prefer whatever formation this side's saved custom lineup actually
+      // used (if it's for this same team) over the visible dropdown value —
+      // this is what lets a saved custom formation survive even if the
+      // dropdown display ever falls out of sync for any reason.
+      const savedForTeam = (customLineups[side] && customLineups[side]._teamId === team.id) ? customLineups[side] : null;
+      const formKey = (savedForTeam && savedForTeam.formation) || (formSel && formSel.value) || '4-3-3';
 
       const formation = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
       const players = [];
@@ -3009,10 +3107,23 @@ var App = (() => {
       }
       return auto ? auto[key] : null;
     };
+    // The 3 corner-box attackers aren't a single named field on `auto` —
+    // they're auto.cornerAttackers[0..2] — but otherwise follow the exact
+    // same manual-override-then-auto-fallback pattern as every other role.
+    const pickCornerAtk = function(idx) {
+      const key = 'cornerAtk' + (idx + 1);
+      const manualId = (sbDraft.roles || {})[key];
+      if (manualId) {
+        const mp = startersArr.find(function(p) { return p.id === manualId; });
+        if (mp) return mp;
+      }
+      return (auto && auto.cornerAttackers) ? (auto.cornerAttackers[idx] || null) : null;
+    };
     return {
       captain: pick('captain'), penalty: pick('penalty'),
       shortFreeKick: pick('shortFreeKick'), longFreeKick: pick('longFreeKick'),
       leftCorner: pick('leftCorner'), rightCorner: pick('rightCorner'),
+      cornerAtk1: pickCornerAtk(0), cornerAtk2: pickCornerAtk(1), cornerAtk3: pickCornerAtk(2),
       auto: auto, startersArr: startersArr
     };
   }
@@ -3027,6 +3138,8 @@ var App = (() => {
     if (isFk) out += '<span class="sb-role-ic" title="Free-kick taker">🦶</span>';
     const isCk = (eff.leftCorner && eff.leftCorner.id === playerId) || (eff.rightCorner && eff.rightCorner.id === playerId);
     if (isCk) out += '<span class="sb-role-ic" title="Corner taker">🚩</span>';
+    const isCa = [eff.cornerAtk1, eff.cornerAtk2, eff.cornerAtk3].some(function(p) { return p && p.id === playerId; });
+    if (isCa) out += '<span class="sb-role-ic" title="Corner-box attacker">⬆️</span>';
     return out;
   }
   function closeSlotPicker() {
@@ -3037,12 +3150,23 @@ var App = (() => {
     const isSel = sbDraft.selected && sbDraft.selected.id === p.id;
     const inj = isPlayerInjured(p.id);
     const susp = isPlayerSuspended(p.id);
+    // Bench <-> reserve rows also get a one-tap move button as a
+    // drag-and-drop alternative — same move sbPlacePlayer() already does
+    // for a drop, just reachable without a pointer drag.
+    let moveBtn = '';
+    if (kind === 'bench') {
+      moveBtn = '<button type="button" class="sb-chip-move" title="Move to reserves"' +
+        ' onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();App.sbMoveToReserve(\'' + p.id + '\')">Reserve ⇩</button>';
+    } else if (kind === 'reserve') {
+      moveBtn = '<button type="button" class="sb-chip-move" title="Move to substitutes"' +
+        ' onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();App.sbMoveToBench(\'' + p.id + '\')">Sub ⇧</button>';
+    }
     return '<div class="sb-chip' + (isSel ? ' selected' : '') + '"' +
       ' onpointerdown="event.stopPropagation();App.sbGrab(event,\'' + kind + '\',\'' + p.id + '\')">' +
       '<span class="sb-chip-num">' + (p.num || '?') + '</span>' +
       '<span class="sb-chip-name">' + p.name + (inj ? ' 🩹' : '') + (susp ? ' 🟥' : '') + '</span>' +
       '<span class="sb-chip-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span>' +
-      sbRoleTagHTML(p.id) +
+      sbRoleTagHTML(p.id) + moveBtn +
       '</div>';
   }
 
@@ -3079,18 +3203,30 @@ var App = (() => {
     const roleDefs = [
       ['captain', 'Captain'], ['penalty', 'Penalty Taker'],
       ['shortFreeKick', 'Short Free-Kick'], ['longFreeKick', 'Long Free-Kick'],
-      ['leftCorner', 'Left Corner'], ['rightCorner', 'Right Corner']
+      ['leftCorner', 'Left Corner'], ['rightCorner', 'Right Corner'],
+      ['cornerAtk1', 'Corner Attacker 1'], ['cornerAtk2', 'Corner Attacker 2'], ['cornerAtk3', 'Corner Attacker 3']
     ];
     if (!starters.length) return '<p class="sb-empty-hint">Fill your starting XI to assign match roles.</p>';
     return roleDefs.map(function(def) {
       const key = def[0], label = def[1];
-      const autoP = eff.auto && eff.auto[key];
+      // The 3 corner-box attacker slots aren't a named field on eff — read
+      // them from eff.cornerAtk1/2/3 (computed in sbEffectiveRoles) same
+      // as every other role for display purposes.
+      const autoP = (key.indexOf('cornerAtk') === 0)
+        ? (eff.auto && eff.auto.cornerAttackers && eff.auto.cornerAttackers[+key.slice(-1) - 1])
+        : (eff.auto && eff.auto[key]);
+      // Each option shows a 1-99 "fit" rating for that role next to the
+      // player's name — the same scoring the auto-pick above uses, so the
+      // number you see is exactly why the auto pick is who it is.
       const opts = starters.map(function(p) {
-        return '<option value="' + p.id + '"' + ((sbDraft.roles || {})[key] === p.id ? ' selected' : '') + '>' + p.name + '</option>';
+        const rating = roleFitRating(p, key);
+        return '<option value="' + p.id + '"' + ((sbDraft.roles || {})[key] === p.id ? ' selected' : '') + '>' +
+          p.name + (rating != null ? ' — ' + rating : '') + '</option>';
       }).join('');
+      const autoRating = autoP ? roleFitRating(autoP, key) : null;
       return '<div class="sb-role-row"><label>' + label + '</label>' +
         '<select onchange="App.sbSetRole(\'' + key + '\', this.value)">' +
-        '<option value="">Auto' + (autoP ? ' — ' + autoP.name : '') + '</option>' + opts +
+        '<option value="">Auto' + (autoP ? ' — ' + autoP.name + (autoRating != null ? ' (' + autoRating + ')' : '') : '') + '</option>' + opts +
         '</select></div>';
     }).join('');
   }
@@ -3270,9 +3406,15 @@ var App = (() => {
       manualRoles: manualRoles, customCoords: sbDraft.coords.map(function(c) { return c.slice(); }),
       customSlotRoles: Object.assign({}, sbDraft.slotRoles)
     };
-    toast((sbSide === 'home' ? 'Home' : 'Away') + ' lineup saved (' + starting.length + '+' + subs.length + ')');
+    // Capture the side before closeSquadBuilder() clears the module-level
+    // sbSide/sbDraft — calling updateTeamPreview(sbSide) *after* close used
+    // to run it with sbSide already null, which made it silently no-op and
+    // leave the home/away formation dropdown showing its old value even
+    // though the new formation had just been saved successfully.
+    const savedSide = sbSide;
+    toast((savedSide === 'home' ? 'Home' : 'Away') + ' lineup saved (' + starting.length + '+' + subs.length + ')');
     closeSquadBuilder();
-    updateTeamPreview(sbSide);
+    updateTeamPreview(savedSide);
   }
   // Switching to a different preset formation tries to keep your current
   // starters on the pitch — each new slot claims the best-fitting player
@@ -3336,6 +3478,47 @@ var App = (() => {
     sbDraft.coords = formation.coords.map(function(c) { return c.slice(); });
     renderSquadBuilderUI();
     toast('Formation shape reset');
+  }
+
+  // Exports the current draft's formation shape — slot codes (including
+  // any per-slot role overrides from setSquadSlotRole) and marker
+  // coordinates (including any reshaping done in "Edit Formation Shape"
+  // mode) — as a downloadable snippet in the exact object shape the
+  // built-in FORMATIONS table (js/state.js) uses, so it can be pasted in
+  // by hand as a new named entry and picked up by build.js on the next
+  // build. This only ever reads sbDraft; it doesn't save/mutate anything.
+  function sbExportFormation() {
+    if (!sbDraft) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const slots = formation.slots.map(function(_, idx) { return sbEffectiveSlotCode(idx); });
+    const coords = sbDraft.coords.map(function(c) {
+      const x = Math.round(((c && c[0]) || 0) * 10) / 10;
+      const y = Math.round(((c && c[1]) || 0) * 10) / 10;
+      return [x, y];
+    });
+    const baseName = (formation.name || sbDraft.formation) + ' (Custom)';
+    const key = 'custom-' + String(sbDraft.formation).replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-' + Date.now().toString(36).slice(-5);
+    const slotsStr = slots.map(function(s) { return "'" + s + "'"; }).join(', ');
+    const coordsStr = coords.map(function(c) { return '[' + c[0] + ',' + c[1] + ']'; }).join(',');
+    const snippet =
+      '// Paste this as a new entry inside the FORMATIONS object in js/state.js,\n' +
+      '// then run `node build.js` to fold it into dist/app.js.\n' +
+      "  '" + key + "': { name: '" + baseName.replace(/'/g, "\\'") + "', slots: [" + slotsStr + '],\n' +
+      '    coords: [' + coordsStr + '] },\n';
+    try {
+      const blob = new Blob([snippet], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = key + '.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+      toast('Formation exported — paste it into FORMATIONS in js/state.js');
+    } catch (e) {
+      toast('Export failed: ' + (e && e.message ? e.message : e));
+    }
   }
   function dedupeSquad(sq) {
     const seen = new Set();
@@ -11992,6 +12175,7 @@ var App = (() => {
     saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
     sbSwitchSide, sbSwitchTab, sbSelectFormationPreset, sbToggleEditMode,
     sbResetFormationShape, sbGrab, sbZoneGrab, sbEmptySlotTap, sbSetRole,
+    sbMoveToBench, sbMoveToReserve, sbExportFormation,
     setTacticsLive, continueToET, continueToPens, skipETAndEnd,
     renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
     simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, showMatchReportLeg,
