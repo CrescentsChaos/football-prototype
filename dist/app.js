@@ -200,7 +200,52 @@ var App = (() => {
     GK: ['GK'], CB: ['CB','RB','LB'], RB: ['RB','CB','RWB','RM'], LB: ['LB','CB','LWB','LM'],
     RWB: ['RWB','RB','RM'], LWB: ['LWB','LB','LM'], CDM: ['CDM','CM','CB'], CM: ['CM','CDM','CAM'],
     CAM: ['CAM','CM','RW','LW','ST','CMF','SS'], RM: ['RM','RW','RWB','CM','RMF'], LM: ['LM','LW','LWB','CM','LMF'],
-    RW: ['RW','RM','ST','CAM','RWF'], LW: ['LW','LM','ST','CAM','LWF'], ST: ['ST','RW','LW','CAM','CF','SS']
+    RW: ['RW','RM','ST','CAM','RWF'], LW: ['LW','LM','ST','CAM','LWF'], ST: ['ST','RW','LW','CAM','CF','SS'],
+    // Several FORMATIONS entries use 'CF' as a distinct slot label from
+    // 'ST' (e.g. 4-4-2, 3-5-2, the False 9 shape) even though a player's
+    // own position data is always canonicalized to 'ST' — see
+    // normalizePlayerPos()/POS_ALIASES below, where CF -> ST. Without this
+    // entry, canPlay() has no compatibility list for the 'CF' slot at all
+    // (falls back to requiring the literal string 'CF', which no
+    // normalized player position ever is), so a 'CF' slot could never be
+    // filled by anyone — treat it exactly like 'ST' here so it isn't a
+    // slot no player can ever be considered comfortable in.
+    CF: ['ST','RW','LW','CAM','CF','SS']
+  };
+
+  // Sensible in-slot role changes for the squad builder — tapping a
+  // position on the pitch (e.g. CM) offers only the handful of role
+  // shifts that stay tactically coherent for that same physical slot
+  // (CM can push forward to CAM or drop to CDM; it can't become a
+  // winger or a centre-back). This is intentionally narrower than
+  // POS_COMPAT above, which answers a different question ("which
+  // players are eligible to fill this slot") — this answers "what can
+  // this slot itself become". Every list includes its own code first so
+  // callers can always fall back to "no change" as option one.
+  const POS_ROLE_ALTS = {
+    GK: ['GK'],
+    CB: ['CB'],
+    RB: ['RB', 'RWB', 'RM'],
+    LB: ['LB', 'LWB', 'LM'],
+    RWB: ['RWB', 'RB', 'RM'],
+    LWB: ['LWB', 'LB', 'LM'],
+    CDM: ['CDM', 'CM'],
+    CM: ['CM', 'CDM', 'CAM'],
+    CAM: ['CAM', 'CM'],
+    RM: ['RM', 'RW', 'RWB'],
+    LM: ['LM', 'LW', 'LWB'],
+    RW: ['RW', 'RM', 'CAM'],
+    LW: ['LW', 'LM', 'CAM'],
+    ST: ['ST', 'CF'],
+    CF: ['CF', 'ST']
+  };
+  // Human-readable names for the role picker — the slot codes alone
+  // (CDM, CAM...) aren't self-explanatory to everyone at a glance.
+  const POS_ROLE_NAMES = {
+    GK: 'Goalkeeper', CB: 'Centre-Back', RB: 'Right-Back', LB: 'Left-Back',
+    RWB: 'Right Wing-Back', LWB: 'Left Wing-Back', CDM: 'Defensive Mid',
+    CM: 'Central Mid', CAM: 'Attacking Mid', RM: 'Right Mid', LM: 'Left Mid',
+    RW: 'Right Wing', LW: 'Left Wing', ST: 'Striker', CF: 'Centre-Forward'
   };
 
   // Different data sources (teams.json, player-attributes.json) name the
@@ -1011,6 +1056,91 @@ var App = (() => {
     if (!p) return 'MID';
     const slot = p.slot || (p.pos || [])[0] || 'CM';
     return POS_LINE[slot] || 'MID';
+  }
+
+  // ===================================================================
+  // ============ FORMATION/SUBSTITUTION POSITIONAL FIT =================
+  // ===================================================================
+  // A real bipartite matching (Kuhn's algorithm with augmenting paths),
+  // not just a greedy best-fit pass — so "can this squad actually fill
+  // this formation" is answered correctly even when a greedy slot-by-slot
+  // assignment would wrongly claim it can't (or silently strand someone
+  // in a slot they're not compatible with). n is at most ~11 here, so
+  // this is effectively instant.
+  //
+  // Preferring each player's exact position first (slotOrderFor) doesn't
+  // change *whether* a full matching exists, only which valid matching we
+  // land on — so results still read as natural fits rather than an
+  // arbitrary technically-legal shuffle.
+  function slotOrderFor(player, slots) {
+    const order = slots.map((slot, i) => ({ i, slot }));
+    order.sort((a, b) => {
+      const aFit = (player.pos || []).includes(a.slot) ? 1 : 0;
+      const bFit = (player.pos || []).includes(b.slot) ? 1 : 0;
+      return bFit - aFit;
+    });
+    return order;
+  }
+
+  // Returns an array (indexed by slot position) of player indices forming
+  // a complete, fully position-compatible assignment of `players` onto
+  // `formKey`'s slots — or null if no such complete assignment exists.
+  function matchPlayersToFormation(players, formKey) {
+    const formation = FORMATIONS[formKey];
+    if (!formation) return null;
+    const slots = formation.slots;
+    if (!players || !players.length || players.length > slots.length) return null;
+    const slotToPlayer = new Array(slots.length).fill(-1);
+
+    function tryAssign(playerIdx, visited) {
+      const order = slotOrderFor(players[playerIdx], slots);
+      for (const entry of order) {
+        const s = entry.i, slot = entry.slot;
+        if (visited.has(s)) continue;
+        if (!canPlay(players[playerIdx], slot)) continue;
+        visited.add(s);
+        if (slotToPlayer[s] === -1 || tryAssign(slotToPlayer[s], visited)) {
+          slotToPlayer[s] = playerIdx;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    for (let i = 0; i < players.length; i++) {
+      const visited = new Set();
+      if (!tryAssign(i, visited)) return null;
+    }
+    return slotToPlayer;
+  }
+
+  // Whether `players` (typically the 11 currently on the pitch) can all be
+  // placed somewhere they're actually comfortable in `formKey` — the gate
+  // changeFormationLive() checks before ever applying a reshape, so a
+  // manager (AI or human) never switches into a shape that would strand
+  // one of their own players out of position.
+  function canFormationFitSquad(players, formKey) {
+    return matchPlayersToFormation(players, formKey) !== null;
+  }
+
+  // Where an incoming substitute should actually line up. Prefers the
+  // exact slot the outgoing player vacated (the normal like-for-like
+  // case), but only if the sub is genuinely comfortable there — a
+  // deliberate tactical swap (attacker on for a defender, or vice versa)
+  // or a forced emergency sub should never leave the incoming player
+  // parked in a position they can't play. Falls back to their own
+  // natural position if it's part of the current formation, then to any
+  // formation slot they can play, and only as an absolute last resort to
+  // their natural position anyway (better than nothing when even the
+  // formation's own slot list has no fit — e.g. a badly thinned-out bench).
+  function pickSlotForIncomingSub(inPlayer, formationKey, outSlot) {
+    if (outSlot && canPlay(inPlayer, outSlot)) return outSlot;
+    const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
+    const natural = (inPlayer.pos || [])[0];
+    if (natural && formation.slots.includes(natural)) return natural;
+    const compatSlot = formation.slots.find(s => canPlay(inPlayer, s));
+    if (compatSlot) return compatSlot;
+    return natural || 'CM';
   }
 
 
@@ -2612,19 +2742,21 @@ var App = (() => {
       let bench = new Set();
       let roles = {};
       let coords = formation.coords.map(c => c.slice());
+      let slotRoles = {};
       const saved = customLineups[side];
       if (saved && saved.formation === formKey && saved._teamId === team.id) {
         saved.starting.forEach((p, i) => { slots[i] = p.id; });
         (saved.subs || []).forEach(p => bench.add(p.id));
         roles = Object.assign({}, saved.manualRoles || {});
         if (saved.customCoords) coords = saved.customCoords.map(c => c.slice());
+        if (saved.customSlotRoles) slotRoles = Object.assign({}, saved.customSlotRoles);
       } else {
         const auto = buildSquad(team, formKey);
         auto.starting.forEach((p, i) => { slots[i] = p.id; });
         (auto.subs || []).slice(0, 9).forEach(p => bench.add(p.id));
       }
 
-      sbDraft = { side, team, formation: formKey, slots, bench, roles, players, coords, editMode: 'lineup', selected: null };
+      sbDraft = { side, team, formation: formKey, slots, bench, roles, players, coords, slotRoles, editMode: 'lineup', selected: null };
       switchView('squadbuilder');
       const titleEl = document.getElementById('sb-page-title');
       if (titleEl) titleEl.textContent = (side === 'home' ? 'HOME' : 'AWAY') + ' · ' + team.name;
@@ -2724,14 +2856,18 @@ var App = (() => {
     const el = document.getElementById('sb-pitch');
     if (!el) return;
     const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
-    const slots = formation.slots;
+    const baseSlots = formation.slots;
     const team = sbDraft.team;
     const primary = team.color || '#1a237e';
     const secondary = team.secondary || '#ffffff';
     const editMode = sbDraft.editMode === 'formation';
 
     let dots = '';
-    slots.forEach(function(slot, idx) {
+    baseSlots.forEach(function(baseSlot, idx) {
+      // The slot's *effective* role — its own manually-picked alternate
+      // (e.g. a CM tapped into playing CAM) if one's been set, otherwise
+      // the formation's default code for this position.
+      const slot = sbEffectiveSlotCode(idx);
       const c = sbDraft.coords[idx] || formation.coords[idx] || [50, 50];
       const x = c[0], y = c[1];
       const pid = sbDraft.slots[idx];
@@ -2739,25 +2875,102 @@ var App = (() => {
       const filled = !!p;
       const isSelected = !editMode && sbDraft.selected && sbDraft.selected.kind === 'slot' && sbDraft.selected.slotIdx === idx;
       const roleTag = (!editMode && p) ? sbRoleTagHTML(p.id) : '';
-      const avatar = editMode ? '<span class="sb-dot-slot-code">' + slot + '</span>'
+      const avatar = editMode ? '<span class="sb-dot-slot-code">' + baseSlot + '</span>'
         : (p ? playerAvatarMark(p) : '<span class="sb-dot-plus">+</span>');
+      // Empty slots show the position code once (as the name line only) —
+      // previously both dot-num and dot-name were set to the same slot
+      // string, which rendered the position name twice back-to-back
+      // (e.g. "CAMCAM").
       const label = editMode ? ''
-        : '<span class="dot-label"><span class="dot-num">' + (p ? (p.num || '?') : slot) + '</span>' +
+        : '<span class="dot-label"><span class="dot-num">' + (p ? (p.num || '?') : '') + '</span>' +
           '<span class="dot-name">' + (p ? abbreviateName(p.name) : slot) + '</span></span>';
       const emptyTapHandler = (!filled && !editMode) ? ' onclick="App.sbEmptySlotTap(' + idx + ')"' : '';
+      // Small tappable badge showing the slot's current role code — lets
+      // you tap CM to switch it to CAM/CDM etc without disturbing the
+      // player-select/drag tap already bound to the rest of the dot.
+      // Only rendered where there's actually more than one sensible
+      // alternative (a GK or CB slot has nowhere sensible to go).
+      const alts = POS_ROLE_ALTS[baseSlot] || [baseSlot];
+      const roleBadge = (!editMode && alts.length > 1)
+        ? '<span class="sb-slot-role-badge' + (slot !== baseSlot ? ' changed' : '') + '"' +
+          ' title="Change position role" onpointerdown="event.stopPropagation()"' +
+          ' onclick="event.stopPropagation();App.openSlotRolePicker(' + idx + ')">' + slot + '</span>'
+        : '';
       dots += '<div id="sb-dot-' + idx + '" class="sb-dot' + (filled ? ' filled' : '') + (isSelected ? ' selected' : '') + (editMode ? ' edit-mode' : '') + '"' +
         ' data-sb-drop="slot" data-slot-idx="' + idx + '"' +
         ' style="left:' + x + '%;top:' + y + '%;background:' + primary + ';border-color:' + secondary + '"' +
         ' onpointerdown="event.stopPropagation();App.sbGrab(event,\'slot\',' + idx + ')"' + emptyTapHandler + '>' +
-        '<span class="dot-avatar">' + avatar + '</span>' + roleTag + label +
+        '<span class="dot-avatar">' + avatar + '</span>' + roleTag + roleBadge + label +
         '</div>';
     });
     el.innerHTML = '<div class="pitch-label">' + teamMark(team, 16) + ' ' + (team.short || team.name) + ' · ' + formation.name + '</div>' + dots;
   }
-  function openSlotPicker(index) {
+  // Resolves slot idx -> its currently-active position code: the manual
+  // override in sbDraft.slotRoles if one was picked, else the formation's
+  // own default for that slot. Centralized here so every consumer of "what
+  // position is this slot" (rendering, the player-eligibility picker, and
+  // what actually gets saved/played) agrees with each other.
+  function sbEffectiveSlotCode(idx) {
+    if (!sbDraft) return null;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const base = formation.slots[idx];
+    const override = sbDraft.slotRoles && sbDraft.slotRoles[idx];
+    return (override && (POS_ROLE_ALTS[base] || []).includes(override)) ? override : base;
+  }
+
+  // Opens the same picker panel used for choosing a player, but filled
+  // with this slot's sensible role alternatives instead (see
+  // POS_ROLE_ALTS) — tapping the little position badge on a pitch dot.
+  function openSlotRolePicker(idx) {
     if (!sbDraft) return;
     const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
-    const slot = formation.slots[index];
+    const base = formation.slots[idx];
+    const alts = POS_ROLE_ALTS[base] || [base];
+    if (alts.length < 2) return;
+    const current = sbEffectiveSlotCode(idx);
+    let picker = document.getElementById('sb-picker');
+    if (!picker) return;
+    picker.style.display = 'block';
+    picker.innerHTML = '<div class="sb-picker-head"><strong>Position Role</strong>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="App.closeSlotPicker()">Close</button></div>' +
+      '<div class="sb-picker-list">' + alts.map(function(code) {
+        const name = POS_ROLE_NAMES[code] || code;
+        return '<button type="button" class="sb-picker-item' + (code === current ? ' selected' : '') + '"' +
+          ' onclick="App.setSquadSlotRole(' + idx + ',\'' + code + '\')">' +
+          '<span class="sb-bench-num">' + code + '</span>' +
+          '<span class="sb-bench-name">' + name + '</span>' +
+          (code === base ? '<span class="sb-bench-meta">default</span>' : '<span class="sb-bench-meta">alt role</span>') +
+          '</button>';
+      }).join('') + '</div>';
+    picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // Applies a role change to a slot. Switching a slot's role can leave
+  // its current occupant no longer eligible there (e.g. CM -> CAM is
+  // fine for most central mids, but not for a pure CDM specialist) — if
+  // so, they're bumped back to the bench rather than left illegally
+  // filling a position they can't actually play, same as a formation
+  // change does.
+  function setSquadSlotRole(idx, code) {
+    if (!sbDraft) return;
+    const formation = FORMATIONS[sbDraft.formation] || FORMATIONS['4-3-3'];
+    const base = formation.slots[idx];
+    if (code === base) { delete sbDraft.slotRoles[idx]; }
+    else { sbDraft.slotRoles[idx] = code; }
+    const pid = sbDraft.slots[idx];
+    if (pid) {
+      const p = sbDraft.players.find(function(x) { return x.id === pid; });
+      if (p && !canPlay(p, code)) {
+        delete sbDraft.slots[idx];
+        if (sbDraft.bench.size < 14) sbDraft.bench.add(pid);
+      }
+    }
+    closeSlotPicker();
+    renderSquadBuilderUI();
+  }
+  function openSlotPicker(index) {
+    if (!sbDraft) return;
+    const slot = sbEffectiveSlotCode(index);
     const used = getUsedInDraft();
     const selected = sbDraft.slots[index] || '';
     const list = sbDraft.players
@@ -2794,7 +3007,7 @@ var App = (() => {
     const startersArr = formation.slots.map(function(slot, i) {
       const id = sbDraft.slots[i];
       const p = id ? sbDraft.players.find(function(x) { return x.id === id; }) : null;
-      return p ? Object.assign({}, p, { slot: slot }) : null;
+      return p ? Object.assign({}, p, { slot: sbEffectiveSlotCode(i) }) : null;
     }).filter(Boolean);
     const auto = startersArr.length ? assignMatchRoles({ squad: { starting: startersArr } }) : null;
     const pick = function(key) {
@@ -3043,7 +3256,7 @@ var App = (() => {
       const p = sbDraft.players.find(function(x) { return x.id === id; });
       if (!p) continue;
       used.add(id);
-      starting.push(Object.assign({}, p, { slot: formation.slots[i], isStarter: true }));
+      starting.push(Object.assign({}, p, { slot: sbEffectiveSlotCode(i), isStarter: true }));
     }
     if (starting.length < 11) { toast('Need 11 unique starters'); return; }
     const subs = [];
@@ -3063,7 +3276,8 @@ var App = (() => {
     customLineups[sbSide] = {
       starting: starting, subs: subs, formation: sbDraft.formation,
       all: starting.concat(subs), _teamId: sbDraft.team.id,
-      manualRoles: manualRoles, customCoords: sbDraft.coords.map(function(c) { return c.slice(); })
+      manualRoles: manualRoles, customCoords: sbDraft.coords.map(function(c) { return c.slice(); }),
+      customSlotRoles: Object.assign({}, sbDraft.slotRoles)
     };
     toast((sbSide === 'home' ? 'Home' : 'Away') + ' lineup saved (' + starting.length + '+' + subs.length + ')');
     closeSquadBuilder();
@@ -3103,6 +3317,11 @@ var App = (() => {
     sbDraft.formation = key;
     sbDraft.slots = newAssign;
     sbDraft.coords = newFormation.coords.map(function(c) { return c.slice(); });
+    // A new formation shape means slot index 3 in the old shape isn't the
+    // same physical position as slot index 3 in the new one — any manual
+    // CM->CAM style role tweaks would silently apply to the wrong slot, so
+    // start the new shape with its own default roles.
+    sbDraft.slotRoles = {};
     sbDraft.selected = null;
     renderFormationSelect();
     renderSquadBuilderUI();
@@ -5721,7 +5940,14 @@ var App = (() => {
     }
     if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => lineOf(p) === outLine); tacticalChange = false; }
     if (!candidatesIn.length) { candidatesIn = availableSubs.filter(p => canPlay(p, outSlot)); matchedOwnPosition = false; tacticalChange = false; }
-    if (!candidatesIn.length) { candidatesIn = availableSubs; matchedOwnPosition = false; tacticalChange = false; }
+    // No further fallback: a manager doesn't send on a player who can't
+    // actually play anywhere near the role being vacated. If the bench
+    // genuinely offers nobody position-compatible, skip this substitution
+    // rather than force someone into a position they're not comfortable
+    // in — trySubstitution() gets called again on later minutes (see
+    // engine/matchEngine.js), so a fitting sub can still happen once one
+    // becomes available (e.g. after a different sub or in a wider window).
+    if (!candidatesIn.length) return;
 
     // Positional need on top of raw quality: if this line is specifically
     // being outrun by the opponent (the same mismatch signal that pushed
@@ -5745,17 +5971,20 @@ var App = (() => {
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
-    // The substitute always inherits the exact pitch slot the outgoing
-    // player vacated (outSlot) — never their own "natural" position. This
-    // is what real substitutions do (the sub takes over that role on the
-    // pitch) and it's also what keeps the on-pitch rendering correct:
-    // onPitchIds/formation.slots stay index-aligned throughout the match
-    // (see buildSquad() in ui/teamUI.js and drawTeam() in ui/matchUI.js),
-    // so assigning anything other than outSlot here — e.g. the incoming
-    // player's own best position, which may not even be a slot that
-    // exists in the team's current formation — is what used to make subs
-    // appear to land in random/weird spots on the pitch.
-    inPlayer.slot = outSlot;
+    // The substitute inherits the outgoing player's exact pitch slot
+    // (outSlot) whenever they're actually comfortable there — the normal
+    // like-for-like case, and also what keeps the on-pitch rendering
+    // correctly index-aligned (see buildSquad() in ui/teamUI.js and
+    // drawTeam() in ui/matchUI.js). For a deliberate tactical change
+    // (tacticalChange above — an attacker on for a defender or vice
+    // versa), the incoming player is picked specifically because they're
+    // NOT the same kind of player as who's going off, so forcing them
+    // into outSlot would be exactly the "playing out of position" bug
+    // this is fixing; pickSlotForIncomingSub() gives them their own
+    // natural slot within the current formation instead (falling back to
+    // any formation slot they can actually play if their exact position
+    // isn't part of this shape).
+    inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outSlot);
     const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
     // Surface the real reason behind a notable change (booked/tiring) in
     // the event log, same spirit as the tactical tag above.
@@ -5814,11 +6043,13 @@ var App = (() => {
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
     m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
     m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
-    // Same fix as the regular substitution above: inherit the exact slot
-    // of whoever came off (the sacrificed forward/midfielder), not the
-    // incoming defender's own natural position, so the pitch rendering
-    // stays correctly index-aligned with the formation.
-    inPlayer.slot = outPlayer.slot || (outPlayer.pos || ['CB'])[0];
+    // Same fix as the regular substitution above: the incoming defender
+    // takes over a slot they can actually play — the sacrificed
+    // forward/midfielder's exact slot if the defender is comfortable
+    // there, otherwise their own natural defensive slot within the
+    // current formation — rather than being forced into an attacking
+    // slot they have no business playing.
+    inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outPlayer.slot || (outPlayer.pos || ['CB'])[0]);
     const newUsed = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     addEvent(m.minute, 'sub',
       `Tactical reshuffle · ${sideData.team.short} reorganise after going down to 10 men<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span> <span style="opacity:0.6">(defensive cover)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,
@@ -5828,28 +6059,42 @@ var App = (() => {
 
   function changeFormationLive(side, formKey) {
     const m = currentMatch;
-    if (!m || m.finished) return;
-    if (!FORMATIONS[formKey]) return;
+    if (!m || m.finished) return false;
+    if (!FORMATIONS[formKey]) return false;
     const sideData = m[side];
-    sideData.squad.formation = formKey;
-    // Reassign slots for on-pitch players by best fit
     const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
     const all = [...(sideData.squad.starting||[]), ...(sideData.squad.subs||[])];
     const onPitch = onIds.map(id => all.find(p => p.id === id)).filter(Boolean);
-    const slots = FORMATIONS[formKey].slots.slice();
-    const used = new Set();
-    const assigned = [];
-    slots.forEach(slot => {
-      const cand = onPitch.filter(p => !used.has(p.id) && canPlay(p, slot))
-        .sort((a,b) => ((b.pos||[]).includes(slot)?1:0) - ((a.pos||[]).includes(slot)?1:0) || (b.ovr||0)-(a.ovr||0));
-      if (cand[0]) { used.add(cand[0].id); cand[0].slot = slot; assigned.push(cand[0]); }
-    });
-    onPitch.filter(p => !used.has(p.id)).forEach((p, i) => {
-      p.slot = slots[assigned.length + i] || (p.pos||['CM'])[0];
+
+    // Gate the whole reshape on every current player actually being able
+    // to fill a slot in the new shape — a real manager doesn't switch
+    // formation if it leaves one of his own players stranded out of
+    // position. matchPlayersToFormation() finds a genuine full matching
+    // (not just a greedy best-fit that can wrongly fail or wrongly
+    // force a mismatch), so this is the single source of truth both for
+    // "can we do this" and, if so, "who goes where".
+    const assignment = matchPlayersToFormation(onPitch, formKey);
+    if (!assignment) {
+      toast(sideData.team.short + ': squad not comfortable in ' + formKey + ' — formation change skipped');
+      // The native <select> already shows the rejected formation (the
+      // user just picked it) even though squad.formation never changed —
+      // snap it back immediately rather than leaving it out of sync until
+      // the next natural renderLineups() call.
+      const selEl = document.getElementById('live-form-' + side);
+      if (selEl) selEl.value = sideData.squad.formation || '4-3-3';
+      return false;
+    }
+
+    sideData.squad.formation = formKey;
+    const slots = FORMATIONS[formKey].slots;
+    assignment.forEach((playerIdx, slotIdx) => {
+      if (playerIdx === -1) return;
+      onPitch[playerIdx].slot = slots[slotIdx];
     });
     addEvent(m.minute, 'whistle', `📐 ${sideData.team.short} switch shape to ${formKey}`, side);
     if (!m.quietSim) { renderLineups(); updateScoreboard(); }
     toast(sideData.team.short + ' → ' + formKey);
+    return true;
   }
 
   function setTacticsLive(side, tactic) {
@@ -5865,17 +6110,27 @@ var App = (() => {
   // Picks a formation clearly more attacking in shape than the current one
   // (most forward-weighted bodies among the alternatives), for the AI's
   // late-game "throw men forward" reshape.
-  function pickMoreAttackingFormation(curKey) {
+  // Picks a formation clearly more attacking in shape than the current
+  // one (most forward-weighted bodies among the alternatives) that the
+  // side currently on the pitch can actually fill without anyone playing
+  // out of position — for the AI's late-game "throw men forward" reshape.
+  // Returns null if nothing more attacking fits this exact XI.
+  function pickMoreAttackingFormation(curKey, onPitchPlayers) {
     const keys = Object.keys(FORMATIONS).filter(k => k !== curKey);
     keys.sort((a, b) => formationShape(b).fwd - formationShape(a).fwd);
-    return keys[0];
+    return keys.find(k => canFormationFitSquad(onPitchPlayers, k)) || null;
   }
   // Picks a formation clearly more defensive in shape than the current one,
   // for the AI's late-game "shut up shop" reshape.
-  function pickMoreDefensiveFormation(curKey) {
+  // Picks a formation clearly more defensive in shape than the current
+  // one that the side currently on the pitch can actually fill without
+  // anyone playing out of position, for the AI's late-game "shut up
+  // shop" reshape. Returns null if nothing more defensive fits this
+  // exact XI.
+  function pickMoreDefensiveFormation(curKey, onPitchPlayers) {
     const keys = Object.keys(FORMATIONS).filter(k => k !== curKey);
     keys.sort((a, b) => formationShape(b).def - formationShape(a).def);
-    return keys[0];
+    return keys.find(k => canFormationFitSquad(onPitchPlayers, k)) || null;
   }
 
   // ===================================================================
@@ -5935,21 +6190,29 @@ var App = (() => {
     // Live formation reshape: reserved for clear, late situations, and only
     // once per side per match, so it reads as a real "extra attacker" or
     // "back five to see it out" moment rather than constant reshuffling.
+    // Only actually fires if a suitably-shaped formation exists that the
+    // current on-pitch XI can fill without anyone playing out of
+    // position — see pickMoreAttackingFormation/pickMoreDefensiveFormation
+    // and changeFormationLive's own gate above. When no such formation
+    // exists, m.formationAIUsed[side] is left false so the AI can
+    // reconsider on a later minute (e.g. once a sub has changed who's on
+    // the pitch) instead of permanently giving up on reshaping.
     if (!m.formationAIUsed) m.formationAIUsed = { home: false, away: false };
     if (m.formationAIUsed[side]) return;
     const curForm = sideData.squad.formation;
     if (!curForm) return;
     const shape = formationShape(curForm);
+    const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const allSidePlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitchPlayers = onIds.map(id => allSidePlayers.find(p => p.id === id)).filter(Boolean);
     if (diff <= -1 && minute >= 75 && shape.fwd <= SHAPE_BASELINE.fwd + 0.4) {
-      const target = pickMoreAttackingFormation(curForm);
-      if (target && target !== curForm) {
-        changeFormationLive(side, target);
+      const target = pickMoreAttackingFormation(curForm, onPitchPlayers);
+      if (target && changeFormationLive(side, target)) {
         m.formationAIUsed[side] = true;
       }
     } else if (diff >= 1 && minute >= 82 && shape.def <= SHAPE_BASELINE.def + 0.4) {
-      const target = pickMoreDefensiveFormation(curForm);
-      if (target && target !== curForm) {
-        changeFormationLive(side, target);
+      const target = pickMoreDefensiveFormation(curForm, onPitchPlayers);
+      if (target && changeFormationLive(side, target)) {
         m.formationAIUsed[side] = true;
       }
     }
@@ -6021,17 +6284,19 @@ var App = (() => {
         !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !isPlayerInjured(p.id) && !leftIds.includes(p.id));
       if (availableSubs.length) {
         let candidates = availableSubs.filter(p => canPlay(p, injured.slot || (injured.pos || ['CM'])[0]));
-        if (!candidates.length) candidates = availableSubs;
+        if (!candidates.length) candidates = availableSubs; // forced — the injured player must leave the pitch either way
         candidates.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
         const inPlayer = candidates[Math.floor(seededRandom() * Math.min(3, candidates.length))];
         const idx = onPitchIds.indexOf(injured.id);
         if (idx >= 0) onPitchIds[idx] = inPlayer.id;
-        // Inherit the injured player's exact pitch slot (not the bench
-        // player's own natural position, which is what inPlayer.slot still
-        // holds from squad selection) — same fix as the other substitution
-        // paths in engine/tactics.js, and for the same reason: it's what
-        // keeps the pitch rendering's formation-slot matching correct.
-        inPlayer.slot = injured.slot || (injured.pos || ['CM'])[0];
+        // Same fix as the other substitution paths in engine/tactics.js:
+        // only inherit the injured player's exact slot if the incoming
+        // sub is actually comfortable there (the normal case, since
+        // candidates above are already filtered to it when possible);
+        // otherwise fall back to their own natural position rather than
+        // force them somewhere they can't play — this only matters for
+        // the rare case where the bench had nobody compatible at all.
+        inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, injured.slot || (injured.pos || ['CM'])[0]);
         markLeftPitch(m, side, injured.id);
         resetFatigueFor(m, side, inPlayer.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
@@ -11731,6 +11996,7 @@ var App = (() => {
     resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile,
     searchTeams, sortTeams, searchTournamentTeams,
     openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
+    openSlotRolePicker, setSquadSlotRole,
     playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
     saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
     sbSwitchSide, sbSwitchTab, sbSelectFormationPreset, sbToggleEditMode,
