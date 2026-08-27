@@ -6575,6 +6575,15 @@ var App = (() => {
     });
 
     // ---- Trophies (team success this season/tournament + individual pedigree) ----
+    // Pre-calculate trophy count lookup map: reduces O(N * T) array filtering to O(T) count map + O(1) lookups per player.
+    const trophyCounts = {};
+    if (trophies && trophies.length) {
+      for (let i = 0; i < trophies.length; i++) {
+        const pName = trophies[i].player;
+        if (pName) trophyCounts[pName] = (trophyCounts[pName] || 0) + 1;
+      }
+    }
+
     Object.values(scores).forEach(e => {
       const aff = findPlayerTeams(e.id) || {};
       let trophyPts = 0;
@@ -6586,7 +6595,7 @@ var App = (() => {
         if (tournament.type === 'worldcup' && aff.national === tournament.champion.name) trophyPts += 6;
         if (tournament.type === 'ucl' && aff.club === tournament.champion.name) trophyPts += 5;
       }
-      const pastIndividual = (trophies || []).filter(t => t.player === e.name).length;
+      const pastIndividual = trophyCounts[e.name] || 0;
       trophyPts += Math.min(pastIndividual, 5) * 0.4;
       e.pts += trophyPts;
       e.trophyPts = Math.round(trophyPts * 10) / 10;
