@@ -20043,8 +20043,8 @@
   "logo":"chelsea.png",
   "stadium":"Stamford Bridge Stadium",
   "players": [
-    {{"id":"avl26_23","name":"Emiliano Martínez","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":84,"pac":50,"tec":68,"num":23},
-"id":"che26_1","name":"Robert Sánchez","pos":["GK"],"ovr":80,"att":15,"def":80,"phy":78,"pac":48,"tec":65,"num":1},
+    {"id":"avl26_23","name":"Emiliano Martínez","pos":["GK"],"ovr":89,"att":15,"def":90,"phy":84,"pac":50,"tec":68,"num":23},
+    {"id":"che26_1","name":"Robert Sánchez","pos":["GK"],"ovr":80,"att":15,"def":80,"phy":78,"pac":48,"tec":65,"num":1},
     {"id":"che26_39","name":"Mike Penders","pos":["GK"],"ovr":76,"att":15,"def":77,"phy":74,"pac":45,"tec":60,"num":39},
     {"id":"che26_44","name":"Gabriel Slonina","pos":["GK"],"ovr":75,"att":15,"def":75,"phy":74,"pac":46,"tec":58,"num":44},
     {"id":"che26_6","name":"Levi Colwill","pos":["CB","LB"],"ovr":84,"att":52,"def":85,"phy":82,"pac":74,"tec":78,"num":6},
