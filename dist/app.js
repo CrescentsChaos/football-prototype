@@ -2217,6 +2217,32 @@ var App = (() => {
     if (af) af.value = pickTeamFormation(away);
     toast(`${home.flag||''} ${home.name} vs ${away.flag||''} ${away.name}`);
   }
+  // Randomizes a single side (home or away) from a chosen pool (club or
+  // national), leaving the other side exactly as it is — unlike
+  // randomMatch() above, which always re-rolls both sides together from
+  // the same pool. Lets the person mix, e.g. a random club side at home
+  // against a random national side away, or just re-roll one side without
+  // disturbing a pick they already like on the other.
+  function randomizeTeamSide(side, category) {
+    const otherSide = side === 'home' ? 'away' : 'home';
+    let pool = category === 'national' ? (teamsData.national || []) : (teamsData.club || []);
+    if (!pool.length) { toast('No teams available'); return; }
+    const otherSel = document.getElementById(otherSide + '-team');
+    const otherId = otherSel ? otherSel.value : null;
+    // Prefer a pick that doesn't duplicate whatever's already on the other
+    // side, but fall back to the full pool if that would leave nothing to
+    // choose from (e.g. a two-team national pool).
+    let candidates = pool.filter(t => t.id !== otherId);
+    if (!candidates.length) candidates = pool;
+    const pick = shuffleArray(candidates)[0];
+    goToMatch();
+    const sel = document.getElementById(side + '-team');
+    if (sel) sel.value = pick.id;
+    updateTeamPreview(side);
+    const formSel = document.getElementById(side + '-formation');
+    if (formSel) formSel.value = pickTeamFormation(pick);
+    toast(`${pick.flag||''} ${pick.name} set as ${side === 'home' ? 'Home' : 'Away'}`);
+  }
 
   function goToMatch() {
     switchView('match');
@@ -2975,6 +3001,10 @@ var App = (() => {
       const label = editMode ? ''
         : '<span class="dot-label"><span class="dot-num">' + (p ? (p.num || '?') : '') + '</span>' +
           '<span class="dot-name">' + (p ? abbreviateName(p.name) : slot) + '</span></span>';
+      // Position code shown above the dot, same badge style as the
+      // jersey number below it. Skipped in edit-mode, where the dot's
+      // own avatar already displays the slot code front and center.
+      const posLabel = editMode ? '' : '<span class="dot-pos">' + slot + '</span>';
       const emptyTapHandler = (!filled && !editMode) ? ' onclick="App.sbEmptySlotTap(' + idx + ')"' : '';
       // Small tappable badge showing the slot's current role code — lets
       // you tap CM to switch it to CAM/CDM etc without disturbing the
@@ -2991,7 +3021,7 @@ var App = (() => {
         ' data-sb-drop="slot" data-slot-idx="' + idx + '"' +
         ' style="left:' + x + '%;top:' + y + '%;background:' + primary + ';border-color:' + secondary + '"' +
         ' onpointerdown="event.stopPropagation();App.sbGrab(event,\'slot\',' + idx + ')"' + emptyTapHandler + '>' +
-        '<span class="dot-avatar">' + avatar + '</span>' + roleTag + roleBadge + label +
+        '<span class="dot-avatar">' + avatar + '</span>' + roleTag + roleBadge + posLabel + label +
         '</div>';
     });
     el.innerHTML = '<div class="pitch-label">' + teamMark(team, 16) + ' ' + (team.short || team.name) + ' · ' + formation.name + '</div>' + dots;
@@ -7084,6 +7114,7 @@ var App = (() => {
 
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
         dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+          <span class="dot-pos">${slots[idx] || ''}</span>
           <span class="dot-avatar">${playerAvatarMark(p)}</span>
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
@@ -9906,12 +9937,14 @@ var App = (() => {
     el.innerHTML = list.map(t => {
       const ovr = teamAvgOvr(t).toFixed(0);
       const primary = t.color || '#d4af37';
+      const formKey = pickTeamFormation(t);
+      const formName = (FORMATIONS[formKey] && FORMATIONS[formKey].name) || formKey;
       return `<div class="team-check" style="cursor:pointer;border-left:3px solid ${primary}" onclick="App.showTeamProfile('${t.id}')">
         <div style="display:flex;align-items:center;gap:8px;width:100%">
           <span style="font-size:1.5rem">${teamMark(t, 32)}</span>
           <div style="flex:1;min-width:0">
             <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</strong>
-            <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''}</div>
+            <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''} · ${formName}</div>
             <div style="font-size:0.7rem;color:var(--gold);display:flex;align-items:center;gap:4px">${t.manager && t.manager.name ? managerAvatarMark(t.manager, 16) : ''}${(t.manager && t.manager.name) || ''} · ${getManagerPlaystyle(t)}</div>
           </div>
           <span class="player-ovr">${ovr}</span>
@@ -10296,6 +10329,8 @@ var App = (() => {
     const mgrAwardCount = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
     const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
     const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
+    const formKey = pickTeamFormation(team);
+    const formation = (FORMATIONS[formKey] && FORMATIONS[formKey].name) || formKey;
     const modal = document.getElementById('team-modal');
     const content = document.getElementById('team-modal-content');
     if (!modal || !content) return;
@@ -10306,6 +10341,7 @@ var App = (() => {
           <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
           <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px">🏟️ ${getStadium(team)}</div>
+          <div style="color:var(--gold);font-size:0.8rem;margin-top:2px;font-weight:700">🧩 ${formation}</div>
         </div>
       </div>
       <div class="card-title" style="margin-top:14px">Manager</div>
@@ -12260,7 +12296,7 @@ var App = (() => {
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
-    returnToTournament, showPlayerProfile, showTeamProfile, randomMatch,
+    returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, randomizeTeamSide,
     resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile,
     searchTeams, sortTeams, searchTournamentTeams,
     openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
