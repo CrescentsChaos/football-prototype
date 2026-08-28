@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Apex — Transfer Tool</title>
+<style>
+  :root{
+    --bg-0:#05080f; --bg-1:#0a101c; --bg-2:#111a2b; --bg-3:#1a2740;
+    --gold:#f0c14b; --gold-dim:#c9a227; --gold-glow:rgba(240,193,75,0.35);
+    --blue:#3d8bfd; --green:#22c55e; --red:#ef4444; --orange:#f59e0b;
+    --text:#f1f5f9; --text-2:#94a3b8; --text-3:#64748b;
+    --border:rgba(148,163,184,0.14); --border-strong:rgba(240,193,75,0.28);
+    --radius:14px; --radius-sm:9px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    min-height:100vh;
+    padding-bottom:100px;
+  }
+  header{
+    position:sticky; top:0; z-index:20;
+    background:rgba(5,8,15,0.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border-strong);
+    padding:14px 16px;
+  }
+  header h1{
+    margin:0; font-size:1.05rem; letter-spacing:0.3px;
+    display:flex; align-items:center; gap:8px;
+  }
+  header h1 .badge{
+    font-size:0.62rem; font-weight:700; letter-spacing:1px;
+    color:var(--bg-0); background:linear-gradient(135deg,var(--gold),var(--gold-dim));
+    padding:2px 7px; border-radius:6px; text-transform:uppercase;
+  }
+  header p{margin:4px 0 0; font-size:0.78rem; color:var(--text-2);}
+  main{max-width:640px; margin:0 auto; padding:14px;}
+
+  .card{
+    background:linear-gradient(160deg, var(--bg-2), var(--bg-1));
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px;
+  }
+  .card h2{
+    margin:0 0 10px; font-size:0.9rem; color:var(--text-2);
+    text-transform:uppercase; letter-spacing:0.8px; font-weight:700;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .card h2 .hint{font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text-3); font-size:0.72rem;}
+
+  /* --- Load screen --- */
+  #loadScreen .drop{
+    border:2px dashed var(--border-strong); border-radius:var(--radius);
+    padding:28px 16px; text-align:center; color:var(--text-2);
+    font-size:0.88rem;
+  }
+  #loadScreen .drop.drag{border-color:var(--gold); background:rgba(240,193,75,0.06);}
+  #fileInput{display:none;}
+
+  button, .btn{
+    font-family:inherit; font-size:0.88rem; font-weight:600;
+    border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    background:rgba(255,255,255,0.04); color:var(--text);
+    padding:12px 16px; cursor:pointer; display:inline-flex;
+    align-items:center; justify-content:center; gap:6px;
+    width:100%; touch-action:manipulation;
+  }
+  button:active{transform:scale(0.98);}
+  .btn-gold{
+    color:var(--bg-0); background:linear-gradient(135deg,var(--gold),var(--gold-dim));
+    border-color:transparent;
+  }
+  .btn-gold:disabled{opacity:0.4; filter:grayscale(0.4);}
+  .btn-ghost{background:rgba(255,255,255,0.03); color:var(--text-2);}
+  .btn-danger{color:var(--red); border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.06);}
+  .btn-warn{color:var(--orange); border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.06);}
+  .btn-sm{width:auto; padding:7px 12px; font-size:0.76rem;}
+  .btn-row{display:flex; gap:8px;}
+  .btn-row > button{width:auto; flex:1;}
+
+  input[type=text], input[type=number], select{
+    width:100%; font-family:inherit; font-size:0.92rem;
+    background:var(--bg-0); color:var(--text);
+    border:1px solid var(--border); border-radius:var(--radius-sm);
+    padding:11px 12px; margin-top:6px;
+  }
+  input[type=text]:focus, input[type=number]:focus, select:focus{outline:none; border-color:var(--border-strong);}
+  label{font-size:0.74rem; color:var(--text-3); text-transform:uppercase; letter-spacing:0.6px;}
+
+  #status{font-size:0.78rem; color:var(--text-2); margin-top:8px; min-height:1.1em;}
+  #status.ok{color:var(--green);}
+  #status.err{color:var(--red);}
+
+  /* --- Top-level tabs (Transfer / Squad) --- */
+  #tabbar{display:none; gap:8px; margin-bottom:14px;}
+  #tabbar button{
+    width:auto; flex:1; padding:11px 10px; font-size:0.82rem;
+    background:rgba(255,255,255,0.03); color:var(--text-2); border:1px solid var(--border);
+  }
+  #tabbar button.active{
+    background:rgba(240,193,75,0.12); color:var(--gold); border-color:var(--border-strong);
+  }
+
+  /* --- Team mark: logo image with flag-emoji fallback --- */
+  .team-mark{
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:none; border-radius:5px; overflow:hidden; line-height:1;
+    background:rgba(255,255,255,0.04);
+  }
+  .team-mark img{width:100%; height:100%; object-fit:contain; display:block;}
+
+  /* --- Club picker (searchable, collapses to a summary once chosen) --- */
+  .club-picker{margin-top:6px;}
+  .club-summary{
+    display:flex; align-items:center; gap:10px;
+    padding:10px; background:var(--bg-0); border-radius:var(--radius-sm);
+    border:1px solid var(--border);
+  }
+  .club-summary .meta{flex:1; min-width:0;}
+  .club-summary .meta .nm{font-size:0.9rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .club-summary .meta .sub{font-size:0.74rem; color:var(--text-3);}
+  .club-summary .placeholder{color:var(--text-3); font-size:0.86rem; flex:1;}
+
+  .filterchips{display:flex; gap:6px; margin-top:8px;}
+  .filterchips button{
+    width:auto; flex:1; padding:7px 8px; font-size:0.74rem;
+    background:rgba(255,255,255,0.03); color:var(--text-2); border:1px solid var(--border);
+  }
+  .filterchips button.active{
+    background:rgba(240,193,75,0.12); color:var(--gold); border-color:var(--border-strong);
+  }
+
+  .clublist{max-height:260px; overflow-y:auto; margin-top:8px; -webkit-overflow-scrolling:touch;}
+  .crow{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 8px; border-bottom:1px solid var(--border);
+    cursor:pointer;
+  }
+  .crow:last-child{border-bottom:none;}
+  .crow:active{background:rgba(255,255,255,0.04);}
+  .crow.selected{background:rgba(240,193,75,0.1); border-radius:8px;}
+  .crow .info{flex:1; min-width:0;}
+  .crow .info .nm{font-size:0.87rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .crow .info .meta{font-size:0.72rem; color:var(--text-3);}
+  .crow .count{font-size:0.76rem; color:var(--text-2); flex:none;}
+
+  .playerlist{max-height:320px; overflow-y:auto; margin-top:8px; -webkit-overflow-scrolling:touch;}
+  .prow{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 8px; border-bottom:1px solid var(--border);
+    cursor:pointer;
+  }
+  .prow:last-child{border-bottom:none;}
+  .prow:active{background:rgba(255,255,255,0.04);}
+  .prow.selected{background:rgba(240,193,75,0.1); border-radius:8px;}
+  .prow .num{
+    width:26px; height:26px; border-radius:6px; background:var(--bg-3);
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.72rem; font-weight:700; color:var(--text-2); flex:none;
+  }
+  .prow .info{flex:1; min-width:0;}
+  .prow .info .nm{font-size:0.88rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .prow .info .meta{font-size:0.72rem; color:var(--text-3);}
+  .prow .ovr{
+    font-family:'Courier New',monospace; font-weight:800; font-size:0.9rem;
+    color:var(--gold); flex:none; min-width:28px; text-align:right;
+  }
+  .prow .chev{color:var(--text-3); flex:none; font-size:0.8rem;}
+
+  .searchwrap{position:relative;}
+  .searchwrap .clear{
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    background:none; border:none; width:auto; color:var(--text-3);
+    font-size:1.1rem; padding:2px 6px; display:none;
+  }
+
+  /* --- Selected player summary --- */
+  .selected-player{
+    display:flex; align-items:center; gap:10px; margin-top:10px;
+    padding:10px; background:var(--bg-0); border:1px solid var(--border-strong);
+    border-radius:var(--radius-sm);
+  }
+  .selected-player .num{
+    width:32px; height:32px; border-radius:8px; background:var(--bg-3);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; color:var(--gold); flex:none; font-size:0.8rem;
+  }
+  .selected-player .info{flex:1; min-width:0;}
+  .selected-player .info .nm{font-weight:700; font-size:0.94rem;}
+  .selected-player .info .meta{font-size:0.76rem; color:var(--text-2);}
+
+  .arrow{text-align:center; color:var(--gold); font-size:1.3rem; margin:4px 0; display:flex; align-items:center; justify-content:center; gap:10px;}
+  .arrow .swapbtn{
+    width:auto; padding:4px 10px; font-size:0.7rem; color:var(--text-2);
+    background:rgba(255,255,255,0.04); border:1px solid var(--border);
+  }
+
+  /* --- Add / Edit player form --- */
+  .formgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px 10px; margin-top:10px;}
+  .formgrid .full{grid-column:1 / -1;}
+  .poschips{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+  .poschips button{
+    width:auto; padding:6px 11px; font-size:0.76rem;
+    background:rgba(255,255,255,0.03); color:var(--text-2); border:1px solid var(--border);
+  }
+  .poschips button.active{
+    background:rgba(240,193,75,0.12); color:var(--gold); border-color:var(--border-strong);
+  }
+  .idrow{
+    display:flex; align-items:center; gap:8px; margin-top:6px;
+    font-family:'Courier New',monospace; font-size:0.8rem; color:var(--text-2);
+  }
+  .idrow input{margin-top:0;}
+  .fielderr{color:var(--red); font-size:0.76rem; margin-top:8px; min-height:1.1em;}
+
+  /* --- Find player (global search) --- */
+  .findresults{max-height:280px; overflow-y:auto; margin-top:8px;}
+  .frow{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 8px; border-bottom:1px solid var(--border); cursor:pointer;
+  }
+  .frow:last-child{border-bottom:none;}
+  .frow:active{background:rgba(255,255,255,0.04);}
+  .frow .info{flex:1; min-width:0;}
+  .frow .info .nm{font-size:0.87rem; font-weight:600;}
+  .frow .info .meta{font-size:0.72rem; color:var(--text-3);}
+  .frow .ovr{font-family:'Courier New',monospace; font-weight:800; color:var(--gold); font-size:0.86rem;}
+
+  /* --- Log --- */
+  #log{max-height:240px; overflow-y:auto;}
+  .logrow{
+    display:flex; align-items:center; gap:8px; font-size:0.82rem;
+    padding:9px 6px; border-bottom:1px solid var(--border); color:var(--text-2);
+  }
+  .logrow:last-child{border-bottom:none;}
+  .logrow b{color:var(--text);}
+  .logrow .to{color:var(--green); font-weight:700;}
+  .logrow .tag-add .to{color:var(--blue);}
+  .logrow .tag-release .to{color:var(--orange);}
+  .logrow .tag-delete .to{color:var(--red);}
+  .logrow .icon{flex:none; font-size:0.9rem;}
+  .logrow .undo{width:auto; margin-left:auto; padding:5px 9px; font-size:0.7rem; color:var(--text-3);}
+  .empty-hint{color:var(--text-3); font-size:0.82rem; text-align:center; padding:14px 4px;}
+
+  /* --- Sticky download bar --- */
+  #dlbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:30;
+    background:rgba(5,8,15,0.95); backdrop-filter:blur(10px);
+    border-top:1px solid var(--border-strong);
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    display:none;
+  }
+  #dlbar.show{display:block;}
+  #dlbar .count{font-size:0.76rem; color:var(--text-2); text-align:center; margin-bottom:8px;}
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50;
+    display:none; align-items:center; justify-content:center; padding:20px;
+    -webkit-overflow-scrolling:touch; overflow-y:auto;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:var(--bg-2); border:1px solid var(--border-strong);
+    border-radius:var(--radius); padding:18px; max-width:380px; width:100%;
+    max-height:88vh; overflow-y:auto;
+  }
+  .modal h2{margin-top:0;}
+  .modal p{font-size:0.88rem; color:var(--text-2); line-height:1.5;}
+  .modal .btn-row{margin-top:14px;}
+  .sheet-player{font-weight:700; font-size:0.95rem; margin-bottom:2px;}
+  .sheet-meta{font-size:0.78rem; color:var(--text-3); margin-bottom:14px;}
+  .sheet-actions{display:flex; flex-direction:column; gap:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚽ Transfer Tool <span class="badge">Local</span></h1>
+  <p>Move, add, edit, or release players directly in teams.json — nothing leaves your phone.</p>
+</header>
+
+<main>
+
+  <!-- STEP 0: Load file -->
+  <section class="card" id="loadScreen">
+    <h2>1 · Load teams.json</h2>
+    <div class="drop" id="dropZone">
+      Tap to choose your <b>teams.json</b> file<br>
+      <span style="font-size:0.74rem;">(or drag &amp; drop on desktop)</span>
+    </div>
+    <input type="file" id="fileInput" accept="application/json,.json">
+    <div id="status"></div>
+  </section>
+
+  <div id="tabbar">
+    <button id="tabTransfer" class="active">🔁 Transfer</button>
+    <button id="tabSquad">👥 Add / Release</button>
+    <button id="tabFind">🔎 Find Player</button>
+  </div>
+
+  <!-- ============ TRANSFER VIEW ============ -->
+  <div id="transferView">
+    <!-- STEP 1: Pick source club + player -->
+    <section class="card" id="fromCard" style="display:none;">
+      <h2>Select Player <span class="hint">from</span></h2>
+
+      <label>Club</label>
+      <div class="club-picker" id="fromPicker"></div>
+
+      <div id="fromPlayerSection" style="display:none;">
+        <label style="display:block; margin-top:12px;">Search player</label>
+        <div class="searchwrap">
+          <input type="text" id="fromSearch" placeholder="Type a name…" autocomplete="off">
+          <button class="clear" id="fromClearBtn">✕</button>
+        </div>
+        <div class="playerlist" id="fromList"></div>
+      </div>
+    </section>
+
+    <!-- STEP 2: Selected + destination -->
+    <section class="card" id="toCard" style="display:none;">
+      <h2>Transfer <span class="hint">to</span></h2>
+      <div class="selected-player" id="selectedPlayer"></div>
+      <div class="arrow">
+        <span>↓</span>
+        <button class="swapbtn" id="swapBtn" title="Pick a different player instead">Pick different player</button>
+      </div>
+      <label>Destination club</label>
+      <div class="club-picker" id="toPicker"></div>
+      <div id="numWarning" style="display:none; color:var(--orange); font-size:0.78rem; margin-top:8px;"></div>
+      <button class="btn-gold" id="transferBtn" style="margin-top:14px;" disabled>Confirm Transfer</button>
+    </section>
+  </div>
+
+  <!-- ============ SQUAD VIEW (add / release / edit / delete) ============ -->
+  <div id="squadView" style="display:none;">
+    <section class="card" id="squadCard">
+      <h2>Club roster</h2>
+      <label>Club</label>
+      <div class="club-picker" id="squadPicker"></div>
+
+      <div id="squadPlayerSection" style="display:none;">
+        <button class="btn-gold" id="addPlayerBtn" style="margin-top:12px;">＋ Add Player</button>
+        <label style="display:block; margin-top:12px;">Search player</label>
+        <div class="searchwrap">
+          <input type="text" id="squadSearch" placeholder="Type a name…" autocomplete="off">
+          <button class="clear" id="squadClearBtn">✕</button>
+        </div>
+        <div class="playerlist" id="squadList"></div>
+        <div style="font-size:0.72rem; color:var(--text-3); margin-top:10px;">Tap a player to edit, release, or delete them.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ FIND PLAYER VIEW (search across every club) ============ -->
+  <div id="findView" style="display:none;">
+    <section class="card" id="findCard">
+      <h2>Find a player <span class="hint">any club or nation</span></h2>
+      <div class="searchwrap">
+        <input type="text" id="findSearch" placeholder="Type at least 2 letters of a name…" autocomplete="off">
+        <button class="clear" id="findClearBtn">✕</button>
+      </div>
+      <div class="findresults" id="findResults"></div>
+    </section>
+  </div>
+
+  <!-- Log of changes this session -->
+  <section class="card" id="logCard" style="display:none;">
+    <h2>Changes this session</h2>
+    <div id="log"></div>
+  </section>
+
+</main>
+
+<div id="dlbar">
+  <div class="count" id="dlcount"></div>
+  <div class="btn-row">
+    <button class="btn-ghost" id="resetBtn">Start Over</button>
+    <button class="btn-gold" id="downloadBtn">⬇ Download Updated teams.json</button>
+  </div>
+</div>
+
+<!-- Generic confirm modal (transfer / release / delete) -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal">
+    <h2 id="confirmTitle">Confirm</h2>
+    <p id="confirmText"></p>
+    <div class="btn-row">
+      <button class="btn-ghost" id="confirmCancel">Cancel</button>
+      <button class="btn-gold" id="confirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Player action sheet (tap a squad row) -->
+<div class="modal-overlay" id="sheetOverlay">
+  <div class="modal">
+    <div class="sheet-player" id="sheetPlayerName"></div>
+    <div class="sheet-meta" id="sheetPlayerMeta"></div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="sheetEditBtn">✏️ Edit Player</button>
+      <button class="btn-warn" id="sheetReleaseBtn">⇄ Release to Free Agents</button>
+      <button class="btn-danger" id="sheetDeleteBtn">🗑 Delete Permanently</button>
+      <button class="btn-ghost" id="sheetCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit player form -->
+<div class="modal-overlay" id="formOverlay">
+  <div class="modal">
+    <h2 id="formTitle">Add Player</h2>
+    <div style="font-size:0.78rem; color:var(--text-3); margin-top:-8px; margin-bottom:10px;" id="formClubLabel"></div>
+
+    <label>Name</label>
+    <input type="text" id="fName" placeholder="Player name" autocomplete="off">
+
+    <label style="display:block; margin-top:12px;">Position(s)</label>
+    <div class="poschips" id="fPosChips"></div>
+
+    <div class="formgrid">
+      <div>
+        <label>Squad number</label>
+        <input type="number" id="fNum" min="1" max="99">
+      </div>
+      <div>
+        <label>Overall (OVR)</label>
+        <input type="number" id="fOvr" min="1" max="99">
+      </div>
+      <div>
+        <label>Attack (att)</label>
+        <input type="number" id="fAtt" min="1" max="99">
+      </div>
+      <div>
+        <label>Defense (def)</label>
+        <input type="number" id="fDef" min="1" max="99">
+      </div>
+      <div>
+        <label>Physical (phy)</label>
+        <input type="number" id="fPhy" min="1" max="99">
+      </div>
+      <div>
+        <label>Pace (pac)</label>
+        <input type="number" id="fPac" min="1" max="99">
+      </div>
+      <div class="full">
+        <label>Technical (tec)</label>
+        <input type="number" id="fTec" min="1" max="99">
+      </div>
+    </div>
+
+    <label style="display:block; margin-top:12px;">Player ID</label>
+    <div class="idrow">
+      <input type="text" id="fId" placeholder="auto-generated">
+      <button class="btn-sm btn-ghost" id="fIdRegen" type="button">Regenerate</button>
+    </div>
+
+    <div class="fielderr" id="formErr"></div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn-ghost" id="formCancel">Cancel</button>
+      <button class="btn-gold" id="formSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  let data = null;          // full parsed teams.json
+  let allClubs = [];         // flat list of {group:'club'|'national', idx, team} — idx is stable into data[group]
+  let selectedPlayer = null; // {group, idx, player}  (transfer flow)
+  let actionLog = [];        // unified log of every change this session — see logAction() for shape
+
+  const $ = (id) => document.getElementById(id);
+  const FREE_AGENT_ID = 'free_agents';
+  const COMMON_POS = ['GK','CB','RB','LB','RWB','LWB','CDM','CM','CAM','LM','RM','LW','RW','ST'];
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[ch]));
+  }
+
+  // =========================================================
+  // Team mark — renders a club/nation's logo image (assets/logos/<logo>,
+  // resolved relative to this tool living in tools/) with the flag emoji
+  // as a fallback whenever there's no logo field or the image 404s, and a
+  // plain "no crest" glyph as the last resort. Mirrors teamMark() in the
+  // main game's ui/playerUI.js so behavior matches in-app.
+  // =========================================================
+  function teamMark(team, size){
+    size = size || 22;
+    const flag = (team && team.flag) || '🏳️';
+    if (team && team.logo){
+      const src = '../assets/logos/' + team.logo;
+      return '<span class="team-mark" style="width:' + size + 'px;height:' + size + 'px;font-size:' +
+        Math.round(size * 0.82) + 'px" data-flag="' + escapeHtml(flag) + '">' +
+        '<img src="' + src + '" alt="" loading="lazy" onerror="this.parentElement.textContent=this.parentElement.getAttribute(\'data-flag\')">' +
+        '</span>';
+    }
+    return '<span class="team-mark" style="width:' + size + 'px;height:' + size + 'px;font-size:' +
+      Math.round(size * 0.82) + 'px">' + escapeHtml(flag) + '</span>';
+  }
+
+  // =========================================================
+  // Generic searchable club picker — used for "from"/"to"/"squad" pickers.
+  // Renders into #<prefix>Picker. Starts in search mode; collapses to a
+  // summary strip once a club is chosen, with a "Change" button to
+  // reopen the search. sel = { group, idx } | null (current pick).
+  // =========================================================
+  function makeClubPicker(prefix, opts){
+    const root = $(prefix + 'Picker');
+    let sel = null;
+    let filterGroup = 'all'; // 'all' | 'club' | 'national'
+    let query = '';
+    let searchOpen = true;
+
+    function clubLabel(c){
+      return c.team.name + (c.team.id === FREE_AGENT_ID ? '' : '');
+    }
+
+    function matches(){
+      let list = allClubs;
+      if (filterGroup !== 'all') list = list.filter(c => c.group === filterGroup);
+      const q = query.trim().toLowerCase();
+      if (q) {
+        list = list.filter(c =>
+          (c.team.name || '').toLowerCase().includes(q) ||
+          (c.team.short || '').toLowerCase().includes(q));
+        // Rank exact/prefix matches first
+        list = list.slice().sort((a, b) => {
+          const an = (a.team.name || '').toLowerCase(), bn = (b.team.name || '').toLowerCase();
+          const as = (a.team.short || '').toLowerCase(), bs = (b.team.short || '').toLowerCase();
+          const aScore = as === q ? 0 : an.startsWith(q) ? 1 : as.startsWith(q) ? 1 : 2;
+          const bScore = bs === q ? 0 : bn.startsWith(q) ? 1 : bs.startsWith(q) ? 1 : 2;
+          if (aScore !== bScore) return aScore - bScore;
+          return an.localeCompare(bn);
+        });
+      }
+      return list;
+    }
+
+    function render(){
+      if (searchOpen) {
+        root.innerHTML =
+          '<div class="filterchips">' +
+            '<button data-f="all" class="' + (filterGroup==='all'?'active':'') + '">All</button>' +
+            '<button data-f="club" class="' + (filterGroup==='club'?'active':'') + '">Clubs</button>' +
+            '<button data-f="national" class="' + (filterGroup==='national'?'active':'') + '">National</button>' +
+          '</div>' +
+          '<div class="searchwrap">' +
+            '<input type="text" id="' + prefix + 'ClubSearch" placeholder="Search club or nation…" autocomplete="off" value="' + escapeHtml(query) + '">' +
+            '<button class="clear" id="' + prefix + 'ClubClearBtn">✕</button>' +
+          '</div>' +
+          '<div class="clublist" id="' + prefix + 'ClubList"></div>';
+
+        root.querySelectorAll('.filterchips button').forEach(b => {
+          b.addEventListener('click', () => { filterGroup = b.getAttribute('data-f'); render(); });
+        });
+        const input = root.querySelector('#' + prefix + 'ClubSearch');
+        input.addEventListener('input', () => { query = input.value; renderList(); });
+        input.focus({ preventScroll: true });
+        const clearBtn = root.querySelector('#' + prefix + 'ClubClearBtn');
+        clearBtn.style.display = query ? 'block' : 'none';
+        clearBtn.addEventListener('click', () => { query = ''; input.value=''; input.focus(); renderList(); });
+
+        renderList();
+      } else {
+        if (!sel) {
+          root.innerHTML = '<div class="club-summary"><span class="placeholder">No club selected</span></div>';
+          return;
+        }
+        const c = allClubs.find(x => x.group === sel.group && x.idx === sel.idx);
+        if (!c) { searchOpen = true; render(); return; }
+        root.innerHTML =
+          '<div class="club-summary">' +
+            teamMark(c.team, 26) +
+            '<div class="meta">' +
+              '<div class="nm">' + escapeHtml(clubLabel(c)) + '</div>' +
+              '<div class="sub">' + (c.team.players||[]).length + ' players' +
+                (c.team.manager ? ' · Mgr ' + escapeHtml(c.team.manager.name||'—') : '') + '</div>' +
+            '</div>' +
+            '<button class="btn-sm btn-ghost" id="' + prefix + 'ChangeBtn">Change</button>' +
+          '</div>';
+        root.querySelector('#' + prefix + 'ChangeBtn').addEventListener('click', () => {
+          searchOpen = true; query=''; render();
+        });
+      }
+    }
+
+    function renderList(){
+      const listEl = root.querySelector('#' + prefix + 'ClubList');
+      const clearBtn = root.querySelector('#' + prefix + 'ClubClearBtn');
+      if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+      const list = matches();
+      if (!list.length) {
+        listEl.innerHTML = '<div class="empty-hint">No teams match.</div>';
+        return;
+      }
+      listEl.innerHTML = list.map(c => {
+        const isSel = sel && sel.group === c.group && sel.idx === c.idx;
+        return '<div class="crow' + (isSel ? ' selected' : '') + '" data-group="' + c.group + '" data-idx="' + c.idx + '">' +
+          teamMark(c.team, 24) +
+          '<div class="info">' +
+            '<div class="nm">' + escapeHtml(clubLabel(c)) + '</div>' +
+            '<div class="meta">' + (c.team.short || '') + '</div>' +
+          '</div>' +
+          '<div class="count">' + (c.team.players||[]).length + '</div>' +
+        '</div>';
+      }).join('');
+      listEl.querySelectorAll('.crow').forEach(row => {
+        row.addEventListener('click', () => {
+          const group = row.getAttribute('data-group');
+          const idx = Number(row.getAttribute('data-idx'));
+          sel = { group, idx };
+          searchOpen = false;
+          render();
+          if (opts && opts.onChange) opts.onChange(sel);
+        });
+      });
+    }
+
+    return {
+      get: () => sel,
+      set: (newSel) => { sel = newSel; searchOpen = !newSel; render(); },
+      openSearch: () => { searchOpen = true; query=''; render(); },
+      refreshLabels: () => render() // re-render summary/list after data mutates (counts change)
+    };
+  }
+
+  let fromPicker, toPicker, squadPicker;
+
+  // ---------- Load ----------
+  $('dropZone').addEventListener('click', () => $('fileInput').click());
+  $('fileInput').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) loadFile(f);
+  });
+  ['dragover','dragenter'].forEach(ev => $('dropZone').addEventListener(ev, (e) => {
+    e.preventDefault(); $('dropZone').classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => $('dropZone').addEventListener(ev, (e) => {
+    e.preventDefault(); $('dropZone').classList.remove('drag');
+  }));
+  $('dropZone').addEventListener('drop', (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+
+  function setStatus(msg, cls){
+    const el = $('status');
+    el.textContent = msg;
+    el.className = cls || '';
+  }
+
+  function loadFile(file){
+    setStatus('Reading ' + file.name + '…');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed || (!Array.isArray(parsed.club) && !Array.isArray(parsed.national))) {
+          setStatus('That doesn\'t look like teams.json — expected "club"/"national" arrays.', 'err');
+          return;
+        }
+        data = parsed;
+        if (!Array.isArray(data.club)) data.club = [];
+        if (!Array.isArray(data.national)) data.national = [];
+        buildClubIndex();
+        setStatus('Loaded ' + allClubs.length + ' teams · ' + countPlayers() + ' players.', 'ok');
+        showTransferUI();
+      } catch (err) {
+        setStatus('Could not parse JSON: ' + err.message, 'err');
+      }
+    };
+    reader.onerror = () => setStatus('Could not read file.', 'err');
+    reader.readAsText(file);
+  }
+
+  function countPlayers(){
+    return allClubs.reduce((n, c) => n + ((c.team.players || []).length), 0);
+  }
+
+  // idx is a stable index into data[group] — everything here only ever
+  // moves/adds/removes *players* within existing team objects (or appends
+  // one new Free Agents team), it never reorders data[group] mid-session,
+  // so these references stay valid for the whole session without any
+  // re-matching.
+  function buildClubIndex(){
+    allClubs = [];
+    ['club','national'].forEach(group => {
+      (data[group] || []).forEach((team, idx) => {
+        allClubs.push({ group, idx, team });
+      });
+    });
+    allClubs.sort((a,b) => (a.team.name||'').localeCompare(b.team.name||''));
+  }
+
+  function clubBy(sel){
+    if (!sel) return null;
+    return allClubs.find(c => c.group === sel.group && c.idx === sel.idx) || null;
+  }
+
+  // Finds (or creates) the Free Agents pseudo-club that released players
+  // land in. Lives in data.club so it behaves like any other club in the
+  // picker (searchable, shows player count, etc).
+  function ensureFreeAgentTeam(){
+    let idx = data.club.findIndex(t => t.id === FREE_AGENT_ID);
+    if (idx === -1) {
+      data.club.push({
+        id: FREE_AGENT_ID,
+        name: 'Free Agents',
+        short: 'FA',
+        flag: '🆓',
+        color: '#64748b',
+        secondary: '#94a3b8',
+        players: []
+      });
+      idx = data.club.length - 1;
+      buildClubIndex();
+    }
+    return allClubs.find(c => c.group === 'club' && c.team.id === FREE_AGENT_ID);
+  }
+
+  // Every player id currently in use across the whole file — used to keep
+  // freshly-generated ids collision-free.
+  function allPlayerIds(){
+    const set = new Set();
+    ['club','national'].forEach(group => {
+      (data[group] || []).forEach(t => (t.players || []).forEach(p => { if (p.id != null) set.add(String(p.id)); }));
+    });
+    return set;
+  }
+
+  function makePlayerId(team){
+    const raw = (team.id || team.short || team.name || 'plyr').toString().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const prefix = (raw || 'plyr') + '_new';
+    const used = allPlayerIds();
+    let n = 1;
+    while (used.has(prefix + n)) n++;
+    return prefix + n;
+  }
+
+  // ---------- Tabs ----------
+  function setTab(tab){
+    $('tabTransfer').classList.toggle('active', tab === 'transfer');
+    $('tabSquad').classList.toggle('active', tab === 'squad');
+    $('tabFind').classList.toggle('active', tab === 'find');
+    $('transferView').style.display = tab === 'transfer' ? '' : 'none';
+    $('squadView').style.display = tab === 'squad' ? '' : 'none';
+    $('findView').style.display = tab === 'find' ? '' : 'none';
+  }
+  $('tabTransfer').addEventListener('click', () => setTab('transfer'));
+  $('tabSquad').addEventListener('click', () => setTab('squad'));
+  $('tabFind').addEventListener('click', () => setTab('find'));
+
+  // ---------- UI transitions ----------
+  function showTransferUI(){
+    $('loadScreen').querySelector('.drop').textContent = '✓ ' + (allClubs.length) + ' teams loaded — tap to load a different file';
+    $('tabbar').style.display = 'flex';
+
+    fromPicker = makeClubPicker('from', { onChange: onFromClubChange });
+    toPicker = makeClubPicker('to', { onChange: onToClubChange });
+    squadPicker = makeClubPicker('squad', { onChange: onSquadClubChange });
+
+    $('fromCard').style.display = '';
+    $('toCard').style.display = 'none';
+    $('fromPlayerSection').style.display = 'none';
+    $('squadPlayerSection').style.display = 'none';
+    fromPicker.set(null);
+    squadPicker.set(null);
+    setTab('transfer');
+  }
+
+  function onFromClubChange(){
+    selectedPlayer = null;
+    $('toCard').style.display = 'none';
+    $('fromPlayerSection').style.display = '';
+    renderPlayerList();
+  }
+
+  function onToClubChange(){
+    updateTransferButton();
+  }
+
+  function renderPlayerList(){
+    const c = clubBy(fromPicker.get());
+    const q = ($('fromSearch').value || '').trim().toLowerCase();
+    const list = $('fromList');
+    if (!c) { list.innerHTML = ''; return; }
+    let players = (c.team.players || []).slice();
+    if (q) players = players.filter(p => (p.name||'').toLowerCase().includes(q));
+    players.sort((a,b) => (b.ovr||0) - (a.ovr||0));
+    $('fromClearBtn').style.display = q ? 'block' : 'none';
+
+    if (!players.length) {
+      list.innerHTML = '<div class="empty-hint">No players match.</div>';
+      return;
+    }
+    list.innerHTML = players.map(p => {
+      const sel = selectedPlayer && selectedPlayer.player.id === p.id ? ' selected' : '';
+      return '<div class="prow' + sel + '" data-id="' + escapeHtml(p.id) + '">' +
+        '<div class="num">' + (p.num != null ? p.num : '—') + '</div>' +
+        '<div class="info">' +
+          '<div class="nm">' + escapeHtml(p.name) + '</div>' +
+          '<div class="meta">' + (p.pos||[]).join('/') + '</div>' +
+        '</div>' +
+        '<div class="ovr">' + (p.ovr != null ? p.ovr : '—') + '</div>' +
+      '</div>';
+    }).join('');
+
+    Array.from(list.querySelectorAll('.prow')).forEach(row => {
+      row.addEventListener('click', () => {
+        const id = row.getAttribute('data-id');
+        const p = (c.team.players || []).find(x => x.id === id);
+        if (!p) return;
+        selectedPlayer = { group: c.group, idx: c.idx, player: p };
+        renderPlayerList();
+        showToStep();
+      });
+    });
+  }
+
+  function showToStep(){
+    $('toCard').style.display = '';
+    const p = selectedPlayer.player;
+    const from = clubBy(fromPicker.get());
+    $('selectedPlayer').innerHTML =
+      '<div class="num">' + (p.num != null ? p.num : '—') + '</div>' +
+      '<div class="info">' +
+        '<div class="nm">' + escapeHtml(p.name) + '</div>' +
+        '<div class="meta">' + (p.pos||[]).join('/') + ' · OVR ' + (p.ovr != null ? p.ovr : '—') +
+          ' · from ' + escapeHtml(from.team.short || from.team.name) + '</div>' +
+      '</div>';
+
+    // Keep a previously-picked destination if it's still valid (not the
+    // source club); otherwise open the destination search fresh.
+    const curTo = toPicker.get();
+    if (!curTo || (curTo.group === from.group && curTo.idx === from.idx)) {
+      toPicker.set(null);
+    } else {
+      toPicker.refreshLabels();
+    }
+    updateTransferButton();
+    $('toCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  $('swapBtn').addEventListener('click', () => {
+    selectedPlayer = null;
+    $('toCard').style.display = 'none';
+    renderPlayerList();
+    $('fromCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  function updateTransferButton(){
+    const btn = $('transferBtn');
+    const from = clubBy(fromPicker.get());
+    const to = clubBy(toPicker.get());
+    const warn = $('numWarning');
+    if (!selectedPlayer || !from || !to || (to.group === from.group && to.idx === from.idx)) {
+      btn.disabled = true;
+      warn.style.display = 'none';
+      return;
+    }
+    btn.disabled = false;
+    const num = selectedPlayer.player.num;
+    const clash = num != null && (to.team.players || []).some(p => p.num === num);
+    if (clash) {
+      warn.style.display = 'block';
+      warn.textContent = '⚠ Squad number ' + num + ' is already taken at ' + (to.team.short || to.team.name) + ' — it will transfer as-is; update it after if needed.';
+    } else {
+      warn.style.display = 'none';
+    }
+  }
+
+  $('fromSearch').addEventListener('input', renderPlayerList);
+  $('fromClearBtn').addEventListener('click', () => { $('fromSearch').value=''; renderPlayerList(); });
+
+  // ---------- Generic confirm modal ----------
+  let pendingConfirm = null;
+  function openConfirm(title, html, onOk){
+    $('confirmTitle').textContent = title;
+    $('confirmText').innerHTML = html;
+    pendingConfirm = onOk;
+    $('confirmOverlay').classList.add('show');
+  }
+  $('confirmCancel').addEventListener('click', () => { $('confirmOverlay').classList.remove('show'); pendingConfirm = null; });
+  $('confirmOk').addEventListener('click', () => {
+    $('confirmOverlay').classList.remove('show');
+    const fn = pendingConfirm; pendingConfirm = null;
+    if (fn) fn();
+  });
+
+  $('transferBtn').addEventListener('click', () => {
+    const from = clubBy(fromPicker.get()), to = clubBy(toPicker.get());
+    openConfirm('Confirm transfer',
+      'Move <b>' + escapeHtml(selectedPlayer.player.name) + '</b> from <b>' +
+      escapeHtml(from.team.short || from.team.name) + '</b> to <b>' + escapeHtml(to.team.short || to.team.name) + '</b>?',
+      doTransfer);
+  });
+
+  function doTransfer(){
+    const from = clubBy(fromPicker.get()), to = clubBy(toPicker.get());
+    const p = selectedPlayer.player;
+
+    const fromArr = data[from.group][from.idx].players;
+    const i = fromArr.findIndex(x => x.id === p.id);
+    if (i === -1) { setStatus('Player no longer found on source club — try again.', 'err'); return; }
+    const [moved] = fromArr.splice(i, 1);
+    data[to.group][to.idx].players.push(moved);
+
+    logAction({
+      type: 'transfer', name: moved.name, id: moved.id,
+      fromGroup: from.group, fromIdx: from.idx, fromLabel: from.team.short || from.team.name,
+      toGroup: to.group, toIdx: to.idx, toLabel: to.team.short || to.team.name
+    });
+
+    afterMutation();
+    selectedPlayer = null;
+    $('toCard').style.display = 'none';
+    renderPlayerList();
+    setStatus('Transferred ' + moved.name + ' → ' + (to.team.short || to.team.name) + '.', 'ok');
+  }
+
+  // ---------- Squad tab: roster list + add/edit/release/delete ----------
+  function onSquadClubChange(){
+    $('squadPlayerSection').style.display = '';
+    renderSquadList();
+  }
+
+  function renderSquadList(){
+    const c = clubBy(squadPicker.get());
+    const q = ($('squadSearch').value || '').trim().toLowerCase();
+    const list = $('squadList');
+    if (!c) { list.innerHTML = ''; return; }
+    let players = (c.team.players || []).slice();
+    if (q) players = players.filter(p => (p.name||'').toLowerCase().includes(q));
+    players.sort((a,b) => (b.ovr||0) - (a.ovr||0));
+    $('squadClearBtn').style.display = q ? 'block' : 'none';
+
+    if (!players.length) {
+      list.innerHTML = '<div class="empty-hint">No players match.</div>';
+      return;
+    }
+    list.innerHTML = players.map(p => {
+      return '<div class="prow" data-id="' + escapeHtml(p.id) + '">' +
+        '<div class="num">' + (p.num != null ? p.num : '—') + '</div>' +
+        '<div class="info">' +
+          '<div class="nm">' + escapeHtml(p.name) + '</div>' +
+          '<div class="meta">' + (p.pos||[]).join('/') + '</div>' +
+        '</div>' +
+        '<div class="ovr">' + (p.ovr != null ? p.ovr : '—') + '</div>' +
+        '<div class="chev">›</div>' +
+      '</div>';
+    }).join('');
+
+    Array.from(list.querySelectorAll('.prow')).forEach(row => {
+      row.addEventListener('click', () => {
+        const id = row.getAttribute('data-id');
+        const p = (c.team.players || []).find(x => x.id === id);
+        if (p) openActionSheet(c, p);
+      });
+    });
+  }
+
+  $('squadSearch').addEventListener('input', renderSquadList);
+  $('squadClearBtn').addEventListener('click', () => { $('squadSearch').value=''; renderSquadList(); });
+
+  // ---- Player action sheet (Edit / Release / Delete) ----
+  let sheetCtx = null; // { club, player }
+  function openActionSheet(club, player){
+    sheetCtx = { club, player };
+    $('sheetPlayerName').textContent = player.name;
+    $('sheetPlayerMeta').textContent = (player.pos||[]).join('/') + ' · OVR ' + (player.ovr != null ? player.ovr : '—') +
+      ' · ' + (club.team.short || club.team.name);
+    $('sheetReleaseBtn').style.display = club.team.id === FREE_AGENT_ID ? 'none' : '';
+    $('sheetOverlay').classList.add('show');
+  }
+  function closeActionSheet(){ $('sheetOverlay').classList.remove('show'); sheetCtx = null; }
+  $('sheetCancelBtn').addEventListener('click', closeActionSheet);
+
+  $('sheetEditBtn').addEventListener('click', () => {
+    const ctx = sheetCtx; closeActionSheet();
+    openPlayerForm({ mode: 'edit', club: ctx.club, player: ctx.player });
+  });
+
+  $('sheetReleaseBtn').addEventListener('click', () => {
+    const ctx = sheetCtx; closeActionSheet();
+    const fa = ensureFreeAgentTeam();
+    openConfirm('Release player',
+      'Release <b>' + escapeHtml(ctx.player.name) + '</b> from <b>' + escapeHtml(ctx.club.team.short || ctx.club.team.name) +
+      '</b> to <b>Free Agents</b>? They\'ll stay in teams.json, just unattached to a club.',
+      () => doRelease(ctx.club, ctx.player, fa));
+  });
+
+  $('sheetDeleteBtn').addEventListener('click', () => {
+    const ctx = sheetCtx; closeActionSheet();
+    openConfirm('Delete player',
+      'Permanently delete <b>' + escapeHtml(ctx.player.name) + '</b> from <b>' + escapeHtml(ctx.club.team.short || ctx.club.team.name) +
+      '</b>? This removes them from teams.json entirely — you can still undo it this session.',
+      () => doDelete(ctx.club, ctx.player));
+  });
+
+  function doRelease(club, player, fa){
+    const fromArr = data[club.group][club.idx].players;
+    const i = fromArr.findIndex(x => x.id === player.id);
+    if (i === -1) { setStatus('Player no longer found — try again.', 'err'); return; }
+    const [moved] = fromArr.splice(i, 1);
+    data[fa.group][fa.idx].players.push(moved);
+
+    logAction({
+      type: 'release', name: moved.name, id: moved.id,
+      fromGroup: club.group, fromIdx: club.idx, fromLabel: club.team.short || club.team.name,
+      toGroup: fa.group, toIdx: fa.idx, toLabel: 'Free Agents'
+    });
+    afterMutation();
+    renderSquadList();
+    setStatus('Released ' + moved.name + ' to Free Agents.', 'ok');
+  }
+
+  function doDelete(club, player){
+    const arr = data[club.group][club.idx].players;
+    const i = arr.findIndex(x => x.id === player.id);
+    if (i === -1) { setStatus('Player no longer found — try again.', 'err'); return; }
+    const [removed] = arr.splice(i, 1);
+
+    logAction({
+      type: 'delete', name: removed.name, id: removed.id,
+      group: club.group, idx: club.idx, label: club.team.short || club.team.name,
+      player: removed, insertAt: i
+    });
+    afterMutation();
+    renderSquadList();
+    setStatus('Deleted ' + removed.name + ' from ' + (club.team.short || club.team.name) + '.', 'ok');
+  }
+
+  // ---- Add / Edit player form ----
+  let formCtx = null; // { mode: 'add'|'edit', club, player? }
+  let formPos = [];
+  let formIdManuallyEdited = false;
+
+  function renderPosChips(){
+    $('fPosChips').innerHTML = COMMON_POS.map(p =>
+      '<button type="button" data-p="' + p + '" class="' + (formPos.includes(p) ? 'active' : '') + '">' + p + '</button>'
+    ).join('');
+    $('fPosChips').querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => {
+        const p = b.getAttribute('data-p');
+        const i = formPos.indexOf(p);
+        if (i === -1) formPos.push(p); else formPos.splice(i, 1);
+        renderPosChips();
+      });
+    });
+  }
+
+  $('addPlayerBtn').addEventListener('click', () => {
+    const c = clubBy(squadPicker.get());
+    if (!c) return;
+    openPlayerForm({ mode: 'add', club: c });
+  });
+
+  function openPlayerForm(ctx){
+    formCtx = ctx;
+    formIdManuallyEdited = false;
+    $('formErr').textContent = '';
+    $('formTitle').textContent = ctx.mode === 'add' ? 'Add Player' : 'Edit Player';
+    $('formClubLabel').textContent = ctx.club.team.short || ctx.club.team.name;
+
+    const p = ctx.player || {};
+    formPos = (p.pos || []).slice();
+    $('fName').value = p.name || '';
+    $('fNum').value = p.num != null ? p.num : '';
+    $('fOvr').value = p.ovr != null ? p.ovr : '';
+    $('fAtt').value = p.att != null ? p.att : '';
+    $('fDef').value = p.def != null ? p.def : '';
+    $('fPhy').value = p.phy != null ? p.phy : '';
+    $('fPac').value = p.pac != null ? p.pac : '';
+    $('fTec').value = p.tec != null ? p.tec : '';
+    $('fId').value = p.id || makePlayerId(ctx.club.team);
+    renderPosChips();
+    $('formOverlay').classList.add('show');
+  }
+
+  $('fId').addEventListener('input', () => { formIdManuallyEdited = true; });
+  $('fIdRegen').addEventListener('click', () => {
+    if (!formCtx) return;
+    $('fId').value = makePlayerId(formCtx.club.team);
+    formIdManuallyEdited = false;
+  });
+  $('formCancel').addEventListener('click', () => { $('formOverlay').classList.remove('show'); formCtx = null; });
+
+  $('formSave').addEventListener('click', () => {
+    if (!formCtx) return;
+    const name = $('fName').value.trim();
+    const id = $('fId').value.trim();
+    const err = $('formErr');
+
+    if (!name) { err.textContent = 'Enter a player name.'; return; }
+    if (!id) { err.textContent = 'Enter or regenerate a player ID.'; return; }
+    if (!formPos.length) { err.textContent = 'Pick at least one position.'; return; }
+
+    const isEdit = formCtx.mode === 'edit';
+    const idsInUse = allPlayerIds();
+    if (isEdit) idsInUse.delete(String(formCtx.player.id));
+    if (idsInUse.has(id)) { err.textContent = 'That player ID is already in use — pick another.'; return; }
+
+    const num = $('fNum').value === '' ? undefined : Number($('fNum').value);
+    const ovr = $('fOvr').value === '' ? undefined : Number($('fOvr').value);
+    const att = $('fAtt').value === '' ? undefined : Number($('fAtt').value);
+    const def = $('fDef').value === '' ? undefined : Number($('fDef').value);
+    const phy = $('fPhy').value === '' ? undefined : Number($('fPhy').value);
+    const pac = $('fPac').value === '' ? undefined : Number($('fPac').value);
+    const tec = $('fTec').value === '' ? undefined : Number($('fTec').value);
+
+    const arr = data[formCtx.club.group][formCtx.club.idx].players;
+
+    if (isEdit) {
+      const i = arr.findIndex(x => x.id === formCtx.player.id);
+      if (i === -1) { err.textContent = 'Player no longer found — try again.'; return; }
+      const before = JSON.parse(JSON.stringify(arr[i]));
+      const updated = Object.assign({}, arr[i], { id, name, pos: formPos.slice() });
+      if (num !== undefined) updated.num = num; else delete updated.num;
+      if (ovr !== undefined) updated.ovr = ovr; else delete updated.ovr;
+      if (att !== undefined) updated.att = att; else delete updated.att;
+      if (def !== undefined) updated.def = def; else delete updated.def;
+      if (phy !== undefined) updated.phy = phy; else delete updated.phy;
+      if (pac !== undefined) updated.pac = pac; else delete updated.pac;
+      if (tec !== undefined) updated.tec = tec; else delete updated.tec;
+      arr[i] = updated;
+
+      logAction({
+        type: 'edit', name: updated.name, id: updated.id,
+        group: formCtx.club.group, idx: formCtx.club.idx, label: formCtx.club.team.short || formCtx.club.team.name,
+        before
+      });
+      setStatus('Updated ' + updated.name + '.', 'ok');
+    } else {
+      const player = { id, name, pos: formPos.slice() };
+      if (num !== undefined) player.num = num;
+      if (ovr !== undefined) player.ovr = ovr;
+      if (att !== undefined) player.att = att;
+      if (def !== undefined) player.def = def;
+      if (phy !== undefined) player.phy = phy;
+      if (pac !== undefined) player.pac = pac;
+      if (tec !== undefined) player.tec = tec;
+      arr.push(player);
+
+      logAction({
+        type: 'add', name: player.name, id: player.id,
+        group: formCtx.club.group, idx: formCtx.club.idx, label: formCtx.club.team.short || formCtx.club.team.name
+      });
+      setStatus('Added ' + player.name + ' to ' + (formCtx.club.team.short || formCtx.club.team.name) + '.', 'ok');
+    }
+
+    $('formOverlay').classList.remove('show');
+    formCtx = null;
+    afterMutation();
+    renderSquadList();
+  });
+
+  // ---------- Find player (global search across every club/nation) ----------
+  $('findSearch').addEventListener('input', renderFindResults);
+  $('findClearBtn').addEventListener('click', () => { $('findSearch').value=''; renderFindResults(); });
+
+  function renderFindResults(){
+    const q = ($('findSearch').value || '').trim().toLowerCase();
+    const clearBtn = $('findClearBtn');
+    clearBtn.style.display = q ? 'block' : 'none';
+    const box = $('findResults');
+    if (q.length < 2) { box.innerHTML = '<div class="empty-hint">Type at least 2 letters to search.</div>'; return; }
+
+    const hits = [];
+    allClubs.forEach(c => {
+      (c.team.players || []).forEach(p => {
+        if ((p.name || '').toLowerCase().includes(q)) hits.push({ club: c, player: p });
+      });
+    });
+    hits.sort((a, b) => (b.player.ovr||0) - (a.player.ovr||0));
+
+    if (!hits.length) { box.innerHTML = '<div class="empty-hint">No players match "' + escapeHtml($('findSearch').value) + '".</div>'; return; }
+
+    box.innerHTML = hits.slice(0, 60).map((h, i) => {
+      return '<div class="frow" data-i="' + i + '">' +
+        teamMark(h.club.team, 22) +
+        '<div class="info">' +
+          '<div class="nm">' + escapeHtml(h.player.name) + '</div>' +
+          '<div class="meta">' + (h.player.pos||[]).join('/') + ' · ' + escapeHtml(h.club.team.short || h.club.team.name) + '</div>' +
+        '</div>' +
+        '<div class="ovr">' + (h.player.ovr != null ? h.player.ovr : '—') + '</div>' +
+      '</div>';
+    }).join('');
+    if (hits.length > 60) box.innerHTML += '<div class="empty-hint">+' + (hits.length - 60) + ' more — refine your search.</div>';
+
+    box.querySelectorAll('.frow').forEach(row => {
+      row.addEventListener('click', () => {
+        const h = hits[Number(row.getAttribute('data-i'))];
+        squadPicker.set({ group: h.club.group, idx: h.club.idx });
+        onSquadClubChange();
+        setTab('squad');
+        openActionSheet(h.club, h.player);
+      });
+    });
+  }
+
+  // ---------- Unified action log + undo ----------
+  function logAction(entry){ actionLog.push(entry); }
+
+  function afterMutation(){
+    buildClubIndex();
+    if (fromPicker) fromPicker.refreshLabels();
+    if (toPicker) toPicker.refreshLabels();
+    if (squadPicker) squadPicker.refreshLabels();
+    renderLog();
+    updateDlBar();
+  }
+
+  const LOG_META = {
+    transfer: { icon: '🔁', tag: 'tag-transfer', verb: (t) => escapeHtml(t.fromLabel) + ' → <span class="to">' + escapeHtml(t.toLabel) + '</span>' },
+    release:  { icon: '⇄', tag: 'tag-release',  verb: (t) => escapeHtml(t.fromLabel) + ' → <span class="to">' + escapeHtml(t.toLabel) + '</span>' },
+    add:      { icon: '＋', tag: 'tag-add',      verb: (t) => 'added to <span class="to">' + escapeHtml(t.label) + '</span>' },
+    delete:   { icon: '🗑', tag: 'tag-delete',   verb: (t) => 'deleted from <span class="to">' + escapeHtml(t.label) + '</span>' },
+    edit:     { icon: '✏️', tag: 'tag-edit',     verb: (t) => 'edited at <span class="to">' + escapeHtml(t.label) + '</span>' }
+  };
+
+  function renderLog(){
+    $('logCard').style.display = actionLog.length ? '' : 'none';
+    const rows = actionLog.map((t, i) => {
+      const meta = LOG_META[t.type] || LOG_META.edit;
+      return '<div class="logrow ' + meta.tag + '"><span class="icon">' + meta.icon + '</span><b>' + escapeHtml(t.name) + '</b> ' +
+        meta.verb(t) +
+        '<button class="undo" data-i="' + i + '">Undo</button></div>';
+    });
+    $('log').innerHTML = rows.slice().reverse().join('');
+    $('log').querySelectorAll('.undo').forEach(btn => {
+      btn.addEventListener('click', () => undoAction(Number(btn.getAttribute('data-i'))));
+    });
+  }
+
+  function undoAction(logIdx){
+    const t = actionLog[logIdx];
+    if (!t) return;
+
+    if (t.type === 'transfer' || t.type === 'release') {
+      const fromArr = data[t.toGroup][t.toIdx].players;
+      const i = fromArr.findIndex(x => x.id === t.id);
+      if (i === -1) { setStatus('Could not undo — player already moved again.', 'err'); return; }
+      const [moved] = fromArr.splice(i, 1);
+      data[t.fromGroup][t.fromIdx].players.push(moved);
+      setStatus('Undid: ' + t.name + ' back to ' + t.fromLabel + '.', 'ok');
+    } else if (t.type === 'add') {
+      const arr = data[t.group][t.idx].players;
+      const i = arr.findIndex(x => x.id === t.id);
+      if (i === -1) { setStatus('Could not undo — player already changed.', 'err'); return; }
+      arr.splice(i, 1);
+      setStatus('Undid: removed ' + t.name + ' from ' + t.label + '.', 'ok');
+    } else if (t.type === 'delete') {
+      const arr = data[t.group][t.idx].players;
+      const at = Math.min(t.insertAt, arr.length);
+      arr.splice(at, 0, t.player);
+      setStatus('Undid: restored ' + t.name + ' to ' + t.label + '.', 'ok');
+    } else if (t.type === 'edit') {
+      const arr = data[t.group][t.idx].players;
+      const i = arr.findIndex(x => x.id === t.id || x.id === t.before.id);
+      if (i === -1) { setStatus('Could not undo — player already changed.', 'err'); return; }
+      arr[i] = t.before;
+      setStatus('Undid edit on ' + t.name + '.', 'ok');
+    }
+
+    actionLog.splice(logIdx, 1);
+    afterMutation();
+    renderPlayerList();
+    renderSquadList();
+  }
+
+  function updateDlBar(){
+    const bar = $('dlbar');
+    if (actionLog.length) {
+      bar.classList.add('show');
+      $('dlcount').textContent = actionLog.length + ' change' + (actionLog.length===1?'':'s') + ' pending — download to save';
+    } else {
+      bar.classList.remove('show');
+    }
+  }
+
+  $('downloadBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'teams.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setStatus('Downloaded teams.json with ' + actionLog.length + ' change(s) applied. Replace your old file with this one.', 'ok');
+  });
+
+  $('resetBtn').addEventListener('click', () => {
+    if (actionLog.length && !confirm('Discard ' + actionLog.length + ' unsaved change(s) and start over?')) return;
+    data = null; allClubs = []; selectedPlayer = null; actionLog = [];
+    $('loadScreen').querySelector('.drop').textContent = 'Tap to choose your teams.json file (or drag & drop on desktop)';
+    $('tabbar').style.display = 'none';
+    $('fromCard').style.display = 'none';
+    $('toCard').style.display = 'none';
+    $('squadPlayerSection').style.display = 'none';
+    $('logCard').style.display = 'none';
+    updateDlBar();
+    setStatus('');
+    $('fileInput').value = '';
+  });
+
+})();
+</script>
+</body>
+</html>
