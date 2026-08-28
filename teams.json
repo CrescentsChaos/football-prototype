@@ -44002,8 +44002,8 @@
       "manager": {
         "name": "Vincent Kompany",
         "ovr": 86,
-        "formation":"4-2-3-1",
-        "playstyle":"Possession"
+        "formation": "4-2-3-1",
+        "playstyle": "Possession"
       }
     },
     {
@@ -44440,8 +44440,8 @@
       "manager": {
         "name": "Andoni Iraola",
         "ovr": 89,
-        "formation":"4-2-3-1",
-        "playstyle":"Quick Counter"
+        "formation": "4-2-3-1",
+        "playstyle": "Quick Counter"
       }
     },
     {
@@ -44874,13 +44874,28 @@
           "pac": 80,
           "tec": 84,
           "num": 29
+        },
+        {
+          "id": "avl26_4",
+          "name": "Ezri Konsa",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 83,
+          "att": 48,
+          "def": 84,
+          "phy": 82,
+          "pac": 76,
+          "tec": 70,
+          "num": 4
         }
       ],
       "manager": {
         "name": "Mikel Arteta",
         "ovr": 90,
-        "formation":"4-2-3-1",
-        "playstyle":"Possession"
+        "formation": "4-2-3-1",
+        "playstyle": "Possession"
       }
     },
     {
@@ -47680,21 +47695,6 @@
           "num": 1
         },
         {
-          "id": "avl26_4",
-          "name": "Ezri Konsa",
-          "pos": [
-            "CB",
-            "RB"
-          ],
-          "ovr": 83,
-          "att": 48,
-          "def": 84,
-          "phy": 82,
-          "pac": 76,
-          "tec": 70,
-          "num": 4
-        },
-        {
           "id": "avl26_14",
           "name": "Pau Torres",
           "pos": [
@@ -47973,6 +47973,20 @@
           "pac": 78,
           "tec": 75,
           "num": 18
+        },
+        {
+          "id": "che27_15",
+          "name": "Nicolas Jackson",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 83,
+          "att": 84,
+          "def": 40,
+          "phy": 79,
+          "pac": 86,
+          "tec": 78,
+          "num": 15
         }
       ],
       "manager": {
@@ -48391,6 +48405,21 @@
           "pac": 80,
           "tec": 80,
           "num": 61
+        },
+        {
+          "id": "bha26_20",
+          "name": "Carlos Baleba",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 81,
+          "att": 74,
+          "def": 80,
+          "phy": 84,
+          "pac": 80,
+          "tec": 78,
+          "num": 20
         }
       ],
       "manager": {
@@ -55829,21 +55858,6 @@
           "num": 27
         },
         {
-          "id": "bha26_20",
-          "name": "Carlos Baleba",
-          "pos": [
-            "CDM",
-            "CM"
-          ],
-          "ovr": 81,
-          "att": 74,
-          "def": 80,
-          "phy": 84,
-          "pac": 80,
-          "tec": 78,
-          "num": 20
-        },
-        {
           "id": "bha26_26",
           "name": "Yasin Ayari",
           "pos": [
@@ -56478,22 +56492,6 @@
           "pac": 92,
           "tec": 81,
           "num": 19
-        },
-        {
-          "id": "hil26_20",
-          "name": "João Cancelo",
-          "pos": [
-            "RB",
-            "RWB",
-            "LB"
-          ],
-          "ovr": 84,
-          "att": 81,
-          "def": 73,
-          "phy": 72,
-          "pac": 84,
-          "tec": 86,
-          "num": 20
         },
         {
           "id": "hil26_87",
@@ -63766,7 +63764,7 @@
           "id": "bra18",
           "name": "Raphinha",
           "pos": [
-          "ST",
+            "ST",
             "LW",
             "RW",
             "LM"
@@ -63825,6 +63823,22 @@
           "pac": 84,
           "tec": 76,
           "num": 74
+        },
+        {
+          "id": "hil26_20",
+          "name": "João Cancelo",
+          "pos": [
+            "RB",
+            "RWB",
+            "LB"
+          ],
+          "ovr": 84,
+          "att": 81,
+          "def": 73,
+          "phy": 72,
+          "pac": 84,
+          "tec": 86,
+          "num": 20
         }
       ],
       "manager": {
@@ -81298,34 +81312,6 @@
           "num": 9
         },
         {
-          "id": "che27_15",
-          "name": "Nicolas Jackson",
-          "pos": [
-            "ST"
-          ],
-          "ovr": 83,
-          "att": 84,
-          "def": 40,
-          "phy": 79,
-          "pac": 86,
-          "tec": 78,
-          "num": 15
-        },
-        {
-          "id": "che27_12",
-          "name": "Liam Delap",
-          "pos": [
-            "ST"
-          ],
-          "ovr": 80,
-          "att": 81,
-          "def": 38,
-          "phy": 84,
-          "pac": 80,
-          "tec": 74,
-          "num": 12
-        },
-        {
           "id": "che27_22",
           "name": "Emmanuel Emegha",
           "pos": [
@@ -81352,6 +81338,20 @@
           "pac": 73,
           "tec": 77,
           "num": 18
+        },
+        {
+          "id": "chelsea2027_new1",
+          "name": "Honest Ahanor",
+          "pos": [
+            "CB"
+          ],
+          "num": 69,
+          "ovr": 75,
+          "att": 47,
+          "def": 80,
+          "phy": 74,
+          "pac": 76,
+          "tec": 69
         }
       ],
       "manager": {
@@ -84017,6 +84017,20 @@
           "pac": 80,
           "tec": 75,
           "num": 19
+        },
+        {
+          "id": "che27_12",
+          "name": "Liam Delap",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 80,
+          "att": 81,
+          "def": 38,
+          "phy": 84,
+          "pac": 80,
+          "tec": 74,
+          "num": 12
         }
       ],
       "manager": {
