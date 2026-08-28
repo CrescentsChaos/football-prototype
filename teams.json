@@ -17835,7 +17835,7 @@
           "num": 14
         },
         {
-          "id": "esp7",
+          "id": "bar26_5",
           "name": "Pau Cubarsí",
           "pos": [
             "CB"
@@ -44001,7 +44001,9 @@
       ],
       "manager": {
         "name": "Vincent Kompany",
-        "ovr": 86
+        "ovr": 86,
+        "formation":"4-2-3-1",
+        "playstyle":"Possession"
       }
     },
     {
@@ -44437,7 +44439,9 @@
       ],
       "manager": {
         "name": "Andoni Iraola",
-        "ovr": 89
+        "ovr": 89,
+        "formation":"4-2-3-1",
+        "playstyle":"Quick Counter"
       }
     },
     {
@@ -44874,7 +44878,9 @@
       ],
       "manager": {
         "name": "Mikel Arteta",
-        "ovr": 90
+        "ovr": 90,
+        "formation":"4-2-3-1",
+        "playstyle":"Possession"
       }
     },
     {
@@ -63681,7 +63687,7 @@
           "num": 17
         },
         {
-          "id": "bar26_20",
+          "id": "esp23",
           "name": "Dani Olmo",
           "pos": [
             "CAM",
