@@ -10531,6 +10531,18 @@ var App = (() => {
     return `<div class="card-title" style="margin-top:8px">Bio</div>${factsHTML}${skillsHTML}`;
   }
 
+  // Color tier for any 0-100(+) stat/attribute bar: red under 70, orange
+  // 70-79, green 80-89, mint 90+. Used everywhere a raw attribute or the
+  // compact ATT/DEF/PHY/PAC/TEC bars are rendered, so the same number
+  // always reads the same color regardless of which view it's shown in.
+  function statTierClass(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return 'stat-tier-red';
+    if (n >= 90) return 'stat-tier-mint';
+    if (n >= 80) return 'stat-tier-green';
+    if (n >= 70) return 'stat-tier-orange';
+    return 'stat-tier-red';
+  }
   function expandedAttrRowsHTML(player) {
     const attr = player.expandedAttrs || {};
     const boostedKeys = new Set();
@@ -10550,8 +10562,8 @@ var App = (() => {
         ${rows.map(([k, label]) => `
           <div class="attr-bar-row expanded${boostedKeys.has(k) ? ' mgr-boosted' : ''}">
             <span class="attr-name">${label}</span>
-            <div class="attr-track"><div class="attr-fill" style="width:${attr[k]}%"></div></div>
-            <span class="attr-val">${attr[k]}</span>
+            <div class="attr-track"><div class="attr-fill ${statTierClass(attr[k])}" style="width:${attr[k]}%"></div></div>
+            <span class="attr-val ${statTierClass(attr[k])}">${attr[k]}</span>
           </div>`).join('')}
       </div>`;
     }).join('');
@@ -10665,8 +10677,8 @@ var App = (() => {
           ? expandedAttrRowsHTML(player)
           : [['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
               <div class="attr-bar-row"><span class="attr-name">${n}</span>
-                <div class="attr-track"><div class="attr-fill" style="width:${v||50}%"></div></div>
-                <span class="attr-val">${v||'-'}</span></div>`).join('')}
+                <div class="attr-track"><div class="attr-fill ${statTierClass(v)}" style="width:${v||50}%"></div></div>
+                <span class="attr-val ${statTierClass(v)}">${v||'-'}</span></div>`).join('')}
       </div>
       ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
