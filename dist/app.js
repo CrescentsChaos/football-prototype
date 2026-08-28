@@ -1546,21 +1546,42 @@ var App = (() => {
   // sharpens that style's specific signature ratings on the player's own
   // attribute sheet — returns a shallow-cloned, boosted copy of attr so the
   // original playerAttributesData source is never mutated.
+  //
+  // eFootball-2027-style manager boost: a manager doesn't hand out one flat
+  // nudge — a signature attribute that's reinforced by *multiple* of a
+  // player's individual playstyles under this manager's team style gets
+  // pushed harder than one only one style touches, exactly like stacking
+  // "Manager Boost" cards onto the same stat in eFootball. Critically this
+  // boost is NOT capped at 99 — a manager can push a player's key stats,
+  // and therefore their overall (see efootballBoostedOverall/weightedOverall
+  // in data/playerDatabase.js), past what the raw card alone could ever
+  // reach. MANAGER_ATTR_CEILING is a soft sanity ceiling, not the old
+  // card-max cap.
+  const MANAGER_ATTR_CEILING = 130;
   function applyManagerAttributeBoost(attr, styles, teamStyle) {
     if (!styles || !styles.length || !teamStyle) return attr;
     const boosted = { ...attr };
     let touched = false;
+    // First tally how many of the player's matching playstyles each raw
+    // attribute key is a signature stat for, so stacked affinities push
+    // that one attribute harder rather than each style just re-applying
+    // an identical flat bump.
+    const hitCounts = {};
     styles.forEach((style) => {
       const suited = PLAYSTYLE_AFFINITY[style];
       if (!suited || !suited.includes(teamStyle)) return;
       const keys = PLAYSTYLE_KEY_ATTRS[style];
       if (!keys) return;
-      keys.forEach((k) => {
-        if (typeof boosted[k] === 'number') {
-          boosted[k] = Math.max(1, Math.min(99, Math.round(boosted[k] + 2)));
-          touched = true;
-        }
-      });
+      keys.forEach((k) => { hitCounts[k] = (hitCounts[k] || 0) + 1; });
+    });
+    Object.keys(hitCounts).forEach((k) => {
+      if (typeof boosted[k] !== 'number') return;
+      // +5 for the first matching style that lands on this attribute,
+      // +2 for every additional style stacking on the same stat.
+      const stacks = hitCounts[k];
+      const bump = 5 + Math.max(0, stacks - 1) * 2;
+      boosted[k] = Math.max(1, Math.min(MANAGER_ATTR_CEILING, Math.round(boosted[k] + bump)));
+      touched = true;
     });
     boosted.managerBoosted = touched;
     return boosted;
@@ -1684,7 +1705,12 @@ var App = (() => {
     const def = isGK
       ? avg(attr.gk_awr, attr.gk_parry, attr.gk_reflex, attr.gk_reach, attr.gk_catch)
       : avg(attr.def_awr, attr.def_eng, attr.tack, attr.aggr);
-    const clamp = (v) => Math.max(1, Math.min(99, Math.round(v)));
+    // Ceiling raised from the old hard 99 card-max: playstyle nudges (and,
+    // upstream, manager attribute boosts applied to attr before this runs
+    // — see applyManagerAttributeBoost in ai/managerAI.js) are allowed to
+    // carry a derived stat past 99, exactly like eFootball 2027 lets a
+    // manager-boosted signature stat break the old card ceiling.
+    const clamp = (v) => Math.max(1, Math.min(ATTRIBUTE_CAP, Math.round(v)));
     // Apply each of the player's individual playstyle tags as a small flat
     // nudge to the raw averages above — this is what keeps two players in
     // the same position from converging on an identical 5-stat profile;
@@ -1720,8 +1746,19 @@ var App = (() => {
   // just be "OVR = best stat". Only expanded-attribute (enhanced) players
   // run through this; everyone else keeps the plain teams.json number.
   const OVERALL_BOOST_LEAN = 0.38;
-  const OVERALL_CAP = 100;
+  // Raised from 100: a manager-boosted player's overall (and, below, the
+  // individual attributes feeding it — see ATTRIBUTE_CAP) is now allowed
+  // to break the old "perfect card" ceiling, matching eFootball 2027 where
+  // a well-fit manager can push a signature player past their base rating.
+  const OVERALL_CAP = 130;
   const OVERALL_FLOOR = 40;
+  // Ceiling for individual derived attributes (att/def/pac/phy/tec) and for
+  // manager-boosted raw sheet ratings feeding them — see clamp() in
+  // deriveStatsFromAttributes and MANAGER_ATTR_CEILING in ai/managerAI.js.
+  // A plain (non-boosted) player's authored sheet tops out at 99 anyway, so
+  // this only actually matters once playstyle nudges or a manager boost
+  // are stacked on top.
+  const ATTRIBUTE_CAP = 130;
   // Non-expanded ("regular") players are scaled down relative to the
   // enhanced/expanded-attribute roster so the boosted players read as
   // genuinely special rather than everyone converging on the same numbers.
@@ -1733,8 +1770,13 @@ var App = (() => {
     return flatAvg + (peak - flatAvg) * OVERALL_BOOST_LEAN;
   }
 
-  // +2 if one of the player's individual playstyles suits the team's
-  // current manager playstyle, +3 if two or more do, else 0.
+  // Direct overall bump from the manager fitting the player, on top of
+  // (and separate from) the inner-attribute boost above — mirrors
+  // eFootball's manager giving a fitting player a visible OVR lift, not
+  // just quietly nudged sub-stats. Scales with how many of the player's
+  // styles suit the team: +4 for one match, +8 for two or more. No upper
+  // clamp here — clamping to the overall's floor/cap happens once, in
+  // applyExpandedPlayerAttributes, against OVERALL_CAP.
   function managerAffinityBonus(playerStyles, teamStyle) {
     if (!playerStyles || !playerStyles.length || !teamStyle) return 0;
     let matches = 0;
@@ -1742,8 +1784,8 @@ var App = (() => {
       const suited = PLAYSTYLE_AFFINITY[s];
       if (suited && suited.includes(teamStyle)) matches++;
     });
-    if (matches >= 2) return 3;
-    if (matches === 1) return 2;
+    if (matches >= 2) return 8;
+    if (matches === 1) return 4;
     return 0;
   }
 
@@ -1796,8 +1838,10 @@ var App = (() => {
         const signatureBonus = styleSignatureBonus(attr, attr.playstyle, isGK);
         // eFootball-style boost: lean the flat weighted average toward the
         // player's peak stat instead of just averaging it away, then layer
-        // the signature/affinity bonuses on top. Cap raised to 100 (was 99)
-        // so a truly elite enhanced player can actually reach a perfect OVR.
+        // the signature/affinity bonuses on top. Cap raised to 130 (was
+        // 100/99) so a manager who genuinely fits a player's style can
+        // push their OVR meaningfully past the old "perfect card" ceiling,
+        // not just up to it.
         const base = efootballBoostedOverall(derived, posArr) + signatureBonus;
         const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base + affinity)));
         p.baseOvr = boostedBase;
@@ -10562,7 +10606,7 @@ var App = (() => {
         ${rows.map(([k, label]) => `
           <div class="attr-bar-row expanded${boostedKeys.has(k) ? ' mgr-boosted' : ''}">
             <span class="attr-name">${label}</span>
-            <div class="attr-track"><div class="attr-fill ${statTierClass(attr[k])}" style="width:${attr[k]}%"></div></div>
+            <div class="attr-track"><div class="attr-fill ${statTierClass(attr[k])}" style="width:${Math.min(100, attr[k])}%"></div></div>
             <span class="attr-val ${statTierClass(attr[k])}">${attr[k]}</span>
           </div>`).join('')}
       </div>`;
@@ -10677,7 +10721,7 @@ var App = (() => {
           ? expandedAttrRowsHTML(player)
           : [['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
               <div class="attr-bar-row"><span class="attr-name">${n}</span>
-                <div class="attr-track"><div class="attr-fill ${statTierClass(v)}" style="width:${v||50}%"></div></div>
+                <div class="attr-track"><div class="attr-fill ${statTierClass(v)}" style="width:${Math.min(100, v||50)}%"></div></div>
                 <span class="attr-val ${statTierClass(v)}">${v||'-'}</span></div>`).join('')}
       </div>
       ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
