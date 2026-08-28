@@ -1507,6 +1507,38 @@ var App = (() => {
   // (GK ratings only count for keepers, so a keeper's sheet isn't dragged
   // down by outfield-only zeros and vice versa) — the baseline that a
   // playstyle's signature attributes are compared against.
+  // player-attributes.json is hand-authored, and playstyle tags get typed
+  // inconsistently just like skill names do ("Fox In The Box" instead of
+  // "Fox in the Box", "goal poacher" instead of "Goal Poacher", etc). Every
+  // playstyle-driven bonus below — PLAYSTYLE_STAT_MODS, PLAYSTYLE_KEY_ATTRS,
+  // PLAYSTYLE_AFFINITY, the signature-attribute bonus, the manager boost —
+  // is a plain exact-string lookup, so a casing/spacing mismatch doesn't
+  // error, it just silently matches nothing and that player quietly loses
+  // their entire playstyle-driven bonus stack. normalizePlayerPlaystyleTags
+  // rewrites every entry's playstyle array to its canonical spelling once,
+  // right when the JSON loads (see ui/matchUI.js), so every lookup below
+  // can stay a simple exact match and still always resolve correctly.
+  function normPlaystyleKey(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+  const PLAYSTYLE_CANON_MAP = (() => {
+    const map = {};
+    Object.keys(PLAYSTYLE_DESCRIPTIONS).forEach((name) => { map[normPlaystyleKey(name)] = name; });
+    return map;
+  })();
+  function canonPlaystyleTag(raw) {
+    const key = normPlaystyleKey(raw);
+    return PLAYSTYLE_CANON_MAP[key] || raw;
+  }
+  function normalizePlayerPlaystyleTags(attrData) {
+    if (!attrData) return;
+    Object.keys(attrData).forEach((id) => {
+      const entry = attrData[id];
+      if (entry && Array.isArray(entry.playstyle)) {
+        entry.playstyle = entry.playstyle.map(canonPlaystyleTag);
+      }
+    });
+  }
   function attrSheetAverage(attr, isGK) {
     const outfieldKeys = ['off_awr','ball_con','tight_pos','fin','spd','accel','bal','head','phy_con',
       'low_pass','place_kick','stam','dribb','lofted_pass','curl','def_awr','def_eng','tack','aggr','jmp','kick_pwr'];
@@ -1769,6 +1801,94 @@ var App = (() => {
     const peak = Math.max(derived.att, derived.def, derived.pac, derived.phy, derived.tec);
     return flatAvg + (peak - flatAvg) * OVERALL_BOOST_LEAN;
   }
+  // ===== eFootball-2027-style POSITION-based overall (raw attributes) =====
+  // weightedOverall/efootballBoostedOverall above compute OVR from the 5
+  // *compact* gameplay stats (att/def/pac/phy/tec) — a coarse blend that
+  // can't tell "Finishing" from "Heading" once both are folded into "att".
+  // Real eFootball instead weighs a fixed, position-specific list of raw
+  // attributes directly, so a CF's overall genuinely hinges on Finishing/
+  // Off. Awareness/Ball Control etc. while a CB's hinges on Def. Awareness/
+  // Tackling/Heading — different players in the same broad area of the
+  // pitch (an AMF vs a CMF, a CF vs an SS) get visibly different emphasis
+  // instead of collapsing into one generic "attacking mid" or "striker"
+  // bucket. This is now the primary OVR base for expanded-attribute
+  // players (see applyExpandedPlayerAttributes); weightedOverall/
+  // efootballBoostedOverall above are left in place but no longer feed OVR.
+  //
+  // Each list below is ordered strongest-value-first (as specified) and
+  // converted to descending linear weights (first attribute weighted most,
+  // last weighted least) that sum to 1 per position — the closest
+  // approximation to eFootball's real per-position emphasis without access
+  // to their exact proprietary weighting.
+  function makeDescendingWeights(orderedKeys) {
+    const n = orderedKeys.length;
+    const denom = (n * (n + 1)) / 2;
+    const weights = {};
+    orderedKeys.forEach((k, i) => { weights[k] = (n - i) / denom; });
+    return weights;
+  }
+  const POSITION_ATTR_WEIGHTS = {
+    // CF (Centre Forward — covers raw 'CF'/'ST' sheets)
+    CF: makeDescendingWeights(['fin', 'off_awr', 'ball_con', 'dribb', 'tight_pos', 'spd', 'accel', 'phy_con', 'head', 'jmp']),
+    // SS (Second Striker) — kept distinct from AMF per eFootball's own split
+    SS: makeDescendingWeights(['off_awr', 'ball_con', 'dribb', 'tight_pos', 'low_pass', 'fin', 'spd', 'accel', 'curl']),
+    // LWF/RWF (wide forwards) — also used for RM/LM (wide mid) sheets,
+    // the closest match given no separate wide-mid list was specified.
+    WF: makeDescendingWeights(['dribb', 'ball_con', 'tight_pos', 'spd', 'accel', 'off_awr', 'low_pass', 'fin', 'curl']),
+    // AMF
+    AMF: makeDescendingWeights(['ball_con', 'dribb', 'tight_pos', 'low_pass', 'lofted_pass', 'off_awr', 'fin', 'curl', 'spd', 'accel']),
+    // CMF
+    CMF: makeDescendingWeights(['low_pass', 'lofted_pass', 'ball_con', 'stam', 'def_awr', 'def_eng', 'dribb', 'tight_pos', 'off_awr']),
+    // DMF
+    DMF: makeDescendingWeights(['def_awr', 'def_eng', 'tack', 'phy_con', 'stam', 'low_pass', 'ball_con', 'aggr', 'head']),
+    // CB
+    CB: makeDescendingWeights(['def_awr', 'tack', 'def_eng', 'phy_con', 'head', 'jmp', 'spd', 'accel', 'bal']),
+    // LB/RB (also used for wing-backs — no separate list was specified)
+    FB: makeDescendingWeights(['def_awr', 'tack', 'def_eng', 'spd', 'accel', 'stam', 'low_pass', 'phy_con', 'bal']),
+    // GK — ONLY the 5 goalkeeper-specific ratings, nothing outfield mixed in.
+    GK: makeDescendingWeights(['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach'])
+  };
+
+  // Maps a player's raw (pre-canonicalization) position string to one of
+  // the position groups above. Deliberately reads posArr[0] BEFORE
+  // normalizeAllPositions() runs (see init() in ui/matchUI.js — expanded
+  // attributes are applied first) so 'SS' is never collapsed into 'CAM'/
+  // 'AMF' here the way the broader canonPos() system does elsewhere; this
+  // resolver is scoped to the OVR calc only and doesn't affect formation/
+  // substitution logic.
+  function resolveAttrPositionGroup(posArr) {
+    const raw = String((posArr && posArr[0]) || 'CM').toUpperCase();
+    if (raw === 'GK') return 'GK';
+    if (raw === 'CF' || raw === 'ST') return 'CF';
+    if (raw === 'SS') return 'SS';
+    if (['LW', 'RW', 'LWF', 'RWF', 'LF', 'RF', 'LM', 'RM', 'LMF', 'RMF'].includes(raw)) return 'WF';
+    if (['CAM', 'AM', 'AMF'].includes(raw)) return 'AMF';
+    if (['CM', 'CMF', 'MF'].includes(raw)) return 'CMF';
+    if (['CDM', 'DM', 'DMF'].includes(raw)) return 'DMF';
+    if (raw === 'CB' || raw === 'SW') return 'CB';
+    if (['LB', 'RB', 'LWB', 'RWB'].includes(raw)) return 'FB';
+    return 'CMF';
+  }
+
+  // Computes OVR straight from the (manager-boosted) raw attribute sheet
+  // using the position's weight list above, then applies the same
+  // "lean toward peak" treatment as efootballBoostedOverall — a truly
+  // standout signature attribute for the role still pulls the whole
+  // rating up rather than just averaging away.
+  function positionalRawOverall(attr, posGroup) {
+    const weights = POSITION_ATTR_WEIGHTS[posGroup] || POSITION_ATTR_WEIGHTS.CMF;
+    let sum = 0, wsum = 0, peak = -Infinity;
+    Object.keys(weights).forEach((k) => {
+      const v = attr[k];
+      if (typeof v !== 'number') return;
+      sum += v * weights[k];
+      wsum += weights[k];
+      if (v > peak) peak = v;
+    });
+    const flat = wsum ? sum / wsum : 60;
+    if (peak === -Infinity) peak = flat;
+    return flat + (peak - flat) * OVERALL_BOOST_LEAN;
+  }
 
   // Direct overall bump from the manager fitting the player, on top of
   // (and separate from) the inner-attribute boost above — mirrors
@@ -1836,13 +1956,17 @@ var App = (() => {
         // toward their overall here than the generic 5-stat blend alone
         // would give them.
         const signatureBonus = styleSignatureBonus(attr, attr.playstyle, isGK);
-        // eFootball-style boost: lean the flat weighted average toward the
-        // player's peak stat instead of just averaging it away, then layer
-        // the signature/affinity bonuses on top. Cap raised to 130 (was
-        // 100/99) so a manager who genuinely fits a player's style can
-        // push their OVR meaningfully past the old "perfect card" ceiling,
-        // not just up to it.
-        const base = efootballBoostedOverall(derived, posArr) + signatureBonus;
+        // Position-based eFootball 2027-style overall: weighs the raw
+        // attribute sheet directly using this exact position's own
+        // strongly-valued attribute list (see POSITION_ATTR_WEIGHTS),
+        // computed on the manager-boosted `attr` sheet so a manager fit
+        // (or a stacked signature/affinity bonus below) still lifts a
+        // player's OVR past what their un-boosted card alone would give.
+        // Cap raised to 130 (was 100/99) so a manager who genuinely fits
+        // a player's style can push their OVR meaningfully past the old
+        // "perfect card" ceiling, not just up to it.
+        const posGroup = resolveAttrPositionGroup(posArr);
+        const base = positionalRawOverall(attr, posGroup) + signatureBonus;
         const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base + affinity)));
         p.baseOvr = boostedBase;
         p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(boostedBase + (p.form || 0))));
@@ -2377,8 +2501,15 @@ var App = (() => {
       }
 
       // player-attributes.json — optional; the app works exactly as before
-      // for any player not listed here.
-      if (attrJson) playerAttributesData = attrJson;
+      // for any player not listed here. Canonicalize every entry's
+      // playstyle tag spelling/casing right away (see
+      // normalizePlayerPlaystyleTags) so a hand-authored casing mismatch
+      // like "Fox In The Box" vs "Fox in the Box" can never silently drop
+      // that player's entire playstyle-driven bonus stack.
+      if (attrJson) {
+        playerAttributesData = attrJson;
+        normalizePlayerPlaystyleTags(playerAttributesData);
+      }
 
       loadStats();
       loadPersistedGameState();
