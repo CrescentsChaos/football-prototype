@@ -649,6 +649,16 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   color: var(--accent-gold); background: rgba(0,0,0,0.7);
   padding: 0 4px; border-radius: 3px; text-shadow: none;
 }
+/* Position code, shown above the dot (mirrors .dot-num's badge look,
+   just anchored to the opposite edge of the dot instead of the label
+   stack below it). */
+.player-dot .dot-pos {
+  position: absolute; bottom: 100%; margin-bottom: 4px; left: 50%; transform: translateX(-50%);
+  font-size: 0.58rem; font-weight: 800; line-height: 1.2;
+  color: var(--accent-gold); background: rgba(0,0,0,0.7);
+  padding: 0 4px; border-radius: 3px; text-shadow: none;
+  white-space: nowrap; pointer-events: none; z-index: 4;
+}
 .player-dot .dot-name {
   font-size: 0.58rem; white-space: nowrap; color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.9); font-weight: 700;
@@ -2138,6 +2148,17 @@ select.ss-native {
   padding: 0 4px; border-radius: 3px; text-shadow: none;
 }
 .sb-dot .dot-num:empty { display: none; }
+/* Position code, shown above the dot — same badge look as .dot-num,
+   just anchored above instead of stacked into the label below. Not
+   shown in edit-mode, where the dot's own avatar already displays the
+   slot code front and center. */
+.sb-dot .dot-pos {
+  position: absolute; bottom: 100%; margin-bottom: 4px; left: 50%; transform: translateX(-50%);
+  font-size: 0.58rem; font-weight: 800; line-height: 1.2;
+  color: var(--accent-gold); background: rgba(0,0,0,0.7);
+  padding: 0 4px; border-radius: 3px; text-shadow: none;
+  white-space: nowrap; pointer-events: none; z-index: 4;
+}
 .sb-dot .dot-name {
   font-size: 0.58rem; white-space: nowrap; color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.9); font-weight: 700;

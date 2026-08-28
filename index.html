@@ -97,6 +97,10 @@
               <div id="home-preview" class="team-preview"></div>
               <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
               <select id="home-formation" class="formation-select" onchange="App.onFormationChange('home')" aria-label="Home formation"></select>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('home','club')">🎲 Club</button>
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('home','national')">🎲 National</button>
+              </div>
               <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('home')">⚙️ Squad Builder</button>
             </div>
             <div class="vs-badge">VS</div>
@@ -106,6 +110,10 @@
               <div id="away-preview" class="team-preview"></div>
               <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
               <select id="away-formation" class="formation-select" onchange="App.onFormationChange('away')" aria-label="Away formation"></select>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('away','club')">🎲 Club</button>
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('away','national')">🎲 National</button>
+              </div>
               <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('away')">⚙️ Squad Builder</button>
             </div>
           </div>
@@ -119,9 +127,6 @@
           </div>
           <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" onclick="App.startMatch()">⚽ Kick Off</button>
-            <button class="btn btn-secondary" onclick="App.quickSimMatch()">⚡ Instant Result</button>
-            <button class="btn btn-secondary" onclick="App.randomMatch('national')">🎲 Random National</button>
-            <button class="btn btn-secondary" onclick="App.randomMatch('club')">🎲 Random Club</button>
           </div>
         </div>
       </div>
