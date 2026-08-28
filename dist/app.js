@@ -216,18 +216,19 @@ var App = (() => {
   const POS_ROLE_ALTS = {
     GK: ['GK'],
     CB: ['CB'],
-    RB: ['RB', 'RWB','CB'],
-    LB: ['LB', 'LWB','CB'],
+    RB: ['RB', 'RWB', 'RM'],
+    LB: ['LB', 'LWB', 'LM'],
     RWB: ['RWB', 'RB', 'RM'],
     LWB: ['LWB', 'LB', 'LM'],
     CDM: ['CDM', 'CM'],
     CM: ['CM', 'CDM', 'CAM'],
     CAM: ['CAM', 'CM'],
-    RM: ['RM', 'RW', 'RWB','CM'],
-    LM: ['LM', 'LW', 'LWB', 'CM'],
-    RW: ['RW', 'RM'],
-    LW: ['LW', 'LM'],
-    ST: ['ST']
+    RM: ['RM', 'RW', 'RWB'],
+    LM: ['LM', 'LW', 'LWB'],
+    RW: ['RW', 'RM', 'CAM'],
+    LW: ['LW', 'LM', 'CAM'],
+    ST: ['ST', 'CF'],
+    CF: ['CF', 'ST']
   };
   // Human-readable names for the role picker — the slot codes alone
   // (CDM, CAM...) aren't self-explanatory to everyone at a glance.
@@ -235,7 +236,7 @@ var App = (() => {
     GK: 'Goalkeeper', CB: 'Centre-Back', RB: 'Right-Back', LB: 'Left-Back',
     RWB: 'Right Wing-Back', LWB: 'Left Wing-Back', CDM: 'Defensive Mid',
     CM: 'Central Mid', CAM: 'Attacking Mid', RM: 'Right Mid', LM: 'Left Mid',
-    RW: 'Right Wing', LW: 'Left Wing', ST: 'Striker'
+    RW: 'Right Wing', LW: 'Left Wing', ST: 'Striker', CF: 'Centre-Forward'
   };
 
   // Different data sources (teams.json, player-attributes.json) name the
@@ -2511,16 +2512,18 @@ var App = (() => {
     }
   }
 
-  // Picks a formation for a team. If the team has a "formation" key set in
-  // teams.json (matching a valid FORMATIONS entry) that formation is used
-  // strictly as the team's default starting shape — though it can still be
-  // changed mid-match via the live tactics panel. Otherwise a formation is
-  // deterministically derived from the team's id/name so the same team
-  // tends to line up the same way match to match, while different teams
-  // spread out across the available formation pool instead of everyone
-  // randomly converging on the same one or two shapes.
+  // Picks a formation for a team. If the team's manager has a "formation"
+  // key set in teams.json (team.manager.formation, matching a valid
+  // FORMATIONS entry) that formation is used strictly as the team's default
+  // starting shape — though it can still be changed mid-match via the live
+  // tactics panel. Otherwise a formation is deterministically derived from
+  // the team's id/name so the same team tends to line up the same way match
+  // to match, while different teams spread out across the available
+  // formation pool instead of everyone randomly converging on the same one
+  // or two shapes.
   function pickTeamFormation(team) {
-    if (team && team.formation && FORMATIONS[team.formation]) return team.formation;
+    const setFormation = team && team.manager && team.manager.formation;
+    if (setFormation && FORMATIONS[setFormation]) return setFormation;
     if (team && team._aiFormation && FORMATIONS[team._aiFormation]) return team._aiFormation;
     // Formation choice now follows from the manager's identity instead of a
     // flat hash of the team name — a Long Ball/defensive-minded manager's
