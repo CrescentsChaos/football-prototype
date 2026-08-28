@@ -12026,12 +12026,68 @@ var App = (() => {
   }
 
 
+  // getVal may return null (attribute doesn't apply to that player, e.g. a
+  // GK-only rating for an outfield player) — null values render as '—' and
+  // are excluded from the best-value comparison entirely, instead of being
+  // coerced to 0 and dragging that player's column down.
   function compareRowsHTML(label, entries, getVal, fmt) {
     const vals = entries.map(e => getVal(e.player));
     let bestIdx = -1, bestVal = -Infinity;
-    vals.forEach((v, i) => { if (v > bestVal) { bestVal = v; bestIdx = i; } });
-    const cells = vals.map((v, i) => `<span class="compare-row-val${(i === bestIdx && vals.length > 1 && bestVal > 0) ? ' best' : ''}">${fmt ? fmt(v) : v}</span>`).join('');
+    vals.forEach((v, i) => { if (v != null && v > bestVal) { bestVal = v; bestIdx = i; } });
+    const cells = vals.map((v, i) => `<span class="compare-row-val${(i === bestIdx && vals.length > 1 && bestVal > 0) ? ' best' : ''}">${v == null ? '—' : (fmt ? fmt(v) : v)}</span>`).join('');
     return `<div class="compare-row"><span class="compare-row-label">${label}</span>${cells}</div>`;
+  }
+
+
+  // Detailed per-rating comparison for enhanced (expanded-attribute)
+  // players — the 25+ individual eFootball-style ratings behind a boosted
+  // player's att/def/pac/phy/tec, grouped the same way as the profile page
+  // (see EXPANDED_ATTR_GROUPS / expandedAttrRowsHTML in playerUI.js). Only
+  // rendered once at least 2 of the compared players actually carry an
+  // expandedAttrs sheet — comparing a single enhanced player against
+  // regular players' (nonexistent) detailed ratings isn't meaningful.
+  // Players without a given rating (e.g. a regular player with no sheet at
+  // all, or a GK-only rating for an outfield player) show '—' for that row
+  // rather than a misleading overwritten 0.
+  function expandedCompareRowsHTML(entries) {
+    const enhancedCount = entries.filter(e => e.player.attrBoosted && e.player.expandedAttrs).length;
+    if (enhancedCount < 2) return '';
+    return EXPANDED_ATTR_GROUPS.map((group) => {
+      const rows = group.keys.filter(([k]) => entries.some(e => e.player.expandedAttrs && typeof e.player.expandedAttrs[k] === 'number'));
+      if (!rows.length) return '';
+      const rowsHTML = rows.map(([k, label]) => compareRowsHTML(label, entries, (p) => {
+        return (p.expandedAttrs && typeof p.expandedAttrs[k] === 'number') ? p.expandedAttrs[k] : null;
+      })).join('');
+      return `<div class="card-title" style="margin-top:14px">${group.label}</div>${rowsHTML}`;
+    }).join('');
+  }
+
+
+  // When every compared player lines up on both position and playstyle,
+  // the raw attribute rows alone don't answer the question that actually
+  // motivated the comparison — "which of these should I pick?" — so this
+  // works out a winner (highest OVR) and returns a banner naming them,
+  // along with which column header should get the crown highlight. Only
+  // enhanced players carry playstyle tags at all, so this only fires when
+  // every player in the comparison is enhanced and shares the exact same
+  // position and at least one playstyle tag.
+  function playersComparePositionMatch(entries) {
+    if (entries.length < 2) return null;
+    const positions = entries.map(e => (e.player.pos || [])[0] || null);
+    if (positions.some(p => !p) || !positions.every(p => p === positions[0])) return null;
+    const styleLists = entries.map(e => (e.player.attrBoosted && e.player.expandedAttrs && e.player.expandedAttrs.playstyle) || []);
+    if (styleLists.some(list => !list.length)) return null;
+    const commonStyles = styleLists.reduce((acc, list) => acc.filter(s => list.includes(s)));
+    if (!commonStyles.length) return null;
+    let bestIdx = 0;
+    entries.forEach((e, i) => { if ((e.player.ovr || 0) > (entries[bestIdx].player.ovr || 0)) bestIdx = i; });
+    return { position: positions[0], styles: commonStyles, bestIdx };
+  }
+
+  function bestPickBannerHTML(entries, match) {
+    if (!match) return '';
+    const best = entries[match.bestIdx].player;
+    return `<div class="compare-best-pick">🏆 Best pick at <strong>${match.position}</strong> (${match.styles.join(', ')}): ${playerNameHTML(best)} — ${best.ovr || '—'} OVR</div>`;
   }
 
 
@@ -12040,15 +12096,24 @@ var App = (() => {
     const content = document.getElementById('compare-modal-content');
     if (!content || !entries.length) return;
     const n = entries.length;
-    const header = entries.map(e => `<div class="compare-col-head">
+    const posMatch = playersComparePositionMatch(entries);
+    const header = entries.map((e, i) => `<div class="compare-col-head${posMatch && posMatch.bestIdx === i ? ' best' : ''}">
         <div class="profile-avatar" style="width:52px;height:52px;margin:0 auto 6px;background:${e.team.color || '#d4af37'};border:2px solid ${e.team.secondary || '#fff'};color:${e.team.secondary || '#fff'}">${playerAvatarMark(e.player)}</div>
         <div style="font-weight:700;font-size:0.82rem;line-height:1.2">${playerNameHTML(e.player)}</div>
         <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px">${teamMark(e.team, 14)} ${e.team.short || ''} · ${(e.player.pos || [])[0] || ''}</div>
         <div style="color:var(--gold);font-weight:800;margin-top:3px">${e.player.ovr || '—'} <span style="font-size:0.6rem;font-weight:600;color:var(--text-3)">OVR</span></div>
       </div>`).join('');
 
+    // Core (att/def/pac/phy/tec) rows — these already reflect an enhanced
+    // player's derived, expanded-attribute-driven values (applied in
+    // applyExpandedPlayerAttributes), same as everywhere else in the app.
     const attrRows = [['ATT', 'att'], ['DEF', 'def'], ['PHY', 'phy'], ['PAC', 'pac'], ['TEC', 'tec']]
       .map(([label, key]) => compareRowsHTML(label, entries, p => p[key] || 0)).join('');
+
+    // The individual eFootball-style ratings behind those core numbers —
+    // this is what actually differentiates two enhanced players who happen
+    // to land on similar att/def/pac/phy/tec.
+    const enhancedRows = expandedCompareRowsHTML(entries);
 
     const careerRows = [
       ['Apps', p => playerCareerCount('ratings', p.id)],
@@ -12062,9 +12127,11 @@ var App = (() => {
 
     content.innerHTML = `
       <div class="card-title">Player Comparison</div>
+      ${bestPickBannerHTML(entries, posMatch)}
       <div class="compare-grid" style="grid-template-columns:repeat(${n},1fr)">${header}</div>
       <div class="card-title" style="margin-top:14px">Attributes</div>
       ${attrRows}
+      ${enhancedRows ? `<div class="card-title" style="margin-top:14px">Enhanced Attributes</div>${enhancedRows}` : ''}
       <div class="card-title" style="margin-top:14px">Career (competitive)</div>
       ${careerRows}
       <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('compare-modal').classList.remove('active')">Close</button></div>`;
