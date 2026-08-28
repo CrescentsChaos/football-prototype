@@ -37403,7 +37403,9 @@
       ],
       "manager": {
         "name": "José Mourinho",
-        "ovr": 96
+        "ovr": 96,
+        "formation":"4-3-3-cdm",
+        "playstyle":"Quick Counter"
       }
     },
     {
