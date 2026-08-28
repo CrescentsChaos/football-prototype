@@ -4655,6 +4655,20 @@
     "label": "players-tab"
   },
   {
+    "id": "cp018b",
+    "file": "ui/playersUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "players-tab"
+  },
+  {
+    "id": "cp018c",
+    "file": "ui/playersUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "players-tab"
+  },
+  {
     "id": "cp019",
     "file": "ui/playersUI.js",
     "start": -1,

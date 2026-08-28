@@ -1991,7 +1991,13 @@ select.ss-native {
 .compare-grid {
   display: grid; gap: 8px; margin-top: 8px;
 }
-.compare-col-head { text-align: center; }
+.compare-col-head { text-align: center; border-radius: 10px; padding: 4px; }
+.compare-col-head.best { background: rgba(240,193,75,0.1); box-shadow: 0 0 0 1px var(--gold) inset; }
+.compare-best-pick {
+  margin-top: 10px; padding: 8px 12px; border-radius: 10px;
+  background: rgba(240,193,75,0.12); border: 1px solid var(--gold);
+  color: var(--gold); font-size: 0.8rem; font-weight: 700; text-align: center;
+}
 .compare-row {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 0; border-bottom: 1px solid var(--border);
