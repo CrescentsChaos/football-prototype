@@ -37404,8 +37404,8 @@
       "manager": {
         "name": "José Mourinho",
         "ovr": 96,
-        "formation":"4-3-3-cdm",
-        "playstyle":"Quick Counter"
+        "formation": "4-3-3-cdm",
+        "playstyle": "Quick Counter"
       }
     },
     {
@@ -51944,6 +51944,36 @@
           "pac": 85,
           "tec": 80,
           "num": 11
+        },
+        {
+          "id": "tot2026_new1",
+          "name": "Omar Marmoush",
+          "pos": [
+            "ST",
+            "CAM"
+          ],
+          "num": 26,
+          "ovr": 83,
+          "att": 82,
+          "def": 59,
+          "phy": 75,
+          "pac": 79,
+          "tec": 74
+        },
+        {
+          "id": "tot2026_new2",
+          "name": "Sando Tonali",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "num": 13,
+          "ovr": 85,
+          "att": 72,
+          "def": 86,
+          "phy": 82,
+          "pac": 78,
+          "tec": 76
         }
       ],
       "manager": {
@@ -63730,6 +63760,7 @@
           "id": "bra18",
           "name": "Raphinha",
           "pos": [
+          "ST",
             "LW",
             "RW",
             "LM"
@@ -63772,7 +63803,7 @@
           "phy": 76,
           "pac": 90,
           "tec": 82,
-          "num": 27
+          "num": 17
         },
         {
           "id": "bar26_74",
@@ -63792,7 +63823,9 @@
       ],
       "manager": {
         "name": "Hansi Flick",
-        "ovr": 89
+        "ovr": 89,
+        "formation":"4-3-3-cdm",
+        "playstyle":"Quick Counter"
       }
     },
     {
