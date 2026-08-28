@@ -216,19 +216,18 @@ var App = (() => {
   const POS_ROLE_ALTS = {
     GK: ['GK'],
     CB: ['CB'],
-    RB: ['RB', 'RWB', 'RM'],
-    LB: ['LB', 'LWB', 'LM'],
+    RB: ['RB', 'RWB','CB'],
+    LB: ['LB', 'LWB','CB'],
     RWB: ['RWB', 'RB', 'RM'],
     LWB: ['LWB', 'LB', 'LM'],
     CDM: ['CDM', 'CM'],
     CM: ['CM', 'CDM', 'CAM'],
     CAM: ['CAM', 'CM'],
-    RM: ['RM', 'RW', 'RWB'],
-    LM: ['LM', 'LW', 'LWB'],
-    RW: ['RW', 'RM', 'CAM'],
-    LW: ['LW', 'LM', 'CAM'],
-    ST: ['ST', 'CF'],
-    CF: ['CF', 'ST']
+    RM: ['RM', 'RW', 'RWB','CM'],
+    LM: ['LM', 'LW', 'LWB', 'CM'],
+    RW: ['RW', 'RM'],
+    LW: ['LW', 'LM'],
+    ST: ['ST']
   };
   // Human-readable names for the role picker — the slot codes alone
   // (CDM, CAM...) aren't self-explanatory to everyone at a glance.
@@ -236,7 +235,7 @@ var App = (() => {
     GK: 'Goalkeeper', CB: 'Centre-Back', RB: 'Right-Back', LB: 'Left-Back',
     RWB: 'Right Wing-Back', LWB: 'Left Wing-Back', CDM: 'Defensive Mid',
     CM: 'Central Mid', CAM: 'Attacking Mid', RM: 'Right Mid', LM: 'Left Mid',
-    RW: 'Right Wing', LW: 'Left Wing', ST: 'Striker', CF: 'Centre-Forward'
+    RW: 'Right Wing', LW: 'Left Wing', ST: 'Striker'
   };
 
   // Different data sources (teams.json, player-attributes.json) name the
