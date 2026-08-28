@@ -185,7 +185,7 @@ var App = (() => {
     '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[75,22],[50,34],[25,22]] },
     '4-3-3-cdm': { name: '4-3-3 (Holding)', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'CAM', 'RW', 'ST', 'LW'],
-    coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[69.8,44.2],[49.4,54],[27.7,46.5],[78,28],[42.9,18],[17.5,30.7]] },
+    coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[65.3,43.1],[50.7,61.7],[35.4,43.1],[84.1,28.9],[49.5,17.6],[17.5,30.7]] },
     '4-3-3-cam': { name: '4-3-3 (Attack)', slots: ['GK','RB','CB','CB','LB','CM','CM','CAM','RW','ST','LW'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[38,52],[50,38],[78,22],[50,14],[22,22]] },
     '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
@@ -6995,9 +6995,34 @@ var App = (() => {
       const onPitchPlayers = onPitchIds.map(id => byId[id]).filter(Boolean);
       const assigned = new Set();
       const slotPlayers = [];
+      // Pass 1 — a player's own recorded `.slot` (set authoritatively by
+      // buildSquad/trySubstitution/pickSlotForIncomingSub/changeFormationLive)
+      // always claims the formation slot it names, before anything else gets
+      // a look-in. This used to be OR'd together with a loose secondary-
+      // position check (p.pos.includes(slot)) in a single find() — since a
+      // player's pos array often lists more than one position (e.g. a CDM
+      // who can also play CM), that loose check could win the very first
+      // slot iterated (array order, not each player's true slot) and drag a
+      // player away from the slot they were actually placed in, while a
+      // completely different player then got shuffled into their vacated
+      // spot. That's what made a formation change or a substitution *look*
+      // like it had put a striker at CDM or a CM at CB on the pitch view,
+      // even though the underlying match data (p.slot) was always correct.
       slots.forEach((slot, idx) => {
-        // Prefer player already marked with this slot
-        let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.slot === slot || (p.pos || []).includes(slot)));
+        const pick = onPitchPlayers.find(p => !assigned.has(p.id) && p.slot === slot);
+        if (pick) {
+          assigned.add(pick.id);
+          slotPlayers[idx] = pick;
+        }
+      });
+      // Pass 2 — only for slots nobody's own `.slot` matched (e.g. stale
+      // data after an edge-case state change). Loosen to secondary
+      // position, then broad compatibility, then whoever's left — same as
+      // before, just demoted to a fallback instead of competing on equal
+      // footing with an exact match.
+      slots.forEach((slot, idx) => {
+        if (slotPlayers[idx]) return;
+        let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.pos || []).includes(slot));
         if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id) && canPlay(p, slot));
         if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id));
         if (pick) {
