@@ -70,6 +70,20 @@
     "label": "func:teamAvgStamina"
   },
   {
+    "id": "cfat08",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:playerMatchSide"
+  },
+  {
+    "id": "cfat09",
+    "file": "engine/fatigue.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:staminaMultiplier"
+  },
+  {
     "id": "cofs01",
     "file": "engine/offside.js",
     "start": -1,
@@ -89,6 +103,13 @@
     "start": -1,
     "end": -1,
     "label": "func:defensiveLineContext"
+  },
+  {
+    "id": "cofs03b",
+    "file": "engine/offside.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:avgLineDefAwareness"
   },
   {
     "id": "cofs04",
@@ -259,6 +280,13 @@
     "label": "gap"
   },
   {
+    "id": "c0012b",
+    "file": "data/playerDatabase.js",
+    "start": 298,
+    "end": 453,
+    "label": "func:normalizePlayerPlaystyleTags"
+  },
+  {
     "id": "c0013",
     "file": "data/playerDatabase.js",
     "start": 454,
@@ -357,6 +385,13 @@
     "label": "func:efootballBoostedOverall + overall system constants"
   },
   {
+    "id": "c0025c",
+    "file": "data/playerDatabase.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:positionalRawOverall + POSITION_ATTR_WEIGHTS"
+  },
+  {
     "id": "c0026",
     "file": "ai/managerAI.js",
     "start": 655,
@@ -427,6 +462,20 @@
     "label": "func:finishingEdge"
   },
   {
+    "id": "cshoot01",
+    "file": "engine/shooting.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:positioningEdge"
+  },
+  {
+    "id": "cshoot02",
+    "file": "engine/shooting.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:shotPowerOf"
+  },
+  {
     "id": "c0035",
     "file": "engine/shooting.js",
     "start": 750,
@@ -476,6 +525,41 @@
     "label": "func:penGkEdge"
   },
   {
+    "id": "cgk01",
+    "file": "engine/goalkeeper.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:gkPositioningEdge"
+  },
+  {
+    "id": "cgk02",
+    "file": "engine/goalkeeper.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:gkReachEdge"
+  },
+  {
+    "id": "cgk03",
+    "file": "engine/goalkeeper.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:gkCatchChance"
+  },
+  {
+    "id": "cgk04",
+    "file": "engine/goalkeeper.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:gkParryReboundDanger"
+  },
+  {
+    "id": "cgk05",
+    "file": "engine/goalkeeper.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:resolveGkSave"
+  },
+  {
     "id": "c0042",
     "file": "engine/shooting.js",
     "start": 785,
@@ -516,6 +600,13 @@
     "start": 809,
     "end": 823,
     "label": "func:defActionEdge"
+  },
+  {
+    "id": "cdef01",
+    "file": "engine/defending.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:foulProneness"
   },
   {
     "id": "c0048",
@@ -1484,6 +1575,13 @@
     "label": "func:pickSaveDesc"
   },
   {
+    "id": "cgk06",
+    "file": "engine/goalkeeper.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:pickCatchDesc"
+  },
+  {
     "id": "c0179",
     "file": "engine/shooting.js",
     "start": 2262,
@@ -1673,17 +1771,17 @@
     "label": "func:simulateDefensiveActions"
   },
   {
-    "id": "c0202",
-    "file": "engine/passing.js",
-    "start": 2783,
-    "end": 2786,
-    "label": "gap"
-  },
-  {
     "id": "c0203",
     "file": "engine/passing.js",
     "start": 2787,
-    "end": 2856,
+    "end": 2786,
+    "label": "table:LOFTED_PASS_SHARE"
+  },
+  {
+    "id": "c0204b",
+    "file": "engine/passing.js",
+    "start": -1,
+    "end": -1,
     "label": "func:simulateMinutePassing"
   },
   {
@@ -1706,6 +1804,20 @@
     "start": 2891,
     "end": 2893,
     "label": "gap"
+  },
+  {
+    "id": "cpass01",
+    "file": "engine/passing.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:groundPassingAbility"
+  },
+  {
+    "id": "cpass02",
+    "file": "engine/passing.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:aerialPassingAbility"
   },
   {
     "id": "c0207",
@@ -3652,6 +3764,13 @@
     "start": -1,
     "end": -1,
     "label": "func:renderPlayerBioHTML"
+  },
+  {
+    "id": "cstat01",
+    "file": "ui/playerUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:statTierClass"
   },
   {
     "id": "c0479",
