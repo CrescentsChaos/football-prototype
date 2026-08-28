@@ -1115,6 +1115,20 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .attr-bar-row.expanded.mgr-boosted .attr-fill { background: linear-gradient(90deg, var(--gold), #fff3c4); }
 .attr-bar-row.expanded.mgr-boosted .attr-val { color: var(--gold); }
 
+/* Stat/attribute value color tiers (0-100+ scale):
+   0-69 red, 70-79 orange, 80-89 green, 90+ mint. Applied to both the
+   compact ATT/DEF/PHY/PAC/TEC bars and the full expanded attribute sheet
+   via statTierClass() in ui/playerUI.js. A mgr-boosted row's gold accent
+   (above) takes visual priority over its tier color. */
+.attr-fill.stat-tier-red { background: linear-gradient(90deg, #6e1414, #e5484d); }
+.attr-fill.stat-tier-orange { background: linear-gradient(90deg, #8a4a06, #f5a623); }
+.attr-fill.stat-tier-green { background: linear-gradient(90deg, #1f5c2e, #4caf50); }
+.attr-fill.stat-tier-mint { background: linear-gradient(90deg, #16916f, #3ee8b8); }
+.attr-val.stat-tier-red { color: #ff6b6f; }
+.attr-val.stat-tier-orange { color: #f5a623; }
+.attr-val.stat-tier-green { color: #5fd873; }
+.attr-val.stat-tier-mint { color: #3ee8b8; }
+
 /* Fixture items */
 .fixture-item {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
