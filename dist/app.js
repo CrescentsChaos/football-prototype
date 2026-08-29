@@ -149,8 +149,80 @@ var App = (() => {
   // can also tally into that competition's own stat bucket (comp.stats), giving each
   // league/competition its own top scorers, assists, cards, awards, etc.
   let currentSeasonComp = null;
-  // playerId -> { type, matchesLeft, teamName, playerName } — counts down once per
-  // this player's team's match played while they're sidelined
+  // injury.json: { injuries: [ { id, name, bodyPart, severity, minMatches,
+  // maxMatches, description, causes: [...] }, ... ] } — the catalogue of
+  // injury types tryInjury() (engine/injuries.js) picks from, and that the
+  // Hospital tab (ui/hospitalUI.js) reads bodyPart/severity/description from.
+  // Embedded below (INJURY_DEFS_DATA) so it works immediately even when
+  // index.html is opened directly (file://), where fetch() of local JSON is
+  // blocked by the browser — same treatment as MANAGER_PORTRAITS_DATA above.
+  // If the app IS served over http(s), a fresh fetch of injury.json (root
+  // dir, alongside index.html) replaces this list, so editing injury.json
+  // (or adding new injury types) works without a rebuild.
+  const INJURY_DEFS_DATA = [
+    { id: 'cramp', name: 'Muscle Cramp', bodyPart: 'Muscle', severity: 'Minor', minMatches: 1, maxMatches: 1,
+      description: 'Sudden involuntary muscle contraction, usually brought on by fatigue or dehydration late in a match.',
+      causes: ['felt a muscle seize up and had to be withdrawn as a precaution', 'was struck down by cramp late in the match'] },
+    { id: 'ankle_sprain', name: 'Ankle Sprain', bodyPart: 'Ankle', severity: 'Minor', minMatches: 1, maxMatches: 3,
+      description: 'A stretching or partial tearing of the ligaments around the ankle joint.',
+      causes: ['rolled his ankle after a heavy tackle', 'twisted his ankle awkwardly on the turf', 'went over on his ankle challenging for the ball'] },
+    { id: 'knee_knock', name: 'Knee Knock', bodyPart: 'Knee', severity: 'Minor', minMatches: 1, maxMatches: 2,
+      description: 'A bruising blow to the knee from a direct collision, with no ligament damage.',
+      causes: ['took a knock on the knee in a goalmouth scramble', 'was caught by a stray boot on the knee'] },
+    { id: 'dead_leg', name: 'Dead Leg (Contusion)', bodyPart: 'Thigh', severity: 'Minor', minMatches: 1, maxMatches: 2,
+      description: 'A deep muscle bruise caused by a direct blow to the thigh, temporarily numbing the leg.',
+      causes: ['took a stray knee to the thigh and needed treatment', 'picked up a dead leg after a collision'] },
+    { id: 'concussion_protocol', name: 'Concussion Protocol', bodyPart: 'Head', severity: 'Minor', minMatches: 1, maxMatches: 2,
+      description: 'Withdrawn as a head-injury precaution to be assessed under concussion protocol.',
+      causes: ['clashed heads with an opponent and was taken off for a head-injury assessment', 'took a blow to the head in an aerial challenge'] },
+    { id: 'hamstring_strain', name: 'Hamstring Strain', bodyPart: 'Hamstring', severity: 'Moderate', minMatches: 2, maxMatches: 5,
+      description: 'A partial tear of the hamstring muscle fibres, typically from an explosive sprint.',
+      causes: ['pulled up sharply while chasing a through ball', 'felt his hamstring go mid-sprint'] },
+    { id: 'calf_strain', name: 'Calf Strain', bodyPart: 'Calf', severity: 'Moderate', minMatches: 2, maxMatches: 4,
+      description: 'A tear in the calf muscle fibres, often from a sudden push-off or change of direction.',
+      causes: ['pulled up with a tight calf after pushing off to sprint', 'felt his calf tighten and signalled to the bench'] },
+    { id: 'groin_strain', name: 'Groin Strain', bodyPart: 'Groin', severity: 'Moderate', minMatches: 2, maxMatches: 4,
+      description: 'A tear in the groin muscles, commonly caused by a sudden stretch or change of direction.',
+      causes: ['felt his groin go while stretching for the ball', 'pulled up sharply after a lunging challenge'] },
+    { id: 'thigh_strain', name: 'Thigh Strain', bodyPart: 'Thigh', severity: 'Moderate', minMatches: 2, maxMatches: 4,
+      description: 'A muscle tear in the front or back of the thigh from a sudden burst of effort.',
+      causes: ['pulled up with a tight thigh chasing back', 'felt his quad tighten after a shot'] },
+    { id: 'back_spasm', name: 'Back Spasm', bodyPart: 'Back', severity: 'Moderate', minMatches: 2, maxMatches: 3,
+      description: 'An involuntary muscle spasm in the lower back, often from an awkward twist or landing.',
+      causes: ['landed awkwardly and felt his back seize up', 'twisted awkwardly clearing the ball and felt his back go'] },
+    { id: 'shoulder_injury', name: 'Shoulder Injury', bodyPart: 'Shoulder', severity: 'Moderate', minMatches: 2, maxMatches: 4,
+      description: 'Bruising or a mild joint sprain in the shoulder from a heavy fall or collision.',
+      causes: ['landed heavily on his shoulder after a challenge', 'fell awkwardly onto his shoulder in a goalmouth clash'] },
+    { id: 'fractured_metatarsal', name: 'Fractured Metatarsal', bodyPart: 'Foot', severity: 'Major', minMatches: 4, maxMatches: 8,
+      description: 'A break in one of the long bones of the foot, usually from a stray boot or a blocked shot.',
+      causes: ['was caught late on the foot and immediately went down in pain', 'took a heavy stamp on the foot in a goalmouth scramble'] },
+    { id: 'knee_ligament_sprain', name: 'Knee Ligament Sprain (MCL)', bodyPart: 'Knee', severity: 'Major', minMatches: 4, maxMatches: 8,
+      description: 'A sprain of the medial collateral ligament from a sideways impact on a planted leg.',
+      causes: ['was caught side-on by a heavy challenge on a planted leg', 'buckled at the knee after a sliding tackle from the side'] },
+    { id: 'rib_fracture', name: 'Rib Fracture', bodyPart: 'Ribs', severity: 'Major', minMatches: 3, maxMatches: 6,
+      description: 'A crack or break in a rib bone, usually from a direct collision or heavy fall.',
+      causes: ['took an elbow to the ribs in an aerial duel', 'collided heavily with the goalkeeper going for the ball'] },
+    { id: 'facial_fracture', name: 'Facial Fracture', bodyPart: 'Face', severity: 'Major', minMatches: 3, maxMatches: 6,
+      description: 'A break to the bones of the face, typically from an accidental clash of heads or a stray elbow.',
+      causes: ['clashed heads with an opponent going for the same ball', 'took an accidental elbow to the face'] },
+    { id: 'hip_flexor_tear', name: 'Hip Flexor Tear', bodyPart: 'Hip', severity: 'Major', minMatches: 4, maxMatches: 7,
+      description: 'A tear in the muscles connecting the thigh to the hip, from an explosive kicking or sprinting motion.',
+      causes: ['felt his hip go through on an over-stretched clearance', 'over-extended for a tackle and felt his hip flexor tear'] },
+    { id: 'acl_tear', name: 'ACL Tear', bodyPart: 'Knee', severity: 'Severe', minMatches: 16, maxMatches: 30,
+      description: "A tear of the anterior cruciate ligament — one of football's most serious injuries, usually needing surgery and months of rehab.",
+      causes: ['planted awkwardly and his knee buckled with no one near him', 'landed from a jump with his knee twisting inward and went down clutching it'] },
+    { id: 'achilles_rupture', name: 'Achilles Tendon Rupture', bodyPart: 'Achilles', severity: 'Severe', minMatches: 18, maxMatches: 28,
+      description: 'A complete tear of the Achilles tendon, one of the longest lay-off injuries in the game.',
+      causes: ['pushed off to sprint and went down instantly clutching his ankle', 'felt something snap in his heel with no contact from anyone'] },
+    { id: 'fractured_tibia', name: 'Fractured Tibia/Fibula', bodyPart: 'Lower Leg', severity: 'Severe', minMatches: 14, maxMatches: 24,
+      description: 'A break to one or both of the lower leg bones, almost always from a serious, high-impact challenge.',
+      causes: ['was caught by a reckless, high challenge on the lower leg', 'took the full force of a mistimed tackle on his shin'] }
+  ];
+  let injuryDefsData = [...INJURY_DEFS_DATA];
+  // playerId -> { defId, type, bodyPart, severity, cause, opponent, competition,
+  // minute, matchesLeft, matchesTotal, teamName, playerName } — counts down
+  // once per this player's team's match played while they're sidelined. Full
+  // record is what the Hospital tab (ui/hospitalUI.js) renders per player.
   let injuryBook = {};
   let suspensionBook = {}; // playerId -> { matchesLeft, teamName, playerName } — 1-match ban after a red card
   let globalMatchDay = 1;
@@ -2426,14 +2498,15 @@ var App = (() => {
         ? [file + '?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './' + file + '?v=' + Date.now(), file]
         : [file + '?v=' + Date.now()];
 
-      // All 6 startup JSON files (1 required, 5 optional) load concurrently.
-      const [teamsJson, leaguesJson, playersJson, trophiesJson, managersJson, attrJson] = await Promise.all([
+      // All 7 startup JSON files (1 required, 6 optional) load concurrently.
+      const [teamsJson, leaguesJson, playersJson, trophiesJson, managersJson, attrJson, injuryJson] = await Promise.all([
         fetchFirstJson(urlSet('teams.json'), 'teams'),
         fetchFirstJson(urlSet('leagues.json'), 'leagues'),
         fetchFirstJson(urlSet('players.json'), 'player portraits'),
         fetchFirstJson(urlSet('trophies.json'), 'trophy images'),
         fetchFirstJson(urlSet('managers.json'), 'manager portraits'),
-        fetchFirstJson(urlSet('player-attributes.json'), 'expanded player attributes')
+        fetchFirstJson(urlSet('player-attributes.json'), 'expanded player attributes'),
+        fetchFirstJson(urlSet('injury.json'), 'injury definitions')
       ]);
 
       let loaded = null;
@@ -2489,6 +2562,15 @@ var App = (() => {
       if (attrJson) {
         playerAttributesData = attrJson;
         normalizePlayerPlaystyleTags(playerAttributesData);
+      }
+
+      // injury.json — optional; the embedded INJURY_DEFS_DATA fallback
+      // (js/state.js) already covers the app working with no server at
+      // all. A valid fetched file with at least one entry fully replaces
+      // it, so editing/extending injury.json's injury catalogue works
+      // without a rebuild — same treatment as leagues.json/trophies.json.
+      if (injuryJson && Array.isArray(injuryJson.injuries) && injuryJson.injuries.length) {
+        injuryDefsData = injuryJson.injuries;
       }
 
       loadStats();
@@ -2556,6 +2638,7 @@ var App = (() => {
     if (view === 'history') showHistory(historyActiveTab || 'team');
     if (view === 'teams') renderTeamsList();
     if (view === 'players') renderPlayersList(false);
+    if (view === 'hospital') renderHospitalList();
     if (view === 'season') goToSeason();
   }
 
@@ -3050,62 +3133,20 @@ var App = (() => {
       }
     });
 
-    // Pass 3 — true last resort: even canPlay() compatibility couldn't
-    // fill every slot (squad is short of anyone position-eligible for
-    // it). The OLD behavior here dumped whoever was left into the XI
-    // labeled with their OWN natural position instead of the formation
-    // slot they were actually filling — which desynced `.slot` from the
-    // real empty slot (e.g. a 3rd player could end up tagged 'ST' when
-    // only 2 ST slots exist) and was the root cause of forwards visually
-    // rendering under defensive labels like CB/RB on the pitch view (see
-    // drawTeam() in ui/matchUI.js, which trusts `.slot` first). Now each
-    // still-empty slot is filled by whichever remaining player's own LINE
-    // (attack/mid/def, see POS_LINE/lineOf) sits CLOSEST to that slot's
-    // line — a midfielder covers a stray empty defensive slot before a
-    // pure forward ever would — and is honestly tagged with the actual
-    // slot they're filling plus outOfPosition:true so the UI can flag it
-    // instead of silently mislabeling them as a natural fit.
-    const _lineOrder = ['DEF', 'MID', 'FWD'];
-    const _lineDist = (playerLine, slotLine) => {
-      const pi = _lineOrder.indexOf(playerLine), si = _lineOrder.indexOf(slotLine);
-      if (pi === -1 || si === -1) return 9;
-      return Math.abs(pi - si);
-    };
-    formation.slots.forEach((slot, i) => {
-      if (slotOf.has(i)) return;
-      const slotLine = POS_LINE[slot] || 'MID';
-      const candidates = players.filter(p => !used.has(p.id))
-        .sort((a, b) => {
-          const d = _lineDist(lineOf(a), slotLine) - _lineDist(lineOf(b), slotLine);
-          // Tie-broken ASCENDING by score (weakest first) — when several
-          // remaining players are equally out-of-position for this slot
-          // (e.g. the squad has nothing but attackers left for a defensive
-          // slot), the squad's weakest attacking option absorbs the
-          // out-of-position duty rather than its best one. Pass 1/2 above
-          // already used descending score for genuine, in-position fits —
-          // this only governs the forced-mismatch case.
-          return d !== 0 ? d : score(a) - score(b);
-        });
-      if (candidates.length) {
-        used.add(candidates[0].id);
-        slotOf.set(i, Object.assign({}, candidates[0], { outOfPosition: true }));
-      }
-    });
-
     const starting = [];
     formation.slots.forEach((slot, i) => {
       const p = slotOf.get(i);
       if (p) starting.push({ ...p, slot, isStarter: true });
     });
 
-    // Absolute final catch-all — only reachable if the squad has fewer
-    // than 11 fit players in total (pass 3 above already covers "enough
-    // bodies, wrong positions"). Field whoever's left, honestly flagged.
+    // Fallback fill if the squad is too thin to fill every slot even via
+    // pass 2 — field whoever's left regardless of position, so we always
+    // put out 11 players.
     while (starting.length < 11) {
       const leftover = players.find(p => !used.has(p.id));
       if (!leftover) break;
       used.add(leftover.id);
-      starting.push({ ...leftover, slot: (leftover.pos || ['CM'])[0], isStarter: true, outOfPosition: true });
+      starting.push({ ...leftover, slot: (leftover.pos || ['CM'])[0], isStarter: true });
     }
 
     const remaining = players.filter(p => !used.has(p.id)).sort((a, b) => score(b) - score(a));
@@ -7076,6 +7117,33 @@ var App = (() => {
     return !!rec && rec.matchesLeft > 0;
   }
 
+  // Picks a random injury definition from injury.json (injuryDefsData),
+  // weighted toward minor knocks and only rarely landing on something
+  // severe — same overall shape as the old hardcoded table, but now backed
+  // by the richer, editable injury.json catalogue (id, bodyPart, severity,
+  // description, flavor "causes" text) that the Hospital tab reads from too.
+  function pickInjuryDef() {
+    const defs = (injuryDefsData && injuryDefsData.length) ? injuryDefsData : INJURY_DEFS_DATA;
+    const byTier = {
+      Minor: defs.filter(d => d.severity === 'Minor'),
+      Moderate: defs.filter(d => d.severity === 'Moderate'),
+      Major: defs.filter(d => d.severity === 'Major'),
+      Severe: defs.filter(d => d.severity === 'Severe')
+    };
+    const roll = seededRandom();
+    let tier;
+    if (roll < 0.55) tier = 'Minor';
+    else if (roll < 0.85) tier = 'Moderate';
+    else if (roll < 0.97) tier = 'Major';
+    else tier = 'Severe';
+    // If the loaded injury.json is missing a whole tier (e.g. a trimmed
+    // custom file), fall back to any tier that does have entries rather
+    // than throwing — degrade gracefully instead of failing the match sim.
+    let pool = byTier[tier];
+    if (!pool.length) pool = defs.filter(d => d && d.minMatches != null);
+    if (!pool.length) pool = defs;
+    return pool[Math.floor(seededRandom() * pool.length)];
+  }
   function tryInjury(side) {
     const m = currentMatch;
     if (!m) return;
@@ -7094,34 +7162,33 @@ var App = (() => {
       injR -= injWeights[i];
       if (injR <= 0) { injured = pool[i]; break; }
     }
-    const injuryTypes = [
-      { type: 'Ankle sprain', min: 1, max: 3 },
-      { type: 'Hamstring strain', min: 2, max: 5 },
-      { type: 'Knee knock', min: 1, max: 2 },
-      { type: 'Calf strain', min: 2, max: 4 },
-      { type: 'Shoulder injury', min: 1, max: 3 },
-      { type: 'Concussion protocol', min: 1, max: 2 },
-      { type: 'Groin strain', min: 2, max: 4 },
-      { type: 'Fractured metatarsal', min: 4, max: 8 },
-      { type: 'ACL concern (precaution)', min: 3, max: 6 },
-      { type: 'Muscle fatigue / cramp', min: 1, max: 1 }
-    ];
-    // Weighted toward minor
-    const roll = seededRandom();
-    let info;
-    if (roll < 0.55) info = injuryTypes[Math.floor(seededRandom() * 3)];
-    else if (roll < 0.85) info = injuryTypes[3 + Math.floor(seededRandom() * 4)];
-    else info = injuryTypes[7 + Math.floor(seededRandom() * 3)];
-    const outMatches = info.min + Math.floor(seededRandom() * (info.max - info.min + 1));
+    const info = pickInjuryDef();
+    const outMatches = info.minMatches + Math.floor(seededRandom() * (info.maxMatches - info.minMatches + 1));
+    // Flavor text for "how it happened" — a random line from this injury
+    // type's causes list in injury.json, falling back to a generic phrase
+    // for a hand-edited injury.json that leaves causes empty.
+    const causeList = (info.causes && info.causes.length) ? info.causes : ['picked up a knock and had to be withdrawn'];
+    const cause = causeList[Math.floor(seededRandom() * causeList.length)];
+    const oppSide = side === 'home' ? 'away' : 'home';
+    const opponent = (m[oppSide] && m[oppSide].team && m[oppSide].team.name) || '';
+    const competition = (typeof matchCompetitionLabel === 'function') ? matchCompetitionLabel(m) : '';
     injuryBook[injured.id] = {
-      type: info.type,
+      defId: info.id,
+      type: info.name,
+      bodyPart: info.bodyPart || '',
+      severity: info.severity || 'Minor',
+      cause: cause,
+      opponent: opponent,
+      competition: competition,
+      minute: m.minute,
       matchesLeft: outMatches,
+      matchesTotal: outMatches,
       teamName: sideData.team.name,
       playerName: injured.name
     };
     m.injuries.push(injured.id);
     addEvent(m.minute, 'injury',
-      `🩹 <span class="player">${injured.name}</span> — ${info.type}. Out for ${outMatches} match${outMatches>1?'es':''}`,
+      `🩹 <span class="player">${injured.name}</span> ${cause} — ${info.name}. Out for ${outMatches} match${outMatches>1?'es':''}`,
       side);
     try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
     if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
@@ -7691,48 +7758,24 @@ var App = (() => {
       });
       // Pass 2 — only for slots nobody's own `.slot` matched (e.g. stale
       // data after an edge-case state change). Loosen to secondary
-      // position, then broad compatibility. If NEITHER finds anyone, the
-      // old behavior fell back to literally "whoever's left" in array
-      // order with zero position check — that blind fallback is exactly
-      // what let a winger or striker render under a CB/RB label on the
-      // pitch view. It's replaced with a line-aware pick: among the
-      // remaining unassigned on-pitch players, prefer whichever one's own
-      // LINE (attack/mid/def) sits closest to this slot's line, so a pure
-      // forward is never chosen for a defensive-labeled slot while a
-      // midfielder or defender is still unassigned.
-      const lineOrder = ['DEF', 'MID', 'FWD'];
-      const lineDist = (playerLine, slotLine) => {
-        const pi = lineOrder.indexOf(playerLine), si = lineOrder.indexOf(slotLine);
-        if (pi === -1 || si === -1) return 9;
-        return Math.abs(pi - si);
-      };
+      // position, then broad compatibility, then whoever's left — same as
+      // before, just demoted to a fallback instead of competing on equal
+      // footing with an exact match.
       slots.forEach((slot, idx) => {
         if (slotPlayers[idx]) return;
         let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.pos || []).includes(slot));
         if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id) && canPlay(p, slot));
-        if (!pick) {
-          const slotLine = POS_LINE[slot] || 'MID';
-          const leftover = onPitchPlayers.filter(p => !assigned.has(p.id))
-            .sort((a, b) => lineDist(lineOf(a), slotLine) - lineDist(lineOf(b), slotLine));
-          pick = leftover[0] || null;
-        }
+        if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id));
         if (pick) {
           assigned.add(pick.id);
           slotPlayers[idx] = pick;
         }
       });
-      // Any remaining on-pitch players fill whatever empty slots are left
-      // (should only ever happen if there are more on-pitch players than
-      // formation slots) — again by closest line match, not array order.
-      onPitchPlayers.filter(p => !assigned.has(p.id)).forEach(p => {
-        const pLine = lineOf(p);
-        let bestIdx = -1, bestDist = Infinity;
-        slots.forEach((slot, i) => {
-          if (slotPlayers[i]) return;
-          const d = lineDist(pLine, POS_LINE[slot] || 'MID');
-          if (d < bestDist) { bestDist = d; bestIdx = i; }
-        });
-        if (bestIdx >= 0) { slotPlayers[bestIdx] = p; assigned.add(p.id); }
+      // Any remaining on-pitch players fill empty slots
+      onPitchPlayers.forEach(p => {
+        if (assigned.has(p.id)) return;
+        const empty = slots.findIndex((_, i) => !slotPlayers[i]);
+        if (empty >= 0) { slotPlayers[empty] = p; assigned.add(p.id); }
       });
 
       let primary = s.team.color || '#1a237e';
@@ -7779,14 +7822,8 @@ var App = (() => {
         if (idx !== 0) used.push({ x, y });
 
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
-        // outOfPosition is set by buildSquad() (ui/teamUI.js) only when the
-        // squad was genuinely too short of eligible players to fill this
-        // slot naturally or compatibly — surfaced here rather than hidden,
-        // so a forced-out-of-position player is visibly flagged instead of
-        // looking like an ordinary (and wrong) natural fit.
-        const oop = !!p.outOfPosition;
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}${oop ? ' oop' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}" title="${oop ? 'Out of position — squad short of eligible players' : ''}">
-          <span class="dot-pos">${oop ? '⚠ ' : ''}${slots[idx] || ''}</span>
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+          <span class="dot-pos">${slots[idx] || ''}</span>
           <span class="dot-avatar">${playerAvatarMark(p)}</span>
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
@@ -10969,6 +11006,14 @@ var App = (() => {
     // (player-attributes.json), so this whole section is naturally absent
     // for a regular, non-enhanced player rather than showing empty fields.
     const bioHTML = (boosted && player.expandedAttrs) ? renderPlayerBioHTML(player.expandedAttrs) : '';
+    // Currently-injured banner — full detail lives on the Hospital tab, but
+    // a quick pointer here means a coach checking a specific player's
+    // profile doesn't have to go hunting for it separately.
+    const injRec = (typeof isPlayerInjured === 'function' && isPlayerInjured(playerId)) ? injuryBook[playerId] : null;
+    const injuryHTML = injRec ? `
+      <div class="hospital-inline-banner">
+        🩹 <strong>${injRec.type || 'Injured'}</strong>${injRec.bodyPart ? ' (' + injRec.bodyPart + ')' : ''} — out for ${injRec.matchesLeft} more match${injRec.matchesLeft > 1 ? 'es' : ''}${injRec.cause ? `<div style="color:var(--text-2);font-size:0.78rem;margin-top:2px">${injRec.cause}${injRec.opponent ? ' vs ' + injRec.opponent : ''}</div>` : ''}
+      </div>` : '';
     content.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
@@ -10986,6 +11031,7 @@ var App = (() => {
           ${playstyleTagsHTML}
         </div>
       </div>
+      ${injuryHTML}
       ${matchBlock}
       ${bioHTML}
       <div class="card-title">Career (competitive)</div>
@@ -12981,6 +13027,133 @@ var App = (() => {
     if (teamMatchLog[team.id].length > 30) teamMatchLog[team.id].length = 30;
   }
 
+  // ========== HOSPITAL TAB ==========
+  // Renders every player currently sidelined (injuryBook entries with
+  // matchesLeft > 0), across every team, with the full detail recorded by
+  // tryInjury() in engine/injuries.js: what the injury is (name/bodyPart/
+  // severity, resolved against injury.json via injuryDefsData), how it
+  // happened (the "cause" flavor line plus opponent/competition/minute
+  // context), and how many matches are left until the player is available
+  // again. Search/severity-filter/sort are kept as small local state here
+  // rather than in js/state.js since they're pure UI/view state, the same
+  // treatment historyActiveTab and seasonActiveTab get.
+  let hospitalFilter = { search: '', severity: 'all', sort: 'matchesLeft' };
+  // One row per currently-injured player, resolved against the live roster
+  // (findPlayerAndTeam, from ui/playersUI.js) for portrait/position, but
+  // reading every injury fact straight from the injuryBook record itself —
+  // that record is the single source of truth for which team the injury
+  // happened at, so this never double-lists a player who has both a club
+  // and a national entry in allTeams.
+  function getHospitalEntries() {
+    const q = (hospitalFilter.search || '').trim().toLowerCase();
+    let list = Object.keys(injuryBook).map(pid => {
+      const rec = injuryBook[pid];
+      if (!rec || !(rec.matchesLeft > 0)) return null;
+      const found = (typeof findPlayerAndTeam === 'function') ? findPlayerAndTeam(pid) : null;
+      const player = (found && found.player) || { id: pid, name: rec.playerName, num: null, pos: [] };
+      const team = (found && found.team) || null;
+      return { id: pid, player, team, rec };
+    }).filter(Boolean);
+
+    if (hospitalFilter.severity !== 'all') {
+      list = list.filter(e => (e.rec.severity || 'Minor') === hospitalFilter.severity);
+    }
+    if (q) {
+      list = list.filter(e =>
+        (e.player.name || e.rec.playerName || '').toLowerCase().includes(q) ||
+        (e.rec.teamName || '').toLowerCase().includes(q) ||
+        (e.rec.type || '').toLowerCase().includes(q) ||
+        (e.rec.bodyPart || '').toLowerCase().includes(q));
+    }
+    const sevOrder = { Severe: 0, Major: 1, Moderate: 2, Minor: 3 };
+    list.sort((a, b) => {
+      if (hospitalFilter.sort === 'name') return (a.player.name || '').localeCompare(b.player.name || '');
+      if (hospitalFilter.sort === 'team') return (a.rec.teamName || '').localeCompare(b.rec.teamName || '');
+      if (hospitalFilter.sort === 'severity') {
+        const d = (sevOrder[a.rec.severity] ?? 9) - (sevOrder[b.rec.severity] ?? 9);
+        return d !== 0 ? d : (b.rec.matchesLeft || 0) - (a.rec.matchesLeft || 0);
+      }
+      return (b.rec.matchesLeft || 0) - (a.rec.matchesLeft || 0);
+    });
+    return list;
+  }
+  function hospitalSeverityClass(sev) {
+    const s = (sev || '').toLowerCase();
+    if (s === 'severe') return 'sev-severe';
+    if (s === 'major') return 'sev-major';
+    if (s === 'moderate') return 'sev-moderate';
+    return 'sev-minor';
+  }
+  // How-it-happened + context line: the random flavor cause from
+  // injury.json, plus the opponent/competition/minute the injury actually
+  // occurred in, when tryInjury() had that context to record.
+  function hospitalCauseLine(rec) {
+    const parts = [];
+    if (rec.cause) parts.push(rec.cause);
+    const ctx = [];
+    if (rec.opponent) ctx.push('vs ' + rec.opponent);
+    if (rec.competition) ctx.push(rec.competition);
+    if (rec.minute != null) ctx.push(rec.minute + "'");
+    if (ctx.length) parts.push('(' + ctx.join(' · ') + ')');
+    return parts.join(' ') || 'No further details recorded.';
+  }
+  function renderHospitalList() {
+    const listEl = document.getElementById('hospital-list');
+    const summaryEl = document.getElementById('hospital-summary');
+    if (!listEl) return;
+
+    const allOut = Object.keys(injuryBook).filter(pid => injuryBook[pid] && injuryBook[pid].matchesLeft > 0);
+    const counts = { Minor: 0, Moderate: 0, Major: 0, Severe: 0 };
+    allOut.forEach(pid => {
+      const s = injuryBook[pid].severity || 'Minor';
+      if (counts[s] != null) counts[s]++;
+    });
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <div class="hospital-stat-row">
+          <div class="hospital-stat"><div class="val">${allOut.length}</div><div class="lbl">Total Out</div></div>
+          <div class="hospital-stat sev-minor"><div class="val">${counts.Minor}</div><div class="lbl">Minor</div></div>
+          <div class="hospital-stat sev-moderate"><div class="val">${counts.Moderate}</div><div class="lbl">Moderate</div></div>
+          <div class="hospital-stat sev-major"><div class="val">${counts.Major}</div><div class="lbl">Major</div></div>
+          <div class="hospital-stat sev-severe"><div class="val">${counts.Severe}</div><div class="lbl">Severe</div></div>
+        </div>`;
+    }
+
+    const entries = getHospitalEntries();
+    if (!entries.length) {
+      listEl.innerHTML = `<div class="empty-state"><div class="icon">🏥</div><p>${allOut.length ? 'No injuries match your filters.' : 'No injuries right now — every squad is fully fit.'}</p></div>`;
+      return;
+    }
+
+    listEl.innerHTML = `<div class="table-scroll"><table class="lb-table hospital-table"><thead><tr>
+      <th>Player</th><th>Team</th><th>Injury</th><th>Body Part</th><th>Severity</th><th>How it happened</th><th>Return</th>
+    </tr></thead><tbody>
+      ${entries.map(e => {
+        const p = e.player, rec = e.rec, team = e.team;
+        const total = rec.matchesTotal || rec.matchesLeft || 1;
+        const done = Math.max(0, Math.min(total, total - rec.matchesLeft));
+        const pct = Math.round(100 * done / total);
+        return `<tr onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
+          <td><div style="display:flex;align-items:center;gap:8px">
+            <div class="lb-avatar" style="width:28px;height:28px">${playerAvatarMark(p)}</div>
+            <span>${p.name || rec.playerName}</span>
+          </div></td>
+          <td>${team ? `${teamMark(team, 18)} ${team.name}` : (rec.teamName || '—')}</td>
+          <td>${rec.type || '—'}</td>
+          <td>${rec.bodyPart || '—'}</td>
+          <td><span class="injury-badge ${hospitalSeverityClass(rec.severity)}">${rec.severity || 'Minor'}</span></td>
+          <td style="max-width:260px;color:var(--text-2);font-size:0.8rem">${hospitalCauseLine(rec)}</td>
+          <td>
+            <div style="font-weight:700;white-space:nowrap">${rec.matchesLeft} match${rec.matchesLeft > 1 ? 'es' : ''} left</div>
+            <div class="hospital-progress"><div class="hospital-progress-fill" style="width:${pct}%"></div></div>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>`;
+  }
+  function searchHospital(v) { hospitalFilter.search = v || ''; renderHospitalList(); }
+  function filterHospitalSeverity(v) { hospitalFilter.severity = v || 'all'; renderHospitalList(); }
+  function sortHospital(v) { hospitalFilter.sort = v || 'matchesLeft'; renderHospitalList(); }
 
   return {
     setRngSeed, getRngSeed,
@@ -13008,7 +13181,8 @@ var App = (() => {
     showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
     simSeasonFixture, playSeasonFixture,
     searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
-    togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare
+    togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare,
+    renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital
   };
 })();
 
