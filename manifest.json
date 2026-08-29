@@ -728,6 +728,13 @@
     "label": "func:selectTournamentFormat"
   },
   {
+    "id": "ccomp03",
+    "file": "ui/seasonUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:applyTournamentBranding"
+  },
+  {
     "id": "c0062",
     "file": "data/teamDatabase.js",
     "start": 1114,

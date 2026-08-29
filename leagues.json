@@ -1,4 +1,101 @@
 {
+  "_tournamentBranding": {
+    "worldcup": {
+      "logo": "worldcup.png",
+      "color": "#D4AF37",
+      "colorDim": "#8A6E1E"
+    },
+    "ucl": {
+      "logo": "ucl.png",
+      "color": "#1428A0",
+      "colorDim": "#0A1550"
+    },
+    "nations-league": {
+      "logo": "nations-league.png",
+      "color": "#FF4C00",
+      "colorDim": "#8F2A00"
+    },
+    "euros": {
+      "logo": "euros.png",
+      "color": "#0033A0",
+      "colorDim": "#FFCC00"
+    },
+    "copa-america": {
+      "logo": "copa-america.png",
+      "color": "#C8102E",
+      "colorDim": "#7A0A1C"
+    },
+    "afcon": {
+      "logo": "afcon.png",
+      "color": "#009739",
+      "colorDim": "#FCD116"
+    },
+    "asian-cup": {
+      "logo": "asian-cup.png",
+      "color": "#EE2C34",
+      "colorDim": "#003DA5"
+    },
+    "gold-cup": {
+      "logo": "gold-cup.png",
+      "color": "#FFB81C",
+      "colorDim": "#002F6C"
+    },
+    "fa-cup": {
+      "logo": "fa-cup.png",
+      "color": "#C8102E",
+      "colorDim": "#041E42"
+    },
+    "efl-cup": {
+      "logo": "efl-cup.png",
+      "color": "#00A9CE",
+      "colorDim": "#1D1D1B"
+    },
+    "community-shield": {
+      "logo": "community-shield.png",
+      "color": "#7A1F2B",
+      "colorDim": "#C9A227"
+    },
+    "copa-del-rey": {
+      "logo": "copa-del-rey.png",
+      "color": "#C60B1E",
+      "colorDim": "#FFC400"
+    },
+    "supercopa-esp": {
+      "logo": "supercopa-esp.png",
+      "color": "#0B3D91",
+      "colorDim": "#C60B1E"
+    },
+    "dfb-pokal": {
+      "logo": "dfb-pokal.png",
+      "color": "#DD0000",
+      "colorDim": "#FFCE00"
+    },
+    "dfl-supercup": {
+      "logo": "dfl-supercup.png",
+      "color": "#006341",
+      "colorDim": "#1A1A1A"
+    },
+    "coppa-italia": {
+      "logo": "coppa-italia.png",
+      "color": "#009246",
+      "colorDim": "#CE2B37"
+    },
+    "supercoppa-ita": {
+      "logo": "supercoppa-ita.png",
+      "color": "#002B7F",
+      "colorDim": "#FFD700"
+    },
+    "coupe-de-france": {
+      "logo": "coupe-de-france.png",
+      "color": "#0055A4",
+      "colorDim": "#EF4135"
+    },
+    "trophee-des-champions": {
+      "logo": "trophee-des-champions.png",
+      "color": "#041E42",
+      "colorDim": "#FFD700"
+    }
+  },
   "La Liga": [
     "Athletic Club 2026-27",
     "Atlético Madrid 2026-27",

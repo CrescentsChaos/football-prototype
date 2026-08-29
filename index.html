@@ -228,7 +228,10 @@
     <!-- TOURNAMENT -->
     <section id="view-tournament" class="view">
       <div id="tournament-setup" class="card">
-        <div class="card-title" id="tournament-title">World Cup Setup</div>
+        <div class="tour-header-row card-title" style="margin-bottom:14px">
+          <img id="tour-logo-setup" class="tour-logo" alt="" style="display:none">
+          <span id="tournament-title">World Cup Setup</span>
+        </div>
         <p style="color:var(--text-secondary);margin-bottom:16px" id="tournament-desc">Select national teams to participate. Minimum 4, recommended 8 or 16.</p>
         <div class="teams-toolbar" style="margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <label style="display:flex;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--text-secondary)">
@@ -283,7 +286,10 @@
 
       <div id="tournament-live" style="display:none">
         <div class="card" style="margin-bottom:20px">
-          <div class="card-title" id="tour-stage-title">Group Stage</div>
+          <div class="tour-header-row card-title" style="margin-bottom:14px">
+            <img id="tour-logo-live" class="tour-logo" alt="" style="display:none">
+            <span id="tour-stage-title">Group Stage</span>
+          </div>
           <div id="groups-container" class="groups-grid"></div>
           <div id="fixture-list" class="fixture-list"></div>
           <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">

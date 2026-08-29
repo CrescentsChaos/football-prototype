@@ -2415,3 +2415,36 @@ select.ss-native {
 .sb-page input, .sb-page select, .sb-page textarea {
   -webkit-user-select: auto; -moz-user-select: auto; user-select: auto;
 }
+
+/* Tournament branding — per-competition logo + accent-color theme. Colors
+   and logo filenames come from leagues.json's "_tournamentBranding" table
+   and are applied at runtime as --tour-color/--tour-color-dim custom
+   properties (see applyTournamentBranding() in ui/seasonUI.js), so every
+   competition in the Tournament tab gets its own visual identity instead of
+   one flat gold theme for all of them. Falls back to the default gold theme
+   until JS sets the variables (or if a competition has no branding entry). */
+.tour-header-row.card-title {
+  display: flex; align-items: center; gap: 10px;
+}
+.tour-logo {
+  width: 30px; height: 30px; object-fit: contain; border-radius: 7px;
+  background: rgba(255,255,255,0.06); padding: 3px; flex: 0 0 auto;
+}
+#tournament-setup.tour-themed {
+  border-color: var(--tour-color-dim, var(--border-strong));
+}
+.tour-themed .card:first-child {
+  border-color: var(--tour-color-dim, var(--border-strong));
+}
+.tour-themed .card-title {
+  color: var(--tour-color, var(--gold));
+}
+.tour-themed .btn-primary {
+  background: linear-gradient(135deg, var(--tour-color, var(--gold)) 0%, var(--tour-color-dim, var(--gold-dim)) 100%);
+}
+.tour-themed .btn-secondary:hover {
+  border-color: var(--tour-color, var(--gold)); color: var(--tour-color, var(--gold));
+}
+.tour-themed .bracket-team.winner {
+  box-shadow: inset 3px 0 0 var(--tour-color, var(--gold));
+}
