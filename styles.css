@@ -216,8 +216,8 @@ body::before {
 .save-menu-panel .save-btn-label { display: inline; }
 
 @media (max-width: 640px) {
-  .save-btn-label { display: none; }
-  .save-btn { padding: 8px 10px; }
+  .header-actions .save-btn-label { display: none; }
+  .header-actions .save-btn { padding: 8px 10px; }
   .header-actions { gap: 6px; }
   .save-menu-panel .save-btn-label { display: inline; }
 }
@@ -617,10 +617,11 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .mini-pitch, .team-pitch {
   position: relative;
-  background:
-    linear-gradient(90deg, rgba(0,0,0,0.15) 50%, transparent 50%),
-    linear-gradient(#1a6b3c, #145230);
-  background-size: 24px 100%, 100% 100%;
+  /* Real pitch photo (assets/images/field.jpg) instead of the old
+     CSS-drawn stripes + halfway-line/center-circle pseudo-elements — the
+     photo already has all the pitch markings (goal boxes, halfway line,
+     center circle, corner arcs) baked in. */
+  background: #145230 url('assets/images/field.jpg') center center / cover no-repeat;
   border: 2px solid rgba(255,255,255,0.25);
   border-radius: 12px;
   /* Bumped up from 320/460 — taller pitch means more real pixel space in
@@ -634,17 +635,6 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
      overflow:visible plus the extra pitch height/gap above is what keeps
      the GK's label from being clipped or landing on top of other content. */
   overflow: visible;
-}
-.mini-pitch::before {
-  content: '';
-  position: absolute; left: 10%; right: 10%; top: 50%; height: 1px;
-  background: var(--pitch-line);
-}
-.mini-pitch::after {
-  content: '';
-  position: absolute; left: 50%; top: 50%; width: 18%; aspect-ratio: 1;
-  border: 1px solid var(--pitch-line); border-radius: 50%;
-  transform: translate(-50%, -50%);
 }
 .pitch-label {
   position: absolute; left: 0; right: 0; top: 6px;

@@ -34,26 +34,8 @@
         <button class="nav-tab" data-view="teams">Teams</button>
         <button class="nav-tab" data-view="players">Players</button>
         <button class="nav-tab" data-view="hospital">🏥 Hospital</button>
+        <button class="nav-tab" data-view="extras">🧰 Extras</button>
       </nav>
-      <div class="header-actions">
-        <div class="save-menu" id="save-menu">
-          <button type="button" class="save-menu-toggle" id="save-menu-toggle" title="Save / Export / Import" aria-label="Save menu" aria-haspopup="true" aria-expanded="false" onclick="App.toggleSaveMenu()">
-            <span class="save-btn-icon">💾</span>
-          </button>
-          <div class="save-menu-panel" id="save-menu-panel">
-            <button class="save-btn" id="manual-save-btn" onclick="App.manualSave()" title="Save your progress now" aria-label="Save game">
-              <span class="save-btn-icon">💾</span><span class="save-btn-label">Save</span>
-            </button>
-            <button class="save-btn save-btn-ghost" onclick="App.exportSave()" title="Export your save to a file" aria-label="Export save">
-              <span class="save-btn-icon">⬇️</span><span class="save-btn-label">Export</span>
-            </button>
-            <button class="save-btn save-btn-ghost" onclick="App.triggerImportSave()" title="Import a save file" aria-label="Import save">
-              <span class="save-btn-icon">⬆️</span><span class="save-btn-label">Import</span>
-            </button>
-          </div>
-        </div>
-        <input type="file" id="import-save-input" accept="application/json,.json" style="display:none" onchange="App.importSaveFile(event)">
-      </div>
     </div>
   </header>
 
@@ -512,6 +494,26 @@
         <div id="hospital-list">
           <div class="empty-state"><div class="icon">🏥</div><p>No injuries right now — every squad is fully fit.</p></div>
         </div>
+      </div>
+    </section>
+
+    <!-- EXTRAS -->
+    <section id="view-extras" class="view">
+      <div class="card">
+        <div class="card-title">🧰 Extras</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Save your progress, or export/import it as a file to move it between browsers or keep a backup.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;max-width:320px">
+          <button class="save-btn" id="manual-save-btn" onclick="App.manualSave()" title="Save your progress now" aria-label="Save game" style="justify-content:flex-start">
+            <span class="save-btn-icon">💾</span><span class="save-btn-label">Save</span>
+          </button>
+          <button class="save-btn save-btn-ghost" onclick="App.exportSave()" title="Export your save to a file" aria-label="Export save" style="justify-content:flex-start">
+            <span class="save-btn-icon">⬇️</span><span class="save-btn-label">Export</span>
+          </button>
+          <button class="save-btn save-btn-ghost" onclick="App.triggerImportSave()" title="Import a save file" aria-label="Import save" style="justify-content:flex-start">
+            <span class="save-btn-icon">⬆️</span><span class="save-btn-label">Import</span>
+          </button>
+        </div>
+        <input type="file" id="import-save-input" accept="application/json,.json" style="display:none" onchange="App.importSaveFile(event)">
       </div>
     </section>
   </main>
