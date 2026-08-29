@@ -1969,7 +1969,9 @@ var App = (() => {
   // baseOvr/form/ovr relate.
   function applyExpandedPlayerAttributes() {
     const hasExpandedData = !!(playerAttributesData && Object.keys(playerAttributesData).length);
+    const nationalTeams = teamsData.national || [];
     allTeams.forEach((team) => {
+      const isNationalTeam = nationalTeams.includes(team);
       (team.players || []).forEach((p) => {
         const rawAttr = hasExpandedData ? playerAttributesData[p.id] : null;
         if (!rawAttr) {
@@ -1995,8 +1997,16 @@ var App = (() => {
         p.att = derived.att; p.def = derived.def; p.pac = derived.pac;
         p.phy = derived.phy; p.tec = derived.tec;
         // The expanded sheet's position list is more detailed (multiple
-        // valid roles) — prefer it over teams.json's when present.
-        if (attr.pos && attr.pos.length) p.pos = attr.pos.slice();
+        // valid roles) — prefer it over teams.json's when present. posArr
+        // above (used for stat derivation) still benefits from the sheet's
+        // richer list either way; only the player's *displayed*/selectable
+        // p.pos is left alone here. National-team squads are the
+        // federation's own roster call-up — jersey number AND position for
+        // country duty must stay exactly what teams.json says, even for a
+        // player whose (club-context) attribute sheet lists a different
+        // number/position. p.num is never touched by this function for any
+        // team, club or national — it always comes from teams.json.
+        if (!isNationalTeam && attr.pos && attr.pos.length) p.pos = attr.pos.slice();
         // A player whose signature attributes for their own playstyle(s)
         // run well above their sheet average gets a much bigger push
         // toward their overall here than the generic 5-stat blend alone
@@ -7841,8 +7851,15 @@ var App = (() => {
         </div>`;
       });
       const mgrStyle = getManagerPlaystyle(s.team);
+      // Sits in the same top strip as the team/formation label, tucked into
+      // whichever top corner is the *outer* edge of this pitch box (left
+      // corner for the home column, right corner for the away column) so
+      // its name+playstyle label — which is wider than the box's own
+      // corner margin — grows outward into open space instead of into the
+      // other team's pitch across the narrow gap between them.
+      const mgrSide = `left:${side === 'away' ? '91' : '9'}%;`;
       const mgrDot = s.team.manager && s.team.manager.name
-        ? `<div class="player-dot manager-dot" style="left:6%;top:95%">
+        ? `<div class="player-dot manager-dot" style="${mgrSide}top:11%">
           <span class="dot-avatar">${managerAvatarMark(s.team.manager, 46)}</span>
           <span class="dot-label"><span class="dot-name">${s.team.manager.name}${mgrStyle ? ' · ' + mgrStyle : ''}</span></span>
         </div>` : '';
@@ -10767,7 +10784,7 @@ var App = (() => {
 
     const mgrStyle = getManagerPlaystyle(team);
     const mgrDot = team.manager && team.manager.name
-      ? `<div class="player-dot manager-dot" style="left:6%;top:95%">
+      ? `<div class="player-dot manager-dot" style="left:9%;top:11%">
         <span class="dot-avatar">${managerAvatarMark(team.manager, 46)}</span>
         <span class="dot-label"><span class="dot-name">${team.manager.name}${mgrStyle ? ' · ' + mgrStyle : ''}</span></span>
       </div>` : '';
