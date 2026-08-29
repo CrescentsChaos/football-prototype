@@ -203,12 +203,12 @@ var App = (() => {
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,45],[62,48],[50,55],[38,48],[18,45],[50,18]] },
     '3-4-3': { name: '3-4-3', slots: ['GK','CB','CB','CB','RM','CM','CM','LM','RW','ST','LW'],
       coords: [[50,92],[68,75],[50,78],[32,75],[82,50],[58,48],[42,48],[18,50],[78,25],[50,16],[22,25]] },
-    '5-3-2': { name: '5-3-2', slots: ['GK','RB','CB','CB','CB','LB','CM','CM','CM','ST','ST'],
-      coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[62,48],[50,50],[38,48],[58,20],[42,20]] },
+    '5-3-2': { name: '5-3-2', slots: ['GK', 'RB', 'CB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'CM', 'ST', 'ST'],
+    coords: [[50,92],[88,68],[68,75],[50,78],[32,75],[12,68],[72.3,44.3],[52,56.3],[27.9,45.3],[68.4,19.9],[29.4,19.7]] },
     '4-1-4-1': { name: '4-1-4-1', slots: ['GK','RB','CB','CB','LB','CDM','RM','CM','CM','LM','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[82,42],[58,45],[42,45],[18,42],[50,16]] },
-    '4-3-2-1': { name: '4-3-2-1', slots: ['GK','RB','CB','CB','LB','CM','CDM','CM','CAM','CAM','ST'],
-      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[62,32],[38,32],[50,16]] },
+    '4-3-2-1': { name: '4-3-2-1', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'CM', 'CAM', 'CAM', 'ST'],
+    coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[72.6,48.6],[52,59],[29.6,49.7],[67.8,31.1],[31.6,31.5],[49.4,15.5]] },
     '3-4-2-1': { name: '3-4-2-1', slots: ['GK','CB','CB','CB','RM','CM','CM','LM','CAM','CAM','ST'],
       coords: [[50,92],[68,75],[50,78],[32,75],[85,50],[58,52],[42,52],[15,50],[62,30],[38,30],[50,14]] },
     '4-4-1-1': { name: '4-4-1-1', slots: ['GK','RB','CB','CB','LB','CM','CDM','CDM','CM','CAM','ST'],
@@ -223,8 +223,8 @@ var App = (() => {
       coords: [[50,92],[68,75],[50,78],[32,75],[50,58],[82,42],[60,44],[40,44],[18,42],[58,18],[42,18]] },
     '4-1-3-2': { name: '4-1-3-2', slots: ['GK','RB','CB','CB','LB','CDM','RM','CAM','LM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[50,58],[78,42],[50,40],[22,42],[58,18],[42,18]] },
-    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK','RB','CB','CB','LB','CM','CM','CM','RW','ST','LW'],
-      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,52],[50,50],[38,52],[75,22],[50,34],[25,22]] },
+    '4-3-3-f9': { name: '4-3-3 (False 9)', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'CM', 'RW', 'ST', 'LW'],
+    coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[72.9,49.2],[51.1,58.2],[27.1,49.5],[75,22],[50,34],[25,22]] },
     '4-3-3-cdm': { name: '4-3-3 (Holding)', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'CAM', 'RW', 'ST', 'LW'],
     coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[65.3,43.1],[50.7,61.7],[35.4,43.1],[84.1,28.9],[49.5,17.6],[17.5,30.7]] },
     '4-3-3-cam': { name: '4-3-3 (Attack)', slots: ['GK','RB','CB','CB','LB','CM','CM','CAM','RW','ST','LW'],
@@ -232,7 +232,11 @@ var App = (() => {
     '4-2-3-1-narrow': { name: '4-2-3-1 (Narrow)', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[58,55],[42,55],[50,38],[66,26],[34,26],[50,16]] },
     '5-3-2-attack': { name: '5-3-2 (Attack)', slots: ['GK','RWB','CB','CB','CB','LWB','CM','CM','CM','ST','ST'],
-      coords: [[50,92],[88,62],[68,72],[50,75],[32,72],[12,62],[62,45],[50,48],[38,45],[58,18],[42,18]] }
+      coords: [[50,92],[88,62],[68,72],[50,75],[32,72],[12,62],[62,45],[50,48],[38,45],[58,18],[42,18]] },
+       '4-2-4': { name: '4-2-4', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'ST', 'RW', 'ST', 'LW'],
+    coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[47.5,37.4],[49.2,57],[60.2,18.2],[85.6,27],[35.6,19.3],[14.6,30.7]] },
+     '4-1-2-3-st': { name: '4-1-2-3 (3 ST)', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CAM', 'CDM', 'CAM', 'ST', 'ST', 'ST'],
+    coords: [[50,92],[85,73.9],[62,75],[38,75],[16,75.4],[64.5,39.4],[51.9,56.7],[35.7,38.9],[73.5,16.8],[49.2,17],[25.3,17.1]] }
   };
 
   const POS_COMPAT = {
@@ -3814,6 +3818,16 @@ var App = (() => {
   // changeFormationLive() uses for an in-match reshape. Anyone the new
   // shape has no room for drops to the bench rather than falling out of
   // the squad entirely.
+  //
+  // A shape change (e.g. 4-1-3-2 -> 4-3-3) doesn't always have an exact
+  // like-for-like replacement among the current XI for every new slot —
+  // e.g. going from one holding mid to none, or from two strikers to one
+  // plus two wide forwards. Any slot the first pass can't fill from the
+  // current starters gets a second pass pulling the best remaining fit
+  // from the rest of the squad (bench first, then reserves), with a final
+  // fallback that fields *someone* regardless of position so a formation
+  // switch never quietly leaves a starting slot empty (which used to make
+  // saveSquadBuilder() reject the whole save with no clear reason why).
   function sbSelectFormationPreset(key) {
     if (!sbDraft || !FORMATIONS[key]) return;
     const newFormation = FORMATIONS[key];
@@ -3838,6 +3852,26 @@ var App = (() => {
     currentStarters.forEach(function(p) {
       if (!used.has(p.id)) sbDraft.bench.add(p.id);
     });
+
+    // Second pass: any new slot still empty gets filled from the rest of
+    // the squad — bench (currently-named subs) before pure reserves, since
+    // a bench spot signals "in the matchday 25 on purpose" more than an
+    // untouched reserve does.
+    const pool = sbDraft.players.filter(function(p) { return !used.has(p.id); })
+      .sort(function(a, b) {
+        const aBench = sbDraft.bench.has(a.id) ? 1 : 0;
+        const bBench = sbDraft.bench.has(b.id) ? 1 : 0;
+        if (bBench !== aBench) return bBench - aBench;
+        return (b.ovr || 0) - (a.ovr || 0);
+      });
+    newFormation.slots.forEach(function(slot, i) {
+      if (newAssign[i]) return;
+      let pick = pool.find(function(p) { return !used.has(p.id) && (p.pos || []).includes(slot); });
+      if (!pick) pick = pool.find(function(p) { return !used.has(p.id) && canPlay(p, slot); });
+      if (!pick) pick = pool.find(function(p) { return !used.has(p.id); }); // fallback: fill with anyone left
+      if (pick) { used.add(pick.id); newAssign[i] = pick.id; sbDraft.bench.delete(pick.id); }
+    });
+
     sbDraft.formation = key;
     sbDraft.slots = newAssign;
     sbDraft.coords = newFormation.coords.map(function(c) { return c.slice(); });
@@ -6930,27 +6964,43 @@ var App = (() => {
     // Live formation reshape: reserved for clear, late situations, and only
     // once per side per match, so it reads as a real "extra attacker" or
     // "back five to see it out" moment rather than constant reshuffling.
-    // Only actually fires if a suitably-shaped formation exists that the
+    // Most real managers stick to their starting shape for the entire
+    // 90 minutes regardless of the scoreline — a genuine mid-match reshape
+    // is the exception, not the norm. So the very first minute this side
+    // qualifies for a reshape, we flip a single coin (roughly 1 in 4) for
+    // whether this particular manager is even the type to do it at all —
+    // decided once and remembered, not re-rolled every minute the
+    // situation persists (a per-minute roll would make *some* minute
+    // hitting near-certain over a 10-15 minute window, defeating the
+    // point). A miss retires the idea for the rest of the match, same as
+    // a manager who talked himself out of it once the moment passed. Only
+    // actually fires if a suitably-shaped formation exists that the
     // current on-pitch XI can fill without anyone playing out of
     // position — see pickMoreAttackingFormation/pickMoreDefensiveFormation
-    // and changeFormationLive's own gate above. When no such formation
-    // exists, m.formationAIUsed[side] is left false so the AI can
-    // reconsider on a later minute (e.g. once a sub has changed who's on
-    // the pitch) instead of permanently giving up on reshaping.
+    // and changeFormationLive's own gate above.
     if (!m.formationAIUsed) m.formationAIUsed = { home: false, away: false };
+    if (!m.formationAIRoll) m.formationAIRoll = { home: null, away: null };
     if (m.formationAIUsed[side]) return;
+    const RESHAPE_CHANCE = 0.25;
     const curForm = sideData.squad.formation;
     if (!curForm) return;
     const shape = formationShape(curForm);
     const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
     const allSidePlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
     const onPitchPlayers = onIds.map(id => allSidePlayers.find(p => p.id === id)).filter(Boolean);
-    if (diff <= -1 && minute >= 75 && shape.fwd <= SHAPE_BASELINE.fwd + 0.4) {
+    const qualifiesAttacking = diff <= -1 && minute >= 75 && shape.fwd <= SHAPE_BASELINE.fwd + 0.4;
+    const qualifiesDefensive = diff >= 1 && minute >= 82 && shape.def <= SHAPE_BASELINE.def + 0.4;
+    if (!qualifiesAttacking && !qualifiesDefensive) return;
+    if (m.formationAIRoll[side] === null) {
+      m.formationAIRoll[side] = seededRandom() < RESHAPE_CHANCE;
+    }
+    if (!m.formationAIRoll[side]) { m.formationAIUsed[side] = true; return; }
+    if (qualifiesAttacking) {
       const target = pickMoreAttackingFormation(curForm, onPitchPlayers);
       if (target && changeFormationLive(side, target)) {
         m.formationAIUsed[side] = true;
       }
-    } else if (diff >= 1 && minute >= 82 && shape.def <= SHAPE_BASELINE.def + 0.4) {
+    } else if (qualifiesDefensive) {
       const target = pickMoreDefensiveFormation(curForm, onPitchPlayers);
       if (target && changeFormationLive(side, target)) {
         m.formationAIUsed[side] = true;
@@ -8440,6 +8490,30 @@ var App = (() => {
   // hide/close), so this doesn't do anything those don't already cover —
   // it exists purely so the person can get an explicit, visible confirmation
   // that their progress is safely written to this browser's storage right now.
+  // Save/Export/Import live inside a small dropdown off a single header
+  // icon (see #save-menu in index.html) rather than sitting on screen as
+  // three permanent buttons. forceState lets callers explicitly open/close
+  // (used to close the menu after picking an action, and by the outside-
+  // click/Escape handlers below) instead of just toggling blindly.
+  let _saveMenuListenerAttached = false;
+  function toggleSaveMenu(forceState) {
+    const menu = document.getElementById('save-menu');
+    const toggleBtn = document.getElementById('save-menu-toggle');
+    if (!menu) return;
+    const shouldOpen = forceState != null ? forceState : !menu.classList.contains('open');
+    menu.classList.toggle('open', shouldOpen);
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    if (!_saveMenuListenerAttached) {
+      _saveMenuListenerAttached = true;
+      document.addEventListener('click', (e) => {
+        const m = document.getElementById('save-menu');
+        if (m && m.classList.contains('open') && !m.contains(e.target)) toggleSaveMenu(false);
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') toggleSaveMenu(false);
+      });
+    }
+  }
   function manualSave() {
     const okSeason = persistAll();
     const okStats = saveStats();
@@ -8459,6 +8533,7 @@ var App = (() => {
     // failure, so only toast the happy path here to avoid two conflicting
     // messages.
     if (ok) toast('Progress saved');
+    toggleSaveMenu(false);
   }
 
   // ========== EXPORT / IMPORT SAVE FILE ==========
@@ -8515,6 +8590,7 @@ var App = (() => {
   }
 
   function exportSave() {
+    toggleSaveMenu(false);
     try {
       // Best-effort: also try to flush to localStorage so autosave/reload
       // stay in sync. If this fails (e.g. storage is full), the export
@@ -8553,6 +8629,7 @@ var App = (() => {
   function triggerImportSave() {
     const input = document.getElementById('import-save-input');
     if (input) { input.value = ''; input.click(); }
+    toggleSaveMenu(false);
   }
 
   function importSaveFile(event) {
@@ -12825,7 +12902,7 @@ var App = (() => {
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, randomizeTeamSide,
-    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile,
+    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
     openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
     openSlotRolePicker, setSquadSlotRole,
