@@ -11590,7 +11590,7 @@
       ],
       "manager": {
         "name": "Vicente del Bosque",
-        "ovr": 96
+        "ovr": 100
       }
     },
     {
@@ -15776,7 +15776,7 @@
       ],
       "manager": {
         "name": "Marcello Lippi",
-        "ovr": 95
+        "ovr": 100
       }
     },
     {
@@ -17736,7 +17736,7 @@
       ],
       "manager": {
         "name": "Jorge Jesus",
-        "ovr": 86
+        "ovr": 89
       }
     },
     {
@@ -18141,7 +18141,7 @@
       ],
       "manager": {
         "name": "Luis de la Fuente",
-        "ovr": 91
+        "ovr": 99
       }
     },
     {
@@ -36693,7 +36693,7 @@
         },
         {
           "id": "rma18_2",
-          "name": "Daniel Carvajal",
+          "name": "Dani Carvajal",
           "pos": [
             "RB"
           ],
@@ -37403,7 +37403,7 @@
       ],
       "manager": {
         "name": "José Mourinho",
-        "ovr": 96,
+        "ovr": 86,
         "formation": "4-3-3-cdm",
         "playstyle": "Quick Counter"
       }
@@ -38687,7 +38687,7 @@
       ],
       "manager": {
         "name": "Fabio Capello",
-        "ovr": 97,
+        "ovr": 98,
         "playstyle": "Long Ball Counter",
         "formation": "4-2-2"
       }
@@ -41493,7 +41493,7 @@
       ],
       "manager": {
         "name": "Jupp Heynckes",
-        "ovr": 98
+        "ovr": 100
       }
     },
     {
@@ -63180,20 +63180,6 @@
           "num": 18
         },
         {
-          "id": "barca08_20",
-          "name": "Daniel Alves",
-          "pos": [
-            "RB"
-          ],
-          "ovr": 86,
-          "att": 84,
-          "def": 80,
-          "phy": 82,
-          "pac": 91,
-          "tec": 85,
-          "num": 20
-        },
-        {
           "id": "barca08_22",
           "name": "Éric Abidal",
           "pos": [
@@ -63843,7 +63829,7 @@
       ],
       "manager": {
         "name": "Hansi Flick",
-        "ovr": 89,
+        "ovr": 93,
         "formation": "4-3-3-cdm",
         "playstyle": "Quick Counter"
       }
@@ -68161,7 +68147,7 @@
         },
         {
           "id": "rma14_15",
-          "name": "Daniel Carvajal",
+          "name": "Dani Carvajal",
           "pos": [
             "RB",
             "RWB"
@@ -71405,7 +71391,7 @@
       ],
       "manager": {
         "name": "Lula",
-        "ovr": 96
+        "ovr": 100
       }
     },
     {
