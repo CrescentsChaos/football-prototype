@@ -18141,7 +18141,9 @@
       ],
       "manager": {
         "name": "Luis de la Fuente",
-        "ovr": 99
+        "ovr": 99,
+        "playstyle":"Possession",
+        "formation":"4-3-3"
       }
     },
     {
@@ -22905,7 +22907,9 @@
       ],
       "manager": {
         "name": "Zinedine Zidane",
-        "ovr": 91
+        "ovr": 91,
+        "playstyle":"Quick Counter",
+        "formation":"4-2-3-1"
       }
     },
     {
@@ -24893,7 +24897,7 @@
       "id": "swe",
       "name": "Sweden",
       "short": "SWE",
-      "flag": "🇸🇪",
+      "flag": "??🇪",
       "color": "#006AA7",
       "secondary": "#FECC00",
       "players": [
@@ -38689,7 +38693,7 @@
         "name": "Fabio Capello",
         "ovr": 98,
         "playstyle": "Long Ball Counter",
-        "formation": "4-2-2"
+        "formation": "4-4-2"
       }
     },
     {
@@ -71391,7 +71395,9 @@
       ],
       "manager": {
         "name": "Lula",
-        "ovr": 100
+        "ovr": 100,
+        "playstyle":"Possession",
+        "formation":"4-2-4"
       }
     },
     {

@@ -35,15 +35,22 @@
         <button class="nav-tab" data-view="players">Players</button>
       </nav>
       <div class="header-actions">
-        <button class="save-btn" id="manual-save-btn" onclick="App.manualSave()" title="Save your progress now" aria-label="Save game">
-          <span class="save-btn-icon">💾</span><span class="save-btn-label">Save</span>
-        </button>
-        <button class="save-btn save-btn-ghost" onclick="App.exportSave()" title="Export your save to a file" aria-label="Export save">
-          <span class="save-btn-icon">⬇️</span><span class="save-btn-label">Export</span>
-        </button>
-        <button class="save-btn save-btn-ghost" onclick="App.triggerImportSave()" title="Import a save file" aria-label="Import save">
-          <span class="save-btn-icon">⬆️</span><span class="save-btn-label">Import</span>
-        </button>
+        <div class="save-menu" id="save-menu">
+          <button type="button" class="save-menu-toggle" id="save-menu-toggle" title="Save / Export / Import" aria-label="Save menu" aria-haspopup="true" aria-expanded="false" onclick="App.toggleSaveMenu()">
+            <span class="save-btn-icon">💾</span>
+          </button>
+          <div class="save-menu-panel" id="save-menu-panel">
+            <button class="save-btn" id="manual-save-btn" onclick="App.manualSave()" title="Save your progress now" aria-label="Save game">
+              <span class="save-btn-icon">💾</span><span class="save-btn-label">Save</span>
+            </button>
+            <button class="save-btn save-btn-ghost" onclick="App.exportSave()" title="Export your save to a file" aria-label="Export save">
+              <span class="save-btn-icon">⬇️</span><span class="save-btn-label">Export</span>
+            </button>
+            <button class="save-btn save-btn-ghost" onclick="App.triggerImportSave()" title="Import a save file" aria-label="Import save">
+              <span class="save-btn-icon">⬆️</span><span class="save-btn-label">Import</span>
+            </button>
+          </div>
+        </div>
         <input type="file" id="import-save-input" accept="application/json,.json" style="display:none" onchange="App.importSaveFile(event)">
       </div>
     </div>
