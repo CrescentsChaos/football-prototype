@@ -269,6 +269,301 @@
         "took the full force of a mistimed tackle on his shin",
         "was on the end of a heavy, studs-up challenge"
       ]
-    }
+    },
+  {
+    "id": "shin_splints",
+    "name": "Shin Splints",
+    "bodyPart": "Lower Leg",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 2,
+    "description": "Pain along the shin bone caused by repetitive stress on hard pitch surfaces.",
+    "causes": [
+      "was struggling with shin pain throughout the second half",
+      "signalled to the bench after feeling persistent soreness in his shins",
+      "was taken off to avoid aggravating a shin reaction"
+    ]
+  },
+  {
+    "id": "wrist_sprain",
+    "name": "Wrist Sprain",
+    "bodyPart": "Wrist",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 2,
+    "description": "A stretch or tear of wrist ligaments, often from breaking a heavy fall.",
+    "causes": [
+      "landed heavily on his outstretched hand after an aerial duel",
+      "went down awkwardly and clutched his wrist in pain",
+      "was replaced after twisting his wrist during a tumble"
+    ]
+  },
+  {
+    "id": "hip_pointer",
+    "name": "Hip Pointer (Contusion)",
+    "bodyPart": "Hip",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 3,
+    "description": "A painful bruise on the iliac crest of the pelvis following a direct impact.",
+    "causes": [
+      "took a hard blow to the hip in a sliding challenge",
+      "landed heavily on his side on the hard turf",
+      "collided with the advertising hoardings and bruised his hip"
+    ]
+  },
+  {
+    "id": "plantar_fasciitis",
+    "name": "Plantar Fasciitis",
+    "bodyPart": "Foot",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 3,
+    "description": "Inflammation of the tissue on the bottom of the foot, causing sharp heel pain.",
+    "causes": [
+      "was visibly hobbling due to foot discomfort late in the game",
+      "pulled up with severe pain in the arch of his foot",
+      "was withdrawn after struggling with persistent heel pain"
+    ]
+  },
+  {
+    "id": "toe_fracture",
+    "name": "Fractured Toe",
+    "bodyPart": "Foot",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 3,
+    "description": "A hairline or full break in a toe bone, typically from getting stepped on.",
+    "causes": [
+      "was stamped on late during a tight duel",
+      "took a direct hit to the foot while blocking a shot",
+      "kicked the bottom of an opponent's boot going for a 50-50 ball"
+    ]
+  },
+  {
+    "id": "abdominal_strain",
+    "name": "Abdominal Strain",
+    "bodyPart": "Core",
+    "severity": "Moderate",
+    "minMatches": 2,
+    "maxMatches": 4,
+    "description": "A strain in the abdominal core muscles from twisting or stretching to make contact.",
+    "causes": [
+      "felt a sharp pain in his midsection while twisting to head the ball",
+      "pulled an abdominal muscle while stretching for a volley",
+      "was forced off holding his stomach after a acrobatic clearance"
+    ]
+  },
+  {
+    "id": "hernia",
+    "name": "Sports Hernia",
+    "bodyPart": "Groin",
+    "severity": "Moderate",
+    "minMatches": 3,
+    "maxMatches": 6,
+    "description": "A strain or tear of soft tissue in the lower abdomen or groin area.",
+    "causes": [
+      "felt severe tightness in his lower abdominal wall when changing direction",
+      "was substituted after persistent groin stiffness flared up again",
+      "pulled up sharp while making a sweeping cross into the box"
+    ]
+  },
+  {
+    "id": "adductor_tendonitis",
+    "name": "Adductor Tendonitis",
+    "bodyPart": "Groin",
+    "severity": "Moderate",
+    "minMatches": 2,
+    "maxMatches": 5,
+    "description": "Inflammation of the adductor tendons inside the thigh due to repetitive kicking.",
+    "causes": [
+      "felt recurring groin soreness while taking a goal kick",
+      "was taken off after feeling a twinge inside his upper thigh",
+      "hobbled off after an intense sequence of lateral movements"
+    ]
+  },
+  {
+    "id": "shoulder_dislocation",
+    "name": "Shoulder Dislocation",
+    "bodyPart": "Shoulder",
+    "severity": "Moderate",
+    "minMatches": 3,
+    "maxMatches": 6,
+    "description": "The upper arm bone pops out of the shoulder socket after a collision or fall.",
+    "causes": [
+      "dislocated his shoulder in a heavy collision with the goalkeeper",
+      "fell awkwardly with his arm extended and went down holding his shoulder",
+      "was yanked back awkwardly in a shirt-pulling incident"
+    ]
+  },
+  {
+    "id": "collarbone_fracture",
+    "name": "Fractured Clavicle",
+    "bodyPart": "Shoulder",
+    "severity": "Moderate",
+    "minMatches": 4,
+    "maxMatches": 8,
+    "description": "A break in the collarbone, usually caused by landing directly on the point of the shoulder.",
+    "causes": [
+      "landed heavily on his shoulder after being upended in the air",
+      "took a direct blow to the collarbone in a aerial collision",
+      "was driven into the turf following a mistimed challenge"
+    ]
+  },
+  {
+    "id": "hyper_extended_knee",
+    "name": "Hyperextended Knee",
+    "bodyPart": "Knee",
+    "severity": "Moderate",
+    "minMatches": 2,
+    "maxMatches": 4,
+    "description": "Occurs when the knee is bent backward beyond its normal range of motion.",
+    "causes": [
+      "had his leg driven backward in a heavy 50-50 challenge",
+      "landed awkwardly with a locked leg on a firm pitch",
+      "suffered a hyperextension after kicking through an opponent's block"
+    ]
+  },
+  {
+    "id": "meniscus_tear",
+    "name": "Meniscus Tear",
+    "bodyPart": "Knee",
+    "severity": "Major",
+    "minMatches": 6,
+    "maxMatches": 12,
+    "description": "A tear in the shock-absorbing cartilage of the knee joint, often requiring arthroscopic surgery.",
+    "causes": [
+      "twisted his knee sharply while turning with the ball",
+      "felt his knee catch and lock up during a rapid pivot",
+      "went down clutching his knee after studs caught in the turf"
+    ]
+  },
+  {
+    "id": "pcl_sprain",
+    "name": "PCL Sprain",
+    "bodyPart": "Knee",
+    "severity": "Major",
+    "minMatches": 6,
+    "maxMatches": 10,
+    "description": "Damage to the posterior cruciate ligament, usually caused by a direct impact to the front of the knee.",
+    "causes": [
+      "took a direct blow to the front of his shin while tackling",
+      "fell hard directly onto a bent knee",
+      "collided heavily knee-first into the post"
+    ]
+  },
+  {
+    "id": "syndesmosis_sprain",
+    "name": "High Ankle Sprain",
+    "bodyPart": "Ankle",
+    "severity": "Major",
+    "minMatches": 5,
+    "maxMatches": 9,
+    "description": "A sprain of the high ankle ligaments above the ankle joint, taking significantly longer to heal than standard sprains.",
+    "causes": [
+      "had his foot twisted outward in a heavy sliding tackle",
+      "was trapped under another player's weight in a goalmouth scramble",
+      "suffered a severe high ankle twist when his studs caught on the turn"
+    ]
+  },
+  {
+    "id": "cheekbone_fracture",
+    "name": "Fractured Zygomatic Bone",
+    "bodyPart": "Face",
+    "severity": "Major",
+    "minMatches": 4,
+    "maxMatches": 7,
+    "description": "A break in the cheekbone, usually caused by a clash of heads or high elbow.",
+    "causes": [
+      "took a severe elbow to the cheek in an aerial challenge",
+      "clashed faces violently with a defender going for a header",
+      "was struck directly in the face by a clearing kick"
+    ]
+  },
+  {
+    "id": "wrist_fracture",
+    "name": "Fractured Scaphoid",
+    "bodyPart": "Wrist",
+    "severity": "Major",
+    "minMatches": 4,
+    "maxMatches": 8,
+    "description": "A break to one of the small carpal bones in the wrist, often requiring immobilization.",
+    "causes": [
+      "fell backward and braced his fall with a firm wrist",
+      "was hit at point-blank range on the wrist by a powerful shot",
+      "collided violently with the goalpost attempting to keep a ball in play"
+    ]
+  },
+  {
+    "id": "fractured_fibula",
+    "name": "Isolated Fibula Fracture",
+    "bodyPart": "Lower Leg",
+    "severity": "Major",
+    "minMatches": 6,
+    "maxMatches": 10,
+    "description": "A break to the smaller, non-weight-bearing outer bone of the lower leg.",
+    "causes": [
+      "was caught by a late, sweeping challenge on the side of his leg",
+      "took a direct kick to the outer calf during a tackle",
+      "twisted his ankle so violently that the outer bone fractured"
+    ]
+  },
+  {
+    "id": "hamstring_rupture",
+    "name": "Severe Hamstring Avulsion",
+    "bodyPart": "Hamstring",
+    "severity": "Severe",
+    "minMatches": 12,
+    "maxMatches": 20,
+    "description": "A complete tear of the hamstring muscle away from the bone, requiring surgical reattachment.",
+    "causes": [
+      "pulled up screaming in agony mid-sprint and collapsed",
+      "stretched excessively for a loose ball and felt a severe tear",
+      "suffered a total muscle tear sprinting on a cold night"
+    ]
+  },
+  {
+    "id": "patellar_tendon_rupture",
+    "name": "Patellar Tendon Rupture",
+    "bodyPart": "Knee",
+    "severity": "Severe",
+    "minMatches": 16,
+    "maxMatches": 26,
+    "description": "A tear of the tendon attaching the kneecap to the shinbone, making it impossible to straighten the leg.",
+    "causes": [
+      "landed heavily from a leap and his knee buckled completely",
+      "felt his kneecap give way while trying to jump for a header",
+      "pushed off aggressively to sprint and went down clutching his knee cap"
+    ]
+  },
+  {
+    "id": "hip_labral_tear",
+    "name": "Hip Labral Tear",
+    "bodyPart": "Hip",
+    "severity": "Severe",
+    "minMatches": 10,
+    "maxMatches": 18,
+    "description": "A tear in the cartilage ring lining the hip joint socket, necessitating extended surgical rehab.",
+    "causes": [
+      "suffered a sharp twisting injury in his hip joint during a rapid turn",
+      "over-pivoted aggressively under pressure from a defender",
+      "felt a deep pop in his hip socket while striking a ball on the stretch"
+    ]
+  },
+  {
+    "id": "pelvic_fracture",
+    "name": "Pelvic Fracture",
+    "bodyPart": "Hip",
+    "severity": "Severe",
+    "minMatches": 16,
+    "maxMatches": 24,
+    "description": "A severe structural break to the pelvic structure following an intense high-impact collision.",
+    "causes": [
+      "was crushed in a terrifying high-speed collision with the goalkeeper",
+      "landed violently from a high jump onto his side after being flipped in the air",
+      "was caught in a catastrophic multi-player collision in the box"
+    ]
+  }
+
   ]
 }
