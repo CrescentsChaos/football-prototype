@@ -53,6 +53,47 @@
   function getRngSeed() {
     return _rngSeed;
   }
+  // ========== NON-LINEAR ATTRIBUTE IMPACT CURVE ==========
+  // Every attribute-driven "edge" in the engine used to be a flat multiplier:
+  // (rating - baseline) / span, scaled by a fixed weight. On a straight
+  // line, every point of rating is worth exactly the same amount everywhere
+  // on the scale — so the gap between an 80 and a 90 read as the same size
+  // as the gap between a 90 and a 97, and a 97-rated attribute basically
+  // felt like "80, but a bit more of the same multiplier" rather than
+  // something genuinely elite.
+  //
+  // curvedStat() reshapes that: it measures how far a rating sits from a
+  // roughly-average baseline, then raises that distance to a power > 1
+  // before scaling it back down. Close to baseline, a few points barely
+  // move the result (a 68 and a 72 in the same role really do play almost
+  // identically). The further out a rating sits in either direction, the
+  // more each additional point is worth, so a 97 reads as a clear tier
+  // above a 90, which reads as a clear tier above an 80 — not just a
+  // bigger number times the same flat rate. Returns a value in -1..1;
+  // callers multiply by whatever weight they need for their own formula.
+  // (power > 1 is deliberately "convex": it flattens the middle of the
+  // scale and steepens the extremes — the opposite of a flat multiplier.)
+  function curvedStat(value, baseline, span, power) {
+    baseline = baseline != null ? baseline : 70;
+    span = span != null ? span : (99 - baseline);
+    power = power != null ? power : 1.6;
+    if (!span) return 0;
+    let raw = (value - baseline) / span;
+    raw = Math.max(-1, Math.min(1, raw));
+    return Math.sign(raw) * Math.pow(Math.abs(raw), power);
+  }
+
+  // Same curve, but returned as an "effective" rating back on the original
+  // 1-99 scale instead of a -1..1 edge — a drop-in replacement for a raw
+  // stat inside an existing weighted-average formula whose overall shape
+  // shouldn't otherwise change. A 97 stays close to 97 (elite ratings are
+  // barely compressed); an 80 reads closer to baseline than its raw number
+  // suggests (a merely-good rating is worth less than a flat scale implies).
+  function curvedAttr(value, baseline, span, power) {
+    baseline = baseline != null ? baseline : 70;
+    span = span != null ? span : (99 - baseline);
+    return baseline + curvedStat(value, baseline, span, power) * span;
+  }
 /* Apex Football Simulator - Fixed (no external fetch) */
 var App = (() => {
   // ========== EMBEDDED TEAMS DATA ==========
@@ -1381,10 +1422,11 @@ var App = (() => {
   };
 
   // Individual eFootball-style playstyle tag -> which team manager
-  // playstyles (see PLAYSTYLES above) it's naturally suited to. Used for
-  // the "manager affinity" overall bonus below — a role player who
-  // genuinely fits the way their manager sets the team up plays a little
-  // better than the raw numbers alone would suggest.
+  // playstyles (see PLAYSTYLES above) it's naturally suited to. Shown in
+  // the player profile UI (see ui/playerUI.js) as a "fits the setup" tag
+  // so it still reads as useful context, but it no longer feeds an overall
+  // or attribute boost — a player's rating is the same regardless of which
+  // manager they're playing under.
   const PLAYSTYLE_AFFINITY = {
     'Goal Poacher':          ['Quick Counter', 'Long Ball Counter'],
     'Fox in the Box':        ['Overload', 'Quick Counter'],
@@ -1444,15 +1486,10 @@ var App = (() => {
   };
 
   // Which raw expanded-attribute ratings define each individual playstyle's
-  // "signature" traits. Used two ways:
-  //  1) Overall calc: a player whose signature attributes for their own
-  //     playstyle(s) run hotter than their attribute sheet on average gets
-  //     a much bigger push toward their overall than a generic 5-stat blend
-  //     would give them — see styleSignatureBonus() below.
-  //  2) Manager attribute boost: when a player's playstyle fits their
-  //     manager's tactic, the manager boost is applied directly to these
-  //     specific raw ratings (not just a flat overall number) — see
-  //     applyManagerAttributeBoost() below.
+  // "signature" traits. A player whose signature attributes for their own
+  // playstyle(s) run hotter than their attribute sheet on average gets a
+  // bigger push toward their overall than a generic 5-stat blend would give
+  // them — see styleSignatureBonus() below.
   const PLAYSTYLE_KEY_ATTRS = {
     'Goal Poacher':          ['off_awr', 'ball_con', 'tight_pos', 'fin', 'spd', 'accel', 'bal'],
     'Fox in the Box':        ['off_awr', 'tight_pos', 'fin', 'ball_con', 'head', 'bal', 'accel'],
@@ -1511,7 +1548,7 @@ var App = (() => {
   // inconsistently just like skill names do ("Fox In The Box" instead of
   // "Fox in the Box", "goal poacher" instead of "Goal Poacher", etc). Every
   // playstyle-driven bonus below — PLAYSTYLE_STAT_MODS, PLAYSTYLE_KEY_ATTRS,
-  // PLAYSTYLE_AFFINITY, the signature-attribute bonus, the manager boost —
+  // the signature-attribute bonus —
   // is a plain exact-string lookup, so a casing/spacing mismatch doesn't
   // error, it just silently matches nothing and that player quietly loses
   // their entire playstyle-driven bonus stack. normalizePlayerPlaystyleTags
@@ -1572,52 +1609,8 @@ var App = (() => {
     });
     return Math.max(0, Math.min(14, Math.round(bonus)));
   }
-  // Manager boost to *inner* attributes, not just the final overall number.
-  // When a player's individual playstyle fits the way their manager sets
-  // the team up (see PLAYSTYLE_AFFINITY), the manager's coaching visibly
-  // sharpens that style's specific signature ratings on the player's own
-  // attribute sheet — returns a shallow-cloned, boosted copy of attr so the
-  // original playerAttributesData source is never mutated.
-  //
-  // eFootball-2027-style manager boost: a manager doesn't hand out one flat
-  // nudge — a signature attribute that's reinforced by *multiple* of a
-  // player's individual playstyles under this manager's team style gets
-  // pushed harder than one only one style touches, exactly like stacking
-  // "Manager Boost" cards onto the same stat in eFootball. Critically this
-  // boost is NOT capped at 99 — a manager can push a player's key stats,
-  // and therefore their overall (see efootballBoostedOverall/weightedOverall
-  // in data/playerDatabase.js), past what the raw card alone could ever
-  // reach. MANAGER_ATTR_CEILING is a soft sanity ceiling, not the old
-  // card-max cap.
-  const MANAGER_ATTR_CEILING = 130;
-  function applyManagerAttributeBoost(attr, styles, teamStyle) {
-    if (!styles || !styles.length || !teamStyle) return attr;
-    const boosted = { ...attr };
-    let touched = false;
-    // First tally how many of the player's matching playstyles each raw
-    // attribute key is a signature stat for, so stacked affinities push
-    // that one attribute harder rather than each style just re-applying
-    // an identical flat bump.
-    const hitCounts = {};
-    styles.forEach((style) => {
-      const suited = PLAYSTYLE_AFFINITY[style];
-      if (!suited || !suited.includes(teamStyle)) return;
-      const keys = PLAYSTYLE_KEY_ATTRS[style];
-      if (!keys) return;
-      keys.forEach((k) => { hitCounts[k] = (hitCounts[k] || 0) + 1; });
-    });
-    Object.keys(hitCounts).forEach((k) => {
-      if (typeof boosted[k] !== 'number') return;
-      // +5 for the first matching style that lands on this attribute,
-      // +2 for every additional style stacking on the same stat.
-      const stacks = hitCounts[k];
-      const bump = 5 + Math.max(0, stacks - 1) * 2;
-      boosted[k] = Math.max(1, Math.min(MANAGER_ATTR_CEILING, Math.round(boosted[k] + bump)));
-      touched = true;
-    });
-    boosted.managerBoosted = touched;
-    return boosted;
-  }
+
+
 
   // True if a player's expanded sheet carries the given individual
   // playstyle tag. Used throughout the match-engine "edge" functions below
@@ -1737,11 +1730,9 @@ var App = (() => {
     const def = isGK
       ? avg(attr.gk_awr, attr.gk_parry, attr.gk_reflex, attr.gk_reach, attr.gk_catch)
       : avg(attr.def_awr, attr.def_eng, attr.tack, attr.aggr);
-    // Ceiling raised from the old hard 99 card-max: playstyle nudges (and,
-    // upstream, manager attribute boosts applied to attr before this runs
-    // — see applyManagerAttributeBoost in ai/managerAI.js) are allowed to
-    // carry a derived stat past 99, exactly like eFootball 2027 lets a
-    // manager-boosted signature stat break the old card ceiling.
+    // Ceiling raised slightly from the old hard 99 card-max: playstyle
+    // nudges (PLAYSTYLE_STAT_MODS below) are allowed to carry an
+    // already-elite derived stat a couple of points past 99.
     const clamp = (v) => Math.max(1, Math.min(ATTRIBUTE_CAP, Math.round(v)));
     // Apply each of the player's individual playstyle tags as a small flat
     // nudge to the raw averages above — this is what keeps two players in
@@ -1778,19 +1769,18 @@ var App = (() => {
   // just be "OVR = best stat". Only expanded-attribute (enhanced) players
   // run through this; everyone else keeps the plain teams.json number.
   const OVERALL_BOOST_LEAN = 0.38;
-  // Raised from 100: a manager-boosted player's overall (and, below, the
-  // individual attributes feeding it — see ATTRIBUTE_CAP) is now allowed
-  // to break the old "perfect card" ceiling, matching eFootball 2027 where
-  // a well-fit manager can push a signature player past their base rating.
-  const OVERALL_CAP = 130;
+  // Raised from 100: individual derived attributes (att/def/pac/phy/tec)
+  // are allowed a small amount of headroom above the old "perfect card"
+  // ceiling, since PLAYSTYLE_STAT_MODS nudges (see clamp() in
+  // deriveStatsFromAttributes) can still occasionally push an already-99
+  // stat a couple of points over.
+  const OVERALL_CAP = 105;
   const OVERALL_FLOOR = 40;
-  // Ceiling for individual derived attributes (att/def/pac/phy/tec) and for
-  // manager-boosted raw sheet ratings feeding them — see clamp() in
-  // deriveStatsFromAttributes and MANAGER_ATTR_CEILING in ai/managerAI.js.
-  // A plain (non-boosted) player's authored sheet tops out at 99 anyway, so
-  // this only actually matters once playstyle nudges or a manager boost
-  // are stacked on top.
-  const ATTRIBUTE_CAP = 130;
+  // Ceiling for individual derived attributes (att/def/pac/phy/tec) — see
+  // clamp() in deriveStatsFromAttributes. A plain (non-boosted) player's
+  // authored sheet tops out at 99 anyway; this only matters once
+  // PLAYSTYLE_STAT_MODS nudges are stacked on top of an already-elite stat.
+  const ATTRIBUTE_CAP = 105;
   // Non-expanded ("regular") players are scaled down relative to the
   // enhanced/expanded-attribute roster so the boosted players read as
   // genuinely special rather than everyone converging on the same numbers.
@@ -1890,31 +1880,14 @@ var App = (() => {
     return flat + (peak - flat) * OVERALL_BOOST_LEAN;
   }
 
-  // Direct overall bump from the manager fitting the player, on top of
-  // (and separate from) the inner-attribute boost above — mirrors
-  // eFootball's manager giving a fitting player a visible OVR lift, not
-  // just quietly nudged sub-stats. Scales with how many of the player's
-  // styles suit the team: +4 for one match, +8 for two or more. No upper
-  // clamp here — clamping to the overall's floor/cap happens once, in
-  // applyExpandedPlayerAttributes, against OVERALL_CAP.
-  function managerAffinityBonus(playerStyles, teamStyle) {
-    if (!playerStyles || !playerStyles.length || !teamStyle) return 0;
-    let matches = 0;
-    playerStyles.forEach((s) => {
-      const suited = PLAYSTYLE_AFFINITY[s];
-      if (suited && suited.includes(teamStyle)) matches++;
-    });
-    if (matches >= 2) return 8;
-    if (matches === 1) return 4;
-    return 0;
-  }
+
 
   // Applies player-attributes.json to every matching player on every team.
   // Runs once at startup, after restorePlayerForms() so it can safely
   // overwrite this player's persisted baseOvr with the freshly-derived
-  // (and manager-affinity-boosted) baseline while still preserving their
-  // accumulated form delta on top of it — see the form system's comment
-  // near applyPlayerForm() for how baseOvr/form/ovr relate.
+  // baseline while still preserving their accumulated form delta on top of
+  // it — see the form system's comment near applyPlayerForm() for how
+  // baseOvr/form/ovr relate.
   function applyExpandedPlayerAttributes() {
     const hasExpandedData = !!(playerAttributesData && Object.keys(playerAttributesData).length);
     allTeams.forEach((team) => {
@@ -1938,19 +1911,13 @@ var App = (() => {
         }
         const posArr = (rawAttr.pos && rawAttr.pos.length) ? rawAttr.pos : (p.pos || ['CM']);
         const isGK = posArr[0] === 'GK';
-        const teamStyle = getManagerPlaystyle(team);
-        // Manager coaching sharpens the specific raw ratings behind a
-        // player's playstyle when it suits the team's tactic — this feeds
-        // into everything downstream (derived stats, overall, and the
-        // expanded sheet the profile UI displays), not just a flat OVR add.
-        const attr = applyManagerAttributeBoost(rawAttr, rawAttr.playstyle, teamStyle);
+        const attr = rawAttr;
         const derived = deriveStatsFromAttributes(attr, posArr);
         p.att = derived.att; p.def = derived.def; p.pac = derived.pac;
         p.phy = derived.phy; p.tec = derived.tec;
         // The expanded sheet's position list is more detailed (multiple
         // valid roles) — prefer it over teams.json's when present.
         if (attr.pos && attr.pos.length) p.pos = attr.pos.slice();
-        const affinity = managerAffinityBonus(attr.playstyle, teamStyle);
         // A player whose signature attributes for their own playstyle(s)
         // run well above their sheet average gets a much bigger push
         // toward their overall here than the generic 5-stat blend alone
@@ -1958,24 +1925,15 @@ var App = (() => {
         const signatureBonus = styleSignatureBonus(attr, attr.playstyle, isGK);
         // Position-based eFootball 2027-style overall: weighs the raw
         // attribute sheet directly using this exact position's own
-        // strongly-valued attribute list (see POSITION_ATTR_WEIGHTS),
-        // computed on the manager-boosted `attr` sheet so a manager fit
-        // (or a stacked signature/affinity bonus below) still lifts a
-        // player's OVR past what their un-boosted card alone would give.
-        // Cap raised to 130 (was 100/99) so a manager who genuinely fits
-        // a player's style can push their OVR meaningfully past the old
-        // "perfect card" ceiling, not just up to it.
+        // strongly-valued attribute list (see POSITION_ATTR_WEIGHTS).
         const posGroup = resolveAttrPositionGroup(posArr);
         const base = positionalRawOverall(attr, posGroup) + signatureBonus;
-        const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base + affinity)));
+        const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base)));
         p.baseOvr = boostedBase;
         p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(boostedBase + (p.form || 0))));
         p.expandedAttrs = attr;
         p.attrBoosted = true;
-        p.affinityBonus = affinity;
-        p.affinityStyle = teamStyle;
         p.signatureBonus = signatureBonus;
-        p.managerAttrBoosted = !!attr.managerBoosted;
       });
     });
   }
@@ -2073,7 +2031,11 @@ var App = (() => {
   // a flat att/tec/ovr blend can't see on its own.
   function finishingEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'fin', 70) - 70) / 100) * 0.5;
+    // Curved rather than linear: the max contribution at a 99 Finishing
+    // rating is unchanged (still 0.145) but a merely-good 80 now gives up
+    // much more of that ceiling than a flat scale would, and a 90+ finisher
+    // pulls disproportionately closer to it — see curvedStat() in js/rng.js.
+    let edge = curvedStat(xattr(p, 'fin', 70), 70, 29, 1.6) * 0.145;
     if (hasSkill(p, 'Phenomenal Finishing')) edge += 0.06;
     if (hasSkill(p, 'First-time Shot')) edge += 0.02;
     if (hasSkill(p, 'Acrobatic Finishing')) edge += 0.045;
@@ -2108,7 +2070,7 @@ var App = (() => {
   // as much as jumping ability).
   function positioningEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    return ((xattr(p, 'off_awr', 70) - 70) / 100) * 0.18 * staminaMultiplier(p);
+    return curvedStat(xattr(p, 'off_awr', 70), 70, 29, 1.6) * 0.0522 * staminaMultiplier(p);
   }
   // How hard the shot is actually struck, 0-1 — driven by Kicking Power.
   // This is deliberately kept separate from shotQuality (placement/
@@ -2136,7 +2098,12 @@ var App = (() => {
     // out to win the position in the first place. Blending all three (not
     // just heading) is what separates a genuine aerial threat from a
     // technically good header of a ball who can't out-jump anyone.
-    let v = (xattr(p, 'head', 60) * 0.55 + xattr(p, 'jmp', 60) * 0.3 + xattr(p, 'phy_con', 60) * 0.15) / 100;
+    // Each raw rating is run through the curve before blending — a 95
+    // Heading rating stands out clearly from an 80, instead of the two
+    // being separated by only a flat, easy-to-miss fraction of a point.
+    let v = (curvedAttr(xattr(p, 'head', 60), 60, 39, 1.6) * 0.55
+      + curvedAttr(xattr(p, 'jmp', 60), 60, 39, 1.6) * 0.3
+      + curvedAttr(xattr(p, 'phy_con', 60), 60, 39, 1.6) * 0.15) / 100;
     if (hasSkill(p, 'Aerial Superiority') || hasSkill(p, 'Heading')) v += 0.12;
     if (hasSkill(p, 'Bullet Header')) v += 0.06;
     if (isDefensiveContext && hasSkill(p, 'Aerial Fort')) v += 0.08;
@@ -2155,7 +2122,10 @@ var App = (() => {
   // decision (chance to save at all, then catch vs. parry vs. a rebound).
   function gkReflexEdge(gk) {
     if (!gk || !gk.expandedAttrs) return 0;
-    let edge = ((xattr(gk, 'gk_reflex', 75) - 75) / 100) * 0.5;
+    // Curved around the keeper baseline (75) instead of a flat multiplier —
+    // preserves the same ceiling at a 99 rating but a merely-good reflex
+    // stat no longer buys nearly as much of it.
+    let edge = curvedStat(xattr(gk, 'gk_reflex', 75), 75, 24, 1.6) * 0.12;
     if (hasSkill(gk, 'Acrobatic Clearance')) edge += 0.05;
     return edge;
   }
@@ -2163,7 +2133,7 @@ var App = (() => {
   // penalty-specific awareness + save skill.
   function penTakerEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'place_kick', 70) - 70) / 100) * 0.35;
+    let edge = curvedStat(xattr(p, 'place_kick', 70), 70, 29, 1.6) * 0.1015;
     if (hasSkill(p, 'Penalty Specialist')) edge += 0.08;
     if (hasSkill(p, 'Chip Shot Control')) edge += 0.02;
     if (hasStyle(p, 'Fox in the Box') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
@@ -2171,7 +2141,7 @@ var App = (() => {
   }
   function penGkEdge(gk) {
     if (!gk || !gk.expandedAttrs) return 0;
-    let edge = ((xattr(gk, 'gk_awr', 75) - 75) / 100) * 0.15;
+    let edge = curvedStat(xattr(gk, 'gk_awr', 75), 75, 24, 1.6) * 0.036;
     if (hasSkill(gk, 'GK Penalty Saver')) edge += 0.10;
     return edge;
   }
@@ -2180,7 +2150,7 @@ var App = (() => {
   // the right spot before reflex/reach even come into it.
   function gkPositioningEdge(gk) {
     if (!gk || !gk.expandedAttrs) return 0;
-    let edge = ((xattr(gk, 'gk_awr', 75) - 75) / 100) * 0.4;
+    let edge = curvedStat(xattr(gk, 'gk_awr', 75), 75, 24, 1.6) * 0.096;
     if (hasSkill(gk, 'GK Directing Defense')) edge += 0.015;
     return edge;
   }
@@ -2189,7 +2159,7 @@ var App = (() => {
   // distance — as opposed to a shot the keeper is already square-on to.
   function gkReachEdge(gk) {
     if (!gk || !gk.expandedAttrs) return 0;
-    return ((xattr(gk, 'gk_reach', 75) - 75) / 100) * 0.4;
+    return curvedStat(xattr(gk, 'gk_reach', 75), 75, 24, 1.6) * 0.096;
   }
   // Once a shot is actually going to be kept out, gk_catch decides how
   // often that's a clean, secure take rather than needing to be parried
@@ -2197,7 +2167,9 @@ var App = (() => {
   // both make a clean catch harder to pull off.
   function gkCatchChance(gk, shotPower, closeRange) {
     if (!gk) return 0.4;
-    const base = gk.expandedAttrs ? xattr(gk, 'gk_catch', 65) / 100 : ((gk.def || 70) * 0.6 + (gk.tec || 70) * 0.4) / 100;
+    const base = gk.expandedAttrs
+      ? curvedAttr(xattr(gk, 'gk_catch', 65), 65, 34, 1.6) / 100
+      : (curvedAttr(gk.def || 70, 70) * 0.6 + curvedAttr(gk.tec || 70, 70) * 0.4) / 100;
     let v = base - (shotPower || 0) * 0.28 - (closeRange ? 0.06 : 0);
     if (hasSkill(gk, 'GK Penalty Saver')) v += 0.02;
     return Math.max(0.06, Math.min(0.93, v));
@@ -2208,7 +2180,9 @@ var App = (() => {
   // to attack. Returns the chance a dangerous rebound actually follows.
   function gkParryReboundDanger(gk) {
     if (!gk) return 0.16;
-    const parry = gk.expandedAttrs ? xattr(gk, 'gk_parry', 65) : ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.5);
+    const parry = gk.expandedAttrs
+      ? curvedAttr(xattr(gk, 'gk_parry', 65), 65, 34, 1.6)
+      : curvedAttr((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.5, 70);
     return Math.max(0.04, Math.min(0.32, 0.05 + (100 - parry) / 260));
   }
   // Full shot-stopping resolution for a shot that's already confirmed on
@@ -2235,7 +2209,7 @@ var App = (() => {
       situational += (closeRange || isHeader) ? reflex * 1.3 : reflex * 0.45;
       situational += (isLongRange || isCrossType) ? reach * 1.2 : reach * 0.35;
     }
-    const gkSkillBase = gk ? ((gk.def || 70) * 0.45 + (gk.ovr || 75) * 0.25 + (gk.tec || 70) * 0.15) / 100 : 0.68;
+    const gkSkillBase = gk ? (curvedAttr(gk.def || 70, 70) * 0.45 + curvedAttr(gk.ovr || 75, 75) * 0.25 + curvedAttr(gk.tec || 70, 70) * 0.15) / 100 : 0.68;
     const gkSkill = Math.max(0.05, Math.min(0.98, gkSkillBase + posEdge + situational));
     const saveChance = Math.min(0.94, Math.max(0.28,
       0.56 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
@@ -2250,7 +2224,8 @@ var App = (() => {
   // Free-kick taker edge — curl/placement plus specialist skills.
   function fkTakerEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'curl', 70) - 70) / 200) + ((xattr(p, 'place_kick', 70) - 70) / 300);
+    let edge = curvedStat(xattr(p, 'curl', 70), 70, 29, 1.6) * 0.145
+      + curvedStat(xattr(p, 'place_kick', 70), 70, 29, 1.6) * 0.0967;
     if (hasSkill(p, 'Long Range Curler')) edge += 0.05;
     if (hasSkill(p, 'Knuckle Shot')) edge += 0.04;
     if (hasSkill(p, 'Dipping Shot')) edge += 0.03;
@@ -2263,7 +2238,7 @@ var App = (() => {
   // Dribble/skill-move success edge — dribbling ability plus specific moves.
   function dribbleSuccessEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'dribb', 70) - 70) / 100) * 0.4;
+    let edge = curvedStat(xattr(p, 'dribb', 70), 70, 29, 1.6) * 0.116;
     const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero', 'Cut Behind & Turn', 'Inside Bounce'];
     if (skillMoves.some((s) => hasSkill(p, s))) edge += 0.08;
     if (hasSkill(p, 'Momentum Dribbling')) edge += 0.03;
@@ -2279,13 +2254,13 @@ var App = (() => {
   // the generic def-based chance already used for the base roll.
   function defActionEdge(p) {
     if (!p || !p.expandedAttrs) return { chance: 0, interceptBias: 0 };
-    let chance = ((xattr(p, 'tack', 70) - 70) / 100) * 0.03;
+    let chance = curvedStat(xattr(p, 'tack', 70), 70, 29, 1.6) * 0.0087;
     // Interception bias now scales continuously with Defensive Awareness
     // (reading the game/anticipating the pass) instead of only moving in
     // fixed jumps from specific skills/playstyles — a player with a
     // genuinely elite def_awr reads passing lanes better than one who
     // merely has the "Interception" skill tag but an average rating.
-    let interceptBias = ((xattr(p, 'def_awr', 70) - 70) / 100) * 0.22;
+    let interceptBias = curvedStat(xattr(p, 'def_awr', 70), 70, 29, 1.6) * 0.0638;
     if (hasSkill(p, 'Sliding Tackle')) chance += 0.01;
     if (hasSkill(p, 'Interception')) { chance += 0.006; interceptBias += 0.15; }
     if (hasSkill(p, 'Man Marking')) chance += 0.006;
@@ -4130,8 +4105,20 @@ var App = (() => {
     // attacking mids) step up before defenders/holding mids, same as real teams do.
     const penOrderScore = (p, side) => (p.att || 0) + (PEN_TAKER_ROLE_WEIGHT[p.slot || (p.pos||[])[0]] || 0.4) * 12
       + (side.roles && side.roles.penalty && side.roles.penalty.id === p.id ? 40 : 0);
-    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.home)-penOrderScore(a,m.home));
-    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.away)-penOrderScore(a,m.away));
+    // Eligible takers are whoever is actually on the pitch at full time —
+    // squad.starting/squad.subs are the fixed pre-match lists and never
+    // change, so filtering only on those would let a player who was
+    // substituted off (or sent off) hours ago still step up to take a
+    // penalty, while a sub who's been on the pitch the whole shootout
+    // build-up gets ignored entirely. m.homeOnPitch/m.awayOnPitch is the
+    // live list of player ids currently out there (see trySubstitution in
+    // engine/tactics.js), so cross-reference against that instead.
+    const homeOnPitchIds = m.homeOnPitch || [];
+    const awayOnPitchIds = m.awayOnPitch || [];
+    const homePool = [...(m.home.squad.starting || []), ...(m.home.squad.subs || [])];
+    const awayPool = [...(m.away.squad.starting || []), ...(m.away.squad.subs || [])];
+    const homeTakers = homePool.filter(p => homeOnPitchIds.includes(p.id) && !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.home)-penOrderScore(a,m.home));
+    const awayTakers = awayPool.filter(p => awayOnPitchIds.includes(p.id) && !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.away)-penOrderScore(a,m.away));
 
     // Silent/bulk sims (quick-sim, tournament auto-play) still resolve instantly —
     // only a real, on-screen live match animates the shootout kick by kick.
@@ -5346,7 +5333,10 @@ var App = (() => {
         const tack = xattr(p, 'tack', p.def != null ? p.def : 70);
         const defEng = xattr(p, 'def_eng', p.def != null ? p.def : 70);
         const engagementMult = (0.75 + (defEng / 100) * 0.5) * staminaMultiplier(p);
-        const execSkill = defAwr * 0.4 + tack * 0.6;
+        // Curved rather than a flat blend: a genuinely elite tackler/reader
+        // of the game (90+) closes the gap on a merely-good one (75-80) by
+        // more than a straight line would ever let him.
+        const execSkill = curvedAttr(defAwr, 70) * 0.4 + curvedAttr(tack, 70) * 0.6;
         const skillMult = 0.72 + (execSkill / 100) * 0.6;
         // Specific tackling/interception traits (Sliding Tackle, Interception,
         // Man Marking, Blocker) add on top of the generic def-based chance,
@@ -5524,10 +5514,12 @@ var App = (() => {
   function groundPassingAbility(p) {
     if (p && p.expandedAttrs) {
       const vals = [xattr(p, 'low_pass', null), xattr(p, 'ball_con', null), xattr(p, 'tight_pos', null)].filter((v) => v != null);
-      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35);
+      const base = vals.length
+        ? curvedAttr(vals.reduce((a, b) => a + b, 0) / vals.length, 70)
+        : (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35);
       return base * staminaMultiplier(p);
     }
-    return ((p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35) * staminaMultiplier(p);
+    return (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35) * staminaMultiplier(p);
   }
   // Aerial/lofted-pass-specific ability — crosses, switches of play, long
   // diagonals. Reads lofted_pass + curl (the whip/bend on a delivery),
@@ -5535,15 +5527,19 @@ var App = (() => {
   function aerialPassingAbility(p) {
     if (p && p.expandedAttrs) {
       const vals = [xattr(p, 'lofted_pass', null), xattr(p, 'curl', null)].filter((v) => v != null);
-      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.6 + (p.ovr || 75) * 0.4);
+      const base = vals.length
+        ? curvedAttr(vals.reduce((a, b) => a + b, 0) / vals.length, 70)
+        : (curvedAttr(p.tec || 70, 70) * 0.6 + curvedAttr(p.ovr || 75, 75) * 0.4);
       return base * staminaMultiplier(p);
     }
-    return ((p.tec || 70) * 0.6 + (p.ovr || 75) * 0.4) * staminaMultiplier(p);
+    return (curvedAttr(p.tec || 70, 70) * 0.6 + curvedAttr(p.ovr || 75, 75) * 0.4) * staminaMultiplier(p);
   }
   function passingAbility(p) {
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.low_pass, p.expandedAttrs.lofted_pass, p.expandedAttrs.ball_con, p.expandedAttrs.tight_pos].filter(v => typeof v === 'number');
-      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35);
+      const base = vals.length
+        ? curvedAttr(vals.reduce((a, b) => a + b, 0) / vals.length, 70)
+        : (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35);
       let bonus = 0;
       if (hasSkill(p, 'Through Passing')) bonus += 2.5;
       if (hasSkill(p, 'Weighted Pass')) bonus += 2;
@@ -5563,7 +5559,7 @@ var App = (() => {
       if (isActingSuperSub(p)) bonus += 2;
       return (base + bonus) * staminaMultiplier(p);
     }
-    return (p.tec || 70) * 0.65 + (p.ovr || 75) * 0.35;
+    return curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35;
   }
   function defensivePressure(p) {
     if (p && p.expandedAttrs) {
@@ -5577,8 +5573,8 @@ var App = (() => {
       const tack = xattr(p, 'tack', null);
       const aggr = xattr(p, 'aggr', null);
       const base = (defAwr != null && defEng != null && tack != null && aggr != null)
-        ? (defAwr * 0.35 + tack * 0.3 + defEng * 0.2 + aggr * 0.15)
-        : ((p.def || 70) * 0.7 + (p.ovr || 75) * 0.3);
+        ? (curvedAttr(defAwr, 70) * 0.35 + curvedAttr(tack, 70) * 0.3 + curvedAttr(defEng, 70) * 0.2 + curvedAttr(aggr, 70) * 0.15)
+        : (curvedAttr(p.def || 70, 70) * 0.7 + curvedAttr(p.ovr || 75, 75) * 0.3);
       let bonus = 0;
       if (hasSkill(p, 'Track Back')) bonus += 1.5;
       if (hasSkill(p, 'Long Reach Tackle')) bonus += 1.5;
@@ -5593,7 +5589,7 @@ var App = (() => {
       // A tired defender presses/closes down a yard slower than a fresh one.
       return (base + bonus) * staminaMultiplier(p);
     }
-    return (p.def || 70) * 0.7 + (p.ovr || 75) * 0.3;
+    return curvedAttr(p.def || 70, 70) * 0.7 + curvedAttr(p.ovr || 75, 75) * 0.3;
   }
   function carryingAbility(p) {
     if (p && p.expandedAttrs) {
@@ -5601,7 +5597,9 @@ var App = (() => {
       // while running with the ball is as much about holding your ground
       // physically as it is about balance/close control.
       const vals = [p.expandedAttrs.dribb, p.expandedAttrs.ball_con, p.expandedAttrs.bal, p.expandedAttrs.spd, p.expandedAttrs.phy_con].filter(v => typeof v === 'number');
-      const base = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : ((p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2);
+      const base = vals.length
+        ? curvedAttr(vals.reduce((a, b) => a + b, 0) / vals.length, 70)
+        : (curvedAttr(p.tec || 70, 70) * 0.5 + curvedAttr(p.pac || 70, 70) * 0.3 + curvedAttr(p.ovr || 75, 75) * 0.2);
       let bonus = 0;
       if (hasSkill(p, 'Momentum Dribbling')) bonus += 2.5;
       if (hasSkill(p, 'Magnetic Feet')) bonus += 2.5;
@@ -5610,7 +5608,7 @@ var App = (() => {
       if (isActingSuperSub(p)) bonus += 1.5;
       return (base + bonus) * staminaMultiplier(p);
     }
-    return (p.tec || 70) * 0.5 + (p.pac || 70) * 0.3 + (p.ovr || 75) * 0.2;
+    return curvedAttr(p.tec || 70, 70) * 0.5 + curvedAttr(p.pac || 70, 70) * 0.3 + curvedAttr(p.ovr || 75, 75) * 0.2;
   }
 
   // ---- Shot-type profile: how a chance was created shapes its baseline
@@ -5644,7 +5642,14 @@ var App = (() => {
     let shotQuality = isHeader
       ? Math.max(0.05, Math.min(0.98, aerialSkill(shooter, false) + positioningEdge(shooter)))
       : Math.max(0.05, Math.min(0.98,
-          ((shooter.att || 70) * 0.42 + (shooter.tec || 70) * 0.33 + (shooter.ovr || 75) * 0.15 + (shooter.pac || 70) * 0.10) / 100
+          // Every compact stat that feeds a shot runs through the curve
+          // before blending — applies to every shooter (expanded sheet or
+          // not) since att/tec/ovr/pac are the one thing every player has,
+          // so a genuinely elite finisher's rating stops reading as "a
+          // decent player plus a flat multiplier" and starts reading as a
+          // real tier above a merely-good one.
+          (curvedAttr(shooter.att || 70, 70) * 0.42 + curvedAttr(shooter.tec || 70, 70) * 0.33
+            + curvedAttr(shooter.ovr || 75, 75) * 0.15 + curvedAttr(shooter.pac || 70, 70) * 0.10) / 100
           + finishingEdge(shooter)
           + positioningEdge(shooter)
           + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)
@@ -10720,22 +10725,13 @@ var App = (() => {
   }
   function expandedAttrRowsHTML(player) {
     const attr = player.expandedAttrs || {};
-    const boostedKeys = new Set();
-    if (player.managerAttrBoosted && player.affinityStyle) {
-      (attr.playstyle || []).forEach((style) => {
-        const suited = PLAYSTYLE_AFFINITY[style];
-        if (suited && suited.includes(player.affinityStyle)) {
-          (PLAYSTYLE_KEY_ATTRS[style] || []).forEach(k => boostedKeys.add(k));
-        }
-      });
-    }
     return EXPANDED_ATTR_GROUPS.map((group) => {
       const rows = group.keys.filter(([k]) => typeof attr[k] === 'number');
       if (!rows.length) return '';
       return `<div class="expanded-attr-group">
         <div class="expanded-attr-group-title">${group.label}</div>
         ${rows.map(([k, label]) => `
-          <div class="attr-bar-row expanded${boostedKeys.has(k) ? ' mgr-boosted' : ''}">
+          <div class="attr-bar-row expanded">
             <span class="attr-name">${label}</span>
             <div class="attr-track"><div class="attr-fill ${statTierClass(attr[k])}" style="width:${Math.min(100, attr[k])}%"></div></div>
             <span class="attr-val ${statTierClass(attr[k])}">${attr[k]}</span>
@@ -10793,22 +10789,15 @@ var App = (() => {
     }
     const boosted = !!player.attrBoosted;
     const boostBadge = boosted
-      ? `<span class="attr-boost-badge" title="Overall derived from expanded attribute data, position, and manager-tactic affinity">★ Enhanced</span>`
-      : '';
-    const affinityNote = (boosted && player.affinityBonus > 0)
-      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.affinityBonus} OVR — fits ${team ? team.name + "'s" : "the"} ${player.affinityStyle} setup</div>`
+      ? `<span class="attr-boost-badge" title="Overall derived from expanded attribute data and position">★ Enhanced</span>`
       : '';
     const signatureNote = (boosted && player.signatureBonus > 0)
       ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.signatureBonus} OVR — signature attributes for their playstyle run well above the rest of their sheet</div>`
       : '';
-    const managerAttrNote = (boosted && player.managerAttrBoosted)
-      ? `<div style="color:var(--gold);font-size:0.75rem;margin-top:2px">⬆ Manager coaching is sharpening this player's playstyle attributes (marked below)</div>`
-      : '';
     const playstyleTagsHTML = (boosted && player.expandedAttrs && (player.expandedAttrs.playstyle || []).length)
       ? `<div style="margin-top:6px">${player.expandedAttrs.playstyle.map(s => {
-          const suited = (PLAYSTYLE_AFFINITY[s] || []).includes(player.affinityStyle);
           const desc = PLAYSTYLE_DESCRIPTIONS[s] || '';
-          return `<span class="playstyle-tag${suited ? ' affinity-match' : ''}" title="${desc}">${s}</span>`;
+          return `<span class="playstyle-tag" title="${desc}">${s}</span>`;
         }).join('')}</div>`
       : '';
     // Bio block: age/height/foot only exist on the expanded attribute sheet
@@ -10828,9 +10817,7 @@ var App = (() => {
             return `${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''}`;
           })()} · ${(player.pos||[])[0] || ''}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
-          ${affinityNote}
           ${signatureNote}
-          ${managerAttrNote}
           ${playstyleTagsHTML}
         </div>
       </div>
