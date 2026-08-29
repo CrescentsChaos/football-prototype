@@ -791,6 +791,18 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .team-check:active { transform: translateY(-1px) scale(0.98); }
 .team-check input { accent-color: var(--gold); width: 16px; height: 16px; }
+.lineup-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex-shrink: 0;
+  background: rgba(240,193,75,0.08); border: 1px solid var(--gold-dim);
+  color: var(--gold); border-radius: 999px; cursor: pointer;
+  font-size: 0.95rem; line-height: 1;
+  transition: background var(--dur-base) var(--ease-smooth),
+              box-shadow var(--dur-base) var(--ease-smooth),
+              transform var(--dur-fast) var(--ease-out);
+}
+.lineup-btn:hover { background: rgba(240,193,75,0.16); box-shadow: 0 4px 16px var(--gold-glow); transform: translateY(-1px); }
+.lineup-btn:active { transform: scale(0.92); }
 
 /* Group table */
 .groups-grid {

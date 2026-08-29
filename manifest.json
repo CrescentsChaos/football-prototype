@@ -3654,6 +3654,13 @@
     "label": "func:renderTeamsList"
   },
   {
+    "id": "tlu001",
+    "file": "ui/teamUI.js",
+    "start": 7047,
+    "end": 7047,
+    "label": "func:renderTeamLineupPitchHTML+showTeamLineup"
+  },
+  {
     "id": "c0462",
     "file": "ui/teamUI.js",
     "start": 7048,
