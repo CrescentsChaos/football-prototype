@@ -32242,7 +32242,9 @@
       ],
       "manager": {
         "name": "Thomas Tuchel",
-        "ovr": 90
+        "ovr": 90,
+        "formation":"4-2-3-1",
+        "playstyle":"Possession"
       }
     },
     {
@@ -34222,7 +34224,9 @@
       ],
       "manager": {
         "name": "Ståle Solbakken",
-        "ovr": 87
+        "ovr": 87,
+        "formation":"4-3-3-cdm",
+        "playstyle":"Quick Counter"
       }
     },
     {
