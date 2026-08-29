@@ -437,15 +437,15 @@ var App = (() => {
     'ucl': { name: 'Champions League', short: 'Champions League', engine: 'league', pool: 'club', leaguesKey: null,
       desc: 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.' },
     'nations-league': { name: 'Nations League', short: 'Nations League', engine: 'groups', pool: 'national', leaguesKey: 'Nations League',
-      desc: 'European nations in groups, then knockout. Team picker is restricted to the eligible nations in leagues.json.' },
+      desc: 'European nations in groups, then knockout (a 4-group, 16-team League A style split sends both group winners and runners-up straight to the quarter-finals — real UEFA promotion/relegation and the lower-league play-off/final formats aren\u2019t modeled). Team picker is restricted to the eligible nations in leagues.json.' },
     'euros': { name: 'European Championship', short: 'Euros', engine: 'groups', pool: 'national', leaguesKey: 'Euros',
-      desc: 'European nations compete through groups and knockouts.' },
+      desc: '24 nations in 6 groups of 4; the top 2 from each group plus the 4 best third-placed teams advance to the Round of 16.' },
     'copa-america': { name: 'Copa América', short: 'Copa América', engine: 'groups', pool: 'national', leaguesKey: 'Copa América',
-      desc: 'South American nations compete through groups and knockouts.' },
+      desc: '16 nations in 4 groups of 4; the top 2 from each group advance straight to the quarter-finals.' },
     'afcon': { name: 'Africa Cup of Nations', short: 'AFCON', engine: 'groups', pool: 'national', leaguesKey: 'AFCON',
-      desc: 'African nations compete through groups and knockouts.' },
+      desc: '24 nations in 6 groups of 4; the top 2 from each group plus the 4 best third-placed teams advance to the Round of 16.' },
     'asian-cup': { name: 'AFC Asian Cup', short: 'Asian Cup', engine: 'groups', pool: 'national', leaguesKey: 'Asian Cup',
-      desc: 'Asian nations compete through groups and knockouts.' },
+      desc: '24 nations in 6 groups of 4; the top 2 from each group plus the 4 best third-placed teams advance to the Round of 16.' },
     'gold-cup': { name: 'CONCACAF Gold Cup', short: 'Gold Cup', engine: 'groups', pool: 'national', leaguesKey: 'Gold Cup',
       desc: 'North/Central American & Caribbean nations compete through groups and knockouts.' },
     'fa-cup': { name: 'FA Cup', short: 'FA Cup', engine: 'knockout', pool: 'club', leaguesKey: 'FA Cup',
@@ -507,6 +507,20 @@ var App = (() => {
     if (!names || !names.length) return fullPool;
     const matched = resolveEligiblePool(names, fullPool);
     return matched.length ? matched : fullPool;
+  }
+
+  // Per-competition logo + accent-color theme. The actual filenames and hex
+  // values live in leagues.json under "_tournamentBranding" (one entry per
+  // TOURNAMENT_FORMATS key, e.g. "euros", "copa-america"), so a tournament's
+  // full identity — eligible teams AND its logo/colors — comes from that one
+  // data file; logos themselves are dropped into assets/images/<logo>.
+  // Falls back to a neutral gold trophy theme if leagues.json hasn't loaded
+  // yet or has no branding entry for a given format, so nothing ever renders
+  // broken while assets are still being added.
+  const DEFAULT_TOURNAMENT_BRANDING = { logo: 'trophy.png', color: '#f0c14b', colorDim: '#c9a227' };
+  function getTournamentBranding(formatKey) {
+    const table = (typeof leaguesData !== 'undefined' && leaguesData && leaguesData._tournamentBranding) || {};
+    return Object.assign({}, DEFAULT_TOURNAMENT_BRANDING, table[formatKey] || {});
   }
 
   // ===================================================================
@@ -2753,7 +2767,38 @@ var App = (() => {
     tourTeamsSearch = '';
     const search = document.getElementById('tour-teams-search');
     if (search) search.value = '';
+    applyTournamentBranding(tournamentType);
     renderTournamentTeamSelect();
+  }
+  // Applies a competition's logo + accent-color theme (from
+  // getTournamentBranding()) to the setup card and the live tournament view:
+  // sets --tour-color/--tour-color-dim custom properties consumed by the
+  // .tour-themed rules in styles.css, and points the #tour-logo-setup /
+  // #tour-logo-live <img> tags at assets/images/<logo>. If the image file
+  // hasn't been added yet (or fails to load), the logo just stays hidden —
+  // the color theme still applies on its own.
+  function applyTournamentBranding(formatKey) {
+    const b = getTournamentBranding(formatKey);
+    const cfg = TOURNAMENT_FORMATS[formatKey] || {};
+    [
+      { root: 'tournament-setup', logo: 'tour-logo-setup' },
+      { root: 'tournament-live', logo: 'tour-logo-live' }
+    ].forEach(({ root, logo }) => {
+      const rootEl = document.getElementById(root);
+      if (rootEl) {
+        rootEl.classList.add('tour-themed');
+        rootEl.style.setProperty('--tour-color', b.color);
+        rootEl.style.setProperty('--tour-color-dim', b.colorDim);
+      }
+      const img = document.getElementById(logo);
+      if (img) {
+        img.onerror = function() { this.style.display = 'none'; };
+        img.alt = cfg.name || '';
+        img.title = cfg.name || '';
+        img.style.display = '';
+        img.src = 'assets/images/' + b.logo;
+      }
+    });
   }
 
   function populateTeamSelects() {
@@ -8610,6 +8655,7 @@ var App = (() => {
     if (desc) desc.textContent = cfg.desc;
     const select = document.getElementById('tour-format-select');
     if (select) select.value = tournamentType;
+    applyTournamentBranding(tournament.competition || tournamentType);
     try {
       if (tournament.format === 'league') { renderUCLLeague(); renderUCLFixtures(); }
       else { renderGroups(); }
@@ -8991,6 +9037,7 @@ var App = (() => {
     const minTeams = cfg.engine === 'knockout' ? 2 : 4;
     if (selected.length < minTeams) { toast('Select at least ' + minTeams + ' teams'); return; }
 
+    applyTournamentBranding(tournamentType);
     tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
@@ -10029,13 +10076,27 @@ var App = (() => {
       if (sorted[1]) qualifiers.push({ team: sorted[1].team, group: gi, rank: 2 });
       if (sorted[2]) thirdPlaces.push({ row: sorted[2], group: gi });
     });
-    // FIFA-style: if we have 8+ groups, bring in the best third-place teams
-    // to fill the bracket out to a power of two (e.g. 8 groups → 16 direct
-    // qualifiers + 8 best thirds = 32).
-    if (tournament.groups.length >= 8 && thirdPlaces.length) {
-      thirdPlaces.sort((a, b) => b.row.pts - a.row.pts || (b.row.gf - b.row.ga) - (a.row.gf - a.row.ga) || b.row.gf - a.row.gf);
-      const need = 32 - qualifiers.length;
+    // FIFA/UEFA/CAF/AFC-style: bring in the best third-place teams whenever
+    // the direct qualifiers (2 per group) don't already form a clean
+    // power-of-two bracket. The target is simply the next power of two at or
+    // above the direct-qualifier count:
+    //   - Euro/AFCON/Asian Cup (6 groups → 12 direct) → target 16, so the
+    //     4 best third-placed teams join the group winners/runners-up for a
+    //     Round of 16.
+    //   - Copa América / a 4-group Nations League split (4 groups → 8
+    //     direct) → target is already 8, so no third-placed teams are
+    //     needed and the bracket goes straight to the quarter-finals.
+    //   - World Cup (12 groups → 24 direct) → target 32, so the 8 best
+    //     thirds join for a Round of 32 (matches the real 2026 format).
+    //   - An 8-group split → 16 direct is already a power of two, so no
+    //     thirds are added, straight to the Round of 16.
+    if (thirdPlaces.length) {
+      const direct = qualifiers.length;
+      let target = 1;
+      while (target < direct) target *= 2;
+      const need = target - direct;
       if (need > 0) {
+        thirdPlaces.sort((a, b) => b.row.pts - a.row.pts || (b.row.gf - b.row.ga) - (a.row.gf - a.row.ga) || b.row.gf - a.row.gf);
         thirdPlaces.slice(0, need).forEach(t => qualifiers.push({ team: t.row.team, group: t.group, rank: 3 }));
       }
     }
@@ -10149,11 +10210,17 @@ var App = (() => {
   }
 
 
-  // World Cup only: when the Semi-finals round has just finished, build and
-  // instantly simulate a "3rd Place Play-off" between the two semi-final
-  // losers, and slot it into the bracket before the Final gets created.
+  // Groups-format competitions only (World Cup, Nations League, Euros, Copa
+  // América, AFCON, Asian Cup, Gold Cup — every format that goes group stage
+  // → knockout; Champions League's league-phase knockout and the straight
+  // domestic-cup knockouts never have a 3rd place play-off): when the
+  // Semi-finals round has just finished, build and instantly simulate a
+  // "3rd Place Play-off" between the two semi-final losers, and slot it into
+  // the bracket before the Final gets created — this always runs automatically
+  // as part of advancing out of the Semi-finals, so the user never has to
+  // simulate it as a separate step.
   function maybeCreateThirdPlacePlayoff(finishedRound) {
-    if (!tournament || tournament.type !== 'worldcup') return;
+    if (!tournament || tournament.format !== 'groups') return;
     if (!finishedRound || finishedRound.name !== 'Semi-finals') return;
     if (tournament.knockout.some(r => r.name === '3rd Place Play-off')) return;
     const losers = finishedRound.matches.map(m => {
