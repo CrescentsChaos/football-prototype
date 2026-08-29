@@ -381,7 +381,13 @@
     "Georgia",
     "Wales",
     "Poland",
-    "Scotland"
+    "Scotland",
+    "Hungary",
+    "Albania",
+    "Romania",
+    "Slovakia",
+    "Ukraine",
+    "Slovenia"
   ],
   "Copa América": [
     "Colombia",
@@ -389,7 +395,17 @@
     "Paraguay",
     "Uruguay",
     "Argentina",
-    "Brazil"
+    "Brazil",
+    "Chile",
+    "Canada"
+    "Peru",
+    "Mexico",
+    "Venezuela",
+    "United States",
+    "Panama",
+    "Bolivia",
+    "Costa Rica",
+    "Jamaica"
   ],
   "AFCON": [
     "Algeria",
@@ -401,7 +417,23 @@
     "Morocco",
     "Senegal",
     "South Africa",
-    "Tunisia"
+    "Tunisia",
+    "Mali",
+    "Zambia",
+    "Comoros",
+    "Angola",
+    "Zimbabwe",
+    "Nigeria",
+    "Uganda",
+    "Tanzania",
+    "Benin",
+    "Botswana",
+    "Burkina Faso",
+    "Sudan",
+    "Equatorial Guinea",
+    "Cameroon",
+    "Gabon",
+    "Mozambique"
   ],
   "Asian Cup": [
     "Australia",
@@ -413,7 +445,22 @@
     "Saudi Arabia",
     "South Korea",
     "Uzbekistan",
-    "Bangladesh"
+    "Bangladesh",
+    "China",
+    "Tajikistan",
+    "Lebanon",
+    "Syria",
+    "India",
+    "United Arab Emirates",
+    "Palestine",
+    "Hong Kong",
+    "Indonesia",
+    "Vietnam",
+    "Bahrain",
+    "Malaysia",
+    "Thailand",
+    "Kyrgyzstan",
+    "Oman"
   ],
   "Gold Cup": [
     "United States",
