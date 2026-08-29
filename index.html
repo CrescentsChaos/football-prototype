@@ -33,6 +33,7 @@
         <button class="nav-tab" data-view="history">History</button>
         <button class="nav-tab" data-view="teams">Teams</button>
         <button class="nav-tab" data-view="players">Players</button>
+        <button class="nav-tab" data-view="hospital">🏥 Hospital</button>
       </nav>
       <div class="header-actions">
         <div class="save-menu" id="save-menu">
@@ -482,6 +483,34 @@
         <div id="players-list" class="teams-checkbox-grid" style="max-height:none"></div>
         <div style="text-align:center;margin-top:16px">
           <button type="button" class="btn btn-secondary btn-sm" id="players-load-more" onclick="App.loadMorePlayers()" style="display:none">Load more players</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOSPITAL -->
+    <section id="view-hospital" class="view">
+      <div class="card">
+        <div class="card-title">🏥 Injury Ward</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Every player currently sidelined, across every team — the injury itself, how it happened, and how many matches until they're back.</p>
+        <div class="teams-toolbar">
+          <input type="search" id="hospital-search" placeholder="Search injured players, teams, injuries..." oninput="App.searchHospital(this.value)" autocomplete="off" aria-label="Search injured players">
+          <select id="hospital-severity" onchange="App.filterHospitalSeverity(this.value)" aria-label="Filter by severity">
+            <option value="all">All severities</option>
+            <option value="Minor">Minor</option>
+            <option value="Moderate">Moderate</option>
+            <option value="Major">Major</option>
+            <option value="Severe">Severe</option>
+          </select>
+          <select id="hospital-sort" onchange="App.sortHospital(this.value)" aria-label="Sort injured players">
+            <option value="matchesLeft">Sort: Matches left</option>
+            <option value="name">Sort: Name</option>
+            <option value="team">Sort: Team</option>
+            <option value="severity">Sort: Severity</option>
+          </select>
+        </div>
+        <div id="hospital-summary"></div>
+        <div id="hospital-list">
+          <div class="empty-state"><div class="icon">🏥</div><p>No injuries right now — every squad is fully fit.</p></div>
         </div>
       </div>
     </section>

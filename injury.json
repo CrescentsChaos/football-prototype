@@ -1,0 +1,274 @@
+{
+  "_comment": "Injury type definitions used by engine/injuries.js (picking a random injury when a player goes down) and the Hospital tab (ui/hospitalUI.js). Optional — the app ships with an embedded fallback copy of this list in js/state.js, so editing this file works without a rebuild, same as leagues.json/managers.json/trophies.json.",
+  "version": 1,
+  "injuries": [
+    {
+      "id": "cramp",
+      "name": "Muscle Cramp",
+      "bodyPart": "Muscle",
+      "severity": "Minor",
+      "minMatches": 1,
+      "maxMatches": 1,
+      "description": "Sudden involuntary muscle contraction, usually brought on by fatigue or dehydration late in a match.",
+      "causes": [
+        "felt a muscle seize up and had to be withdrawn as a precaution",
+        "was struck down by cramp late in the match",
+        "signalled to the bench after his leg locked up"
+      ]
+    },
+    {
+      "id": "ankle_sprain",
+      "name": "Ankle Sprain",
+      "bodyPart": "Ankle",
+      "severity": "Minor",
+      "minMatches": 1,
+      "maxMatches": 3,
+      "description": "A stretching or partial tearing of the ligaments around the ankle joint.",
+      "causes": [
+        "rolled his ankle after a heavy tackle",
+        "twisted his ankle awkwardly on the turf",
+        "went over on his ankle challenging for the ball",
+        "landed badly after an aerial duel and turned his ankle"
+      ]
+    },
+    {
+      "id": "knee_knock",
+      "name": "Knee Knock",
+      "bodyPart": "Knee",
+      "severity": "Minor",
+      "minMatches": 1,
+      "maxMatches": 2,
+      "description": "A bruising blow to the knee from a direct collision, with no ligament damage.",
+      "causes": [
+        "took a knock on the knee in a goalmouth scramble",
+        "was caught by a stray boot on the knee",
+        "clattered knees with an opponent going for a header"
+      ]
+    },
+    {
+      "id": "dead_leg",
+      "name": "Dead Leg (Contusion)",
+      "bodyPart": "Thigh",
+      "severity": "Minor",
+      "minMatches": 1,
+      "maxMatches": 2,
+      "description": "A deep muscle bruise caused by a direct blow to the thigh, temporarily numbing the leg.",
+      "causes": [
+        "took a stray knee to the thigh and needed treatment",
+        "was caught by a heavy challenge on the thigh",
+        "picked up a dead leg after a collision"
+      ]
+    },
+    {
+      "id": "concussion_protocol",
+      "name": "Concussion Protocol",
+      "bodyPart": "Head",
+      "severity": "Minor",
+      "minMatches": 1,
+      "maxMatches": 2,
+      "description": "Withdrawn as a head-injury precaution to be assessed under concussion protocol.",
+      "causes": [
+        "clashed heads with an opponent and was taken off for a head-injury assessment",
+        "took a blow to the head in an aerial challenge",
+        "was withdrawn as a precaution after a heavy fall"
+      ]
+    },
+    {
+      "id": "hamstring_strain",
+      "name": "Hamstring Strain",
+      "bodyPart": "Hamstring",
+      "severity": "Moderate",
+      "minMatches": 2,
+      "maxMatches": 5,
+      "description": "A partial tear of the hamstring muscle fibres, typically from an explosive sprint.",
+      "causes": [
+        "pulled up sharply while chasing a through ball",
+        "felt his hamstring go mid-sprint",
+        "pulled up holding the back of his leg after a burst of pace",
+        "stretched to reach a pass and felt his hamstring tighten"
+      ]
+    },
+    {
+      "id": "calf_strain",
+      "name": "Calf Strain",
+      "bodyPart": "Calf",
+      "severity": "Moderate",
+      "minMatches": 2,
+      "maxMatches": 4,
+      "description": "A tear in the calf muscle fibres, often from a sudden push-off or change of direction.",
+      "causes": [
+        "pulled up with a tight calf after pushing off to sprint",
+        "felt his calf tighten and signalled to the bench",
+        "was substituted after feeling a twinge in his calf"
+      ]
+    },
+    {
+      "id": "groin_strain",
+      "name": "Groin Strain",
+      "bodyPart": "Groin",
+      "severity": "Moderate",
+      "minMatches": 2,
+      "maxMatches": 4,
+      "description": "A tear in the groin muscles, commonly caused by a sudden stretch or change of direction.",
+      "causes": [
+        "felt his groin go while stretching for the ball",
+        "pulled up sharply after a lunging challenge",
+        "was withdrawn after a sharp pain in his groin"
+      ]
+    },
+    {
+      "id": "thigh_strain",
+      "name": "Thigh Strain",
+      "bodyPart": "Thigh",
+      "severity": "Moderate",
+      "minMatches": 2,
+      "maxMatches": 4,
+      "description": "A muscle tear in the front or back of the thigh from a sudden burst of effort.",
+      "causes": [
+        "pulled up with a tight thigh chasing back",
+        "felt his quad tighten after a shot",
+        "was caught mid-stride by a muscle strain in his thigh"
+      ]
+    },
+    {
+      "id": "back_spasm",
+      "name": "Back Spasm",
+      "bodyPart": "Back",
+      "severity": "Moderate",
+      "minMatches": 2,
+      "maxMatches": 3,
+      "description": "An involuntary muscle spasm in the lower back, often from an awkward twist or landing.",
+      "causes": [
+        "landed awkwardly and felt his back seize up",
+        "was withdrawn after his back locked up mid-match",
+        "twisted awkwardly clearing the ball and felt his back go"
+      ]
+    },
+    {
+      "id": "shoulder_injury",
+      "name": "Shoulder Injury",
+      "bodyPart": "Shoulder",
+      "severity": "Moderate",
+      "minMatches": 2,
+      "maxMatches": 4,
+      "description": "Bruising or a mild joint sprain in the shoulder from a heavy fall or collision.",
+      "causes": [
+        "landed heavily on his shoulder after a challenge",
+        "took a shoulder charge and needed treatment",
+        "fell awkwardly onto his shoulder in a goalmouth clash"
+      ]
+    },
+    {
+      "id": "fractured_metatarsal",
+      "name": "Fractured Metatarsal",
+      "bodyPart": "Foot",
+      "severity": "Major",
+      "minMatches": 4,
+      "maxMatches": 8,
+      "description": "A break in one of the long bones of the foot, usually from a stray boot or a blocked shot.",
+      "causes": [
+        "was caught late on the foot and immediately went down in pain",
+        "took a heavy stamp on the foot in a goalmouth scramble",
+        "twisted awkwardly and felt his foot give way"
+      ]
+    },
+    {
+      "id": "knee_ligament_sprain",
+      "name": "Knee Ligament Sprain (MCL)",
+      "bodyPart": "Knee",
+      "severity": "Major",
+      "minMatches": 4,
+      "maxMatches": 8,
+      "description": "A sprain of the medial collateral ligament from a sideways impact on a planted leg.",
+      "causes": [
+        "was caught side-on by a heavy challenge on a planted leg",
+        "twisted awkwardly with his studs stuck in the turf",
+        "buckled at the knee after a sliding tackle from the side"
+      ]
+    },
+    {
+      "id": "rib_fracture",
+      "name": "Rib Fracture",
+      "bodyPart": "Ribs",
+      "severity": "Major",
+      "minMatches": 3,
+      "maxMatches": 6,
+      "description": "A crack or break in a rib bone, usually from a direct collision or heavy fall.",
+      "causes": [
+        "took an elbow to the ribs in an aerial duel",
+        "landed hard on an opponent's knee after a challenge",
+        "collided heavily with the goalkeeper going for the ball"
+      ]
+    },
+    {
+      "id": "facial_fracture",
+      "name": "Facial Fracture",
+      "bodyPart": "Face",
+      "severity": "Major",
+      "minMatches": 3,
+      "maxMatches": 6,
+      "description": "A break to the bones of the face, typically from an accidental clash of heads or a stray elbow.",
+      "causes": [
+        "clashed heads with an opponent going for the same ball",
+        "took an accidental elbow to the face",
+        "was caught flush in the face by a clearance"
+      ]
+    },
+    {
+      "id": "hip_flexor_tear",
+      "name": "Hip Flexor Tear",
+      "bodyPart": "Hip",
+      "severity": "Major",
+      "minMatches": 4,
+      "maxMatches": 7,
+      "description": "A tear in the muscles connecting the thigh to the hip, from an explosive kicking or sprinting motion.",
+      "causes": [
+        "felt his hip go through on an over-stretched clearance",
+        "pulled up sharply mid-sprint holding his hip",
+        "over-extended for a tackle and felt his hip flexor tear"
+      ]
+    },
+    {
+      "id": "acl_tear",
+      "name": "ACL Tear",
+      "bodyPart": "Knee",
+      "severity": "Severe",
+      "minMatches": 16,
+      "maxMatches": 30,
+      "description": "A tear of the anterior cruciate ligament — one of football's most serious injuries, usually needing surgery and months of rehab.",
+      "causes": [
+        "planted awkwardly and his knee buckled with no one near him",
+        "landed from a jump with his knee twisting inward and went down clutching it",
+        "was caught with his studs stuck in the turf as his knee gave way"
+      ]
+    },
+    {
+      "id": "achilles_rupture",
+      "name": "Achilles Tendon Rupture",
+      "bodyPart": "Achilles",
+      "severity": "Severe",
+      "minMatches": 18,
+      "maxMatches": 28,
+      "description": "A complete tear of the Achilles tendon, one of the longest lay-off injuries in the game.",
+      "causes": [
+        "pushed off to sprint and went down instantly clutching his ankle",
+        "felt something snap in his heel with no contact from anyone",
+        "collapsed to the turf mid-stride grabbing the back of his ankle"
+      ]
+    },
+    {
+      "id": "fractured_tibia",
+      "name": "Fractured Tibia/Fibula",
+      "bodyPart": "Lower Leg",
+      "severity": "Severe",
+      "minMatches": 14,
+      "maxMatches": 24,
+      "description": "A break to one or both of the lower leg bones, almost always from a serious, high-impact challenge.",
+      "causes": [
+        "was caught by a reckless, high challenge on the lower leg",
+        "took the full force of a mistimed tackle on his shin",
+        "was on the end of a heavy, studs-up challenge"
+      ]
+    }
+  ]
+}

@@ -2177,6 +2177,13 @@
     "label": "gap"
   },
   {
+    "id": "cinj01",
+    "file": "engine/injuries.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:pickInjuryDef"
+  },
+  {
     "id": "c0257",
     "file": "engine/injuries.js",
     "start": 3996,
@@ -4856,6 +4863,48 @@
     "start": -1,
     "end": -1,
     "label": "team-match-log"
+  },
+  {
+    "id": "chos01",
+    "file": "ui/hospitalUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "hospitalFilter state"
+  },
+  {
+    "id": "chos02",
+    "file": "ui/hospitalUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:getHospitalEntries"
+  },
+  {
+    "id": "chos03",
+    "file": "ui/hospitalUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:hospitalSeverityClass"
+  },
+  {
+    "id": "chos04",
+    "file": "ui/hospitalUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:hospitalCauseLine"
+  },
+  {
+    "id": "chos05",
+    "file": "ui/hospitalUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:renderHospitalList"
+  },
+  {
+    "id": "chos06",
+    "file": "ui/hospitalUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:searchHospital,filterHospitalSeverity,sortHospital"
   },
   {
     "id": "c0598",

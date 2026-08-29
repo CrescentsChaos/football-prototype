@@ -942,6 +942,48 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .lb-table tr.lb-row-top.rank-2 td { background: rgba(192,192,192,0.10); box-shadow: inset 3px 0 0 #c0c0c0; }
 .lb-table tr.lb-row-top.rank-3 td { background: rgba(205,127,50,0.10); box-shadow: inset 3px 0 0 #cd7f32; }
 
+/* Hospital tab — injury ward summary + player table */
+.hospital-stat-row {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 4px 0 16px;
+}
+.hospital-stat {
+  flex: 1; min-width: 84px;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 8px; text-align: center;
+}
+.hospital-stat .val { font-family: var(--display); font-weight: 800; font-size: 1.3rem; color: var(--text); }
+.hospital-stat .lbl { font-size: 0.68rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+.hospital-stat.sev-minor .val { color: var(--green); }
+.hospital-stat.sev-moderate .val { color: var(--orange); }
+.hospital-stat.sev-major .val { color: #fb923c; }
+.hospital-stat.sev-severe .val { color: var(--red); }
+.hospital-table td { vertical-align: middle; }
+.injury-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.injury-badge.sev-minor { background: rgba(34,197,94,0.15); color: var(--green); }
+.injury-badge.sev-moderate { background: rgba(245,158,11,0.15); color: var(--orange); }
+.injury-badge.sev-major { background: rgba(251,146,60,0.18); color: #fb923c; }
+.injury-badge.sev-severe { background: rgba(239,68,68,0.18); color: var(--red); }
+.hospital-progress {
+  width: 88px; height: 5px; border-radius: 4px; margin-top: 5px;
+  background: rgba(255,255,255,0.08); overflow: hidden;
+}
+.hospital-progress-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+  transition: width var(--dur-base) var(--ease-smooth);
+}
+.hospital-inline-banner {
+  margin: 10px 0; padding: 8px 12px; border-radius: 10px;
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25);
+  color: var(--text); font-size: 0.85rem;
+}
+
 /* Podium — top 3 of the main leaderboard, awards-show style */
 .lb-podium {
   display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end;
