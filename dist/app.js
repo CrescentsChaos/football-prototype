@@ -94,6 +94,7 @@
     span = span != null ? span : (99 - baseline);
     return baseline + curvedStat(value, baseline, span, power) * span;
   }
+
 /* Apex Football Simulator - Fixed (no external fetch) */
 var App = (() => {
   // ========== EMBEDDED TEAMS DATA ==========
@@ -3049,20 +3050,62 @@ var App = (() => {
       }
     });
 
+    // Pass 3 — true last resort: even canPlay() compatibility couldn't
+    // fill every slot (squad is short of anyone position-eligible for
+    // it). The OLD behavior here dumped whoever was left into the XI
+    // labeled with their OWN natural position instead of the formation
+    // slot they were actually filling — which desynced `.slot` from the
+    // real empty slot (e.g. a 3rd player could end up tagged 'ST' when
+    // only 2 ST slots exist) and was the root cause of forwards visually
+    // rendering under defensive labels like CB/RB on the pitch view (see
+    // drawTeam() in ui/matchUI.js, which trusts `.slot` first). Now each
+    // still-empty slot is filled by whichever remaining player's own LINE
+    // (attack/mid/def, see POS_LINE/lineOf) sits CLOSEST to that slot's
+    // line — a midfielder covers a stray empty defensive slot before a
+    // pure forward ever would — and is honestly tagged with the actual
+    // slot they're filling plus outOfPosition:true so the UI can flag it
+    // instead of silently mislabeling them as a natural fit.
+    const _lineOrder = ['DEF', 'MID', 'FWD'];
+    const _lineDist = (playerLine, slotLine) => {
+      const pi = _lineOrder.indexOf(playerLine), si = _lineOrder.indexOf(slotLine);
+      if (pi === -1 || si === -1) return 9;
+      return Math.abs(pi - si);
+    };
+    formation.slots.forEach((slot, i) => {
+      if (slotOf.has(i)) return;
+      const slotLine = POS_LINE[slot] || 'MID';
+      const candidates = players.filter(p => !used.has(p.id))
+        .sort((a, b) => {
+          const d = _lineDist(lineOf(a), slotLine) - _lineDist(lineOf(b), slotLine);
+          // Tie-broken ASCENDING by score (weakest first) — when several
+          // remaining players are equally out-of-position for this slot
+          // (e.g. the squad has nothing but attackers left for a defensive
+          // slot), the squad's weakest attacking option absorbs the
+          // out-of-position duty rather than its best one. Pass 1/2 above
+          // already used descending score for genuine, in-position fits —
+          // this only governs the forced-mismatch case.
+          return d !== 0 ? d : score(a) - score(b);
+        });
+      if (candidates.length) {
+        used.add(candidates[0].id);
+        slotOf.set(i, Object.assign({}, candidates[0], { outOfPosition: true }));
+      }
+    });
+
     const starting = [];
     formation.slots.forEach((slot, i) => {
       const p = slotOf.get(i);
       if (p) starting.push({ ...p, slot, isStarter: true });
     });
 
-    // Fallback fill if the squad is too thin to fill every slot even via
-    // pass 2 — field whoever's left regardless of position, so we always
-    // put out 11 players.
+    // Absolute final catch-all — only reachable if the squad has fewer
+    // than 11 fit players in total (pass 3 above already covers "enough
+    // bodies, wrong positions"). Field whoever's left, honestly flagged.
     while (starting.length < 11) {
       const leftover = players.find(p => !used.has(p.id));
       if (!leftover) break;
       used.add(leftover.id);
-      starting.push({ ...leftover, slot: (leftover.pos || ['CM'])[0], isStarter: true });
+      starting.push({ ...leftover, slot: (leftover.pos || ['CM'])[0], isStarter: true, outOfPosition: true });
     }
 
     const remaining = players.filter(p => !used.has(p.id)).sort((a, b) => score(b) - score(a));
@@ -6706,8 +6749,23 @@ var App = (() => {
     let matchedOwnPosition = true;
     let tacticalChange = false;
     if (chasing) {
+      // Only throw an EXTRA attacker forward (converting what would've
+      // been a MID/DEF-for-MID/DEF swap into a FWD coming on) if the
+      // attackers already out there are actually running low on legs.
+      // Fresh, fit forwards don't get reinforced just because the
+      // scoreline says "chasing" — a manager doesn't load up on
+      // attackers who are still doing fine. If the current front line is
+      // fit, this branch is skipped entirely: the substitution falls
+      // through to the normal like-for-like tiers below, and if the
+      // bench has nothing that fits THOSE either, no substitution
+      // happens this call (see the "no further fallback" comment below).
+      const onPitchAttackers = onPitch.filter(p => lineOf(p) === 'FWD');
+      const avgAttackerStamina = onPitchAttackers.length
+        ? onPitchAttackers.reduce((s, p) => s + getStamina(m, side, p.id), 0) / onPitchAttackers.length
+        : 100;
+      const attackersNeedFreshening = avgAttackerStamina < 68;
       const attackers = availableSubs.filter(p => lineOf(p) === 'FWD');
-      if (attackers.length && outLine !== 'FWD') { candidatesIn = attackers; matchedOwnPosition = false; tacticalChange = true; }
+      if (attackers.length && outLine !== 'FWD' && attackersNeedFreshening) { candidatesIn = attackers; matchedOwnPosition = false; tacticalChange = true; }
     } else if (protectingLead) {
       const defenders = availableSubs.filter(p => lineOf(p) === 'DEF' || (lineOf(p) === 'MID' && (p.slot === 'CDM' || (p.pos||[]).includes('CDM'))));
       if (defenders.length && outLine !== 'DEF') { candidatesIn = defenders; matchedOwnPosition = false; tacticalChange = true; }
@@ -7633,24 +7691,48 @@ var App = (() => {
       });
       // Pass 2 — only for slots nobody's own `.slot` matched (e.g. stale
       // data after an edge-case state change). Loosen to secondary
-      // position, then broad compatibility, then whoever's left — same as
-      // before, just demoted to a fallback instead of competing on equal
-      // footing with an exact match.
+      // position, then broad compatibility. If NEITHER finds anyone, the
+      // old behavior fell back to literally "whoever's left" in array
+      // order with zero position check — that blind fallback is exactly
+      // what let a winger or striker render under a CB/RB label on the
+      // pitch view. It's replaced with a line-aware pick: among the
+      // remaining unassigned on-pitch players, prefer whichever one's own
+      // LINE (attack/mid/def) sits closest to this slot's line, so a pure
+      // forward is never chosen for a defensive-labeled slot while a
+      // midfielder or defender is still unassigned.
+      const lineOrder = ['DEF', 'MID', 'FWD'];
+      const lineDist = (playerLine, slotLine) => {
+        const pi = lineOrder.indexOf(playerLine), si = lineOrder.indexOf(slotLine);
+        if (pi === -1 || si === -1) return 9;
+        return Math.abs(pi - si);
+      };
       slots.forEach((slot, idx) => {
         if (slotPlayers[idx]) return;
         let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.pos || []).includes(slot));
         if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id) && canPlay(p, slot));
-        if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id));
+        if (!pick) {
+          const slotLine = POS_LINE[slot] || 'MID';
+          const leftover = onPitchPlayers.filter(p => !assigned.has(p.id))
+            .sort((a, b) => lineDist(lineOf(a), slotLine) - lineDist(lineOf(b), slotLine));
+          pick = leftover[0] || null;
+        }
         if (pick) {
           assigned.add(pick.id);
           slotPlayers[idx] = pick;
         }
       });
-      // Any remaining on-pitch players fill empty slots
-      onPitchPlayers.forEach(p => {
-        if (assigned.has(p.id)) return;
-        const empty = slots.findIndex((_, i) => !slotPlayers[i]);
-        if (empty >= 0) { slotPlayers[empty] = p; assigned.add(p.id); }
+      // Any remaining on-pitch players fill whatever empty slots are left
+      // (should only ever happen if there are more on-pitch players than
+      // formation slots) — again by closest line match, not array order.
+      onPitchPlayers.filter(p => !assigned.has(p.id)).forEach(p => {
+        const pLine = lineOf(p);
+        let bestIdx = -1, bestDist = Infinity;
+        slots.forEach((slot, i) => {
+          if (slotPlayers[i]) return;
+          const d = lineDist(pLine, POS_LINE[slot] || 'MID');
+          if (d < bestDist) { bestDist = d; bestIdx = i; }
+        });
+        if (bestIdx >= 0) { slotPlayers[bestIdx] = p; assigned.add(p.id); }
       });
 
       let primary = s.team.color || '#1a237e';
@@ -7697,8 +7779,14 @@ var App = (() => {
         if (idx !== 0) used.push({ x, y });
 
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
-          <span class="dot-pos">${slots[idx] || ''}</span>
+        // outOfPosition is set by buildSquad() (ui/teamUI.js) only when the
+        // squad was genuinely too short of eligible players to fill this
+        // slot naturally or compatibly — surfaced here rather than hidden,
+        // so a forced-out-of-position player is visibly flagged instead of
+        // looking like an ordinary (and wrong) natural fit.
+        const oop = !!p.outOfPosition;
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}${oop ? ' oop' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}" title="${oop ? 'Out of position — squad short of eligible players' : ''}">
+          <span class="dot-pos">${oop ? '⚠ ' : ''}${slots[idx] || ''}</span>
           <span class="dot-avatar">${playerAvatarMark(p)}</span>
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
