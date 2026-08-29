@@ -50766,7 +50766,7 @@
       "short": "RBL",
       "flag": "🇩🇪",
       "color": "#DD002A",
-      "secondary": "#FFFFFF",,
+      "secondary": "#FFFFFF",
       "logo":"RBL.png",
       "stadium":"Red Bull Arena",
       "players": [
@@ -53885,7 +53885,7 @@
       "short": "RBS",
       "flag": "🇦🇹",
       "color": "#E21A15",
-      "secondary": "#FFFFFF",,
+      "secondary": "#FFFFFF",
       "logo":"RBS.png",
       "stadium":"Red Bull Arena",
       "players": [
@@ -58677,7 +58677,7 @@
       "short": "VFB",
       "flag": "🇩🇪",
       "color": "#E32219",
-      "secondary": "#FFFFFF",,
+      "secondary": "#FFFFFF",
       "logo":"stuttgart.png",
       "stadium":"MHPArena",
       "players": [
