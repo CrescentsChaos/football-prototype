@@ -688,6 +688,15 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   line-height: 1.1; pointer-events: none;
   background: rgba(0,0,0,0.35); padding: 0 3px; border-radius: 2px;
 }
+/* Manager marker on the formation pitch — reuses .player-dot's sizing
+   (avatar + below-dot label) so the manager reads at the same visual
+   scale as a player, just with a neutral/gold styling instead of a kit
+   color so it isn't mistaken for one of the eleven. */
+.manager-dot {
+  background: rgba(10,14,23,0.65);
+  border: 2px solid var(--gold);
+}
+.manager-dot .dot-name { max-width: 96px; }
 
 /* Lineup lists */
 .lineup-grid {
@@ -1504,8 +1513,7 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   font-weight: 800;
   font-family: var(--display);
   color: var(--bg-0);
-  background: var(--gold);
-  border-radius: 50%;
+  background: none;
   vertical-align: middle;
   margin-left: 4px;
 }
@@ -2281,8 +2289,8 @@ select.ss-native {
 .sb-role-ic .emoji-icon-img { width: 70%; height: 70%; }
 .sb-dot .captain-armband {
   position: absolute; top: -6px; left: -6px;
-  background: var(--gold); color: #1a1400; font-weight: 800;
-  font-size: 0.6rem; width: 16px; height: 16px; border-radius: 4px;
+  background: none; color: #1a1400; font-weight: 800;
+  font-size: 0.6rem; width: 16px; height: 16px;
   display: flex; align-items: center; justify-content: center; z-index: 5;
 }
 /* Small tappable pill on the dot itself, sitting bottom-right so it never
