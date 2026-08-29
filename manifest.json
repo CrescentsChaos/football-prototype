@@ -7,6 +7,13 @@
     "label": "rng"
   },
   {
+    "id": "crngcurve",
+    "file": "js/rng.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:curvedStat,curvedAttr"
+  },
+  {
     "id": "c0000",
     "file": "js/state.js",
     "start": 0,
