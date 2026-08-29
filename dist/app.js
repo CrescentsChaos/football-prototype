@@ -10683,10 +10683,77 @@ var App = (() => {
             <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''} · ${formName}</div>
             <div style="font-size:0.7rem;color:var(--gold);display:flex;align-items:center;gap:4px">${t.manager && t.manager.name ? managerAvatarMark(t.manager, 16) : ''}${(t.manager && t.manager.name) || ''} · ${getManagerPlaystyle(t)}</div>
           </div>
+          <button type="button" class="lineup-btn" title="View lineup" aria-label="View ${t.name} lineup" onclick="event.stopPropagation();App.showTeamLineup('${t.id}')">🧩</button>
           <span class="player-ovr">${ovr}</span>
         </div>
       </div>`;
     }).join('');
+  }
+
+  // ========== TEAM LINEUP VIEWER (Teams tab) ==========
+  // Shows a team's best XI laid out on the same pitch visual used for live
+  // matches (.mini-pitch/.team-pitch + .player-dot markers), without
+  // needing an actual match in progress. Builds a fresh best-XI via
+  // buildSquad() using the team's own preferred formation (pickTeamFormation)
+  // so the shape and starters match what a match kickoff would auto-select.
+  function renderTeamLineupPitchHTML(team) {
+    const formKey = pickTeamFormation(team);
+    const form = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
+    const squad = buildSquad(team, formKey);
+    const coords = form.coords || [];
+    const slots = form.slots || [];
+    const primary = team.color || '#1a237e';
+    const secondary = team.secondary || '#ffffff';
+
+    // Line players up against their own slot (buildSquad already assigns
+    // squad.starting[i].slot === form.slots[i] in the common case), falling
+    // back to array order if a slot's own player is somehow missing.
+    const slotPlayers = slots.map((slot, i) => {
+      return squad.starting.find(p => p.slot === slot) || squad.starting[i] || null;
+    });
+
+    const used = [];
+    let dots = '';
+    slotPlayers.forEach((p, idx) => {
+      if (!p) return;
+      const c = coords[idx] || [50, 50];
+      let x = c[0], y = c[1];
+      if (idx !== 0) {
+        for (let t = 0; t < 8; t++) {
+          const hit = used.find(u => Math.hypot((u.x - x) * 1.5, u.y - y) < 16);
+          if (!hit) break;
+          const dir = (x - 50) >= 0 ? 1 : -1;
+          x += dir * 4;
+          x = Math.max(8, Math.min(92, x));
+        }
+        used.push({ x, y });
+      }
+      dots += `<div class="player-dot" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+        <span class="dot-pos">${slots[idx] || ''}</span>
+        <span class="dot-avatar">${playerAvatarMark(p)}</span>
+        <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
+      </div>`;
+    });
+
+    const mgrTag = team.manager && team.manager.name
+      ? `<span class="pitch-mgr">${managerAvatarMark(team.manager, 16)} ${team.manager.name}</span>` : '';
+    return `<div class="mini-pitch team-pitch">
+      <div class="pitch-label">${teamMark(team, 16)} ${team.short || team.name} · ${form.name}${mgrTag}</div>
+      ${dots}
+    </div>`;
+  }
+
+  function showTeamLineup(teamId) {
+    const team = getTeam(teamId);
+    if (!team) { toast('Team not found'); return; }
+    const modal = document.getElementById('lineup-modal');
+    const content = document.getElementById('lineup-modal-content');
+    if (!modal || !content) return;
+    content.innerHTML = `
+      <div class="card-title" style="display:flex;align-items:center;gap:8px">${teamMark(team, 22)} ${team.name} — Lineup</div>
+      <div class="pitch-wrap">${renderTeamLineupPitchHTML(team)}</div>
+    `;
+    modal.classList.add('active');
   }
 
   function searchTournamentTeams(q) {
@@ -13162,7 +13229,7 @@ var App = (() => {
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
-    returnToTournament, showPlayerProfile, showTeamProfile, randomMatch, randomizeTeamSide,
+    returnToTournament, showPlayerProfile, showTeamProfile, showTeamLineup, randomMatch, randomizeTeamSide,
     resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
     openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
