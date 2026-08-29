@@ -866,7 +866,7 @@ var App = (() => {
         m.playerMatchStats[taker.id].goals++;
         m.playerMatchStats[taker.id].xg += 0.12 + seededRandom() * 0.1;
         pushGoal(attackingSide, taker, m.minute, fk.text);
-        addEvent(m.minute, 'goal', `⚽ Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide, true);
+        addEvent(m.minute, 'goal', `${emojiImg('goal', 'Goal')} Free-kick goal! <span class="player">${taker.name}</span> — ${fk.text}`, attackingSide, true);
         if (seededRandom() < 0.55) recordStat('puskas', taker, attTeam.team);
         // The taker's own direct shot on goal, not a pass to a team-mate
         // beyond the defence — not an offside-eligible phase of play.
@@ -941,7 +941,7 @@ var App = (() => {
       m.playerMatchStats[scorer.id].goals++;
       m.playerMatchStats[scorer.id].xg += 0.18 + seededRandom() * 0.1;
       pushGoal(attackingSide, scorer, m.minute, 'first-time strike from an indirect routine');
-      addEvent(m.minute, 'goal', `⚽ Worked short and finished! <span class="player">${scorer.name}</span> converts the indirect routine`, attackingSide, true);
+      addEvent(m.minute, 'goal', `${emojiImg('goal', 'Goal')} Worked short and finished! <span class="player">${scorer.name}</span> converts the indirect routine`, attackingSide, true);
     } else {
       addEvent(m.minute, 'miss', `Blocked by the wall on the line — the indirect routine breaks down`, attackingSide);
       if (seededRandom() < 0.5) resolveCorner(attackingSide);
@@ -977,7 +977,7 @@ var App = (() => {
           m.playerMatchStats[scorer.id].goals++;
           m.playerMatchStats[scorer.id].xg += 0.16 + seededRandom() * 0.1;
           pushGoal(side, scorer, m.minute, 'header from a long throw');
-          addEvent(m.minute, 'goal', `⚽ Long throw flick-on converted! <span class="player">${scorer.name}</span> heads home`, side, true);
+          addEvent(m.minute, 'goal', `${emojiImg('goal', 'Goal')} Long throw flick-on converted! <span class="player">${scorer.name}</span> heads home`, side, true);
         }
       }
     } else if (roll < (longThrowSpecialist ? 0.55 : 0.7)) {
@@ -1247,14 +1247,16 @@ var App = (() => {
     const roles = m && m[side] && m[side].roles;
     if (!roles || !p) return '';
     let out = '';
-    if (roles.captain && roles.captain.id === p.id) out += '<span class="captain-armband" title="Captain">C</span>';
-    if (roles.penalty && roles.penalty.id === p.id) out += '<span class="li-icon" title="Penalty taker">🎯</span>';
+    if (roles.captain && roles.captain.id === p.id) out += `<span class="captain-armband" title="Captain">${emojiImg('captain', 'Captain')}</span>`;
+    if (roles.penalty && roles.penalty.id === p.id) out += `<span class="li-icon" title="Penalty taker">${emojiImg('penalty_goal', 'Penalty taker')}</span>`;
     const isFk = (roles.shortFreeKick && roles.shortFreeKick.id === p.id) || (roles.longFreeKick && roles.longFreeKick.id === p.id);
     if (isFk) out += '<span class="li-icon" title="Free-kick taker">🦶</span>';
-    const isCk = (roles.leftCorner && roles.leftCorner.id === p.id) || (roles.rightCorner && roles.rightCorner.id === p.id);
-    if (isCk) out += '<span class="li-icon" title="Corner taker">🚩</span>';
+    const isLeftCk = roles.leftCorner && roles.leftCorner.id === p.id;
+    const isRightCk = roles.rightCorner && roles.rightCorner.id === p.id;
+    if (isLeftCk) out += `<span class="li-icon" title="Left corner taker">${emojiImg('left_corner', 'Left corner taker')}</span>`;
+    if (isRightCk) out += `<span class="li-icon" title="Right corner taker">${emojiImg('right_corner', 'Right corner taker')}</span>`;
     const isCa = (roles.cornerAttackers || []).some((cp) => cp && cp.id === p.id);
-    if (isCa) out += '<span class="li-icon" title="Corner-box attacker">⬆️</span>';
+    if (isCa) out += `<span class="li-icon" title="Corner-box attacker">${emojiImg('corner_attacker', 'Corner-box attacker')}</span>`;
     return out;
   }
   function formationShape(formationKey) {
@@ -3611,14 +3613,16 @@ var App = (() => {
     const eff = sbDraft && sbDraft._eff;
     if (!eff) return '';
     let out = '';
-    if (eff.captain && eff.captain.id === playerId) out += '<span class="captain-armband" title="Captain">C</span>';
-    if (eff.penalty && eff.penalty.id === playerId) out += '<span class="sb-role-ic" title="Penalty taker">🎯</span>';
+    if (eff.captain && eff.captain.id === playerId) out += `<span class="captain-armband" title="Captain">${emojiImg('captain', 'Captain')}</span>`;
+    if (eff.penalty && eff.penalty.id === playerId) out += `<span class="sb-role-ic" title="Penalty taker">${emojiImg('penalty_goal', 'Penalty taker')}</span>`;
     const isFk = (eff.shortFreeKick && eff.shortFreeKick.id === playerId) || (eff.longFreeKick && eff.longFreeKick.id === playerId);
     if (isFk) out += '<span class="sb-role-ic" title="Free-kick taker">🦶</span>';
-    const isCk = (eff.leftCorner && eff.leftCorner.id === playerId) || (eff.rightCorner && eff.rightCorner.id === playerId);
-    if (isCk) out += '<span class="sb-role-ic" title="Corner taker">🚩</span>';
+    const isLeftCk = eff.leftCorner && eff.leftCorner.id === playerId;
+    const isRightCk = eff.rightCorner && eff.rightCorner.id === playerId;
+    if (isLeftCk) out += `<span class="sb-role-ic" title="Left corner taker">${emojiImg('left_corner', 'Left corner taker')}</span>`;
+    if (isRightCk) out += `<span class="sb-role-ic" title="Right corner taker">${emojiImg('right_corner', 'Right corner taker')}</span>`;
     const isCa = [eff.cornerAtk1, eff.cornerAtk2, eff.cornerAtk3].some(function(p) { return p && p.id === playerId; });
-    if (isCa) out += '<span class="sb-role-ic" title="Corner-box attacker">⬆️</span>';
+    if (isCa) out += `<span class="sb-role-ic" title="Corner-box attacker">${emojiImg('corner_attacker', 'Corner-box attacker')}</span>`;
     return out;
   }
   function closeSlotPicker() {
@@ -3643,7 +3647,7 @@ var App = (() => {
     return '<div class="sb-chip' + (isSel ? ' selected' : '') + '"' +
       ' onpointerdown="event.stopPropagation();App.sbGrab(event,\'' + kind + '\',\'' + p.id + '\')">' +
       '<span class="sb-chip-num">' + (p.num || '?') + '</span>' +
-      '<span class="sb-chip-name">' + p.name + (inj ? ' 🩹' : '') + (susp ? ' 🟥' : '') + '</span>' +
+      '<span class="sb-chip-name">' + p.name + (inj ? ' 🩹' : '') + (susp ? ' ' + emojiImg('red_card', 'Suspended') : '') + '</span>' +
       '<span class="sb-chip-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span>' +
       sbRoleTagHTML(p.id) + moveBtn +
       '</div>';
@@ -4216,7 +4220,7 @@ var App = (() => {
     if (!m || m.inPens) return;
     m.inPens = true;
     m.status = 'Penalties';
-    addEvent(m.minute, 'pen', '⚽ Penalty shootout!', null);
+    addEvent(m.minute, 'pen', `${emojiImg('penalty_goal', 'Penalty')} Penalty shootout!`, null);
     updateScoreboard();
 
     // Order the takers list so recognised penalty takers (strikers/wingers, then
@@ -4286,9 +4290,9 @@ var App = (() => {
     const teamShort = m[side].team.short;
     if (out.scored) {
       st[side === 'home' ? 'homePens' : 'awayPens']++;
-      addEvent(m.minute, 'pen', `⚽ ${taker.name} (${teamShort}) ${out.text} [${st.homePens}-${st.awayPens}]`, side);
+      addEvent(m.minute, 'pen', `${emojiImg('penalty_goal', 'Penalty scored')} ${taker.name} (${teamShort}) ${out.text} [${st.homePens}-${st.awayPens}]`, side);
     } else {
-      addEvent(m.minute, 'pen', `❌ ${taker.name} (${teamShort}) — ${out.text} [${st.homePens}-${st.awayPens}]`, side);
+      addEvent(m.minute, 'pen', `${emojiImg('penalty_miss_saved', 'Penalty missed')} ${taker.name} (${teamShort}) — ${out.text} [${st.homePens}-${st.awayPens}]`, side);
     }
   }
 
@@ -4446,7 +4450,7 @@ var App = (() => {
   function renderRatingRow(p, motmId) {
     const isMotm = motmId != null && p.id === motmId;
     const rc = isMotm ? 'rating-motm' : (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
-    const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals, 3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists, 2)) : '');
+    const icons = (p.goals ? emojiImg('goal', 'Goal').repeat(Math.min(p.goals, 3)) : '') + (p.assists ? emojiImg('assist', 'Assist').repeat(Math.min(p.assists, 2)) : '');
     return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
         <span class="player-num">${p.num || ''}</span>
         <span style="flex:1;font-weight:600">${playerNameHTML(p)}${isMotm ? ' <span title="Man of the Match">⭐</span>' : ''}</span>
@@ -6071,7 +6075,7 @@ var App = (() => {
           m.playerMatchStats[taker.id].goals++;
           m.playerMatchStats[taker.id].xg += 0.76 + seededRandom() * 0.08;
           pushGoal(attackingSide, taker, m.minute, 'penalty — ' + po.text);
-          addEvent(m.minute, 'goal', `⚽ Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true);
+          addEvent(m.minute, 'goal', `${emojiImg('penalty_goal', 'Penalty goal')} Penalty goal! <span class="player">${taker.name}</span> ${po.text}`, attackingSide, true, true);
           maybeOffsideDisallow(attackingSide, taker, m.minute, 'penalty');
         } else {
           if (po.saved) {
@@ -6082,9 +6086,9 @@ var App = (() => {
               if (!m.playerMatchStats[penGk.id]) m.playerMatchStats[penGk.id] = blankPlayerMatchStats(penGk);
               m.playerMatchStats[penGk.id].saves = (m.playerMatchStats[penGk.id].saves || 0) + 1;
             }
-            addEvent(m.minute, 'save', `🧤 Penalty saved! <span class="player">${taker.name}</span>'s effort ${po.text}${penGk ? ` — <span class="player">${penGk.name}</span> denies it` : ''}`, attackingSide);
+            addEvent(m.minute, 'save', `${emojiImg('penalty_miss_saved', 'Penalty saved')} Penalty saved! <span class="player">${taker.name}</span>'s effort ${po.text}${penGk ? ` — <span class="player">${penGk.name}</span> denies it` : ''}`, attackingSide);
           } else {
-            addEvent(m.minute, 'miss', `Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, attackingSide);
+            addEvent(m.minute, 'miss', `${emojiImg('penalty_miss_saved', 'Penalty missed')} Penalty missed — <span class="player">${taker.name}</span>: ${po.text}`, attackingSide);
           }
         }
       }
@@ -6107,7 +6111,7 @@ var App = (() => {
       if (!m.playerMatchStats) m.playerMatchStats = {};
       if (!m.playerMatchStats[fouler.id]) m.playerMatchStats[fouler.id] = blankPlayerMatchStats(fouler);
       m.playerMatchStats[fouler.id].red = true;
-      addEvent(m.minute, 'red', `🟥 Straight red! ${foulText} — reckless challenge`, defendingSide);
+      addEvent(m.minute, 'red', `${emojiImg('red_card', 'Red card')} Straight red! ${foulText} — reckless challenge`, defendingSide);
       removeFromPitch(defendingSide, fouler.id);
       handleRedCardReshuffle(defendingSide, fouler);
       return { outcome: 'red' };
@@ -6123,12 +6127,12 @@ var App = (() => {
         defTeam.stats.reds++;
         recordStat('reds', fouler, defTeam.team);
         m.playerMatchStats[fouler.id].red = true;
-        addEvent(m.minute, 'red', `🟥 Second yellow → red! ${foulText}`, defendingSide);
+        addEvent(m.minute, 'red', `${emojiImg('red_card', 'Red card')} Second yellow → red! ${foulText}`, defendingSide);
         removeFromPitch(defendingSide, fouler.id);
         handleRedCardReshuffle(defendingSide, fouler);
         return { outcome: 'red' };
       } else {
-        addEvent(m.minute, 'yellow', `🟨 Yellow card — ${foulText}${foulCount > 1 ? ' (repeated fouls)' : ''}`, defendingSide);
+        addEvent(m.minute, 'yellow', `${emojiImg('yellow_card', 'Yellow card')} Yellow card — ${foulText}${foulCount > 1 ? ' (repeated fouls)' : ''}`, defendingSide);
         return { outcome: 'yellow' };
       }
     } else {
@@ -6405,7 +6409,7 @@ var App = (() => {
           if (!m.playerMatchStats) m.playerMatchStats = {};
           if (!m.playerMatchStats[player.id]) m.playerMatchStats[player.id] = blankPlayerMatchStats(player);
           m.playerMatchStats[player.id].yellow = true;
-          addEvent(m.minute, 'yellow', `🟨 Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
+          addEvent(m.minute, 'yellow', `${emojiImg('yellow_card', 'Yellow card')} Yellow card — <span class="player">${player.name}</span> booked after VAR review`, defSide);
         }
       }
     } else if (roll < 0.78) {
@@ -7615,13 +7619,21 @@ var App = (() => {
     persistAll();
   }
 
-  function addEvent(minute, type, text, side, isGoal) {
+  // Renders one of the curated PNGs in assets/images/ as an inline,
+  // emoji-sized icon. Used everywhere a status emoji (goal, assist,
+  // captain, penalty, card, ...) used to be a plain unicode character —
+  // see the .emoji-icon-img rule in styles.css for sizing.
+  function emojiImg(name, title) {
+    const t = title || '';
+    return `<img src="assets/images/${name}.png" alt="${t}" title="${t}" class="emoji-icon-img">`;
+  }
+  function addEvent(minute, type, text, side, isGoal, isPenalty) {
     if (!currentMatch) return;
     currentMatch.events.push({ minute, type, text, side });
     if (currentMatch.quietSim) return;
     const feed = document.getElementById('events-feed');
     if (!feed) return;
-    const icons = { goal: '⚽', save: '🧤', yellow: '🟨', red: '🟥', sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', tackle: '🦵', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: '📢', pressure: '🔥', motm: '⭐', var: '📺', pen: '⚽', skill: '✨', handball: '✋', et: '⏱️' };
+    const icons = { goal: emojiImg(isPenalty ? 'penalty_goal' : 'goal', isPenalty ? 'Penalty goal' : 'Goal'), save: '🧤', yellow: emojiImg('yellow_card', 'Yellow card'), red: emojiImg('red_card', 'Red card'), sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', tackle: '🦵', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: emojiImg('whistle', 'Whistle'), pressure: '🔥', motm: '⭐', var: '📺', pen: emojiImg('penalty_goal', 'Penalty'), skill: '✨', handball: '✋', et: '⏱️' };
     const div = document.createElement('div');
     div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
     div.innerHTML = `<span class="event-time">${minute}'</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
@@ -7843,10 +7855,10 @@ var App = (() => {
   function playerLineIcons(ps, subInfo, onPitch, inj) {
     let icons = '';
     if (ps) {
-      for (let i = 0; i < (ps.goals || 0); i++) icons += '<span class="li-icon" title="Goal">⚽</span>';
-      for (let i = 0; i < (ps.assists || 0); i++) icons += '<span class="li-icon" title="Assist">🅰️</span>';
-      if (ps.yellow) icons += '<span class="li-icon" title="Yellow">🟨</span>';
-      if (ps.red) icons += '<span class="li-icon" title="Red">🟥</span>';
+      for (let i = 0; i < (ps.goals || 0); i++) icons += `<span class="li-icon" title="Goal">${emojiImg('goal', 'Goal')}</span>`;
+      for (let i = 0; i < (ps.assists || 0); i++) icons += `<span class="li-icon" title="Assist">${emojiImg('assist', 'Assist')}</span>`;
+      if (ps.yellow) icons += `<span class="li-icon" title="Yellow">${emojiImg('yellow_card', 'Yellow card')}</span>`;
+      if (ps.red) icons += `<span class="li-icon" title="Red">${emojiImg('red_card', 'Red card')}</span>`;
     }
     if (inj) icons += '<span class="li-icon" title="Injured">🩹</span>';
     if (subInfo && subInfo.outMin != null) icons += `<span class="li-sub out" title="Subbed off">🔻${subInfo.outMin}'</span>`;
@@ -10434,11 +10446,11 @@ var App = (() => {
       ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${playerNameHTML(p)}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
     el.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-        ${col('⚽ Golden Boot', g)}
-        ${col('🎯 Assists', a)}
+        ${col(emojiImg('goal', 'Goal') + ' Golden Boot', g)}
+        ${col(emojiImg('assist', 'Assist') + ' Assists', a)}
         ${col('⭐ MOTM', m)}
-        ${col('🟨 Yellows', y)}
-        ${col('🟥 Reds', r)}
+        ${col(emojiImg('yellow_card', 'Yellow card') + ' Yellows', y)}
+        ${col(emojiImg('red_card', 'Red card') + ' Reds', r)}
         ${col('🧤 Saves', s)}
       </div>
       <div style="margin-top:10px;font-size:0.75rem;color:var(--text-muted)">Matchday ${globalMatchDay} · Full match engine · Injuries tracked</div>`;
@@ -10708,8 +10720,26 @@ var App = (() => {
     // Line players up against their own slot (buildSquad already assigns
     // squad.starting[i].slot === form.slots[i] in the common case), falling
     // back to array order if a slot's own player is somehow missing.
+    const usedIds = new Set();
     const slotPlayers = slots.map((slot, i) => {
-      return squad.starting.find(p => p.slot === slot) || squad.starting[i] || null;
+      // Prefer the player buildSquad() already lined up for this exact
+      // slot index (the common case). Only fall back to searching by slot
+      // *code* when that's missing, and always skip anyone already placed
+      // in an earlier slot — otherwise two players sharing a slot code
+      // (e.g. two "CB"s) both resolve to the same first match, so that
+      // player gets drawn twice while the other one never appears.
+      let p = null;
+      if (squad.starting[i] && squad.starting[i].slot === slot && !usedIds.has(squad.starting[i].id)) {
+        p = squad.starting[i];
+      }
+      if (!p) {
+        p = squad.starting.find(pl => pl.slot === slot && !usedIds.has(pl.id)) || null;
+      }
+      if (!p) {
+        p = squad.starting.find(pl => !usedIds.has(pl.id)) || null;
+      }
+      if (p) usedIds.add(p.id);
+      return p;
     });
 
     const used = [];
@@ -11185,7 +11215,7 @@ var App = (() => {
     if (!el) return;
     if (type === 'goldenboot') {
       const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">⚽</div><p>No goals yet.</p></div>'; return; }
+      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">' + emojiImg('goal', 'Goal') + '</div><p>No goals yet.</p></div>'; return; }
       el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Golden Boot', 34) + ' Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
@@ -12320,12 +12350,12 @@ var App = (() => {
   function renderCompStatsHTML(comp) {
     let h = '<div class="group-card league-table-wrap" style="margin-bottom:14px"><h4>' + comp.name + ' — Season Stats</h4>' +
       '<p style="font-size:0.8rem;color:var(--text-muted)">Top performers across every matchday played in this competition so far.</p></div>';
-    h += renderCompStatTable(comp, 'Top Scorers', '⚽', compStatTop(comp, 'goals', 15), 'Goals');
-    h += renderCompStatTable(comp, 'Top Assists', '🎯', compStatTop(comp, 'assists', 15), 'Assists');
+    h += renderCompStatTable(comp, 'Top Scorers', emojiImg('goal', 'Goal'), compStatTop(comp, 'goals', 15), 'Goals');
+    h += renderCompStatTable(comp, 'Top Assists', emojiImg('assist', 'Assist'), compStatTop(comp, 'assists', 15), 'Assists');
     h += renderCompStatTable(comp, 'Most Saves', '🧤', compStatTop(comp, 'saves', 15), 'Saves');
     h += renderCompStatTable(comp, 'Clean Sheets', '🛡️', compStatTop(comp, 'cleanSheets', 15), 'Clean Sheets');
-    h += renderCompStatTable(comp, 'Yellow Cards', '🟨', compStatTop(comp, 'yellows', 15), 'Yellows');
-    h += renderCompStatTable(comp, 'Red Cards', '🟥', compStatTop(comp, 'reds', 15), 'Reds');
+    h += renderCompStatTable(comp, 'Yellow Cards', emojiImg('yellow_card', 'Yellow card'), compStatTop(comp, 'yellows', 15), 'Yellows');
+    h += renderCompStatTable(comp, 'Red Cards', emojiImg('red_card', 'Red card'), compStatTop(comp, 'reds', 15), 'Reds');
     return h;
   }
 
