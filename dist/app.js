@@ -1250,7 +1250,7 @@ var App = (() => {
     if (roles.captain && roles.captain.id === p.id) out += `<span class="captain-armband" title="Captain">${emojiImg('captain', 'Captain')}</span>`;
     if (roles.penalty && roles.penalty.id === p.id) out += `<span class="li-icon" title="Penalty taker">${emojiImg('penalty_goal', 'Penalty taker')}</span>`;
     const isFk = (roles.shortFreeKick && roles.shortFreeKick.id === p.id) || (roles.longFreeKick && roles.longFreeKick.id === p.id);
-    if (isFk) out += '<span class="li-icon" title="Free-kick taker">🦶</span>';
+    if (isFk) out += `<span class="li-icon" title="Free-kick taker">${emojiImg('freekick', 'Free-kick taker')}</span>`;
     const isLeftCk = roles.leftCorner && roles.leftCorner.id === p.id;
     const isRightCk = roles.rightCorner && roles.rightCorner.id === p.id;
     if (isLeftCk) out += `<span class="li-icon" title="Left corner taker">${emojiImg('left_corner', 'Left corner taker')}</span>`;
@@ -3616,7 +3616,7 @@ var App = (() => {
     if (eff.captain && eff.captain.id === playerId) out += `<span class="captain-armband" title="Captain">${emojiImg('captain', 'Captain')}</span>`;
     if (eff.penalty && eff.penalty.id === playerId) out += `<span class="sb-role-ic" title="Penalty taker">${emojiImg('penalty_goal', 'Penalty taker')}</span>`;
     const isFk = (eff.shortFreeKick && eff.shortFreeKick.id === playerId) || (eff.longFreeKick && eff.longFreeKick.id === playerId);
-    if (isFk) out += '<span class="sb-role-ic" title="Free-kick taker">🦶</span>';
+    if (isFk) out += `<span class="sb-role-ic" title="Free-kick taker">${emojiImg('freekick', 'Free-kick taker')}</span>`;
     const isLeftCk = eff.leftCorner && eff.leftCorner.id === playerId;
     const isRightCk = eff.rightCorner && eff.rightCorner.id === playerId;
     if (isLeftCk) out += `<span class="sb-role-ic" title="Left corner taker">${emojiImg('left_corner', 'Left corner taker')}</span>`;
@@ -7840,11 +7840,16 @@ var App = (() => {
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
       });
-      const mgrTag = s.team.manager && s.team.manager.name
-        ? `<span class="pitch-mgr">${managerAvatarMark(s.team.manager, 16)} ${s.team.manager.name}</span>` : '';
+      const mgrStyle = getManagerPlaystyle(s.team);
+      const mgrDot = s.team.manager && s.team.manager.name
+        ? `<div class="player-dot manager-dot" style="left:6%;top:95%">
+          <span class="dot-avatar">${managerAvatarMark(s.team.manager, 46)}</span>
+          <span class="dot-label"><span class="dot-name">${s.team.manager.name}${mgrStyle ? ' · ' + mgrStyle : ''}</span></span>
+        </div>` : '';
       return `<div class="mini-pitch team-pitch">
-        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}${mgrTag}</div>
+        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}</div>
         ${dots}
+        ${mgrDot}
       </div>`;
     };
 
@@ -7895,15 +7900,10 @@ var App = (() => {
       const rating = liveRatingBadge(ps);
       const dim = (!on && !inj && !sentOff && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
       const pos = p.slot || (p.pos || [''])[0] || '';
-      const passAcc = ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
-      const passInfo = (ps.passes > 0)
-        ? `<span class="player-passes" title="Passes completed / attempted">${ps.passesCompleted || 0}/${ps.passes} <em>(${passAcc}%)</em></span>`
-        : '';
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
         <span class="player-num">${p.num || ''}</span>
         <span class="player-pos">${pos}</span>
         <span class="player-name">${playerNameHTML(p)}${roleBadgesHTML(p, side)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
-        ${passInfo}
         <span class="player-icons">${icons}</span>
         ${rating}
       </li>`;
@@ -10765,11 +10765,16 @@ var App = (() => {
       </div>`;
     });
 
-    const mgrTag = team.manager && team.manager.name
-      ? `<span class="pitch-mgr">${managerAvatarMark(team.manager, 16)} ${team.manager.name}</span>` : '';
+    const mgrStyle = getManagerPlaystyle(team);
+    const mgrDot = team.manager && team.manager.name
+      ? `<div class="player-dot manager-dot" style="left:6%;top:95%">
+        <span class="dot-avatar">${managerAvatarMark(team.manager, 46)}</span>
+        <span class="dot-label"><span class="dot-name">${team.manager.name}${mgrStyle ? ' · ' + mgrStyle : ''}</span></span>
+      </div>` : '';
     return `<div class="mini-pitch team-pitch">
-      <div class="pitch-label">${teamMark(team, 16)} ${team.short || team.name} · ${form.name}${mgrTag}</div>
+      <div class="pitch-label">${teamMark(team, 16)} ${team.short || team.name} · ${form.name}</div>
       ${dots}
+      ${mgrDot}
     </div>`;
   }
 
