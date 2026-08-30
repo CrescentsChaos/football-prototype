@@ -21913,7 +21913,9 @@
       ],
       "manager": {
         "name": "Vicente del Bosque",
-        "ovr": 100
+        "ovr": 100,
+        "formation":"4-3-3-cdm",
+        "playstyle":"Possession"
       }
     },
     {
@@ -24933,7 +24935,9 @@
       ],
       "manager": {
         "name": "Lionel Scaloni",
-        "ovr": 96
+        "ovr": 98,
+        "formation":"4-3-3-cdm",
+        "playstyle":"Possession"
       }
     },
     {
@@ -26068,7 +26072,9 @@
       ],
       "manager": {
         "name": "Marcello Lippi",
-        "ovr": 100
+        "ovr": 100,
+        "formation":"4-4-1-1",
+        "playstyle":"Quick Counter"
       }
     },
     {
@@ -28028,7 +28034,9 @@
       ],
       "manager": {
         "name": "Jorge Jesus",
-        "ovr": 89
+        "ovr": 89,
+        "formation":"4-2-3-1",
+        "playstyle":"Possession"
       }
     },
     {
@@ -28435,7 +28443,7 @@
         "name": "Luis de la Fuente",
         "ovr": 99,
         "playstyle": "Possession",
-        "formation": "4-3-3"
+        "formation": "4-3-3-cdm"
       }
     },
     {
@@ -28834,7 +28842,9 @@
       ],
       "manager": {
         "name": "Jürgen Klopp",
-        "ovr": 95
+        "ovr": 95,
+        "formation":"4-2-3-1",
+        "playstyle":"Overload"
       }
     },
     {
@@ -38447,6 +38457,19 @@
           "pac": 86,
           "tec": 88,
           "num": 3
+        },  {
+          "id": "mci2026_new1",
+          "name": "Ayyoub Bouaddi",
+          "pos": [
+            "CDM"
+          ],
+          "num": 6,
+          "ovr": 82,
+          "att": 70,
+          "def": 85,
+          "phy": 82,
+          "pac": 85,
+          "tec": 83
         },
         {
           "id": "mar9",
@@ -38476,6 +38499,20 @@
           "pac": 88,
           "tec": 79,
           "num": 20
+        },{
+          "id": "bru27_68",
+          "name": "Chemsdine Talbi",
+          "pos": [
+            "RW",
+            "LW"
+          ],
+          "ovr": 72,
+          "att": 71,
+          "def": 38,
+          "phy": 64,
+          "pac": 82,
+          "tec": 74,
+          "num": 68
         },
         {
           "id": "mar11",
@@ -61448,6 +61485,20 @@
           "pac": 42,
           "tec": 50,
           "num": 40
+        },{
+          "id": "sco4",
+          "name": "Andrew Robertson",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 86,
+          "att": 78,
+          "def": 82,
+          "phy": 78,
+          "pac": 88,
+          "tec": 88,
+          "num": 3
         },
         {
           "id": "tot26_37",
@@ -93901,6 +93952,20 @@
           "pac": 72,
           "tec": 69,
           "num": 33
+        },{
+          "id": "bru27_68",
+          "name": "Chemsdine Talbi",
+          "pos": [
+            "RW",
+            "LW"
+          ],
+          "ovr": 72,
+          "att": 71,
+          "def": 38,
+          "phy": 64,
+          "pac": 82,
+          "tec": 74,
+          "num": 68
         },
         {
           "id": "sun27_42",
@@ -100655,21 +100720,6 @@
           "pac": 74,
           "tec": 75,
           "num": 15
-        },
-        {
-          "id": "bru27_68",
-          "name": "Chemsdine Talbi",
-          "pos": [
-            "RW",
-            "LW"
-          ],
-          "ovr": 72,
-          "att": 71,
-          "def": 38,
-          "phy": 64,
-          "pac": 82,
-          "tec": 74,
-          "num": 68
         },
         {
           "id": "bru27_70",
