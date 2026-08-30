@@ -1388,14 +1388,37 @@ var App = (() => {
   // formation slot they can play, and only as an absolute last resort to
   // their natural position anyway (better than nothing when even the
   // formation's own slot list has no fit — e.g. a badly thinned-out bench).
-  function pickSlotForIncomingSub(inPlayer, formationKey, outSlot) {
-    if (outSlot && canPlay(inPlayer, outSlot)) return outSlot;
+  // `occupantPlayers` is everyone else currently on the pitch for this side
+  // (i.e. excluding the outgoing player, who's leaving, and the incoming
+  // sub, who doesn't have a slot yet) — used to make sure the slot handed
+  // back is actually still free. Without this, a sub whose natural/fallback
+  // slot was already held by an existing teammate (e.g. a second player
+  // both tagged 'CB' because the formation only has one open CB berth)
+  // ended up rendered nowhere near where they were actually subbed on:
+  // renderPitch()'s slot lookup can only match one player per named slot,
+  // so the loser of that collision gets swept into whichever slot is still
+  // empty — usually the very one this player just vacated — which is what
+  // made a defender look like they'd been sent on up front, or a forward
+  // like they'd dropped into the back line.
+  function pickSlotForIncomingSub(inPlayer, formationKey, outSlot, occupantPlayers) {
     const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
+    const occupied = {};
+    (occupantPlayers || []).forEach((p) => {
+      if (p && p.slot) occupied[p.slot] = (occupied[p.slot] || 0) + 1;
+    });
+    const slotCounts = {};
+    formation.slots.forEach((s) => { slotCounts[s] = (slotCounts[s] || 0) + 1; });
+    const isFree = (s) => (occupied[s] || 0) < (slotCounts[s] || 0);
+
+    if (outSlot && canPlay(inPlayer, outSlot) && isFree(outSlot)) return outSlot;
     const natural = (inPlayer.pos || [])[0];
-    if (natural && formation.slots.includes(natural)) return natural;
-    const compatSlot = formation.slots.find(s => canPlay(inPlayer, s));
+    if (natural && formation.slots.includes(natural) && isFree(natural)) return natural;
+    const compatSlot = formation.slots.find(s => canPlay(inPlayer, s) && isFree(s));
     if (compatSlot) return compatSlot;
-    return natural || 'CM';
+    // Nothing both comfortable and free — the vacated slot is still the
+    // least-bad landing spot (it's the one guaranteed to actually be open),
+    // even if the incoming player isn't a natural fit for it.
+    return outSlot || natural || 'CM';
   }
 
 
@@ -4675,7 +4698,7 @@ var App = (() => {
     const m = tournament && tournament.knockout[ri] && tournament.knockout[ri].matches[mi];
     if (!m) { toast('No detailed report for this match'); return; }
     if (m.twoLeg !== false && m.leg1 && m.leg2 && m.leg1.report && m.leg2.report) {
-      const aggText = (m.aggHome != null) ? `Aggregate: ${m.home.short} ${m.aggHome} - ${m.aggAway} ${m.away.short}${m.penalties ? ' (on penalties)' : ''}` : '';
+      const aggText = (m.aggHome != null) ? `Aggregate: ${m.home.short} ${m.aggHome} - ${m.aggAway} ${m.away.short}${m.penalties ? (m.pens ? ` (pens ${m.pens.home}-${m.pens.away})` : ' (on penalties)') : ''}` : '';
       const legs = [
         { label: `Leg 1 · ${m.leg1.report.home.short} home`, report: m.leg1.report },
         { label: `Leg 2 · ${m.leg2.report.home.short} home`, report: m.leg2.report }
@@ -6946,7 +6969,7 @@ var App = (() => {
     // natural slot within the current formation instead (falling back to
     // any formation slot they can actually play if their exact position
     // isn't part of this shape).
-    inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outSlot);
+    inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outSlot, onPitch.filter(p => p.id !== outPlayer.id));
     const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
     // Surface the real reason behind a notable change (booked/tiring) in
     // the event log, same spirit as the tactical tag above.
@@ -7011,7 +7034,7 @@ var App = (() => {
     // there, otherwise their own natural defensive slot within the
     // current formation — rather than being forced into an attacking
     // slot they have no business playing.
-    inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outPlayer.slot || (outPlayer.pos || ['CB'])[0]);
+    inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outPlayer.slot || (outPlayer.pos || ['CB'])[0], onPitch.filter(p => p.id !== outPlayer.id));
     const newUsed = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     addEvent(m.minute, 'sub',
       `Tactical reshuffle · ${sideData.team.short} reorganise after going down to 10 men<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span> <span style="opacity:0.6">(defensive cover)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,
@@ -7300,7 +7323,8 @@ var App = (() => {
         // otherwise fall back to their own natural position rather than
         // force them somewhere they can't play — this only matters for
         // the rare case where the bench had nobody compatible at all.
-        inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, injured.slot || (injured.pos || ['CM'])[0]);
+        const onPitchNow = (sideData.squad.all || []).filter(p => onPitchIds.includes(p.id) && p.id !== injured.id);
+        inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, injured.slot || (injured.pos || ['CM'])[0], onPitchNow);
         markLeftPitch(m, side, injured.id);
         resetFatigueFor(m, side, inPlayer.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
@@ -9719,6 +9743,13 @@ var App = (() => {
 
   function simSingleFixture(idx) {
     if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    withLoading('Simulating match…', function() {
+      _simSingleFixtureWork(idx);
+    });
+  }
+
+  function _simSingleFixtureWork(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
     const f = tournament.fixtures[idx];
     const home = getTeam(f.home), away = getTeam(f.away);
     const result = simQuickMatch(home, away);
@@ -10049,6 +10080,7 @@ var App = (() => {
         m.report = result.report;
         if (result.pens) {
           m.penalties = true;
+          m.pens = result.pens;
           m.winner = result.pens.home > result.pens.away ? m.home : m.away;
         } else if (result.home > result.away) m.winner = m.home;
         else if (result.away > result.home) m.winner = m.away;
@@ -10212,6 +10244,13 @@ var App = (() => {
 
   function simPlayoffTie(idx) {
     if (!tournament || !tournament.playoff[idx] || tournament.playoff[idx].played) return;
+    withLoading('Simulating match…', function() {
+      _simPlayoffTieWork(idx);
+    });
+  }
+
+  function _simPlayoffTieWork(idx) {
+    if (!tournament || !tournament.playoff[idx] || tournament.playoff[idx].played) return;
     const p = tournament.playoff[idx];
     // Leg 1: away team (lower seed) at home vs higher seed
     const leg1Home = p.away, leg1Away = p.home;
@@ -10227,7 +10266,7 @@ var App = (() => {
     else if (p.aggAway > p.aggHome) p.winner = p.away;
     else {
       // Pens already may have decided leg2 if scores level after 90 — if still level use pens flag or random
-      if (r2.pens) p.winner = r2.pens.home > r2.pens.away ? p.home : p.away;
+      if (r2.pens) { p.winner = r2.pens.home > r2.pens.away ? p.home : p.away; p.pens = r2.pens; }
       else p.winner = seededRandom() < 0.5 ? p.home : p.away;
       p.penalties = true;
     }
@@ -10303,7 +10342,7 @@ var App = (() => {
     if (m.aggHome > m.aggAway) m.winner = m.home;
     else if (m.aggAway > m.aggHome) m.winner = m.away;
     else {
-      if (r2.pens) m.winner = r2.pens.home > r2.pens.away ? m.home : m.away;
+      if (r2.pens) { m.winner = r2.pens.home > r2.pens.away ? m.home : m.away; m.pens = r2.pens; }
       else m.winner = seededRandom() < 0.5 ? m.home : m.away;
       m.penalties = true;
     }
@@ -10320,6 +10359,7 @@ var App = (() => {
     m.twoLeg = false;
     if (result.pens) {
       m.penalties = true;
+      m.pens = result.pens;
       m.winner = result.pens.home > result.pens.away ? m.home : m.away;
     } else if (result.home === result.away) {
       m.penalties = true;
@@ -10333,7 +10373,7 @@ var App = (() => {
     const p = tournament && tournament.playoff && tournament.playoff[idx];
     if (!p) return;
     if (p.leg1 && p.leg2 && p.leg1.report && p.leg2.report) {
-      const aggText = (p.aggHome != null) ? `Aggregate: ${p.home.short} ${p.aggHome} - ${p.aggAway} ${p.away.short}${p.penalties ? ' (on penalties)' : ''}` : '';
+      const aggText = (p.aggHome != null) ? `Aggregate: ${p.home.short} ${p.aggHome} - ${p.aggAway} ${p.away.short}${p.penalties ? (p.pens ? ` (pens ${p.pens.home}-${p.pens.away})` : ' (on penalties)') : ''}` : '';
       const legs = [
         { label: `Leg 1 · ${p.leg1.report.home.short} home`, report: p.leg1.report },
         { label: `Leg 2 · ${p.leg2.report.home.short} home`, report: p.leg2.report }
@@ -10526,6 +10566,7 @@ var App = (() => {
       m.report = result.report;
       if (result.pens) {
         m.penalties = true;
+        m.pens = result.pens;
         m.winner = result.pens.home > result.pens.away ? m.home : m.away;
       } else if (result.home === result.away) {
         m.penalties = true;
@@ -10551,28 +10592,46 @@ var App = (() => {
   // América, AFCON, Asian Cup, Gold Cup — every format that goes group stage
   // → knockout; Champions League's league-phase knockout and the straight
   // domestic-cup knockouts never have a 3rd place play-off): when the
-  // Semi-finals round has just finished, build and instantly simulate a
-  // "3rd Place Play-off" between the two semi-final losers, and slot it into
-  // the bracket before the Final gets created — this always runs automatically
-  // as part of advancing out of the Semi-finals, so the user never has to
-  // simulate it as a separate step.
-  function maybeCreateThirdPlacePlayoff(finishedRound) {
-    if (!tournament || tournament.format !== 'groups') return;
-    if (!finishedRound || finishedRound.name !== 'Semi-finals') return;
-    if (tournament.knockout.some(r => r.name === '3rd Place Play-off')) return;
+  // Semi-finals round has just finished, build a "3rd Place Play-off"
+  // fixture between the two semi-final losers and slot it into the bracket
+  // alongside the Final. Left unplayed here — same as every other knockout
+  // match, it's up to the user to simulate it (Live or Instant) from the
+  // bracket view. Callers that DO want it resolved immediately as part of a
+  // bulk "simulate everything" action can call simThirdPlacePlayoffNow()
+  // right after this.
+  function createThirdPlacePlayoffFixture(finishedRound) {
+    if (!tournament || tournament.format !== 'groups') return null;
+    if (!finishedRound || finishedRound.name !== 'Semi-finals') return null;
+    if (tournament.knockout.some(r => r.name === '3rd Place Play-off')) return null;
     const losers = finishedRound.matches.map(m => {
       if (!m.winner) return null;
       return m.winner.id === m.home.id ? m.away : m.home;
     }).filter(Boolean);
-    if (losers.length < 2) return;
-    const result = simQuickMatch(losers[0], losers[1], { allowET: true, allowPens: true, countForLeaderboard: true });
+    if (losers.length < 2) return null;
     const match = {
       home: losers[0], away: losers[1],
-      homeScore: result.home, awayScore: result.away,
-      played: true, report: result.report, penalties: false, winner: null
+      homeScore: null, awayScore: null, winner: null, played: false, penalties: false
     };
+    tournament.knockout.push({ name: '3rd Place Play-off', matches: [match] });
+    return match;
+  }
+
+  // Instantly resolves an unplayed 3rd Place Play-off match — used only by
+  // bulk auto-sim flows (Simulate Round / Simulate All) that are already
+  // resolving every other unplayed match without individual user
+  // interaction; a single-match Live/Instant sim never calls this, so
+  // completing a semi-final there always leaves the 3rd place match for the
+  // user to trigger themselves, same as the Final.
+  function simThirdPlacePlayoffNow(match) {
+    if (!match || match.played) return;
+    const result = simQuickMatch(match.home, match.away, { allowET: true, allowPens: true, countForLeaderboard: true });
+    match.homeScore = result.home;
+    match.awayScore = result.away;
+    match.played = true;
+    match.report = result.report;
     if (result.pens) {
       match.penalties = true;
+      match.pens = result.pens;
       match.winner = result.pens.home > result.pens.away ? match.home : match.away;
     } else if (result.home === result.away) {
       match.penalties = true;
@@ -10580,7 +10639,14 @@ var App = (() => {
     } else {
       match.winner = result.home > result.away ? match.home : match.away;
     }
-    tournament.knockout.push({ name: '3rd Place Play-off', matches: [match] });
+  }
+
+  // Convenience wrapper for the bulk-sim call sites: create the fixture (if
+  // due) and resolve it immediately, preserving their previous "fully
+  // automatic" behavior.
+  function maybeCreateThirdPlacePlayoff(finishedRound) {
+    const match = createThirdPlacePlayoffFixture(finishedRound);
+    if (match) simThirdPlacePlayoffNow(match);
   }
 
   function createNextKnockoutRound(winners, finishedRound) {
@@ -10887,7 +10953,6 @@ var App = (() => {
       el.innerHTML = '<p style="color:var(--text-muted)">No knockout matches yet.</p>';
       return;
     }
-    const curIdx = tournament.knockout.length - 1;
     el.innerHTML = tournament.knockout.map((round, ri) => `
       <div class="round"><div class="round-title">${round.name}${round.twoLeg ? ' (two legs)' : ''}</div>
       ${round.matches.map((m, mi) => {
@@ -10896,6 +10961,7 @@ var App = (() => {
               ? `Agg ${m.aggHome}-${m.aggAway}`
               : `${m.homeScore} - ${m.awayScore}`)
           : '-';
+        const pensText = m.pens ? `pens ${m.pens.home}-${m.pens.away}` : 'pens';
         return `<div class="bracket-match ${m.played ? 'played' : ''}">
           <div class="bracket-team ${m.winner && m.winner.id === m.home.id ? 'winner' : ''}">
             <span>${teamMark(m.home, 18)} ${m.home.short}</span>
@@ -10905,9 +10971,9 @@ var App = (() => {
             <span>${teamMark(m.away, 18)} ${m.away.short}</span>
             <span class="bracket-score">${m.played ? (m.twoLeg !== false && m.aggAway != null ? m.aggAway : m.awayScore) : '-'}</span>
           </div>
-          ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">pens</div>' : ''}
+          ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + pensText + '</div>' : ''}
           ${m.played && m.twoLeg !== false && m.aggHome != null ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + score + '</div>' : ''}
-          ${(!m.played && ri === curIdx && !tournament.champion) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+          ${(!m.played && m.home && m.away && !tournament.champion) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Live</button>
             <button class="btn btn-secondary btn-sm" onclick="App.simKnockoutMatch(${ri},${mi})">⚡ Instant</button>
           </div>` : ''}
@@ -10990,6 +11056,16 @@ var App = (() => {
       renderTournamentLeaderboard();
       return;
     }
+    // The 3rd Place Play-off is a side fixture, not a bracket-advancing
+    // round — it has just one match, so without this check the generic
+    // "winners.length === 1" branch below would wrongly crown its winner
+    // tournament champion. Its result only feeds tournament.thirdPlace/
+    // fourthPlace, which setChampion() reads once the real Final finishes.
+    if (current.name === '3rd Place Play-off') {
+      renderBracket();
+      renderTournamentLeaderboard();
+      return;
+    }
     const winners = current.matches.map(m => m.winner).filter(Boolean);
     if (winners.length === 1) {
       setChampion(winners[0]);
@@ -11006,7 +11082,10 @@ var App = (() => {
     let list = winners.slice();
     if (list.length % 2 === 1) list.pop();
     const nextIsFinal = list.length === 2;
-    maybeCreateThirdPlacePlayoff(current);
+    // Single-match progression (one Live/Instant sim at a time): only
+    // create the 3rd Place Play-off fixture, don't simulate it — the user
+    // simulates it themselves from the bracket like any other match.
+    createThirdPlacePlayoffFixture(current);
     const nextMatches = [];
     for (let i = 0; i < list.length; i += 2) {
       if (tournament.type === 'ucl' && !nextIsFinal) {
