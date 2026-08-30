@@ -95,6 +95,21 @@
     return baseline + curvedStat(value, baseline, span, power) * span;
   }
 
+  // ========== SHARED UI PERFORMANCE HELPERS ==========
+  // debounce(fn, wait) returns a wrapped version of fn that only actually
+  // runs once calls stop arriving for `wait` ms — used on the search boxes
+  // (players/teams/hospital/season/tournament) so filtering + re-rendering
+  // a large list doesn't run on every single keystroke, which is what was
+  // causing typing lag on those pages. Each call still records the latest
+  // arguments immediately; only the expensive work is delayed.
+  function debounce(fn, wait) {
+    let t = null;
+    return function debounced(...args) {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { t = null; fn.apply(this, args); }, wait);
+    };
+  }
+
 /* Apex Football Simulator - Fixed (no external fetch) */
 var App = (() => {
   // ========== EMBEDDED TEAMS DATA ==========
@@ -841,7 +856,7 @@ var App = (() => {
     const hasCrosser = (attTeam.squad.all || []).some(p => hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Prolific Winger') || hasSkill(p, 'Pinpoint Crossing') || hasSkill(p, 'Edged Crossing'));
     const m = currentMatch;
     const diff = m ? (attTeam.score || 0) - (m[attTeam === m.home ? 'away' : 'home'].score || 0) : 0;
-    const urgent = m && m.minute >= 75 && diff < 0;
+    const urgent = m && (m.dispMin != null ? m.dispMin : m.minute) >= 75 && diff < 0;
     const roll = seededRandom();
     if (!closeRange) {
       // Too far out for a direct effort — always a delivery into the box
@@ -4179,6 +4194,11 @@ var App = (() => {
       home: { team: homeTeam, squad: homeSquad, score: 0, stats: blankStats() },
       away: { team: awayTeam, squad: awaySquad, score: 0, stats: blankStats() },
       minute: 0, events: [], status: '1st Half', finished: false,
+      // Match-clock state (see updateMatchClock) — the first half starts
+      // its own 45-minute regulation window right away; the display minute
+      // and label are recomputed every tick.
+      period: 'H1', periodStartRaw: 0, periodBaseDisplay: 0, periodDuration: 45, periodStoppage: null,
+      dispMin: 0, dispLabel: "0'",
       homeOnPitch: homeSquad.starting.map(p => p.id),
       awayOnPitch: awaySquad.starting.map(p => p.id),
       homeSubsUsed: 0, awaySubsUsed: 0, maxSubs: 5,
@@ -4292,9 +4312,11 @@ var App = (() => {
     hideETPrompt();
     m._awaitingET = false;
     m.inET = true;
-    m.etStart = m.minute;
-    m.status = 'Extra Time';
+    m.status = 'Extra Time (1st Half)';
     addEvent(m.minute, 'et', 'Extra time begins — two periods of 15 minutes', null);
+    // The clock itself doesn't restart at 90' until the next tick — see the
+    // pendingPeriod handling at the top of tick().
+    m.pendingPeriod = { period: 'ET1', base: 90, duration: 15, status: 'Extra Time (1st Half)' };
     updateScoreboard();
     isPlaying = true;
     const btn = document.getElementById('btn-play');
@@ -4510,7 +4532,12 @@ var App = (() => {
     if (!currentMatch) return;
     if (!currentMatch.goalList) currentMatch.goalList = [];
     const isPen = /^penalty/i.test(methodDesc || '');
-    currentMatch.goalList.push({ side, player: player.name, num: player.num, minute, method: methodDesc || '', pen: isPen });
+    // dispMin/dispLabel are the match-clock reading at the moment of the
+    // goal (e.g. 90 / "90+2'") — see updateMatchClock — while `minute`
+    // stays the raw tick for anything that needs strict chronological order.
+    const dispMin = currentMatch.dispMin != null ? currentMatch.dispMin : minute;
+    const dispLabel = currentMatch.dispLabel || (minute + "'");
+    currentMatch.goalList.push({ side, player: player.name, num: player.num, minute, dispMin, dispLabel, method: methodDesc || '', pen: isPen });
     renderGoalTimeline();
   }
 
@@ -4524,7 +4551,7 @@ var App = (() => {
     }
     const goals = currentMatch.goalList || [];
     const fmt = (arr) => arr.map(g => {
-      return `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.pen ? ' <span class="pen-tag">[Penalty]</span>' : ''}${g.num != null && g.num !== '' ? ' · '+g.num : ''}</div>`;
+      return `<div class="scorer-line"><span class="gt-min">${g.dispLabel || (g.minute + "'")}</span> ${g.player}${g.pen ? ' <span class="pen-tag">[Penalty]</span>' : ''}${g.num != null && g.num !== '' ? ' · '+g.num : ''}</div>`;
     }).join('');
     if (homeEl) homeEl.innerHTML = fmt(goals.filter(g => g.side === 'home'));
     if (awayEl) awayEl.innerHTML = fmt(goals.filter(g => g.side === 'away'));
@@ -4545,7 +4572,7 @@ var App = (() => {
       venue: getStadium(m.home.team),
       home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, logo: m.home.team.logo, score: m.home.score, penScore: m.home.penScore, stats: JSON.parse(JSON.stringify(m.home.stats || {})), formation: m.home.squad && m.home.squad.formation, ratings: homeRatings },
       away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, logo: m.away.team.logo, score: m.away.score, penScore: m.away.penScore, stats: JSON.parse(JSON.stringify(m.away.stats || {})), formation: m.away.squad && m.away.squad.formation, ratings: awayRatings },
-      events: (m.events || []).map(e => ({ minute: e.minute, type: e.type, text: e.text, side: e.side })),
+      events: (m.events || []).map(e => ({ minute: e.minute, dispMin: e.dispMin, dispLabel: e.dispLabel, type: e.type, text: e.text, side: e.side })),
       goals: JSON.parse(JSON.stringify(m.goalList || [])),
       ratings: allStats,
       motmId: m.motmId || null,
@@ -4617,19 +4644,19 @@ var App = (() => {
       : `${h.score} - ${a.score}`;
     const goalsH = (report.goals || []).filter(g => g.side === 'home');
     const goalsA = (report.goals || []).filter(g => g.side === 'away');
-    const fmtG = (arr) => arr.map(g => `${g.minute}' ${g.player}${g.pen || /^penalty/i.test(g.method || '') ? ' <span class="pen-tag">[Penalty]</span>' : ''}`).join('<br>') || '—';
+    const fmtG = (arr) => arr.map(g => `${g.dispLabel || (g.minute + "'")} ${g.player}${g.pen || /^penalty/i.test(g.method || '') ? ' <span class="pen-tag">[Penalty]</span>' : ''}`).join('<br>') || '—';
     // Prefer the home/away-split ratings captured by buildMatchReport; fall back
     // to the old flat map for any legacy report objects saved before this split existed.
     const homeRatings = h.ratings || Object.values(report.ratings || {});
     const awayRatings = a.ratings || [];
     let eventsHtml = (report.events || []).filter(e => e.type !== 'pressure' || seededRandom() < 0.3).slice(-80).map(e => {
       const t = (e.text || '').replace(/<[^>]+>/g, '');
-      return `<div class="report-event"><span class="re-min">${e.minute}'</span> <span class="re-type">${e.type}</span> ${t}</div>`;
+      return `<div class="report-event"><span class="re-min">${e.dispLabel || (e.minute + "'")}</span> <span class="re-type">${e.type}</span> ${t}</div>`;
     }).join('');
     // show important events only for cleaner view
     eventsHtml = (report.events || []).filter(e => ['goal','yellow','red','injury','sub','pen','var','motm','whistle','save','miss'].includes(e.type)).map(e => {
       const t = (e.text || '').replace(/<[^>]+>/g, '');
-      return `<div class="report-event"><span class="re-min">${e.minute}'</span> ${t}</div>`;
+      return `<div class="report-event"><span class="re-min">${e.dispLabel || (e.minute + "'")}</span> ${t}</div>`;
     }).join('');
     const legTabsHtml = (ctx && ctx.legs && ctx.legs.length > 1)
       ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap">
@@ -5342,7 +5369,7 @@ var App = (() => {
   // side "managing the clock"). This scans the half's own event log so two
   // otherwise-identical matches with different incident counts get
   // different, explainable stoppage totals instead of the same dice roll.
-  function computeAddedTime(m, fromMin, toMin) {
+  function computeAddedTime(m, fromMin, toMin, capMinutes) {
     const evs = (m.events || []).filter(e => e.minute >= fromMin && e.minute <= toMin);
     const count = (type) => evs.filter(e => e.type === type).length;
     const goals = count('goal');
@@ -5365,7 +5392,12 @@ var App = (() => {
     const timeWastingTime = lateFouls * 0.25 + lateCards * 0.2; // clock management called out by the ref
 
     const raw = goalTime + celebrationTime + subTime + injuryTime + varTime + cardTime + timeWastingTime;
-    const minutes = Math.max(1, Math.min(11, Math.round(raw)));
+    // Every period gets its own realistic ceiling so added time — however
+    // eventful the period was — can never run away toward infinity: a
+    // 45-minute half can eat into a longer stoppage than a 15-minute
+    // period of extra time reasonably would.
+    const cap = capMinutes || 11;
+    const minutes = Math.max(1, Math.min(cap, Math.round(raw)));
     return {
       minutes,
       breakdown: { goals, subs, injuries, var: varChecks, cards, timeWasting: lateFouls + lateCards }
@@ -5386,110 +5418,218 @@ var App = (() => {
     if (b.timeWasting) parts.push('time-wasting');
     return parts.length ? parts.join(', ') : 'general stoppages';
   }
+
+  // ========== MATCH-CLOCK DISPLAY ==========
+  // m.minute is only the raw simulation tick — it never resets and just
+  // keeps climbing straight through stoppage time, extra time and
+  // penalties. Nothing shown to the person should read straight off it.
+  // Instead every period (1st half, 2nd half, each period of extra time)
+  // tracks its own start (periodStartRaw), its own regulation length
+  // (periodDuration) and, once that length is reached, its own added/
+  // stoppage time (periodStoppage) — computed once from the events that
+  // actually happened in that period, then capped so it can never run
+  // away. This turns the raw tick into a real match-clock label: the
+  // second half resumes counting from 45', extra time resets to 90'
+  // instead of continuing to climb past 100', and the second period of
+  // extra time resets to 105'. Any added time within a period is always
+  // shown as "<periodEnd>+<n>'", exactly like a real match clock.
+  function updateMatchClock(m) {
+    const elapsed = Math.max(0, m.minute - (m.periodStartRaw || 0));
+    const dur = m.periodDuration || 45;
+    const base = m.periodBaseDisplay || 0;
+    if (elapsed <= dur) {
+      m.dispMin = base + elapsed;
+      m.dispLabel = m.dispMin + "'";
+    } else {
+      m.dispMin = base + dur;
+      m.dispLabel = m.dispMin + '+' + (elapsed - dur) + "'";
+    }
+  }
   function tick(silent) {
     if (!currentMatch || currentMatch.finished) return;
     const m = currentMatch;
     m.minute++;
-    if (m.minute === 45) {
-      m.status = 'Half Time';
-      addEvent(45, 'whistle', '—— HALF TIME ——', null);
-      addEvent(45, 'whistle', 'Tap Play to start 2nd half', null);
-      updateScoreboard();
-      // Pause at half time (unless turbo finish)
-      if (!silent) {
-        clearInterval(simInterval);
-        isPlaying = false;
-        const btn = document.getElementById('btn-play');
-        if (btn) btn.textContent = '▶ 2nd Half';
-        return;
+
+    // A period transition (half time -> 2nd half, full time -> extra time,
+    // end of the first period of extra time -> second period) is queued by
+    // the code below rather than applied immediately, so it activates right
+    // here, on the first tick of the new period. That's what makes the
+    // match-clock genuinely restart — 45' for the second half, 90' for
+    // extra time, 105' for its second period — instead of continuing to
+    // climb from wherever the previous period's stoppage time left off.
+    if (m.pendingPeriod) {
+      const p = m.pendingPeriod;
+      m.pendingPeriod = null;
+      m.period = p.period;
+      m.periodStartRaw = m.minute;
+      m.periodBaseDisplay = p.base;
+      m.periodDuration = p.duration;
+      m.periodStoppage = null;
+      m.status = p.status;
+      if (p.announce) addEvent(m.minute, p.announceType || 'whistle', p.announce, null);
+    }
+    updateMatchClock(m);
+
+    // ===== First half =====
+    if (m.period === 'H1') {
+      const elapsed = m.minute - m.periodStartRaw;
+      if (elapsed >= m.periodDuration) {
+        if (m.periodStoppage == null) {
+          const added = computeAddedTime(m, m.periodStartRaw + 1, m.periodStartRaw + m.periodDuration, 6);
+          m.periodStoppage = added.minutes;
+          addEvent(m.minute, 'whistle', `📋 ${added.minutes} minute${added.minutes === 1 ? '' : 's'} of first-half stoppage time signalled: ${describeAddedTime(added)}`, null);
+          updateMatchClock(m);
+        }
+        m.status = 'Stoppage Time';
+        if (elapsed >= m.periodDuration + m.periodStoppage) {
+          m.status = 'Half Time';
+          addEvent(m.minute, 'whistle', '—— HALF TIME ——', null);
+          addEvent(m.minute, 'whistle', 'Tap Play to start 2nd half', null);
+          m.pendingPeriod = { period: 'H2', base: 45, duration: 45, status: '2nd Half', announce: 'Second half begins' };
+          updateScoreboard();
+          // Pause at half time (unless turbo finish) — either way the next
+          // tick() call is what actually kicks off the second half.
+          if (!silent) {
+            clearInterval(simInterval);
+            isPlaying = false;
+            const btn = document.getElementById('btn-play');
+            if (btn) btn.textContent = '▶ 2nd Half';
+          }
+          return;
+        }
       }
     }
-    if (m.minute === 46) {
-      m.status = '2nd Half';
-      addEvent(46, 'whistle', 'Second half begins', null);
-    }
-    if (m.minute >= 90 && !m.inET && !m.inPens && !m._awaitingET) {
-      if (!m._stoppage) {
-        const added = computeAddedTime(m, 46, 90);
-        m._stoppage = added.minutes;
-        addEvent(90, 'whistle', `📋 ${added.minutes} minute${added.minutes === 1 ? '' : 's'} of stoppage time signalled: ${describeAddedTime(added)}`, null);
-      }
-      if (m.minute >= 90 + m._stoppage) {
-        const drawn = m.home.score === m.away.score;
-        if (drawn && (m.allowET || m.allowPens)) {
-          // Instant/bulk sims have no one to click the prompt, so resolve immediately
-          // instead of stalling — this is what was causing 200+ minute "matches".
-          if (m.silentDeep) {
-            addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
-            if (m.allowET) {
-              m.inET = true;
-              m.etStart = m.minute;
-              m.status = 'Extra Time';
-              addEvent(m.minute, 'et', 'Extra time begins — two periods of 15 minutes', null);
-            } else {
-              runPenaltyShootout();
+
+    // ===== Second half =====
+    if (m.period === 'H2' && !m.inET && !m.inPens && !m._awaitingET) {
+      const elapsed = m.minute - m.periodStartRaw;
+      if (elapsed >= m.periodDuration) {
+        if (m.periodStoppage == null) {
+          const added = computeAddedTime(m, m.periodStartRaw + 1, m.periodStartRaw + m.periodDuration, 11);
+          m.periodStoppage = added.minutes;
+          addEvent(m.minute, 'whistle', `📋 ${added.minutes} minute${added.minutes === 1 ? '' : 's'} of stoppage time signalled: ${describeAddedTime(added)}`, null);
+          updateMatchClock(m);
+        }
+        m.status = 'Stoppage Time';
+        if (elapsed >= m.periodDuration + m.periodStoppage) {
+          const drawn = m.home.score === m.away.score;
+          if (drawn && (m.allowET || m.allowPens)) {
+            // Instant/bulk sims have no one to click the prompt, so resolve
+            // immediately instead of stalling on a prompt nobody can answer.
+            if (m.silentDeep) {
+              addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
+              if (m.allowET) {
+                m.inET = true;
+                m.status = 'Extra Time (1st Half)';
+                addEvent(m.minute, 'et', 'Extra time begins — two periods of 15 minutes', null);
+                m.pendingPeriod = { period: 'ET1', base: 90, duration: 15, status: 'Extra Time (1st Half)' };
+              } else {
+                runPenaltyShootout();
+              }
+              return;
             }
+            // Pause — user chooses to continue to ET / pens
+            m._awaitingET = true;
+            m.status = 'Full Time';
+            addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
+            clearInterval(simInterval); isPlaying = false;
+            const btn = document.getElementById('btn-play');
+            if (btn) btn.textContent = '▶ Play';
+            updateScoreboard();
+            showETPrompt(drawn);
             return;
           }
-          // Pause — user chooses to continue to ET / pens
-          m._awaitingET = true;
-          m.status = 'Full Time';
-          addEvent(m.minute, 'whistle', `Full time ${m.home.team.short} ${m.home.score}-${m.away.score} ${m.away.team.short} — scores level`, null);
-          clearInterval(simInterval); isPlaying = false;
-          const btn = document.getElementById('btn-play');
-          if (btn) btn.textContent = '▶ Play';
-          updateScoreboard();
-          showETPrompt(drawn);
+          endMatch();
           return;
         }
-        endMatch();
-        return;
       }
-      m.status = 'Stoppage ' + (m.minute - 90) + "'";
     }
-    // Extra time running
-    if (m.inET && !m.inPens) {
-      const etMin = m.minute - (m.etStart || 90);
-      if (etMin >= 30) {
-        if (m.home.score === m.away.score && m.allowPens) {
-          if (m.silentDeep) {
-            addEvent(m.minute, 'et', 'Extra time finished — still level. Straight to penalties.', null);
-            runPenaltyShootout();
-            return;
-          }
-          m._awaitingPens = true;
-          m.status = 'ET Full Time';
-          addEvent(m.minute, 'et', 'Extra time finished — still level. Penalty shootout?', null);
-          clearInterval(simInterval); isPlaying = false;
-          const btn = document.getElementById('btn-play');
-          if (btn) btn.textContent = '▶ Play';
+
+    // ===== Extra time, first period (restarts the clock at 90') =====
+    if (m.period === 'ET1' && !m.inPens) {
+      const elapsed = m.minute - m.periodStartRaw;
+      if (elapsed >= m.periodDuration) {
+        if (m.periodStoppage == null) {
+          const added = computeAddedTime(m, m.periodStartRaw + 1, m.periodStartRaw + m.periodDuration, 3);
+          m.periodStoppage = added.minutes;
+          addEvent(m.minute, 'et', `📋 ${added.minutes} minute${added.minutes === 1 ? '' : 's'} added at the end of the first half of extra time`, null);
+          updateMatchClock(m);
+        }
+        m.status = 'Stoppage Time (ET)';
+        if (elapsed >= m.periodDuration + m.periodStoppage) {
+          // Half time of extra time, at 105' — mirrors the normal half-time
+          // break (paused for a live match, seamless for a fast/silent sim).
+          m.status = 'Half Time (ET)';
+          addEvent(m.minute, 'et', '—— END OF THE FIRST HALF OF EXTRA TIME ——', null);
+          addEvent(m.minute, 'et', 'Tap Play to start the second half of extra time', null);
+          m.pendingPeriod = { period: 'ET2', base: 105, duration: 15, status: 'Extra Time (2nd Half)', announce: 'Second half of extra time begins', announceType: 'et' };
           updateScoreboard();
-          showETPrompt(true, true);
+          if (!silent) {
+            clearInterval(simInterval);
+            isPlaying = false;
+            const btn = document.getElementById('btn-play');
+            if (btn) btn.textContent = '▶ 2nd Half (ET)';
+          }
           return;
         }
-        endMatch();
-        return;
       }
-      if (etMin === 15) {
-        addEvent(m.minute, 'et', 'End of the first period of extra time', null);
-      }
-      m.status = 'ET ' + Math.min(etMin, 30) + "'";
       if (seededRandom() < 0.0025) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
     }
+
+    // ===== Extra time, second period (restarts the clock at 105', usually
+    // ends at 120' — but, like every other period here, can run a little
+    // long on added time, never indefinitely) =====
+    if (m.period === 'ET2' && !m.inPens) {
+      const elapsed = m.minute - m.periodStartRaw;
+      if (elapsed >= m.periodDuration) {
+        if (m.periodStoppage == null) {
+          const added = computeAddedTime(m, m.periodStartRaw + 1, m.periodStartRaw + m.periodDuration, 3);
+          m.periodStoppage = added.minutes;
+          addEvent(m.minute, 'et', `📋 ${added.minutes} minute${added.minutes === 1 ? '' : 's'} added at the end of extra time`, null);
+          updateMatchClock(m);
+        }
+        m.status = 'Stoppage Time (ET)';
+        if (elapsed >= m.periodDuration + m.periodStoppage) {
+          if (m.home.score === m.away.score && m.allowPens) {
+            if (m.silentDeep) {
+              addEvent(m.minute, 'et', 'Extra time finished — still level. Straight to penalties.', null);
+              runPenaltyShootout();
+              return;
+            }
+            m._awaitingPens = true;
+            m.status = 'ET Full Time';
+            addEvent(m.minute, 'et', 'Extra time finished — still level. Penalty shootout?', null);
+            clearInterval(simInterval); isPlaying = false;
+            const btn = document.getElementById('btn-play');
+            if (btn) btn.textContent = '▶ Play';
+            updateScoreboard();
+            showETPrompt(true, true);
+            return;
+          }
+          endMatch();
+          return;
+        }
+      }
+      if (seededRandom() < 0.0025) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
+    }
+
     generateEvents();
     updateFatigue();
     runTacticalAI();
-    // Substitutions: aim for at least 3 per team (max 5)
-    if (m.minute >= 55 && m.minute <= 88 && !m.inET) {
+    // Substitutions: aim for at least 3 per team (max 5). Uses the display
+    // minute (m.dispMin), not the raw tick, so a first-half that ran long
+    // on stoppage time can't nudge this window earlier or later than it
+    // should be.
+    if (m.dispMin >= 55 && m.dispMin <= 88 && !m.inET) {
       const homeDiff = (m.home.score || 0) - (m.away.score || 0);
       const awayDiff = -homeDiff;
       const needHome = (m.homeSubsUsed || 0) < 3;
       const needAway = (m.awaySubsUsed || 0) < 3;
-      const windowLeft = Math.max(1, 88 - m.minute);
+      const windowLeft = Math.max(1, 88 - m.dispMin);
       // Higher urgency if still below 3
       let pHome = needHome ? Math.min(0.55, 0.12 + (3 - m.homeSubsUsed) * 0.12 / windowLeft * 8) : 0.06;
       let pAway = needAway ? Math.min(0.55, 0.12 + (3 - m.awaySubsUsed) * 0.12 / windowLeft * 8) : 0.06;
-      if (m.minute >= 70) { pHome *= 1.3; pAway *= 1.3; }
+      if (m.dispMin >= 70) { pHome *= 1.3; pAway *= 1.3; }
       // A team chasing the game brings changes on earlier and more urgently;
       // one comfortably ahead can afford to take its time — so subs stop
       // landing on a flat, identical clock every match.
@@ -5505,7 +5645,7 @@ var App = (() => {
       if (seededRandom() < pAway) trySubstitution('away');
     }
     // Late forced catch-up so each side reaches 3 if possible
-    if (m.minute === 80 || m.minute === 84 || m.minute === 87) {
+    if (m.dispMin === 80 || m.dispMin === 84 || m.dispMin === 87) {
       if ((m.homeSubsUsed || 0) < 3) trySubstitution('home');
       if ((m.awaySubsUsed || 0) < 3) trySubstitution('away');
     }
@@ -5648,7 +5788,7 @@ var App = (() => {
       baseVol *= (side === 'home' ? (1 + ctrlShift) : (1 - ctrlShift)); // raw quality gap
       // Game state: a team chasing the game commits more men forward and sees more
       // of the ball late on; one nursing a lead can afford to sit off it.
-      if (m.minute > 60) {
+      if ((m.dispMin != null ? m.dispMin : m.minute) > 60) {
         const diff = (team.score || 0) - (oppTeam.score || 0);
         if (diff <= -1) baseVol *= 1 + Math.min(0.18, Math.abs(diff) * 0.08);
         else if (diff >= 1) baseVol *= 1 - Math.min(0.1, diff * 0.04);
@@ -6590,9 +6730,10 @@ var App = (() => {
     let awayCreate = awayStr.att * 0.62 + (100 - homeStr.def) * 0.28 + awayStr.ovr * 0.10;
     // Game-state realism: a team chasing the game late pushes players forward
     // and creates more (higher risk, higher reward); one nursing a lead sits in.
-    if (m.minute > 55) {
+    if ((m.dispMin != null ? m.dispMin : m.minute) > 55) {
+      const dm = m.dispMin != null ? m.dispMin : m.minute;
       const diff = (m.home.score || 0) - (m.away.score || 0);
-      const urgency = Math.min(1, (m.minute - 55) / 35);
+      const urgency = Math.min(1, (dm - 55) / 35);
       if (diff <= -1) homeCreate += Math.min(10, Math.abs(diff) * 4) * urgency;
       else if (diff >= 1) homeCreate -= Math.min(6, diff * 2.5) * urgency;
       if (diff >= 1) awayCreate += Math.min(10, diff * 4) * urgency;
@@ -6807,8 +6948,8 @@ var App = (() => {
     // winning side's subs read as genuine game management — not the same
     // like-for-like swap regardless of the scoreline.
     const diff = (sideData.score || 0) - ((m[otherSide] || {}).score || 0);
-    const chasing = diff <= -1 && m.minute >= 60;
-    const protectingLead = diff >= 1 && m.minute >= 72;
+    const chasing = diff <= -1 && (m.dispMin != null ? m.dispMin : m.minute) >= 60;
+    const protectingLead = diff >= 1 && (m.dispMin != null ? m.dispMin : m.minute) >= 72;
     // Anyone currently on pitch (starter or previous sub)
     const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
     const onPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && !m.injuries.includes(p.id));
@@ -6849,13 +6990,13 @@ var App = (() => {
       // strong candidate to come off, and increasingly so as the second
       // half wears on.
       const stamina = getStamina(m, side, p.id);
-      if (m.minute >= 58) score += Math.max(0, 72 - stamina) * 0.55;
+      if ((m.dispMin != null ? m.dispMin : m.minute) >= 58) score += Math.max(0, 72 - stamina) * 0.55;
       // Second-yellow risk: booked earlier and still out there for a
       // fast/aggressive closing stretch is exactly the profile that ends
       // up costing the team a man — pull them before that happens rather
       // than reacting to it after.
       const hasYellow = (m.cards[side] && m.cards[side][p.id]) >= 1;
-      if (hasYellow && m.minute >= 55) score += 24 + Math.min(20, (m.minute - 55) * 0.6);
+      if (hasYellow && (m.dispMin != null ? m.dispMin : m.minute) >= 55) score += 24 + Math.min(20, ((m.dispMin != null ? m.dispMin : m.minute) - 55) * 0.6);
       // Poor match rating so far — a genuinely bad game, not just tired or
       // booked. Only weighed once there's enough of a sample to mean
       // anything.
@@ -6954,8 +7095,9 @@ var App = (() => {
     markLeftPitch(m, side, outPlayer.id);
     resetFatigueFor(m, side, inPlayer.id);
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
-    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
-    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
+    const subDispMin = m.dispMin != null ? m.dispMin : m.minute;
+    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: subDispMin, replacedBy: inPlayer.name });
+    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: subDispMin, replaced: outPlayer.name });
     // The substitute inherits the outgoing player's exact pitch slot
     // (outSlot) whenever they're actually comfortable there — the normal
     // like-for-like case, and also what keeps the on-pitch rendering
@@ -6974,7 +7116,7 @@ var App = (() => {
     // Surface the real reason behind a notable change (booked/tiring) in
     // the event log, same spirit as the tactical tag above.
     const reasonBits = [];
-    if (outPick.hasYellow && m.minute >= 55) reasonBits.push('booked, managing risk');
+    if (outPick.hasYellow && (m.dispMin != null ? m.dispMin : m.minute) >= 55) reasonBits.push('booked, managing risk');
     if (outPick.stamina < 40) reasonBits.push('tiring');
     const reasonTag = reasonBits.length ? ` <span style="opacity:0.55">(${reasonBits.join(', ')})</span>` : '';
     addEvent(m.minute, 'sub',
@@ -7026,8 +7168,9 @@ var App = (() => {
     markLeftPitch(m, side, outPlayer.id);
     resetFatigueFor(m, side, inPlayer.id);
     if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
-    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: m.minute, replacedBy: inPlayer.name });
-    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: m.minute, replaced: outPlayer.name });
+    const subDispMin = m.dispMin != null ? m.dispMin : m.minute;
+    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: subDispMin, replacedBy: inPlayer.name });
+    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: subDispMin, replaced: outPlayer.name });
     // Same fix as the regular substitution above: the incoming defender
     // takes over a slot they can actually play — the sacrificed
     // forward/midfielder's exact slot if the defender is comfortable
@@ -7143,7 +7286,7 @@ var App = (() => {
     if (!sideData || !oppData) return;
     if (!m.tacticalAI) m.tacticalAI = { home: { lastChange: -999 }, away: { lastChange: -999 } };
     const ai = m.tacticalAI[side];
-    const minute = m.minute;
+    const minute = m.dispMin != null ? m.dispMin : m.minute;
     const diff = (sideData.score || 0) - (oppData.score || 0);
     const style = getManagerPlaystyle(sideData.team);
     const aggressive = ['Overload', 'Quick Counter', 'Long Ball Counter'].includes(style);
@@ -7292,7 +7435,7 @@ var App = (() => {
       cause: cause,
       opponent: opponent,
       competition: competition,
-      minute: m.minute,
+      minute: (m.dispMin != null ? m.dispMin : m.minute),
       matchesLeft: outMatches,
       matchesTotal: outMatches,
       teamName: sideData.team.name,
@@ -7388,7 +7531,7 @@ var App = (() => {
         else if (e.type === 'save') d = e.side === 'home' ? -0.8 : (e.side === 'away' ? 0.8 : 0);
         else if (e.type === 'yellow' || e.type === 'red') d = e.side === 'home' ? -0.5 : (e.side === 'away' ? 0.5 : 0);
         mom = Math.max(-12, Math.min(12, mom + d));
-        pts.push({ x: (e.minute || i) / Math.max(m.minute, 90), y: mom });
+        pts.push({ x: (e.dispMin != null ? e.dispMin : (e.minute || i)) / Math.max(m.dispMin || m.minute, 90), y: mom });
       });
       const homeCol = m.home.team.color || '#3d8bfd';
       const awayCol = m.away.team.color || '#ef4444';
@@ -7477,9 +7620,10 @@ var App = (() => {
     const m = currentMatch;
     if (!m) return;
     m.finished = true;
-    if (!m.inET && !m.inPens) { m.status = 'Full Time'; if (m.minute < 90) m.minute = 90; }
+    if (!m.inET && !m.inPens) { m.status = 'Full Time'; if ((m.dispMin || 0) < 90) m.dispMin = 90; }
     else if (m.inPens) m.status = 'FT (Pens)';
-    else m.status = 'Full Time (ET)';
+    else { m.status = 'Full Time (ET)'; if ((m.dispMin || 0) < 120) m.dispMin = 120; }
+    m.dispLabel = m.inPens ? 'Pens' : (m.dispLabel && parseInt(m.dispLabel, 10) >= (m.dispMin || 0) ? m.dispLabel : m.dispMin + "'");
     clearInterval(simInterval); isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
@@ -7763,14 +7907,20 @@ var App = (() => {
   }
   function addEvent(minute, type, text, side, isGoal, isPenalty) {
     if (!currentMatch) return;
-    currentMatch.events.push({ minute, type, text, side });
+    // dispLabel/dispMin reflect the match clock at the moment this event
+    // happened (see updateMatchClock in matchEngine.js) — e.g. "45+2'" or
+    // "96'" during extra time — while the raw `minute` is kept only for
+    // internal ordering/filtering (computeAddedTime, the momentum chart).
+    const dispLabel = currentMatch.inPens ? 'Pens' : (currentMatch.dispLabel || (minute + "'"));
+    const dispMin = currentMatch.inPens ? (currentMatch.dispMin || 120) : (currentMatch.dispMin != null ? currentMatch.dispMin : minute);
+    currentMatch.events.push({ minute, dispMin, dispLabel, type, text, side });
     if (currentMatch.quietSim) return;
     const feed = document.getElementById('events-feed');
     if (!feed) return;
     const icons = { goal: emojiImg(isPenalty ? 'penalty_goal' : 'goal', isPenalty ? 'Penalty goal' : 'Goal'), save: '🧤', yellow: emojiImg('yellow_card', 'Yellow card'), red: emojiImg('red_card', 'Red card'), sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', tackle: '🦵', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: emojiImg('whistle', 'Whistle'), pressure: '🔥', motm: '⭐', var: '📺', pen: emojiImg('penalty_goal', 'Penalty'), skill: '✨', handball: '✋', et: '⏱️' };
     const div = document.createElement('div');
     div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
-    div.innerHTML = `<span class="event-time">${minute}'</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
+    div.innerHTML = `<span class="event-time">${dispLabel}</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
     feed.insertBefore(div, feed.firstChild);
     if (['goal','sub','yellow','red','injury','pen'].includes(type)) {
       try { renderLineups(); } catch (e) {}
@@ -7815,7 +7965,7 @@ var App = (() => {
     };
     popIfChanged('live-home-score', hs);
     popIfChanged('live-away-score', as_);
-    set('live-minute', m.inPens ? 'Pens' : (m.minute + "'"));
+    set('live-minute', m.inPens ? 'Pens' : (m.dispLabel || (m.minute + "'")));
     set('live-status', m.status);
     set('live-venue', '🏟️ ' + getStadium(m.home.team));
     renderGoalTimeline();
@@ -10782,6 +10932,8 @@ var App = (() => {
       status: '1st Half',
       finished: false,
       events: [],
+      period: 'H1', periodStartRaw: 0, periodBaseDisplay: 0, periodDuration: 45, periodStoppage: null,
+      dispMin: 0, dispLabel: "0'",
       homeOnPitch: homeSquad.starting.map(p => p.id),
       awayOnPitch: awaySquad.starting.map(p => p.id),
       homeSubsUsed: 0,
@@ -11150,9 +11302,14 @@ var App = (() => {
     renderTeamsList();
   }
 
+  // Debounced — the full team pool can run into the hundreds once every
+  // league/competition is loaded, and renderTeamsList() does a full
+  // innerHTML rebuild, so filtering + re-rendering on every single
+  // keystroke was a real source of typing lag on this page.
+  const _debouncedRenderTeamsList = debounce(renderTeamsList, 150);
   function searchTeams(q) {
     teamsSearch = (q || '').trim().toLowerCase();
-    renderTeamsList();
+    _debouncedRenderTeamsList();
   }
 
   function sortTeams(mode) {
@@ -12026,9 +12183,17 @@ var App = (() => {
       </div>`;
   }
 
+  // Debounced per-competition — renderSeasonSetup() rebuilds the whole
+  // season setup panel (every competition's team list) on each call, so
+  // firing that on every keystroke was unnecessary lag. Keyed by compKey
+  // since more than one competition's search box can be on screen at once.
+  const _seasonSearchDebouncers = {};
   function searchSeasonTeams(compKey, value) {
     seasonSetup.search[compKey] = value;
-    renderSeasonSetup();
+    if (!_seasonSearchDebouncers[compKey]) {
+      _seasonSearchDebouncers[compKey] = debounce(renderSeasonSetup, 150);
+    }
+    _seasonSearchDebouncers[compKey]();
   }
 
   function toggleSeasonTeam(compKey, teamId) {
@@ -13276,9 +13441,14 @@ var App = (() => {
   }
 
 
+  // Debounced — getFilteredSortedPlayers() filters/sorts the entire player
+  // pool (every squad across every team) on each call, which is expensive
+  // enough that running it on every keystroke was the main source of
+  // typing lag on the Players page.
+  const _debouncedRenderPlayersListReset = debounce(() => renderPlayersList(true), 150);
   function searchPlayers(q) {
     playersSearch = (q || '').trim().toLowerCase();
-    renderPlayersList(true);
+    _debouncedRenderPlayersListReset();
   }
 
 
@@ -13588,13 +13758,13 @@ var App = (() => {
   // subLog at all, so this is the only record of when that player's
   // involvement actually ended).
   function computeMinutesPlayed(m, playerId, playerName, side) {
-    const endMin = Math.max(m.minute || 90, 90);
+    const endMin = Math.max(m.dispMin || 90, 90);
     const log = (m.subLog && m.subLog[side] && m.subLog[side][playerId]) || {};
     const start = typeof log.inMin === 'number' ? log.inMin : 0;
     let end = typeof log.outMin === 'number' ? log.outMin : endMin;
     if (typeof log.outMin !== 'number' && playerName) {
       const evt = (m.events || []).find(e => e.type === 'red' && e.text && e.text.indexOf(playerName) !== -1);
-      if (evt) end = Math.min(end, evt.minute);
+      if (evt) end = Math.min(end, evt.dispMin != null ? evt.dispMin : evt.minute);
     }
     return Math.max(0, Math.min(end, endMin) - start);
   }
@@ -13769,7 +13939,10 @@ var App = (() => {
       }).join('')}
     </tbody></table></div>`;
   }
-  function searchHospital(v) { hospitalFilter.search = v || ''; renderHospitalList(); }
+  // Debounced — renderHospitalList() rebuilds the whole injured-players
+  // table from scratch, so tying it to every keystroke was unnecessary lag.
+  const _debouncedRenderHospitalList = debounce(renderHospitalList, 150);
+  function searchHospital(v) { hospitalFilter.search = v || ''; _debouncedRenderHospitalList(); }
   function filterHospitalSeverity(v) { hospitalFilter.severity = v || 'all'; renderHospitalList(); }
   function sortHospital(v) { hospitalFilter.sort = v || 'matchesLeft'; renderHospitalList(); }
 
