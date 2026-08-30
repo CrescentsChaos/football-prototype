@@ -84911,9 +84911,9 @@
             "LWB",
             "LM"
           ],
-          "ovr": 81,
+          "ovr": 79,
           "att": 76,
-          "def": 78,
+          "def": 77,
           "phy": 77,
           "pac": 84,
           "tec": 78,
@@ -84938,10 +84938,10 @@
           "id": "mlg27_31",
           "name": "Rafita Garrido",
           "pos": [
-            "RB",
-            "RWB"
+            "LB",
+            "LWB"
           ],
-          "ovr": 77,
+          "ovr": 80,
           "att": 72,
           "def": 76,
           "phy": 75,
@@ -84968,6 +84968,7 @@
           "id": "mlg27_8_dot",
           "name": "Carlos Dotor",
           "pos": [
+          "ST",
             "CM",
             "CDM"
           ],
@@ -85028,8 +85029,8 @@
           "id": "mlg27_14",
           "name": "Rafa Rodríguez",
           "pos": [
-            "CAM",
-            "CM"
+            "CM",
+            "CAM"
           ],
           "ovr": 80,
           "att": 79,
@@ -85075,6 +85076,7 @@
           "name": "Joaquín Muñoz",
           "pos": [
             "LW",
+            "LM",
             "RW"
           ],
           "ovr": 82,
@@ -85106,6 +85108,7 @@
           "name": "David Larrubia",
           "pos": [
             "RW",
+            "RM",
             "LW",
             "CAM"
           ],
@@ -85177,7 +85180,9 @@
       ],
       "manager": {
         "name": "Juanfran Funes",
-        "ovr": 83
+        "ovr": 83,
+        "formation":"4-4-2",
+        "playstyle":"Possession"
       }
     },
     {
