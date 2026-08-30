@@ -29957,7 +29957,7 @@
         },
         {
           "id": "ecu6",
-          "name": "William Pacho",
+          "name": "Willian Pacho",
           "pos": [
             "CB"
           ],
@@ -43648,21 +43648,6 @@
           "num": 21
         },
         {
-          "id": "geo23",
-          "name": "George Mikautadze",
-          "pos": [
-            "ST",
-            "LW"
-          ],
-          "ovr": 86,
-          "att": 92,
-          "def": 30,
-          "phy": 78,
-          "pac": 89,
-          "tec": 86,
-          "num": 19
-        },
-        {
           "id": "geo24",
           "name": "Giorgi Beridze",
           "pos": [
@@ -46269,7 +46254,7 @@
         },
         {
           "id": "bra16",
-          "name": "Paquetá",
+          "name": "Lucas Paquetá",
           "pos": [
             "CM",
             "CAM"
@@ -47656,7 +47641,7 @@
         },
         {
           "id": "mci26_28",
-          "name": "Geronimo Rulli",
+          "name": "Gerónimo Rulli",
           "pos": [
             "GK"
           ],
@@ -47670,7 +47655,7 @@
         },
         {
           "id": "mci26_33",
-          "name": "Nico O’Reilly",
+          "name": "Nico O'Reilly",
           "pos": [
             "CM",
             "CAM"
@@ -96879,7 +96864,7 @@
         },
         {
           "id": "juv27_11",
-          "name": "Nico González",
+          "name": "Nicolás González",
           "pos": [
             "RW",
             "LW",
