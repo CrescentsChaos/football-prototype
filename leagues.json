@@ -94,6 +94,31 @@
       "logo": "trophee-des-champions.png",
       "color": "#041E42",
       "colorDim": "#FFD700"
+    },
+    "premier-league": {
+      "logo": "premier-league.png",
+      "color": "#3D0F5B",
+      "colorDim": "#E90052"
+    },
+    "la-liga": {
+      "logo": "la-liga.png",
+      "color": "#EE8707",
+      "colorDim": "#FF4B44"
+    },
+    "serie-a": {
+      "logo": "serie-a.png",
+      "color": "#008C45",
+      "colorDim": "#00285E"
+    },
+    "bundesliga": {
+      "logo": "bundesliga.png",
+      "color": "#D3010C",
+      "colorDim": "#1A1A1A"
+    },
+    "ligue-1": {
+      "logo": "ligue-1.png",
+      "color": "#0A1958",
+      "colorDim": "#DC143C"
     }
   },
   "La Liga": [

@@ -231,6 +231,7 @@
         <div class="tour-header-row card-title" style="margin-bottom:14px">
           <img id="tour-logo-setup" class="tour-logo" alt="" style="display:none">
           <span id="tournament-title">World Cup Setup</span>
+          <span id="tour-format-badge-setup" class="tour-format-badge"></span>
         </div>
         <p style="color:var(--text-secondary);margin-bottom:16px" id="tournament-desc">Select national teams to participate. Minimum 4, recommended 8 or 16.</p>
         <div class="teams-toolbar" style="margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
@@ -250,6 +251,13 @@
               </optgroup>
               <optgroup label="Club — Europe">
                 <option value="ucl">Champions League</option>
+              </optgroup>
+              <optgroup label="Domestic Leagues">
+                <option value="premier-league">Premier League</option>
+                <option value="la-liga">La Liga</option>
+                <option value="serie-a">Serie A</option>
+                <option value="bundesliga">Bundesliga</option>
+                <option value="ligue-1">Ligue 1</option>
               </optgroup>
               <optgroup label="Club — England">
                 <option value="fa-cup">FA Cup</option>
@@ -289,6 +297,7 @@
           <div class="tour-header-row card-title" style="margin-bottom:14px">
             <img id="tour-logo-live" class="tour-logo" alt="" style="display:none">
             <span id="tour-stage-title">Group Stage</span>
+            <span id="tour-format-badge-live" class="tour-format-badge"></span>
           </div>
           <div id="groups-container" class="groups-grid"></div>
           <div id="fixture-list" class="fixture-list"></div>
@@ -298,7 +307,7 @@
             <button class="btn btn-secondary" onclick="App.resetTournament()">↺ Reset</button>
           </div>
         </div>
-        <div class="card">
+        <div class="card" id="tour-bracket-card">
           <div class="card-title">Knockout Bracket</div>
           <div class="bracket-container">
             <div class="bracket" id="bracket"></div>

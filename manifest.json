@@ -1,5000 +1,5070 @@
 [
-  {
-    "id": "crng0000",
-    "file": "js/rng.js",
-    "start": -1,
-    "end": -1,
-    "label": "rng"
-  },
-  {
-    "id": "crngcurve",
-    "file": "js/rng.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:curvedStat,curvedAttr"
-  },
-  {
-    "id": "c0000",
-    "file": "js/state.js",
-    "start": 0,
-    "end": 170,
-    "label": "gap"
-  },
-  {
-    "id": "ccomp01",
-    "file": "data/competitions.js",
-    "start": -1,
-    "end": -1,
-    "label": "tournament formats registry"
-  },
-  {
-    "id": "cfat01",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "gap"
-  },
-  {
-    "id": "cfat02",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:ensureFatigueState"
-  },
-  {
-    "id": "cfat03",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:getStamina"
-  },
-  {
-    "id": "cfat04",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:fatigueDrainRate"
-  },
-  {
-    "id": "cfat05",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:updateFatigue"
-  },
-  {
-    "id": "cfat06",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:resetFatigueFor"
-  },
-  {
-    "id": "cfat07",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:teamAvgStamina"
-  },
-  {
-    "id": "cfat08",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:playerMatchSide"
-  },
-  {
-    "id": "cfat09",
-    "file": "engine/fatigue.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:staminaMultiplier"
-  },
-  {
-    "id": "cofs01",
-    "file": "engine/offside.js",
-    "start": -1,
-    "end": -1,
-    "label": "gap"
-  },
-  {
-    "id": "cofs02",
-    "file": "engine/offside.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:playerAdvancement"
-  },
-  {
-    "id": "cofs03",
-    "file": "engine/offside.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:defensiveLineContext"
-  },
-  {
-    "id": "cofs03b",
-    "file": "engine/offside.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:avgLineDefAwareness"
-  },
-  {
-    "id": "cofs04",
-    "file": "engine/offside.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:evaluateOffside"
-  },
-  {
-    "id": "cofs05",
-    "file": "engine/offside.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:checkLiveOffside"
-  },
-  {
-    "id": "csp01",
-    "file": "engine/setpieces.js",
-    "start": -1,
-    "end": -1,
-    "label": "gap"
-  },
-  {
-    "id": "csp02",
-    "file": "engine/setpieces.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:pickFreeKickRoutine"
-  },
-  {
-    "id": "csp03",
-    "file": "engine/setpieces.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:resolveFreeKickRoutine"
-  },
-  {
-    "id": "csp04",
-    "file": "engine/setpieces.js",
-    "start": -1,
-    "end": -1,
-    "label": "gap"
-  },
-  {
-    "id": "csp05",
-    "file": "engine/setpieces.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:resolveThrowIn"
-  },
-  {
-    "id": "csp06",
-    "file": "engine/setpieces.js",
-    "start": -1,
-    "end": -1,
-    "label": "gap"
-  },
-  {
-    "id": "csp07",
-    "file": "engine/setpieces.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:resolveGoalKick"
-  },
-  {
-    "id": "cmr01",
-    "file": "engine/matchRoles.js",
-    "start": -1,
-    "end": -1,
-    "label": "gap"
-  },
-  {
-    "id": "cmr02",
-    "file": "engine/matchRoles.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:assignMatchRoles"
-  },
-  {
-    "id": "cmr03",
-    "file": "engine/matchRoles.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:roleBadgesHTML"
-  },
-  {
-    "id": "c0001",
-    "file": "engine/tactics.js",
-    "start": 171,
-    "end": 185,
-    "label": "func:formationShape"
-  },
-  {
-    "id": "c0002",
-    "file": "engine/tactics.js",
-    "start": 186,
-    "end": 189,
-    "label": "gap"
-  },
-  {
-    "id": "c0003",
-    "file": "engine/tactics.js",
-    "start": 190,
-    "end": 193,
-    "label": "func:formationWideCount"
-  },
-  {
-    "id": "c0004",
-    "file": "engine/tactics.js",
-    "start": 194,
-    "end": 194,
-    "label": "gap"
-  },
-  {
-    "id": "c0005",
-    "file": "engine/tactics.js",
-    "start": 195,
-    "end": 199,
-    "label": "func:lineOf"
-  },
-  {
-    "id": "c0006",
-    "file": "ai/managerAI.js",
-    "start": 200,
-    "end": 249,
-    "label": "gap"
-  },
-  {
-    "id": "c0007",
-    "file": "ai/managerAI.js",
-    "start": 250,
-    "end": 257,
-    "label": "func:getManagerPlaystyle"
-  },
-  {
-    "id": "c0008",
-    "file": "ai/managerAI.js",
-    "start": 258,
-    "end": 258,
-    "label": "gap"
-  },
-  {
-    "id": "c0009",
-    "file": "ai/managerAI.js",
-    "start": 259,
-    "end": 261,
-    "label": "func:getPlaystyleMods"
-  },
-  {
-    "id": "c0010",
-    "file": "data/playerDatabase.js",
-    "start": 262,
-    "end": 284,
-    "label": "gap"
-  },
-  {
-    "id": "c0011",
-    "file": "data/playerDatabase.js",
-    "start": 285,
-    "end": 297,
-    "label": "func:attrPosGroup"
-  },
-  {
-    "id": "c0012",
-    "file": "data/playerDatabase.js",
-    "start": 298,
-    "end": 453,
-    "label": "gap"
-  },
-  {
-    "id": "c0012b",
-    "file": "data/playerDatabase.js",
-    "start": 298,
-    "end": 453,
-    "label": "func:normalizePlayerPlaystyleTags"
-  },
-  {
-    "id": "c0013",
-    "file": "data/playerDatabase.js",
-    "start": 454,
-    "end": 461,
-    "label": "func:attrSheetAverage"
-  },
-  {
-    "id": "c0014",
-    "file": "ai/managerAI.js",
-    "start": 462,
-    "end": 471,
-    "label": "gap"
-  },
-  {
-    "id": "c0015",
-    "file": "ai/managerAI.js",
-    "start": 472,
-    "end": 486,
-    "label": "func:styleSignatureBonus"
-  },
-  {
-    "id": "c0016",
-    "file": "ai/managerAI.js",
-    "start": 487,
-    "end": 492,
-    "label": "gap"
-  },
-  {
-    "id": "c0017",
-    "file": "ai/managerAI.js",
-    "start": 493,
-    "end": 511,
-    "label": "func:applyManagerAttributeBoost"
-  },
-  {
-    "id": "c0018",
-    "file": "ai/managerAI.js",
-    "start": 512,
-    "end": 515,
-    "label": "gap"
-  },
-  {
-    "id": "c0019",
-    "file": "ai/managerAI.js",
-    "start": 516,
-    "end": 518,
-    "label": "func:hasStyle"
-  },
-  {
-    "id": "c0020",
-    "file": "ai/managerAI.js",
-    "start": 519,
-    "end": 525,
-    "label": "gap"
-  },
-  {
-    "id": "c0021",
-    "file": "ai/managerAI.js",
-    "start": 526,
-    "end": 534,
-    "label": "func:styleFlavor"
-  },
-  {
-    "id": "c0022",
-    "file": "data/playerDatabase.js",
-    "start": 535,
-    "end": 611,
-    "label": "gap"
-  },
-  {
-    "id": "c0023",
-    "file": "data/playerDatabase.js",
-    "start": 612,
-    "end": 648,
-    "label": "func:deriveStatsFromAttributes"
-  },
-  {
-    "id": "c0024",
-    "file": "data/playerDatabase.js",
-    "start": 649,
-    "end": 649,
-    "label": "gap"
-  },
-  {
-    "id": "c0025",
-    "file": "data/playerDatabase.js",
-    "start": 650,
-    "end": 654,
-    "label": "func:weightedOverall"
-  },
-  {
-    "id": "c0025b",
-    "file": "data/playerDatabase.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:efootballBoostedOverall + overall system constants"
-  },
-  {
-    "id": "c0025c",
-    "file": "data/playerDatabase.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:positionalRawOverall + POSITION_ATTR_WEIGHTS"
-  },
-  {
-    "id": "c0026",
-    "file": "ai/managerAI.js",
-    "start": 655,
-    "end": 657,
-    "label": "gap"
-  },
-  {
-    "id": "c0027",
-    "file": "ai/managerAI.js",
-    "start": 658,
-    "end": 668,
-    "label": "func:managerAffinityBonus"
-  },
-  {
-    "id": "c0028",
-    "file": "data/playerDatabase.js",
-    "start": 669,
-    "end": 675,
-    "label": "gap"
-  },
-  {
-    "id": "c0029",
-    "file": "data/playerDatabase.js",
-    "start": 676,
-    "end": 714,
-    "label": "func:applyExpandedPlayerAttributes"
-  },
-  {
-    "id": "c0030",
-    "file": "data/playerDatabase.js",
-    "start": 715,
-    "end": 726,
-    "label": "gap"
-  },
-  {
-    "id": "c0031",
-    "file": "data/playerDatabase.js",
-    "start": 727,
-    "end": 729,
-    "label": "func:hasSkill"
-  },
-  {
-    "id": "c0032",
-    "file": "data/playerDatabase.js",
-    "start": 730,
-    "end": 733,
-    "label": "func:xattr"
-  },
-  {
-    "id": "c0032b",
-    "file": "data/playerDatabase.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:matchStateHelpers (skill context)"
-  },
-  {
-    "id": "c0033",
-    "file": "engine/shooting.js",
-    "start": 734,
-    "end": 735,
-    "label": "gap"
-  },
-  {
-    "id": "c0034",
-    "file": "engine/shooting.js",
-    "start": 736,
-    "end": 749,
-    "label": "func:finishingEdge"
-  },
-  {
-    "id": "cshoot01",
-    "file": "engine/shooting.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:positioningEdge"
-  },
-  {
-    "id": "cshoot02",
-    "file": "engine/shooting.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:shotPowerOf"
-  },
-  {
-    "id": "c0035",
-    "file": "engine/shooting.js",
-    "start": 750,
-    "end": 752,
-    "label": "gap"
-  },
-  {
-    "id": "c0036",
-    "file": "engine/shooting.js",
-    "start": 753,
-    "end": 762,
-    "label": "func:aerialSkill"
-  },
-  {
-    "id": "c0037",
-    "file": "engine/goalkeeper.js",
-    "start": 763,
-    "end": 763,
-    "label": "gap"
-  },
-  {
-    "id": "c0038",
-    "file": "engine/goalkeeper.js",
-    "start": 764,
-    "end": 769,
-    "label": "func:gkReflexEdge"
-  },
-  {
-    "id": "c0039",
-    "file": "engine/shooting.js",
-    "start": 770,
-    "end": 771,
-    "label": "gap"
-  },
-  {
-    "id": "c0040",
-    "file": "engine/shooting.js",
-    "start": 772,
-    "end": 778,
-    "label": "func:penTakerEdge"
-  },
-  {
-    "id": "c0041",
-    "file": "engine/goalkeeper.js",
-    "start": 779,
-    "end": 784,
-    "label": "func:penGkEdge"
-  },
-  {
-    "id": "cgk01",
-    "file": "engine/goalkeeper.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:gkPositioningEdge"
-  },
-  {
-    "id": "cgk02",
-    "file": "engine/goalkeeper.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:gkReachEdge"
-  },
-  {
-    "id": "cgk03",
-    "file": "engine/goalkeeper.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:gkCatchChance"
-  },
-  {
-    "id": "cgk04",
-    "file": "engine/goalkeeper.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:gkParryReboundDanger"
-  },
-  {
-    "id": "cgk05",
-    "file": "engine/goalkeeper.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:resolveGkSave"
-  },
-  {
-    "id": "c0042",
-    "file": "engine/shooting.js",
-    "start": 785,
-    "end": 785,
-    "label": "gap"
-  },
-  {
-    "id": "c0043",
-    "file": "engine/shooting.js",
-    "start": 786,
-    "end": 795,
-    "label": "func:fkTakerEdge"
-  },
-  {
-    "id": "c0044",
-    "file": "engine/shooting.js",
-    "start": 796,
-    "end": 796,
-    "label": "gap"
-  },
-  {
-    "id": "c0045",
-    "file": "engine/shooting.js",
-    "start": 797,
-    "end": 806,
-    "label": "func:dribbleSuccessEdge"
-  },
-  {
-    "id": "c0046",
-    "file": "engine/defending.js",
-    "start": 807,
-    "end": 808,
-    "label": "gap"
-  },
-  {
-    "id": "c0047",
-    "file": "engine/defending.js",
-    "start": 809,
-    "end": 823,
-    "label": "func:defActionEdge"
-  },
-  {
-    "id": "cdef01",
-    "file": "engine/defending.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:foulProneness"
-  },
-  {
-    "id": "c0048",
-    "file": "engine/injuries.js",
-    "start": 824,
-    "end": 824,
-    "label": "gap"
-  },
-  {
-    "id": "c0049",
-    "file": "engine/injuries.js",
-    "start": 825,
-    "end": 836,
-    "label": "func:injuryWeightMult"
-  },
-  {
-    "id": "c0050",
-    "file": "engine/possession.js",
-    "start": 837,
-    "end": 839,
-    "label": "gap"
-  },
-  {
-    "id": "c0051",
-    "file": "engine/possession.js",
-    "start": 840,
-    "end": 857,
-    "label": "func:pickPlayerCustomWeighted"
-  },
-  {
-    "id": "c0052",
-    "file": "ui/matchUI.js",
-    "start": 858,
-    "end": 1029,
-    "label": "gap"
-  },
-  {
-    "id": "c0053",
-    "file": "ui/matchUI.js",
-    "start": 1030,
-    "end": 1042,
-    "label": "func:bindNav"
-  },
-  {
-    "id": "c0054",
-    "file": "ui/matchUI.js",
-    "start": 1043,
-    "end": 1043,
-    "label": "gap"
-  },
-  {
-    "id": "c0055",
-    "file": "ui/matchUI.js",
-    "start": 1044,
-    "end": 1056,
-    "label": "func:switchView"
-  },
-  {
-    "id": "c0056",
-    "file": "ui/matchUI.js",
-    "start": 1057,
-    "end": 1057,
-    "label": "gap"
-  },
-  {
-    "id": "c0057",
-    "file": "ui/matchUI.js",
-    "start": 1058,
-    "end": 1079,
-    "label": "func:randomMatch"
-  },
-  {
-    "id": "c0057b",
-    "file": "ui/matchUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:randomizeTeamSide"
-  },
-  {
-    "id": "c0058",
-    "file": "ui/matchUI.js",
-    "start": 1080,
-    "end": 1080,
-    "label": "gap"
-  },
-  {
-    "id": "c0059",
-    "file": "ui/matchUI.js",
-    "start": 1081,
-    "end": 1096,
-    "label": "func:goToMatch"
-  },
-  {
-    "id": "c0060",
-    "file": "ui/seasonUI.js",
-    "start": 1097,
-    "end": 1097,
-    "label": "gap"
-  },
-  {
-    "id": "c0061",
-    "file": "ui/seasonUI.js",
-    "start": 1098,
-    "end": 1113,
-    "label": "func:goToTournament"
-  },
-  {
-    "id": "ccomp02",
-    "file": "ui/seasonUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:selectTournamentFormat"
-  },
-  {
-    "id": "ccomp03",
-    "file": "ui/seasonUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:applyTournamentBranding"
-  },
-  {
-    "id": "c0062",
-    "file": "data/teamDatabase.js",
-    "start": 1114,
-    "end": 1114,
-    "label": "gap"
-  },
-  {
-    "id": "c0063",
-    "file": "data/teamDatabase.js",
-    "start": 1115,
-    "end": 1143,
-    "label": "func:populateTeamSelects"
-  },
-  {
-    "id": "c0064",
-    "file": "data/teamDatabase.js",
-    "start": 1144,
-    "end": 1144,
-    "label": "gap"
-  },
-  {
-    "id": "c0065",
-    "file": "data/teamDatabase.js",
-    "start": 1145,
-    "end": 1153,
-    "label": "func:populateFormations"
-  },
-  {
-    "id": "c0066",
-    "file": "data/teamDatabase.js",
-    "start": 1154,
-    "end": 1154,
-    "label": "gap"
-  },
-  {
-    "id": "c0067",
-    "file": "data/teamDatabase.js",
-    "start": 1155,
-    "end": 1156,
-    "label": "func:getTeam"
-  },
-  {
-    "id": "c0068",
-    "file": "data/teamDatabase.js",
-    "start": 1157,
-    "end": 1158,
-    "label": "gap"
-  },
-  {
-    "id": "c0069",
-    "file": "data/teamDatabase.js",
-    "start": 1159,
-    "end": 1160,
-    "label": "func:getStadium"
-  },
-  {
-    "id": "c0070",
-    "file": "ui/playerUI.js",
-    "start": 1161,
-    "end": 1164,
-    "label": "gap"
-  },
-  {
-    "id": "c0071",
-    "file": "ui/playerUI.js",
-    "start": 1165,
-    "end": 1173,
-    "label": "func:teamMark"
-  },
-  {
-    "id": "c0072",
-    "file": "ui/playerUI.js",
-    "start": 1174,
-    "end": 1176,
-    "label": "gap"
-  },
-  {
-    "id": "c0073",
-    "file": "ui/playerUI.js",
-    "start": 1177,
-    "end": 1184,
-    "label": "func:teamAvatarMark"
-  },
-  {
-    "id": "c0074",
-    "file": "ui/playerUI.js",
-    "start": 1185,
-    "end": 1189,
-    "label": "gap"
-  },
-  {
-    "id": "c0075",
-    "file": "ui/playerUI.js",
-    "start": 1190,
-    "end": 1195,
-    "label": "func:resolvePlayerPortrait"
-  },
-  {
-    "id": "c0076",
-    "file": "ui/playerUI.js",
-    "start": 1196,
-    "end": 1201,
-    "label": "gap"
-  },
-  {
-    "id": "c0077",
-    "file": "ui/playerUI.js",
-    "start": 1202,
-    "end": 1207,
-    "label": "func:playerAvatarMark"
-  },
-  {
-    "id": "c0078",
-    "file": "ui/playerUI.js",
-    "start": 1208,
-    "end": 1212,
-    "label": "gap"
-  },
-  {
-    "id": "c0079",
-    "file": "ui/playerUI.js",
-    "start": 1213,
-    "end": 1221,
-    "label": "func:abbreviateName"
-  },
-  {
-    "id": "c0079b",
-    "file": "ui/playerUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:playerNameHTML"
-  },
-  {
-    "id": "c0080",
-    "file": "ui/playerUI.js",
-    "start": 1222,
-    "end": 1230,
-    "label": "gap"
-  },
-  {
-    "id": "c0081",
-    "file": "ui/playerUI.js",
-    "start": 1231,
-    "end": 1233,
-    "label": "func:initialsOf"
-  },
-  {
-    "id": "c0082",
-    "file": "ui/playerUI.js",
-    "start": 1234,
-    "end": 1240,
-    "label": "func:lbAvatar"
-  },
-  {
-    "id": "c0083",
-    "file": "ui/playerUI.js",
-    "start": 1241,
-    "end": 1241,
-    "label": "gap"
-  },
-  {
-    "id": "c0084",
-    "file": "ui/playerUI.js",
-    "start": 1242,
-    "end": 1244,
-    "label": "func:lbPlayerCell"
-  },
-  {
-    "id": "c0085",
-    "file": "ui/playerUI.js",
-    "start": 1245,
-    "end": 1245,
-    "label": "gap"
-  },
-  {
-    "id": "c0086",
-    "file": "ui/playerUI.js",
-    "start": 1246,
-    "end": 1252,
-    "label": "func:rankBadge"
-  },
-  {
-    "id": "c0087",
-    "file": "ui/playerUI.js",
-    "start": 1253,
-    "end": 1256,
-    "label": "gap"
-  },
-  {
-    "id": "c0088",
-    "file": "ui/playerUI.js",
-    "start": 1257,
-    "end": 1265,
-    "label": "func:trophyMark"
-  },
-  {
-    "id": "c0089",
-    "file": "ui/playerUI.js",
-    "start": 1266,
-    "end": 1270,
-    "label": "gap"
-  },
-  {
-    "id": "c0090",
-    "file": "ui/playerUI.js",
-    "start": 1271,
-    "end": 1279,
-    "label": "func:resolveManagerPortrait"
-  },
-  {
-    "id": "c0091",
-    "file": "ui/playerUI.js",
-    "start": 1280,
-    "end": 1286,
-    "label": "gap"
-  },
-  {
-    "id": "c0092",
-    "file": "ui/playerUI.js",
-    "start": 1287,
-    "end": 1292,
-    "label": "func:managerAvatarMark"
-  },
-  {
-    "id": "c0093",
-    "file": "ui/teamUI.js",
-    "start": 1293,
-    "end": 1293,
-    "label": "gap"
-  },
-  {
-    "id": "c0094",
-    "file": "ui/teamUI.js",
-    "start": 1294,
-    "end": 1307,
-    "label": "func:updateTeamPreview"
-  },
-  {
-    "id": "c0095",
-    "file": "engine/tactics.js",
-    "start": 1308,
-    "end": 1316,
-    "label": "gap"
-  },
-  {
-    "id": "c0096",
-    "file": "engine/tactics.js",
-    "start": 1317,
-    "end": 1344,
-    "label": "func:pickTeamFormation"
-  },
-  {
-    "id": "c0097",
-    "file": "ui/teamUI.js",
-    "start": 1345,
-    "end": 1345,
-    "label": "gap"
-  },
-  {
-    "id": "c0098",
-    "file": "ui/teamUI.js",
-    "start": 1346,
-    "end": 1441,
-    "label": "func:buildSquad"
-  },
-  {
-    "id": "c0099",
-    "file": "ui/teamUI.js",
-    "start": 1442,
-    "end": 1442,
-    "label": "gap"
-  },
-  {
-    "id": "c0100",
-    "file": "ui/teamUI.js",
-    "start": 1443,
-    "end": 1446,
-    "label": "func:canPlay"
-  },
-  {
-    "id": "c0101",
-    "file": "ui/teamUI.js",
-    "start": 1447,
-    "end": 1447,
-    "label": "gap"
-  },
-  {
-    "id": "c0102",
-    "file": "ui/teamUI.js",
-    "start": 1448,
-    "end": 1455,
-    "label": "func:shuffleArray"
-  },
-  {
-    "id": "c0103",
-    "file": "ui/teamUI.js",
-    "start": 1456,
-    "end": 1461,
-    "label": "gap"
-  },
-  {
-    "id": "c0104",
-    "file": "ui/teamUI.js",
-    "start": 1462,
-    "end": 1464,
-    "label": "func:onFormationChange"
-  },
-  {
-    "id": "c0105",
-    "file": "ui/teamUI.js",
-    "start": 1465,
-    "end": 1465,
-    "label": "gap"
-  },
-  {
-    "id": "c0106",
-    "file": "ui/teamUI.js",
-    "start": 1466,
-    "end": 1503,
-    "label": "func:openSquadBuilder"
-  },
-  {
-    "id": "c0107",
-    "file": "ui/teamUI.js",
-    "start": 1504,
-    "end": 1504,
-    "label": "gap"
-  },
-  {
-    "id": "c0108",
-    "file": "ui/teamUI.js",
-    "start": 1505,
-    "end": 1509,
-    "label": "func:getUsedInDraft"
-  },
-  {
-    "id": "c0109",
-    "file": "ui/teamUI.js",
-    "start": 1510,
-    "end": 1510,
-    "label": "gap"
-  },
-  {
-    "id": "c0110",
-    "file": "ui/teamUI.js",
-    "start": 1511,
-    "end": 1553,
-    "label": "func:renderSquadBuilderUI"
-  },
-  {
-    "id": "c0111",
-    "file": "ui/teamUI.js",
-    "start": 1554,
-    "end": 1554,
-    "label": "gap"
-  },
-  {
-    "id": "c0111b",
-    "file": "ui/teamUI.js",
-    "start": 1554,
-    "end": 1554,
-    "label": "func:sbEffectiveSlotCode,openSlotRolePicker,setSquadSlotRole"
-  },
-  {
-    "id": "c0112",
-    "file": "ui/teamUI.js",
-    "start": 1555,
-    "end": 1582,
-    "label": "func:openSlotPicker"
-  },
-  {
-    "id": "c0113",
-    "file": "ui/teamUI.js",
-    "start": 1583,
-    "end": 1583,
-    "label": "gap"
-  },
-  {
-    "id": "c0114",
-    "file": "ui/teamUI.js",
-    "start": 1584,
-    "end": 1587,
-    "label": "func:closeSlotPicker"
-  },
-  {
-    "id": "c0115",
-    "file": "ui/teamUI.js",
-    "start": 1588,
-    "end": 1589,
-    "label": "gap"
-  },
-  {
-    "id": "c0116",
-    "file": "ui/teamUI.js",
-    "start": 1590,
-    "end": 1602,
-    "label": "func:setSquadSlot"
-  },
-  {
-    "id": "c0117",
-    "file": "ui/teamUI.js",
-    "start": 1603,
-    "end": 1603,
-    "label": "gap"
-  },
-  {
-    "id": "c0118",
-    "file": "ui/teamUI.js",
-    "start": 1604,
-    "end": 1614,
-    "label": "func:toggleBench"
-  },
-  {
-    "id": "c0119",
-    "file": "ui/teamUI.js",
-    "start": 1615,
-    "end": 1615,
-    "label": "gap"
-  },
-  {
-    "id": "c0120",
-    "file": "ui/teamUI.js",
-    "start": 1616,
-    "end": 1624,
-    "label": "func:autoFillSquadBuilder"
-  },
-  {
-    "id": "c0121",
-    "file": "ui/teamUI.js",
-    "start": 1625,
-    "end": 1625,
-    "label": "gap"
-  },
-  {
-    "id": "c0122",
-    "file": "ui/teamUI.js",
-    "start": 1626,
-    "end": 1656,
-    "label": "func:saveSquadBuilder"
-  },
-  {
-    "id": "c0123",
-    "file": "ui/teamUI.js",
-    "start": 1657,
-    "end": 1657,
-    "label": "gap"
-  },
-  {
-    "id": "c0124",
-    "file": "ui/teamUI.js",
-    "start": 1658,
-    "end": 1662,
-    "label": "func:closeSquadBuilder"
-  },
-  {
-    "id": "c0125",
-    "file": "ui/teamUI.js",
-    "start": 1663,
-    "end": 1663,
-    "label": "gap"
-  },
-  {
-    "id": "c0126",
-    "file": "ui/teamUI.js",
-    "start": 1664,
-    "end": 1677,
-    "label": "func:dedupeSquad"
-  },
-  {
-    "id": "c0127",
-    "file": "engine/matchEngine.js",
-    "start": 1678,
-    "end": 1678,
-    "label": "gap"
-  },
-  {
-    "id": "c0128",
-    "file": "engine/matchEngine.js",
-    "start": 1679,
-    "end": 1758,
-    "label": "func:startMatch"
-  },
-  {
-    "id": "c0129",
-    "file": "engine/matchEngine.js",
-    "start": 1759,
-    "end": 1759,
-    "label": "gap"
-  },
-  {
-    "id": "c0130",
-    "file": "engine/matchEngine.js",
-    "start": 1760,
-    "end": 1762,
-    "label": "func:blankStats"
-  },
-  {
-    "id": "c0131",
-    "file": "ui/matchUI.js",
-    "start": 1763,
-    "end": 1766,
-    "label": "gap"
-  },
-  {
-    "id": "c0132",
-    "file": "ui/matchUI.js",
-    "start": 1767,
-    "end": 1788,
-    "label": "func:showETPrompt"
-  },
-  {
-    "id": "c0133",
-    "file": "ui/matchUI.js",
-    "start": 1789,
-    "end": 1789,
-    "label": "gap"
-  },
-  {
-    "id": "c0134",
-    "file": "ui/matchUI.js",
-    "start": 1790,
-    "end": 1793,
-    "label": "func:hideETPrompt"
-  },
-  {
-    "id": "c0135",
-    "file": "engine/matchEngine.js",
-    "start": 1794,
-    "end": 1794,
-    "label": "gap"
-  },
-  {
-    "id": "c0136",
-    "file": "engine/matchEngine.js",
-    "start": 1795,
-    "end": 1811,
-    "label": "func:continueToET"
-  },
-  {
-    "id": "c0137",
-    "file": "engine/matchEngine.js",
-    "start": 1812,
-    "end": 1812,
-    "label": "gap"
-  },
-  {
-    "id": "c0138",
-    "file": "engine/matchEngine.js",
-    "start": 1813,
-    "end": 1820,
-    "label": "func:continueToPens"
-  },
-  {
-    "id": "c0139",
-    "file": "engine/matchEngine.js",
-    "start": 1821,
-    "end": 1821,
-    "label": "gap"
-  },
-  {
-    "id": "c0140",
-    "file": "engine/matchEngine.js",
-    "start": 1822,
-    "end": 1829,
-    "label": "func:skipETAndEnd"
-  },
-  {
-    "id": "c0141",
-    "file": "engine/shooting.js",
-    "start": 1830,
-    "end": 1831,
-    "label": "gap"
-  },
-  {
-    "id": "c0142",
-    "file": "engine/shooting.js",
-    "start": 1832,
-    "end": 1881,
-    "label": "func:runPenaltyShootout"
-  },
-  {
-    "id": "c0143",
-    "file": "engine/shooting.js",
-    "start": 1882,
-    "end": 1884,
-    "label": "gap"
-  },
-  {
-    "id": "c0144",
-    "file": "engine/shooting.js",
-    "start": 1885,
-    "end": 1898,
-    "label": "func:takePenaltyKick"
-  },
-  {
-    "id": "c0145",
-    "file": "engine/shooting.js",
-    "start": 1899,
-    "end": 1901,
-    "label": "gap"
-  },
-  {
-    "id": "c0146",
-    "file": "engine/shooting.js",
-    "start": 1902,
-    "end": 1935,
-    "label": "func:stepPenaltyShootout"
-  },
-  {
-    "id": "c0147",
-    "file": "engine/shooting.js",
-    "start": 1936,
-    "end": 1936,
-    "label": "gap"
-  },
-  {
-    "id": "c0148",
-    "file": "engine/shooting.js",
-    "start": 1937,
-    "end": 1946,
-    "label": "func:finishPenaltyShootout"
-  },
-  {
-    "id": "c0149",
-    "file": "engine/shooting.js",
-    "start": 1947,
-    "end": 1947,
-    "label": "gap"
-  },
-  {
-    "id": "c0150",
-    "file": "engine/shooting.js",
-    "start": 1948,
-    "end": 1981,
-    "label": "func:maybeOffsideDisallow"
-  },
-  {
-    "id": "c0151",
-    "file": "engine/matchEngine.js",
-    "start": 1982,
-    "end": 1982,
-    "label": "gap"
-  },
-  {
-    "id": "c0152",
-    "file": "engine/matchEngine.js",
-    "start": 1983,
-    "end": 1989,
-    "label": "func:pushGoal"
-  },
-  {
-    "id": "c0153",
-    "file": "ui/matchUI.js",
-    "start": 1990,
-    "end": 1990,
-    "label": "gap"
-  },
-  {
-    "id": "c0154",
-    "file": "ui/matchUI.js",
-    "start": 1991,
-    "end": 2005,
-    "label": "func:renderGoalTimeline"
-  },
-  {
-    "id": "c0155",
-    "file": "engine/matchEngine.js",
-    "start": 2006,
-    "end": 2006,
-    "label": "gap"
-  },
-  {
-    "id": "c0156",
-    "file": "engine/matchEngine.js",
-    "start": 2007,
-    "end": 2027,
-    "label": "func:buildMatchReport"
-  },
-  {
-    "id": "c0157",
-    "file": "ui/matchUI.js",
-    "start": 2028,
-    "end": 2030,
-    "label": "gap"
-  },
-  {
-    "id": "c0158",
-    "file": "ui/matchUI.js",
-    "start": 2031,
-    "end": 2041,
-    "label": "func:renderRatingRow"
-  },
-  {
-    "id": "cx904",
-    "file": "ui/matchUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:renderCategorizedTeamStatsHTML"
-  },
-  {
-    "id": "c0159",
-    "file": "ui/matchUI.js",
-    "start": 2042,
-    "end": 2044,
-    "label": "gap"
-  },
-  {
-    "id": "c0160",
-    "file": "ui/matchUI.js",
-    "start": 2045,
-    "end": 2117,
-    "label": "func:showMatchReport"
-  },
-  {
-    "id": "c0161",
-    "file": "ui/matchUI.js",
-    "start": 2118,
-    "end": 2119,
-    "label": "gap"
-  },
-  {
-    "id": "c0162",
-    "file": "ui/matchUI.js",
-    "start": 2120,
-    "end": 2124,
-    "label": "func:showMatchReportLeg"
-  },
-  {
-    "id": "c0163",
-    "file": "ui/matchUI.js",
-    "start": 2125,
-    "end": 2125,
-    "label": "gap"
-  },
-  {
-    "id": "c0164",
-    "file": "ui/matchUI.js",
-    "start": 2126,
-    "end": 2132,
-    "label": "func:viewFixtureReport"
-  },
-  {
-    "id": "c0165",
-    "file": "ui/matchUI.js",
-    "start": 2133,
-    "end": 2133,
-    "label": "gap"
-  },
-  {
-    "id": "c0166",
-    "file": "ui/matchUI.js",
-    "start": 2134,
-    "end": 2148,
-    "label": "func:viewKnockoutReport"
-  },
-  {
-    "id": "c0167",
-    "file": "engine/matchEngine.js",
-    "start": 2149,
-    "end": 2150,
-    "label": "gap"
-  },
-  {
-    "id": "c0168",
-    "file": "engine/matchEngine.js",
-    "start": 2151,
-    "end": 2153,
-    "label": "func:blankPlayerMatchStats"
-  },
-  {
-    "id": "cx901",
-    "file": "engine/matchEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:posGroupOf"
-  },
-  {
-    "id": "cx902",
-    "file": "engine/matchEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:deriveExtendedMatchStats"
-  },
-  {
-    "id": "c0169",
-    "file": "engine/shooting.js",
-    "start": 2154,
-    "end": 2154,
-    "label": "gap"
-  },
-  {
-    "id": "c0170",
-    "file": "engine/shooting.js",
-    "start": 2155,
-    "end": 2213,
-    "label": "func:pickGoalMethod"
-  },
-  {
-    "id": "c0171",
-    "file": "engine/shooting.js",
-    "start": 2214,
-    "end": 2214,
-    "label": "gap"
-  },
-  {
-    "id": "c0172",
-    "file": "engine/shooting.js",
-    "start": 2215,
-    "end": 2232,
-    "label": "func:pickMissDesc"
-  },
-  {
-    "id": "c0173",
-    "file": "engine/shooting.js",
-    "start": 2233,
-    "end": 2233,
-    "label": "gap"
-  },
-  {
-    "id": "c0174",
-    "file": "engine/shooting.js",
-    "start": 2234,
-    "end": 2236,
-    "label": "func:sofascoreMiss"
-  },
-  {
-    "id": "c0175",
-    "file": "engine/goalkeeper.js",
-    "start": 2237,
-    "end": 2237,
-    "label": "gap"
-  },
-  {
-    "id": "c0176",
-    "file": "engine/goalkeeper.js",
-    "start": 2238,
-    "end": 2247,
-    "label": "func:sofascoreSave"
-  },
-  {
-    "id": "c0177",
-    "file": "engine/goalkeeper.js",
-    "start": 2248,
-    "end": 2249,
-    "label": "gap"
-  },
-  {
-    "id": "c0178",
-    "file": "engine/goalkeeper.js",
-    "start": 2250,
-    "end": 2261,
-    "label": "func:pickSaveDesc"
-  },
-  {
-    "id": "cgk06",
-    "file": "engine/goalkeeper.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:pickCatchDesc"
-  },
-  {
-    "id": "c0179",
-    "file": "engine/shooting.js",
-    "start": 2262,
-    "end": 2302,
-    "label": "gap"
-  },
-  {
-    "id": "c0180",
-    "file": "engine/shooting.js",
-    "start": 2303,
-    "end": 2331,
-    "label": "func:pickSkillDesc"
-  },
-  {
-    "id": "c0181",
-    "file": "engine/shooting.js",
-    "start": 2332,
-    "end": 2332,
-    "label": "gap"
-  },
-  {
-    "id": "c0182",
-    "file": "engine/shooting.js",
-    "start": 2333,
-    "end": 2356,
-    "label": "func:pickPenOutcome"
-  },
-  {
-    "id": "c0183",
-    "file": "engine/shooting.js",
-    "start": 2357,
-    "end": 2357,
-    "label": "gap"
-  },
-  {
-    "id": "c0184",
-    "file": "engine/shooting.js",
-    "start": 2358,
-    "end": 2375,
-    "label": "func:pickFkOutcome"
-  },
-  {
-    "id": "c0185",
-    "file": "engine/matchEngine.js",
-    "start": 2376,
-    "end": 2377,
-    "label": "gap"
-  },
-  {
-    "id": "c0186",
-    "file": "engine/matchEngine.js",
-    "start": 2378,
-    "end": 2505,
-    "label": "func:calcPlayerRating"
-  },
-  {
-    "id": "c0187",
-    "file": "engine/matchEngine.js",
-    "start": 2506,
-    "end": 2507,
-    "label": "gap"
-  },
-  {
-    "id": "c0188",
-    "file": "engine/matchEngine.js",
-    "start": 2508,
-    "end": 2509,
-    "label": "func:quickSimMatch"
-  },
-  {
-    "id": "c0189",
-    "file": "engine/matchEngine.js",
-    "start": 2510,
-    "end": 2527,
-    "label": "func:toggleSim"
-  },
-  {
-    "id": "c0190",
-    "file": "engine/matchEngine.js",
-    "start": 2528,
-    "end": 2528,
-    "label": "gap"
-  },
-  {
-    "id": "c0191",
-    "file": "engine/matchEngine.js",
-    "start": 2529,
-    "end": 2541,
-    "label": "func:setSpeed"
-  },
-  {
-    "id": "c0192",
-    "file": "engine/matchEngine.js",
-    "start": 2542,
-    "end": 2542,
-    "label": "gap"
-  },
-  {
-    "id": "c0193",
-    "file": "engine/matchEngine.js",
-    "start": 2543,
-    "end": 2562,
-    "label": "func:simToEnd"
-  },
-  {
-    "id": "c0194",
-    "file": "engine/matchEngine.js",
-    "start": 2563,
-    "end": 2570,
-    "label": "gap"
-  },
-  {
-    "id": "c0195",
-    "file": "engine/matchEngine.js",
-    "start": 2571,
-    "end": 2593,
-    "label": "func:finishMatch"
-  },
-  {
-    "id": "c0196",
-    "file": "engine/matchEngine.js",
-    "start": 2594,
-    "end": 2594,
-    "label": "gap"
-  },
-  {
-    "id": "c0197",
-    "file": "engine/matchEngine.js",
-    "start": 2595,
-    "end": 2601,
-    "label": "func:resetMatch"
-  },
-  {
-    "id": "c0198",
-    "file": "engine/matchEngine.js",
-    "start": 2602,
-    "end": 2602,
-    "label": "gap"
-  },
-  {
-    "id": "c0198a",
-    "file": "engine/matchEngine.js",
-    "start": 2603,
-    "end": 2612,
-    "label": "gap"
-  },
-  {
-    "id": "c0198b",
-    "file": "engine/matchEngine.js",
-    "start": 2613,
-    "end": 2637,
-    "label": "func:computeAddedTime"
-  },
-  {
-    "id": "c0198c",
-    "file": "engine/matchEngine.js",
-    "start": 2638,
-    "end": 2642,
-    "label": "gap"
-  },
-  {
-    "id": "c0198d",
-    "file": "engine/matchEngine.js",
-    "start": 2643,
-    "end": 2652,
-    "label": "func:describeAddedTime"
-  },
-  {
-    "id": "c0199",
-    "file": "engine/matchEngine.js",
-    "start": 2603,
-    "end": 2720,
-    "label": "func:tick"
-  },
-  {
-    "id": "c0200",
-    "file": "engine/defending.js",
-    "start": 2721,
-    "end": 2741,
-    "label": "gap"
-  },
-  {
-    "id": "c0201",
-    "file": "engine/defending.js",
-    "start": 2742,
-    "end": 2782,
-    "label": "func:simulateDefensiveActions"
-  },
-  {
-    "id": "c0203",
-    "file": "engine/passing.js",
-    "start": 2787,
-    "end": 2786,
-    "label": "table:LOFTED_PASS_SHARE"
-  },
-  {
-    "id": "c0204b",
-    "file": "engine/passing.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:simulateMinutePassing"
-  },
-  {
-    "id": "c0204",
-    "file": "engine/defending.js",
-    "start": 2857,
-    "end": 2885,
-    "label": "gap"
-  },
-  {
-    "id": "c0205",
-    "file": "engine/defending.js",
-    "start": 2886,
-    "end": 2890,
-    "label": "func:mirrorDefenderPos"
-  },
-  {
-    "id": "c0206",
-    "file": "engine/passing.js",
-    "start": 2891,
-    "end": 2893,
-    "label": "gap"
-  },
-  {
-    "id": "cpass01",
-    "file": "engine/passing.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:groundPassingAbility"
-  },
-  {
-    "id": "cpass02",
-    "file": "engine/passing.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:aerialPassingAbility"
-  },
-  {
-    "id": "c0207",
-    "file": "engine/passing.js",
-    "start": 2894,
-    "end": 2900,
-    "label": "func:passingAbility"
-  },
-  {
-    "id": "c0208",
-    "file": "engine/defending.js",
-    "start": 2901,
-    "end": 2907,
-    "label": "func:defensivePressure"
-  },
-  {
-    "id": "c0209",
-    "file": "engine/passing.js",
-    "start": 2908,
-    "end": 2914,
-    "label": "func:carryingAbility"
-  },
-  {
-    "id": "c0210",
-    "file": "engine/shooting.js",
-    "start": 2915,
-    "end": 2930,
-    "label": "gap"
-  },
-  {
-    "id": "c0211",
-    "file": "engine/shooting.js",
-    "start": 2931,
-    "end": 3025,
-    "label": "func:resolveShot"
-  },
-  {
-    "id": "c0212",
-    "file": "engine/shooting.js",
-    "start": 3026,
-    "end": 3027,
-    "label": "gap"
-  },
-  {
-    "id": "c0213",
-    "file": "engine/shooting.js",
-    "start": 3028,
-    "end": 3056,
-    "label": "func:resolveCorner"
-  },
-  {
-    "id": "c0214",
-    "file": "engine/passing.js",
-    "start": 3057,
-    "end": 3063,
-    "label": "gap"
-  },
-  {
-    "id": "c0215",
-    "file": "engine/passing.js",
-    "start": 3064,
-    "end": 3096,
-    "label": "func:resolveChanceCreation"
-  },
-  {
-    "id": "c0216",
-    "file": "engine/referee.js",
-    "start": 3097,
-    "end": 3107,
-    "label": "gap"
-  },
-  {
-    "id": "c0217",
-    "file": "engine/referee.js",
-    "start": 3108,
-    "end": 3198,
-    "label": "func:resolveFoul"
-  },
-  {
-    "id": "c0218",
-    "file": "engine/transitions.js",
-    "start": 3199,
-    "end": 3203,
-    "label": "gap"
-  },
-  {
-    "id": "c0219",
-    "file": "engine/transitions.js",
-    "start": 3204,
-    "end": 3212,
-    "label": "func:runFastBreak"
-  },
-  {
-    "id": "c0220",
-    "file": "engine/transitions.js",
-    "start": 3213,
-    "end": 3215,
-    "label": "gap"
-  },
-  {
-    "id": "c0221",
-    "file": "engine/transitions.js",
-    "start": 3216,
-    "end": 3260,
-    "label": "func:resolveTurnover"
-  },
-  {
-    "id": "c0222",
-    "file": "engine/possession.js",
-    "start": 3261,
-    "end": 3264,
-    "label": "gap"
-  },
-  {
-    "id": "c0223",
-    "file": "engine/possession.js",
-    "start": 3265,
-    "end": 3324,
-    "label": "func:runPossessionSequence"
-  },
-  {
-    "id": "c0224",
-    "file": "engine/matchEngine.js",
-    "start": 3325,
-    "end": 3329,
-    "label": "gap"
-  },
-  {
-    "id": "c0225",
-    "file": "engine/matchEngine.js",
-    "start": 3330,
-    "end": 3478,
-    "label": "func:maybeSecondaryMatchEvent"
-  },
-  {
-    "id": "c0226",
-    "file": "engine/matchEngine.js",
-    "start": 3479,
-    "end": 3482,
-    "label": "gap"
-  },
-  {
-    "id": "c0227",
-    "file": "engine/matchEngine.js",
-    "start": 3483,
-    "end": 3568,
-    "label": "func:generateEvents"
-  },
-  {
-    "id": "c0228",
-    "file": "engine/tactics.js",
-    "start": 3569,
-    "end": 3572,
-    "label": "gap"
-  },
-  {
-    "id": "c0229",
-    "file": "engine/tactics.js",
-    "start": 3573,
-    "end": 3582,
-    "label": "func:decideOpeningTactic"
-  },
-  {
-    "id": "c0230",
-    "file": "engine/matchEngine.js",
-    "start": 3583,
-    "end": 3583,
-    "label": "gap"
-  },
-  {
-    "id": "c0231",
-    "file": "engine/matchEngine.js",
-    "start": 3584,
-    "end": 3617,
-    "label": "func:calcTeamStrength"
-  },
-  {
-    "id": "c0232",
-    "file": "engine/possession.js",
-    "start": 3618,
-    "end": 3618,
-    "label": "gap"
-  },
-  {
-    "id": "c0233",
-    "file": "engine/possession.js",
-    "start": 3619,
-    "end": 3644,
-    "label": "func:pickPlayer"
-  },
-  {
-    "id": "c0234",
-    "file": "engine/possession.js",
-    "start": 3645,
-    "end": 3662,
-    "label": "gap"
-  },
-  {
-    "id": "c0235",
-    "file": "engine/possession.js",
-    "start": 3663,
-    "end": 3693,
-    "label": "func:pickPlayerWeighted"
-  },
-  {
-    "id": "c0236",
-    "file": "engine/tactics.js",
-    "start": 3694,
-    "end": 3695,
-    "label": "gap"
-  },
-  {
-    "id": "c0237",
-    "file": "engine/tactics.js",
-    "start": 3696,
-    "end": 3803,
-    "label": "func:trySubstitution"
-  },
-  {
-    "id": "c0238",
-    "file": "engine/tactics.js",
-    "start": 3804,
-    "end": 3810,
-    "label": "gap"
-  },
-  {
-    "id": "c0239",
-    "file": "engine/tactics.js",
-    "start": 3811,
-    "end": 3855,
-    "label": "func:handleRedCardReshuffle"
-  },
-  {
-    "id": "c0240",
-    "file": "engine/tactics.js",
-    "start": 3856,
-    "end": 3856,
-    "label": "gap"
-  },
-  {
-    "id": "c0241",
-    "file": "engine/tactics.js",
-    "start": 3857,
-    "end": 3881,
-    "label": "func:changeFormationLive"
-  },
-  {
-    "id": "c0242",
-    "file": "engine/tactics.js",
-    "start": 3882,
-    "end": 3882,
-    "label": "gap"
-  },
-  {
-    "id": "c0243",
-    "file": "engine/tactics.js",
-    "start": 3883,
-    "end": 3891,
-    "label": "func:setTacticsLive"
-  },
-  {
-    "id": "c0244",
-    "file": "engine/tactics.js",
-    "start": 3892,
-    "end": 3895,
-    "label": "gap"
-  },
-  {
-    "id": "c0245",
-    "file": "engine/tactics.js",
-    "start": 3896,
-    "end": 3900,
-    "label": "func:pickMoreAttackingFormation"
-  },
-  {
-    "id": "c0246",
-    "file": "engine/tactics.js",
-    "start": 3901,
-    "end": 3902,
-    "label": "gap"
-  },
-  {
-    "id": "c0247",
-    "file": "engine/tactics.js",
-    "start": 3903,
-    "end": 3907,
-    "label": "func:pickMoreDefensiveFormation"
-  },
-  {
-    "id": "c0248",
-    "file": "engine/tactics.js",
-    "start": 3908,
-    "end": 3919,
-    "label": "gap"
-  },
-  {
-    "id": "c0249",
-    "file": "engine/tactics.js",
-    "start": 3920,
-    "end": 3925,
-    "label": "func:runTacticalAI"
-  },
-  {
-    "id": "c0250",
-    "file": "engine/tactics.js",
-    "start": 3926,
-    "end": 3926,
-    "label": "gap"
-  },
-  {
-    "id": "c0251",
-    "file": "engine/tactics.js",
-    "start": 3927,
-    "end": 3984,
-    "label": "func:evaluateTacticalAI"
-  },
-  {
-    "id": "c0252",
-    "file": "engine/injuries.js",
-    "start": 3985,
-    "end": 3985,
-    "label": "gap"
-  },
-  {
-    "id": "c0253",
-    "file": "engine/injuries.js",
-    "start": 3986,
-    "end": 3989,
-    "label": "func:isPlayerInjured"
-  },
-  {
-    "id": "c0254",
-    "file": "engine/injuries.js",
-    "start": 3990,
-    "end": 3990,
-    "label": "gap"
-  },
-  {
-    "id": "c0255",
-    "file": "engine/injuries.js",
-    "start": 3991,
-    "end": 3994,
-    "label": "func:isPlayerSuspended"
-  },
-  {
-    "id": "c0256",
-    "file": "engine/injuries.js",
-    "start": 3995,
-    "end": 3995,
-    "label": "gap"
-  },
-  {
-    "id": "cinj01",
-    "file": "engine/injuries.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:pickInjuryDef"
-  },
-  {
-    "id": "c0257",
-    "file": "engine/injuries.js",
-    "start": 3996,
-    "end": 4066,
-    "label": "func:tryInjury"
-  },
-  {
-    "id": "c0258",
-    "file": "engine/injuries.js",
-    "start": 4067,
-    "end": 4067,
-    "label": "gap"
-  },
-  {
-    "id": "c0259",
-    "file": "engine/injuries.js",
-    "start": 4068,
-    "end": 4074,
-    "label": "func:removeFromPitch"
-  },
-  {
-    "id": "c0260",
-    "file": "engine/injuries.js",
-    "start": 4075,
-    "end": 4078,
-    "label": "gap"
-  },
-  {
-    "id": "c0261",
-    "file": "engine/injuries.js",
-    "start": 4079,
-    "end": 4084,
-    "label": "func:markLeftPitch"
-  },
-  {
-    "id": "c0262",
-    "file": "ui/matchUI.js",
-    "start": 4085,
-    "end": 4086,
-    "label": "gap"
-  },
-  {
-    "id": "c0263",
-    "file": "ui/matchUI.js",
-    "start": 4087,
-    "end": 4202,
-    "label": "func:renderMomentumAndHeat"
-  },
-  {
-    "id": "c0264",
-    "file": "engine/matchEngine.js",
-    "start": 4203,
-    "end": 4203,
-    "label": "gap"
-  },
-  {
-    "id": "c0265",
-    "file": "engine/matchEngine.js",
-    "start": 4204,
-    "end": 4440,
-    "label": "func:endMatch"
-  },
-  {
-    "id": "c0266",
-    "file": "ui/matchUI.js",
-    "start": 4441,
-    "end": 4441,
-    "label": "gap"
-  },
-  {
-    "id": "c0267",
-    "file": "ui/matchUI.js",
-    "start": 4442,
-    "end": 4456,
-    "label": "func:addEvent"
-  },
-  {
-    "id": "c0268",
-    "file": "ui/matchUI.js",
-    "start": 4457,
-    "end": 4457,
-    "label": "gap"
-  },
-  {
-    "id": "c0269",
-    "file": "ui/matchUI.js",
-    "start": 4458,
-    "end": 4500,
-    "label": "func:updateScoreboard"
-  },
-  {
-    "id": "c0270",
-    "file": "ui/matchUI.js",
-    "start": 4501,
-    "end": 4501,
-    "label": "gap"
-  },
-  {
-    "id": "c0271",
-    "file": "ui/matchUI.js",
-    "start": 4502,
-    "end": 4526,
-    "label": "func:updateStatsPanel"
-  },
-  {
-    "id": "c0272",
-    "file": "ui/matchUI.js",
-    "start": 4527,
-    "end": 4528,
-    "label": "gap"
-  },
-  {
-    "id": "c0273",
-    "file": "ui/matchUI.js",
-    "start": 4529,
-    "end": 4614,
-    "label": "func:renderPitch"
-  },
-  {
-    "id": "c0274",
-    "file": "ui/matchUI.js",
-    "start": 4615,
-    "end": 4616,
-    "label": "gap"
-  },
-  {
-    "id": "c0275",
-    "file": "ui/matchUI.js",
-    "start": 4617,
-    "end": 4629,
-    "label": "func:playerLineIcons"
-  },
-  {
-    "id": "c0276",
-    "file": "ui/matchUI.js",
-    "start": 4630,
-    "end": 4630,
-    "label": "gap"
-  },
-  {
-    "id": "c0277",
-    "file": "ui/matchUI.js",
-    "start": 4631,
-    "end": 4637,
-    "label": "func:liveRatingBadge"
-  },
-  {
-    "id": "c0278",
-    "file": "ui/matchUI.js",
-    "start": 4638,
-    "end": 4638,
-    "label": "gap"
-  },
-  {
-    "id": "c0279",
-    "file": "ui/matchUI.js",
-    "start": 4639,
-    "end": 4738,
-    "label": "func:renderLineups"
-  },
-  {
-    "id": "c0280",
-    "file": "ui/statisticsUI.js",
-    "start": 4739,
-    "end": 4742,
-    "label": "gap"
-  },
-  {
-    "id": "c0281",
-    "file": "ui/statisticsUI.js",
-    "start": 4743,
-    "end": 4745,
-    "label": "func:blankCompStats"
-  },
-  {
-    "id": "c0282",
-    "file": "ui/statisticsUI.js",
-    "start": 4746,
-    "end": 4746,
-    "label": "gap"
-  },
-  {
-    "id": "c0283",
-    "file": "ui/statisticsUI.js",
-    "start": 4747,
-    "end": 4749,
-    "label": "func:bumpStatBucket"
-  },
-  {
-    "id": "c0284",
-    "file": "ui/statisticsUI.js",
-    "start": 4750,
-    "end": 4753,
-    "label": "gap"
-  },
-  {
-    "id": "c0285",
-    "file": "ui/statisticsUI.js",
-    "start": 4754,
-    "end": 4762,
-    "label": "func:bumpStatBucketBy"
-  },
-  {
-    "id": "c0286",
-    "file": "ui/statisticsUI.js",
-    "start": 4763,
-    "end": 4763,
-    "label": "gap"
-  },
-  {
-    "id": "c0287",
-    "file": "ui/statisticsUI.js",
-    "start": 4764,
-    "end": 4774,
-    "label": "func:bumpRatingBucket"
-  },
-  {
-    "id": "c0287b",
-    "file": "ui/statisticsUI.js",
-    "start": 47,
-    "end": 50,
-    "label": "func:bumpRatingBucket"
-  },
-  {
-    "id": "c0287c",
-    "file": "ui/statisticsUI.js",
-    "start": 51,
-    "end": 66,
-    "label": "func:isBigGameContext"
-  },
-  {
-    "id": "c0288",
-    "file": "ui/statisticsUI.js",
-    "start": 4775,
-    "end": 4775,
-    "label": "gap"
-  },
-  {
-    "id": "c0289",
-    "file": "ui/statisticsUI.js",
-    "start": 4776,
-    "end": 4785,
-    "label": "func:recordRating"
-  },
-  {
-    "id": "c0290",
-    "file": "ui/statisticsUI.js",
-    "start": 4786,
-    "end": 4799,
-    "label": "gap"
-  },
-  {
-    "id": "c0291",
-    "file": "ui/statisticsUI.js",
-    "start": 4800,
-    "end": 4815,
-    "label": "func:updatePlayerForm"
-  },
-  {
-    "id": "c0292",
-    "file": "ui/statisticsUI.js",
-    "start": 4816,
-    "end": 4818,
-    "label": "gap"
-  },
-  {
-    "id": "c0293",
-    "file": "ui/statisticsUI.js",
-    "start": 4819,
-    "end": 4826,
-    "label": "func:formArrow"
-  },
-  {
-    "id": "c0294",
-    "file": "ui/statisticsUI.js",
-    "start": 4827,
-    "end": 4827,
-    "label": "gap"
-  },
-  {
-    "id": "c0295",
-    "file": "ui/statisticsUI.js",
-    "start": 4828,
-    "end": 4835,
-    "label": "func:formLabel"
-  },
-  {
-    "id": "c0296",
-    "file": "ui/statisticsUI.js",
-    "start": 4836,
-    "end": 4838,
-    "label": "gap"
-  },
-  {
-    "id": "c0297",
-    "file": "ui/statisticsUI.js",
-    "start": 4839,
-    "end": 4847,
-    "label": "func:collectPlayerFormsMap"
-  },
-  {
-    "id": "c0298",
-    "file": "data/playerDatabase.js",
-    "start": 4848,
-    "end": 4852,
-    "label": "func:persistPlayerForms"
-  },
-  {
-    "id": "c0299",
-    "file": "data/playerDatabase.js",
-    "start": 4853,
-    "end": 4867,
-    "label": "func:restorePlayerForms"
-  },
-  {
-    "id": "c0300",
-    "file": "data/playerDatabase.js",
-    "start": 4868,
-    "end": 4868,
-    "label": "gap"
-  },
-  {
-    "id": "c0301",
-    "file": "data/playerDatabase.js",
-    "start": 4869,
-    "end": 4917,
-    "label": "func:findPlayerTeams"
-  },
-  {
-    "id": "c0302",
-    "file": "ui/statisticsUI.js",
-    "start": 4918,
-    "end": 4918,
-    "label": "gap"
-  },
-  {
-    "id": "c0303",
-    "file": "ui/statisticsUI.js",
-    "start": 4919,
-    "end": 4929,
-    "label": "func:recordStat"
-  },
-  {
-    "id": "c0304",
-    "file": "ui/statisticsUI.js",
-    "start": 4930,
-    "end": 4932,
-    "label": "gap"
-  },
-  {
-    "id": "c0305",
-    "file": "ui/statisticsUI.js",
-    "start": 4933,
-    "end": 4942,
-    "label": "func:recordStatCount"
-  },
-  {
-    "id": "c0306",
-    "file": "simulation/seasonEngine.js",
-    "start": 4943,
-    "end": 4948,
-    "label": "gap"
-  },
-  {
-    "id": "c0307",
-    "file": "simulation/seasonEngine.js",
-    "start": 4949,
-    "end": 4951,
-    "label": "func:saveTrophiesToStorage"
-  },
-  {
-    "id": "c0308",
-    "file": "simulation/seasonEngine.js",
-    "start": 4952,
-    "end": 4957,
-    "label": "func:pushTeamTrophy"
-  },
-  {
-    "id": "c0309",
-    "file": "simulation/seasonEngine.js",
-    "start": 4958,
-    "end": 4964,
-    "label": "func:pushIndividualTrophy"
-  },
-  {
-    "id": "c0310",
-    "file": "simulation/seasonEngine.js",
-    "start": 4965,
-    "end": 4969,
-    "label": "gap"
-  },
-  {
-    "id": "c0311",
-    "file": "simulation/seasonEngine.js",
-    "start": 4970,
-    "end": 4976,
-    "label": "func:pushManagerAward"
-  },
-  {
-    "id": "c0312",
-    "file": "simulation/seasonEngine.js",
-    "start": 4977,
-    "end": 4979,
-    "label": "gap"
-  },
-  {
-    "id": "c0313",
-    "file": "simulation/seasonEngine.js",
-    "start": 4980,
-    "end": 4990,
-    "label": "func:recordIndividualAwardsFromAwardsObject"
-  },
-  {
-    "id": "c0314",
-    "file": "simulation/seasonEngine.js",
-    "start": 4991,
-    "end": 4996,
-    "label": "gap"
-  },
-  {
-    "id": "c0315",
-    "file": "simulation/seasonEngine.js",
-    "start": 4997,
-    "end": 5040,
-    "label": "func:computeBallonRanking"
-  },
-  {
-    "id": "c0315b",
-    "file": "simulation/seasonEngine.js",
-    "start": 5040,
-    "end": 5048,
-    "label": "func:computeBallonRanking"
-  },
-  {
-    "id": "c0316",
-    "file": "simulation/seasonEngine.js",
-    "start": 5041,
-    "end": 5047,
-    "label": "gap"
-  },
-  {
-    "id": "c0317",
-    "file": "simulation/seasonEngine.js",
-    "start": 5048,
-    "end": 5067,
-    "label": "func:archiveAndResetGlobalAwards"
-  },
-  {
-    "id": "c0318",
-    "file": "simulation/seasonEngine.js",
-    "start": 5068,
-    "end": 5072,
-    "label": "gap"
-  },
-  {
-    "id": "c0319",
-    "file": "simulation/seasonEngine.js",
-    "start": 5073,
-    "end": 5080,
-    "label": "func:finalizeSeasonIfComplete"
-  },
-  {
-    "id": "c0320",
-    "file": "simulation/seasonEngine.js",
-    "start": 5081,
-    "end": 5084,
-    "label": "gap"
-  },
-  {
-    "id": "c0321",
-    "file": "simulation/seasonEngine.js",
-    "start": 5085,
-    "end": 5088,
-    "label": "func:isQuotaError"
-  },
-  {
-    "id": "c0322",
-    "file": "simulation/seasonEngine.js",
-    "start": 5089,
-    "end": 5094,
-    "label": "gap"
-  },
-  {
-    "id": "c0323",
-    "file": "simulation/seasonEngine.js",
-    "start": 5095,
-    "end": 5106,
-    "label": "func:safeSetItem"
-  },
-  {
-    "id": "c0324",
-    "file": "simulation/seasonEngine.js",
-    "start": 5107,
-    "end": 5107,
-    "label": "gap"
-  },
-  {
-    "id": "c0325",
-    "file": "simulation/seasonEngine.js",
-    "start": 5108,
-    "end": 5117,
-    "label": "func:saveStats"
-  },
-  {
-    "id": "c0326",
-    "file": "simulation/seasonEngine.js",
-    "start": 5118,
-    "end": 5132,
-    "label": "func:loadStats"
-  },
-  {
-    "id": "c0327",
-    "file": "simulation/seasonEngine.js",
-    "start": 5133,
-    "end": 5140,
-    "label": "gap"
-  },
-  {
-    "id": "c0328",
-    "file": "simulation/seasonEngine.js",
-    "start": 5141,
-    "end": 5157,
-    "label": "func:persistAll"
-  },
-  {
-    "id": "c0329",
-    "file": "simulation/seasonEngine.js",
-    "start": 5158,
-    "end": 5158,
-    "label": "gap"
-  },
-  {
-    "id": "c0330",
-    "file": "simulation/seasonEngine.js",
-    "start": 5159,
-    "end": 5182,
-    "label": "func:loadPersistedGameState"
-  },
-  {
-    "id": "c0331",
-    "file": "simulation/seasonEngine.js",
-    "start": 5183,
-    "end": 5186,
-    "label": "gap"
-  },
-  {
-    "id": "c0332",
-    "file": "simulation/seasonEngine.js",
-    "start": 5187,
-    "end": 5207,
-    "label": "func:restoreTournamentUI"
-  },
-  {
-    "id": "c0333",
-    "file": "simulation/seasonEngine.js",
-    "start": 5208,
-    "end": 5208,
-    "label": "gap"
-  },
-  {
-    "id": "c0334",
-    "file": "simulation/seasonEngine.js",
-    "start": 5209,
-    "end": 5216,
-    "label": "func:restoreSeasonUI"
-  },
-  {
-    "id": "c0335",
-    "file": "simulation/seasonEngine.js",
-    "start": 5217,
-    "end": 5221,
-    "label": "gap"
-  },
-  {
-    "id": "c0336",
-    "file": "simulation/seasonEngine.js",
-    "start": 5222,
-    "end": 5227,
-    "label": "func:setupAutoSave"
-  },
-  {
-    "id": "c0337",
-    "file": "simulation/seasonEngine.js",
-    "start": 5228,
-    "end": 5233,
-    "label": "gap"
-  },
-  {
-    "id": "c0337b",
-    "file": "simulation/seasonEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:toggleSaveMenu"
-  },
-  {
-    "id": "c0338",
-    "file": "simulation/seasonEngine.js",
-    "start": 5234,
-    "end": 5253,
-    "label": "func:manualSave"
-  },
-  {
-    "id": "c0339",
-    "file": "simulation/seasonEngine.js",
-    "start": 5254,
-    "end": 5272,
-    "label": "gap"
-  },
-  {
-    "id": "c0340",
-    "file": "simulation/seasonEngine.js",
-    "start": 5273,
-    "end": 5304,
-    "label": "func:collectExportData"
-  },
-  {
-    "id": "c0341",
-    "file": "simulation/seasonEngine.js",
-    "start": 5305,
-    "end": 5305,
-    "label": "gap"
-  },
-  {
-    "id": "c0342",
-    "file": "simulation/seasonEngine.js",
-    "start": 5306,
-    "end": 5340,
-    "label": "func:exportSave"
-  },
-  {
-    "id": "c0343",
-    "file": "simulation/seasonEngine.js",
-    "start": 5341,
-    "end": 5341,
-    "label": "gap"
-  },
-  {
-    "id": "c0344",
-    "file": "simulation/seasonEngine.js",
-    "start": 5342,
-    "end": 5345,
-    "label": "func:triggerImportSave"
-  },
-  {
-    "id": "c0345",
-    "file": "simulation/seasonEngine.js",
-    "start": 5346,
-    "end": 5346,
-    "label": "gap"
-  },
-  {
-    "id": "c0346",
-    "file": "simulation/seasonEngine.js",
-    "start": 5347,
-    "end": 5395,
-    "label": "func:importSaveFile"
-  },
-  {
-    "id": "c0347",
-    "file": "ui/statisticsUI.js",
-    "start": 5396,
-    "end": 5396,
-    "label": "gap"
-  },
-  {
-    "id": "c0348",
-    "file": "ui/statisticsUI.js",
-    "start": 5397,
-    "end": 5416,
-    "label": "func:resetLeaderboard"
-  },
-  {
-    "id": "c0349",
-    "file": "ui/statisticsUI.js",
-    "start": 5417,
-    "end": 5417,
-    "label": "gap"
-  },
-  {
-    "id": "c0350",
-    "file": "ui/statisticsUI.js",
-    "start": 5418,
-    "end": 5452,
-    "label": "func:showLeaderboard"
-  },
-  {
-    "id": "c0351",
-    "file": "ui/seasonUI.js",
-    "start": 5453,
-    "end": 5453,
-    "label": "gap"
-  },
-  {
-    "id": "c0352",
-    "file": "ui/seasonUI.js",
-    "start": 5454,
-    "end": 5490,
-    "label": "func:renderTournamentTeamSelect"
-  },
-  {
-    "id": "c0353",
-    "file": "ui/seasonUI.js",
-    "start": 5491,
-    "end": 5491,
-    "label": "gap"
-  },
-  {
-    "id": "c0354",
-    "file": "ui/seasonUI.js",
-    "start": 5492,
-    "end": 5509,
-    "label": "func:updateTournamentSelectedCount"
-  },
-  {
-    "id": "c0355",
-    "file": "ui/seasonUI.js",
-    "start": 5510,
-    "end": 5511,
-    "label": "gap"
-  },
-  {
-    "id": "c0356",
-    "file": "ui/seasonUI.js",
-    "start": 5512,
-    "end": 5519,
-    "label": "func:selectAllTeams"
-  },
-  {
-    "id": "c0357",
-    "file": "ui/seasonUI.js",
-    "start": 5520,
-    "end": 5526,
-    "label": "func:deselectAllTeams"
-  },
-  {
-    "id": "c0358",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5527,
-    "end": 5527,
-    "label": "gap"
-  },
-  {
-    "id": "c0359",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5528,
-    "end": 5552,
-    "label": "func:startTournament"
-  },
-  {
-    "id": "c0360",
-    "file": "simulation/worldEngine.js",
-    "start": 5553,
-    "end": 5553,
-    "label": "gap"
-  },
-  {
-    "id": "c0361",
-    "file": "simulation/worldEngine.js",
-    "start": 5554,
-    "end": 5580,
-    "label": "func:startWorldCupTournament"
-  },
-  {
-    "id": "c0362",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5581,
-    "end": 5581,
-    "label": "gap"
-  },
-  {
-    "id": "c0363",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5582,
-    "end": 5617,
-    "label": "func:startUCLTournament"
-  },
-  {
-    "id": "cko0001",
-    "file": "simulation/knockoutEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:startKnockoutTournament"
-  },
-  {
-    "id": "c0364",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5618,
-    "end": 5618,
-    "label": "gap"
-  },
-  {
-    "id": "c0365",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5619,
-    "end": 5658,
-    "label": "func:generateUCLLeagueFixtures"
-  },
-  {
-    "id": "c0366",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5659,
-    "end": 5659,
-    "label": "gap"
-  },
-  {
-    "id": "c0367",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5660,
-    "end": 5662,
-    "label": "func:blankLeagueRow"
-  },
-  {
-    "id": "c0368",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5663,
-    "end": 5663,
-    "label": "gap"
-  },
-  {
-    "id": "c0369",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5664,
-    "end": 5674,
-    "label": "func:applyLeagueResult"
-  },
-  {
-    "id": "c0370",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5675,
-    "end": 5675,
-    "label": "gap"
-  },
-  {
-    "id": "c0371",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5676,
-    "end": 5680,
-    "label": "func:sortedLeague"
-  },
-  {
-    "id": "c0372",
-    "file": "ui/seasonUI.js",
-    "start": 5681,
-    "end": 5681,
-    "label": "gap"
-  },
-  {
-    "id": "c0373",
-    "file": "ui/seasonUI.js",
-    "start": 5682,
-    "end": 5705,
-    "label": "func:renderUCLLeague"
-  },
-  {
-    "id": "c0374",
-    "file": "ui/seasonUI.js",
-    "start": 5706,
-    "end": 5706,
-    "label": "gap"
-  },
-  {
-    "id": "c0375",
-    "file": "ui/seasonUI.js",
-    "start": 5707,
-    "end": 5760,
-    "label": "func:renderUCLFixtures"
-  },
-  {
-    "id": "c0376",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5761,
-    "end": 5762,
-    "label": "gap"
-  },
-  {
-    "id": "c0377",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5763,
-    "end": 5772,
-    "label": "func:generateGroupFixtures"
-  },
-  {
-    "id": "c0378",
-    "file": "ui/seasonUI.js",
-    "start": 5773,
-    "end": 5773,
-    "label": "gap"
-  },
-  {
-    "id": "c0379",
-    "file": "ui/seasonUI.js",
-    "start": 5774,
-    "end": 5820,
-    "label": "func:renderGroups"
-  },
-  {
-    "id": "c0380",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5821,
-    "end": 5821,
-    "label": "gap"
-  },
-  {
-    "id": "c0381",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5822,
-    "end": 5846,
-    "label": "func:simSingleFixture"
-  },
-  {
-    "id": "c0382",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5847,
-    "end": 5847,
-    "label": "gap"
-  },
-  {
-    "id": "c0383",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5848,
-    "end": 5879,
-    "label": "func:playTournamentMatch"
-  },
-  {
-    "id": "c0384",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5880,
-    "end": 5881,
-    "label": "gap"
-  },
-  {
-    "id": "c0385",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5882,
-    "end": 5888,
-    "label": "func:simTournamentRound"
-  },
-  {
-    "id": "c0386",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5889,
-    "end": 5889,
-    "label": "gap"
-  },
-  {
-    "id": "c0387",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5890,
-    "end": 5934,
-    "label": "func:_simTournamentRoundWork"
-  },
-  {
-    "id": "c0388",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5935,
-    "end": 5935,
-    "label": "gap"
-  },
-  {
-    "id": "c0389",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5936,
-    "end": 5941,
-    "label": "func:simAllTournament"
-  },
-  {
-    "id": "c0390",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5942,
-    "end": 5942,
-    "label": "gap"
-  },
-  {
-    "id": "c0391",
-    "file": "simulation/tournamentEngine.js",
-    "start": 5943,
-    "end": 6146,
-    "label": "func:_simAllTournamentWork"
-  },
-  {
-    "id": "c0392",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6147,
-    "end": 6148,
-    "label": "gap"
-  },
-  {
-    "id": "c0393",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6149,
-    "end": 6156,
-    "label": "func:simUCLFixture"
-  },
-  {
-    "id": "c0394",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6157,
-    "end": 6171,
-    "label": "func:_simUCLFixtureWork"
-  },
-  {
-    "id": "c0395",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6172,
-    "end": 6172,
-    "label": "gap"
-  },
-  {
-    "id": "c0396",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6173,
-    "end": 6202,
-    "label": "func:playUCLFixture"
-  },
-  {
-    "id": "c0397",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6203,
-    "end": 6204,
-    "label": "gap"
-  },
-  {
-    "id": "c0398",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6205,
-    "end": 6252,
-    "label": "func:advanceUCLFromLeague"
-  },
-  {
-    "id": "c0399",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6253,
-    "end": 6253,
-    "label": "gap"
-  },
-  {
-    "id": "c0400",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6254,
-    "end": 6280,
-    "label": "func:simPlayoffTie"
-  },
-  {
-    "id": "c0401",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6281,
-    "end": 6281,
-    "label": "gap"
-  },
-  {
-    "id": "c0402",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6282,
-    "end": 6295,
-    "label": "func:finishUCLPlayoffs"
-  },
-  {
-    "id": "c0403",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6296,
-    "end": 6296,
-    "label": "gap"
-  },
-  {
-    "id": "c0404",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6297,
-    "end": 6313,
-    "label": "func:buildUCLKnockoutFromTeams"
-  },
-  {
-    "id": "c0405",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6314,
-    "end": 6314,
-    "label": "gap"
-  },
-  {
-    "id": "c0406",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6315,
-    "end": 6331,
-    "label": "func:makeTwoLegTie"
-  },
-  {
-    "id": "c0407",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6332,
-    "end": 6332,
-    "label": "gap"
-  },
-  {
-    "id": "c0408",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6333,
-    "end": 6353,
-    "label": "func:simTwoLegTie"
-  },
-  {
-    "id": "c0409",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6354,
-    "end": 6354,
-    "label": "gap"
-  },
-  {
-    "id": "c0410",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6355,
-    "end": 6371,
-    "label": "func:simSingleFinal"
-  },
-  {
-    "id": "c0411",
-    "file": "ui/seasonUI.js",
-    "start": 6372,
-    "end": 6372,
-    "label": "gap"
-  },
-  {
-    "id": "c0412",
-    "file": "ui/seasonUI.js",
-    "start": 6373,
-    "end": 6388,
-    "label": "func:viewPlayoffReport"
-  },
-  {
-    "id": "c0413",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6389,
-    "end": 6390,
-    "label": "gap"
-  },
-  {
-    "id": "c0414",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6391,
-    "end": 6433,
-    "label": "func:advanceToKnockout"
-  },
-  {
-    "id": "c0415",
-    "file": "simulation/seasonEngine.js",
-    "start": 6434,
-    "end": 6434,
-    "label": "gap"
-  },
-  {
-    "id": "c0416",
-    "file": "simulation/seasonEngine.js",
-    "start": 6435,
-    "end": 6443,
-    "label": "func:getRoundName"
-  },
-  {
-    "id": "c0417",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6444,
-    "end": 6444,
-    "label": "gap"
-  },
-  {
-    "id": "c0418",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6445,
-    "end": 6456,
-    "label": "func:simKnockoutRound"
-  },
-  {
-    "id": "c0419",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6457,
-    "end": 6457,
-    "label": "gap"
-  },
-  {
-    "id": "c0420",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6458,
-    "end": 6503,
-    "label": "func:_simKnockoutRoundWork"
-  },
-  {
-    "id": "c0421",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6504,
-    "end": 6505,
-    "label": "gap"
-  },
-  {
-    "id": "c0422",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6506,
-    "end": 6526,
-    "label": "func:createNextKnockoutRound"
-  },
-  {
-    "id": "c0423",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6527,
-    "end": 6528,
-    "label": "gap"
-  },
-  {
-    "id": "c0424",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6529,
-    "end": 6559,
-    "label": "func:setChampion"
-  },
-  {
-    "id": "c0425",
-    "file": "ui/seasonUI.js",
-    "start": 6560,
-    "end": 6560,
-    "label": "gap"
-  },
-  {
-    "id": "c0426",
-    "file": "ui/seasonUI.js",
-    "start": 6561,
-    "end": 6594,
-    "label": "func:renderTournamentPodium"
-  },
-  {
-    "id": "c0427",
-    "file": "engine/matchEngine.js",
-    "start": 6595,
-    "end": 6596,
-    "label": "gap"
-  },
-  {
-    "id": "c0428",
-    "file": "engine/matchEngine.js",
-    "start": 6597,
-    "end": 6676,
-    "label": "func:simQuickMatch"
-  },
-  {
-    "id": "c0429",
-    "file": "engine/matchEngine.js",
-    "start": 6677,
-    "end": 6677,
-    "label": "gap"
-  },
-  {
-    "id": "c0430",
-    "file": "engine/matchEngine.js",
-    "start": 6678,
-    "end": 6683,
-    "label": "func:poisson"
-  },
-  {
-    "id": "c0431",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6684,
-    "end": 6685,
-    "label": "gap"
-  },
-  {
-    "id": "c0432",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6686,
-    "end": 6744,
-    "label": "func:assignTournamentAwards"
-  },
-  {
-    "id": "c0433",
-    "file": "ui/seasonUI.js",
-    "start": 6745,
-    "end": 6745,
-    "label": "gap"
-  },
-  {
-    "id": "c0434",
-    "file": "ui/seasonUI.js",
-    "start": 6746,
-    "end": 6769,
-    "label": "func:renderTournamentAwards"
-  },
-  {
-    "id": "c0435",
-    "file": "ui/seasonUI.js",
-    "start": 6770,
-    "end": 6770,
-    "label": "gap"
-  },
-  {
-    "id": "c0436",
-    "file": "ui/seasonUI.js",
-    "start": 6771,
-    "end": 6778,
-    "label": "func:refreshTournamentStatsUI"
-  },
-  {
-    "id": "c0437",
-    "file": "ui/seasonUI.js",
-    "start": 6779,
-    "end": 6779,
-    "label": "gap"
-  },
-  {
-    "id": "c0438",
-    "file": "ui/seasonUI.js",
-    "start": 6780,
-    "end": 6805,
-    "label": "func:renderTournamentLeaderboard"
-  },
-  {
-    "id": "c0439",
-    "file": "ui/seasonUI.js",
-    "start": 6806,
-    "end": 6806,
-    "label": "gap"
-  },
-  {
-    "id": "c0440",
-    "file": "ui/seasonUI.js",
-    "start": 6807,
-    "end": 6842,
-    "label": "func:renderBracket"
-  },
-  {
-    "id": "c0441",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6843,
-    "end": 6844,
-    "label": "gap"
-  },
-  {
-    "id": "c0442",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6845,
-    "end": 6854,
-    "label": "func:simKnockoutMatch"
-  },
-  {
-    "id": "c0443",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6855,
-    "end": 6871,
-    "label": "func:_simKnockoutMatchWork"
-  },
-  {
-    "id": "c0444",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6872,
-    "end": 6872,
-    "label": "gap"
-  },
-  {
-    "id": "c0445",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6873,
-    "end": 6907,
-    "label": "func:playKnockoutMatch"
-  },
-  {
-    "id": "c0446",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6908,
-    "end": 6909,
-    "label": "gap"
-  },
-  {
-    "id": "c0447",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6910,
-    "end": 6958,
-    "label": "func:afterKnockoutMatchPlayed"
-  },
-  {
-    "id": "c0448",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6959,
-    "end": 6960,
-    "label": "gap"
-  },
-  {
-    "id": "c0449",
-    "file": "simulation/tournamentEngine.js",
-    "start": 6961,
-    "end": 6977,
-    "label": "func:resetTournament"
-  },
-  {
-    "id": "c0450",
-    "file": "ui/teamUI.js",
-    "start": 6978,
-    "end": 6983,
-    "label": "gap"
-  },
-  {
-    "id": "c0451",
-    "file": "ui/teamUI.js",
-    "start": 6984,
-    "end": 6988,
-    "label": "func:teamAvgOvr"
-  },
-  {
-    "id": "c0452",
-    "file": "ui/teamUI.js",
-    "start": 6989,
-    "end": 6989,
-    "label": "gap"
-  },
-  {
-    "id": "c0453",
-    "file": "ui/teamUI.js",
-    "start": 6990,
-    "end": 6993,
-    "label": "func:filterTeams"
-  },
-  {
-    "id": "c0454",
-    "file": "ui/teamUI.js",
-    "start": 6994,
-    "end": 6994,
-    "label": "gap"
-  },
-  {
-    "id": "c0455",
-    "file": "ui/teamUI.js",
-    "start": 6995,
-    "end": 6998,
-    "label": "func:searchTeams"
-  },
-  {
-    "id": "c0456",
-    "file": "ui/teamUI.js",
-    "start": 6999,
-    "end": 6999,
-    "label": "gap"
-  },
-  {
-    "id": "c0457",
-    "file": "ui/teamUI.js",
-    "start": 7000,
-    "end": 7003,
-    "label": "func:sortTeams"
-  },
-  {
-    "id": "c0458",
-    "file": "ui/teamUI.js",
-    "start": 7004,
-    "end": 7004,
-    "label": "gap"
-  },
-  {
-    "id": "c0459",
-    "file": "ui/teamUI.js",
-    "start": 7005,
-    "end": 7022,
-    "label": "func:getFilteredTeamsList"
-  },
-  {
-    "id": "c0460",
-    "file": "ui/teamUI.js",
-    "start": 7023,
-    "end": 7023,
-    "label": "gap"
-  },
-  {
-    "id": "c0461",
-    "file": "ui/teamUI.js",
-    "start": 7024,
-    "end": 7047,
-    "label": "func:renderTeamsList"
-  },
-  {
-    "id": "tlu001",
-    "file": "ui/teamUI.js",
-    "start": 7047,
-    "end": 7047,
-    "label": "func:renderTeamLineupPitchHTML+showTeamLineup"
-  },
-  {
-    "id": "c0462",
-    "file": "ui/teamUI.js",
-    "start": 7048,
-    "end": 7048,
-    "label": "gap"
-  },
-  {
-    "id": "c0463",
-    "file": "ui/teamUI.js",
-    "start": 7049,
-    "end": 7052,
-    "label": "func:searchTournamentTeams"
-  },
-  {
-    "id": "c0464",
-    "file": "ui/matchUI.js",
-    "start": 7053,
-    "end": 7054,
-    "label": "gap"
-  },
-  {
-    "id": "c0465",
-    "file": "ui/matchUI.js",
-    "start": 7055,
-    "end": 7068,
-    "label": "func:showLoading"
-  },
-  {
-    "id": "c0466",
-    "file": "ui/matchUI.js",
-    "start": 7069,
-    "end": 7069,
-    "label": "gap"
-  },
-  {
-    "id": "c0467",
-    "file": "ui/matchUI.js",
-    "start": 7070,
-    "end": 7073,
-    "label": "func:hideLoading"
-  },
-  {
-    "id": "c0468",
-    "file": "ui/matchUI.js",
-    "start": 7074,
-    "end": 7074,
-    "label": "gap"
-  },
-  {
-    "id": "c0469",
-    "file": "ui/matchUI.js",
-    "start": 7075,
-    "end": 7097,
-    "label": "func:withLoading"
-  },
-  {
-    "id": "c0469b",
-    "file": "ui/matchUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:withLoadingProgress"
-  },
-  {
-    "id": "c0470",
-    "file": "ui/matchUI.js",
-    "start": 7098,
-    "end": 7098,
-    "label": "gap"
-  },
-  {
-    "id": "c0471",
-    "file": "ui/matchUI.js",
-    "start": 7099,
-    "end": 7107,
-    "label": "func:toast"
-  },
-  {
-    "id": "c0472",
-    "file": "ui/matchUI.js",
-    "start": 7108,
-    "end": 7109,
-    "label": "gap"
-  },
-  {
-    "id": "c0473",
-    "file": "ui/matchUI.js",
-    "start": 7110,
-    "end": 7128,
-    "label": "func:renderPostMatchRatings"
-  },
-  {
-    "id": "c0474",
-    "file": "ui/matchUI.js",
-    "start": 7129,
-    "end": 7129,
-    "label": "gap"
-  },
-  {
-    "id": "c0475",
-    "file": "ui/matchUI.js",
-    "start": 7130,
-    "end": 7151,
-    "label": "func:returnToTournament"
-  },
-  {
-    "id": "c0476",
-    "file": "ui/playerUI.js",
-    "start": 7152,
-    "end": 7155,
-    "label": "gap"
-  },
-  {
-    "id": "c0477",
-    "file": "ui/playerUI.js",
-    "start": 7156,
-    "end": 7163,
-    "label": "func:playerTrophyCabinetHTML"
-  },
-  {
-    "id": "c0478",
-    "file": "ui/playerUI.js",
-    "start": 7164,
-    "end": 7171,
-    "label": "gap"
-  },
-  {
-    "id": "c0478b",
-    "file": "ui/playerUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:renderPlayerBioHTML"
-  },
-  {
-    "id": "cstat01",
-    "file": "ui/playerUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:statTierClass"
-  },
-  {
-    "id": "c0479",
-    "file": "ui/playerUI.js",
-    "start": 7172,
-    "end": 7196,
-    "label": "func:expandedAttrRowsHTML"
-  },
-  {
-    "id": "c0480",
-    "file": "ui/playerUI.js",
-    "start": 7197,
-    "end": 7197,
-    "label": "gap"
-  },
-  {
-    "id": "c0481",
-    "file": "ui/playerUI.js",
-    "start": 7198,
-    "end": 7301,
-    "label": "func:showPlayerProfile"
-  },
-  {
-    "id": "c0482",
-    "file": "ui/playerUI.js",
-    "start": 7302,
-    "end": 7303,
-    "label": "gap"
-  },
-  {
-    "id": "c0483",
-    "file": "ui/playerUI.js",
-    "start": 7304,
-    "end": 7351,
-    "label": "func:showTeamProfile"
-  },
-  {
-    "id": "c0484",
-    "file": "ui/statisticsUI.js",
-    "start": 7352,
-    "end": 7353,
-    "label": "gap"
-  },
-  {
-    "id": "c0485",
-    "file": "ui/statisticsUI.js",
-    "start": 7354,
-    "end": 7505,
-    "label": "func:showAwards"
-  },
-  {
-    "id": "c0486",
-    "file": "ui/statisticsUI.js",
-    "start": 7506,
-    "end": 7510,
-    "label": "gap"
-  },
-  {
-    "id": "c0487",
-    "file": "ui/statisticsUI.js",
-    "start": 7511,
-    "end": 7515,
-    "label": "func:trophyGroupKey"
-  },
-  {
-    "id": "c0488",
-    "file": "ui/statisticsUI.js",
-    "start": 7516,
-    "end": 7523,
-    "label": "func:trophyGroupLabel"
-  },
-  {
-    "id": "c0489",
-    "file": "ui/statisticsUI.js",
-    "start": 7524,
-    "end": 7524,
-    "label": "gap"
-  },
-  {
-    "id": "c0490",
-    "file": "ui/statisticsUI.js",
-    "start": 7525,
-    "end": 7565,
-    "label": "func:showHistory"
-  },
-  {
-    "id": "c0491",
-    "file": "ui/seasonUI.js",
-    "start": 7566,
-    "end": 7567,
-    "label": "gap"
-  },
-  {
-    "id": "c0492",
-    "file": "ui/seasonUI.js",
-    "start": 7568,
-    "end": 7575,
-    "label": "func:goToSeason"
-  },
-  {
-    "id": "c0493",
-    "file": "simulation/seasonEngine.js",
-    "start": 7576,
-    "end": 7581,
-    "label": "gap"
-  },
-  {
-    "id": "c0494",
-    "file": "simulation/seasonEngine.js",
-    "start": 7582,
-    "end": 7584,
-    "label": "func:isCurrentSeasonSquad"
-  },
-  {
-    "id": "c0495",
-    "file": "simulation/seasonEngine.js",
-    "start": 7585,
-    "end": 7587,
-    "label": "func:seasonClubPool"
-  },
-  {
-    "id": "c0496",
-    "file": "simulation/seasonEngine.js",
-    "start": 7588,
-    "end": 7590,
-    "label": "gap"
-  },
-  {
-    "id": "c0497",
-    "file": "simulation/seasonEngine.js",
-    "start": 7591,
-    "end": 7593,
-    "label": "func:normalizeLeagueName"
-  },
-  {
-    "id": "c0498",
-    "file": "simulation/seasonEngine.js",
-    "start": 7594,
-    "end": 7599,
-    "label": "gap"
-  },
-  {
-    "id": "c0499",
-    "file": "simulation/seasonEngine.js",
-    "start": 7600,
-    "end": 7613,
-    "label": "func:getLeagueTeamPool"
-  },
-  {
-    "id": "c0500",
-    "file": "ui/seasonUI.js",
-    "start": 7614,
-    "end": 7614,
-    "label": "gap"
-  },
-  {
-    "id": "c0501",
-    "file": "ui/seasonUI.js",
-    "start": 7615,
-    "end": 7648,
-    "label": "func:renderSeasonSetup"
-  },
-  {
-    "id": "c0502",
-    "file": "ui/seasonUI.js",
-    "start": 7649,
-    "end": 7649,
-    "label": "gap"
-  },
-  {
-    "id": "c0503",
-    "file": "ui/seasonUI.js",
-    "start": 7650,
-    "end": 7653,
-    "label": "func:searchSeasonTeams"
-  },
-  {
-    "id": "c0504",
-    "file": "ui/seasonUI.js",
-    "start": 7654,
-    "end": 7654,
-    "label": "gap"
-  },
-  {
-    "id": "c0505",
-    "file": "ui/seasonUI.js",
-    "start": 7655,
-    "end": 7665,
-    "label": "func:toggleSeasonTeam"
-  },
-  {
-    "id": "c0506",
-    "file": "ui/seasonUI.js",
-    "start": 7666,
-    "end": 7666,
-    "label": "gap"
-  },
-  {
-    "id": "c0507",
-    "file": "ui/seasonUI.js",
-    "start": 7667,
-    "end": 7687,
-    "label": "func:autoFillSeason"
-  },
-  {
-    "id": "c0508",
-    "file": "ui/seasonUI.js",
-    "start": 7688,
-    "end": 7688,
-    "label": "gap"
-  },
-  {
-    "id": "c0509",
-    "file": "ui/seasonUI.js",
-    "start": 7689,
-    "end": 7692,
-    "label": "func:clearSeasonSetup"
-  },
-  {
-    "id": "c0510",
-    "file": "simulation/seasonEngine.js",
-    "start": 7693,
-    "end": 7694,
-    "label": "gap"
-  },
-  {
-    "id": "c0511",
-    "file": "simulation/seasonEngine.js",
-    "start": 7695,
-    "end": 7714,
-    "label": "func:circleMethodRounds"
-  },
-  {
-    "id": "c0512",
-    "file": "simulation/seasonEngine.js",
-    "start": 7715,
-    "end": 7715,
-    "label": "gap"
-  },
-  {
-    "id": "c0513",
-    "file": "simulation/seasonEngine.js",
-    "start": 7716,
-    "end": 7724,
-    "label": "func:buildDoubleRoundRobinRounds"
-  },
-  {
-    "id": "c0514",
-    "file": "simulation/seasonEngine.js",
-    "start": 7725,
-    "end": 7725,
-    "label": "gap"
-  },
-  {
-    "id": "c0515",
-    "file": "simulation/seasonEngine.js",
-    "start": 7726,
-    "end": 7728,
-    "label": "func:blankSeasonRow"
-  },
-  {
-    "id": "c0516",
-    "file": "simulation/seasonEngine.js",
-    "start": 7729,
-    "end": 7729,
-    "label": "gap"
-  },
-  {
-    "id": "c0517",
-    "file": "simulation/seasonEngine.js",
-    "start": 7730,
-    "end": 7739,
-    "label": "func:applyResultToTable"
-  },
-  {
-    "id": "c0518",
-    "file": "simulation/seasonEngine.js",
-    "start": 7740,
-    "end": 7740,
-    "label": "gap"
-  },
-  {
-    "id": "c0519",
-    "file": "simulation/seasonEngine.js",
-    "start": 7741,
-    "end": 7743,
-    "label": "func:sortedTable"
-  },
-  {
-    "id": "c0520",
-    "file": "simulation/seasonEngine.js",
-    "start": 7744,
-    "end": 7744,
-    "label": "gap"
-  },
-  {
-    "id": "c0521",
-    "file": "simulation/seasonEngine.js",
-    "start": 7745,
-    "end": 7749,
-    "label": "func:bracketSizeFor"
-  },
-  {
-    "id": "c0522",
-    "file": "simulation/seasonEngine.js",
-    "start": 7750,
-    "end": 7750,
-    "label": "gap"
-  },
-  {
-    "id": "c0523",
-    "file": "simulation/seasonEngine.js",
-    "start": 7751,
-    "end": 7755,
-    "label": "func:seedPairsForSize"
-  },
-  {
-    "id": "c0524",
-    "file": "simulation/seasonEngine.js",
-    "start": 7756,
-    "end": 7756,
-    "label": "gap"
-  },
-  {
-    "id": "c0525",
-    "file": "simulation/seasonEngine.js",
-    "start": 7757,
-    "end": 7762,
-    "label": "func:winnerOfResult"
-  },
-  {
-    "id": "c0526",
-    "file": "simulation/seasonEngine.js",
-    "start": 7763,
-    "end": 7763,
-    "label": "gap"
-  },
-  {
-    "id": "c0527",
-    "file": "simulation/seasonEngine.js",
-    "start": 7764,
-    "end": 7777,
-    "label": "func:simulateRoundFixtures"
-  },
-  {
-    "id": "c0528",
-    "file": "simulation/seasonEngine.js",
-    "start": 7778,
-    "end": 7778,
-    "label": "gap"
-  },
-  {
-    "id": "c0529",
-    "file": "simulation/seasonEngine.js",
-    "start": 7779,
-    "end": 7783,
-    "label": "func:buildKnockoutFixtures"
-  },
-  {
-    "id": "c0530",
-    "file": "simulation/seasonEngine.js",
-    "start": 7784,
-    "end": 7784,
-    "label": "gap"
-  },
-  {
-    "id": "c0531",
-    "file": "simulation/seasonEngine.js",
-    "start": 7785,
-    "end": 7794,
-    "label": "func:buildKnockoutFromWinners"
-  },
-  {
-    "id": "c0532",
-    "file": "simulation/seasonEngine.js",
-    "start": 7795,
-    "end": 7799,
-    "label": "gap"
-  },
-  {
-    "id": "c0533",
-    "file": "simulation/seasonEngine.js",
-    "start": 7800,
-    "end": 7807,
-    "label": "func:computeInitialUCLQualifiers"
-  },
-  {
-    "id": "c0534",
-    "file": "simulation/seasonEngine.js",
-    "start": 7808,
-    "end": 7808,
-    "label": "gap"
-  },
-  {
-    "id": "c0535",
-    "file": "simulation/seasonEngine.js",
-    "start": 7809,
-    "end": 7818,
-    "label": "func:computeUCLQualifiersFromStandings"
-  },
-  {
-    "id": "c0536",
-    "file": "simulation/seasonEngine.js",
-    "start": 7819,
-    "end": 7820,
-    "label": "gap"
-  },
-  {
-    "id": "c0537",
-    "file": "simulation/seasonEngine.js",
-    "start": 7821,
-    "end": 7879,
-    "label": "func:startSeason"
-  },
-  {
-    "id": "c0538",
-    "file": "simulation/seasonEngine.js",
-    "start": 7880,
-    "end": 7880,
-    "label": "gap"
-  },
-  {
-    "id": "c0539",
-    "file": "simulation/seasonEngine.js",
-    "start": 7881,
-    "end": 7891,
-    "label": "func:crownLeagueChampion"
-  },
-  {
-    "id": "c0540",
-    "file": "simulation/seasonEngine.js",
-    "start": 7892,
-    "end": 7892,
-    "label": "gap"
-  },
-  {
-    "id": "c0541",
-    "file": "simulation/seasonEngine.js",
-    "start": 7893,
-    "end": 7904,
-    "label": "func:simulateLeagueRound"
-  },
-  {
-    "id": "c0542",
-    "file": "simulation/seasonEngine.js",
-    "start": 7905,
-    "end": 7909,
-    "label": "gap"
-  },
-  {
-    "id": "c0543",
-    "file": "simulation/seasonEngine.js",
-    "start": 7910,
-    "end": 7919,
-    "label": "func:buildUCLBracketFromLeagueTable"
-  },
-  {
-    "id": "c0544",
-    "file": "simulation/seasonEngine.js",
-    "start": 7920,
-    "end": 7920,
-    "label": "gap"
-  },
-  {
-    "id": "c0545",
-    "file": "simulation/seasonEngine.js",
-    "start": 7921,
-    "end": 7967,
-    "label": "func:simulateUCLStep"
-  },
-  {
-    "id": "c0546",
-    "file": "simulation/seasonEngine.js",
-    "start": 7968,
-    "end": 7976,
-    "label": "gap"
-  },
-  {
-    "id": "c0547",
-    "file": "simulation/seasonEngine.js",
-    "start": 7977,
-    "end": 7985,
-    "label": "func:computeSeasonWeek"
-  },
-  {
-    "id": "c0547b",
-    "file": "simulation/seasonEngine.js",
-    "start": 41727,
-    "end": 42903,
-    "label": "func:seasonCompEntries"
-  },
-  {
-    "id": "c0547c",
-    "file": "simulation/seasonEngine.js",
-    "start": 42926,
-    "end": 43363,
-    "label": "func:seasonCompDoneWithMatchday"
-  },
-  {
-    "id": "c0547d",
-    "file": "simulation/seasonEngine.js",
-    "start": 43386,
-    "end": 43867,
-    "label": "func:seasonCompCanPlayNow"
-  },
-  {
-    "id": "c0547e",
-    "file": "simulation/seasonEngine.js",
-    "start": 43890,
-    "end": 44895,
-    "label": "func:seasonMatchesDue"
-  },
-  {
-    "id": "c0548",
-    "file": "simulation/seasonEngine.js",
-    "start": 7986,
-    "end": 7990,
-    "label": "gap"
-  },
-  {
-    "id": "c0549",
-    "file": "simulation/seasonEngine.js",
-    "start": 7991,
-    "end": 8007,
-    "label": "func:advanceSeasonRoundIfComplete"
-  },
-  {
-    "id": "c0550",
-    "file": "simulation/seasonEngine.js",
-    "start": 8008,
-    "end": 8010,
-    "label": "gap"
-  },
-  {
-    "id": "c0551",
-    "file": "simulation/seasonEngine.js",
-    "start": 8011,
-    "end": 8034,
-    "label": "func:simSeasonFixture"
-  },
-  {
-    "id": "c0552",
-    "file": "simulation/seasonEngine.js",
-    "start": 8035,
-    "end": 8038,
-    "label": "gap"
-  },
-  {
-    "id": "c0553",
-    "file": "simulation/seasonEngine.js",
-    "start": 8039,
-    "end": 8075,
-    "label": "func:playSeasonFixture"
-  },
-  {
-    "id": "c0554",
-    "file": "simulation/seasonEngine.js",
-    "start": 8076,
-    "end": 8076,
-    "label": "gap"
-  },
-  {
-    "id": "c0555",
-    "file": "simulation/seasonEngine.js",
-    "start": 8077,
-    "end": 8080,
-    "label": "func:seasonIsComplete"
-  },
-  {
-    "id": "c0556",
-    "file": "simulation/seasonEngine.js",
-    "start": 8081,
-    "end": 8081,
-    "label": "gap"
-  },
-  {
-    "id": "c0557",
-    "file": "simulation/seasonEngine.js",
-    "start": 8082,
-    "end": 8091,
-    "label": "func:simulateSeasonWeek"
-  },
-  {
-    "id": "c0558",
-    "file": "simulation/seasonEngine.js",
-    "start": 8092,
-    "end": 8092,
-    "label": "gap"
-  },
-  {
-    "id": "c0559",
-    "file": "simulation/seasonEngine.js",
-    "start": 8093,
-    "end": 8106,
-    "label": "func:simulateSeasonToEnd"
-  },
-  {
-    "id": "c0560",
-    "file": "simulation/seasonEngine.js",
-    "start": 8107,
-    "end": 8107,
-    "label": "gap"
-  },
-  {
-    "id": "c0561",
-    "file": "simulation/seasonEngine.js",
-    "start": 8108,
-    "end": 8140,
-    "label": "func:startNewSeasonYear"
-  },
-  {
-    "id": "c0562",
-    "file": "simulation/seasonEngine.js",
-    "start": 8141,
-    "end": 8141,
-    "label": "gap"
-  },
-  {
-    "id": "c0563",
-    "file": "simulation/seasonEngine.js",
-    "start": 8142,
-    "end": 8158,
-    "label": "func:resetSeason"
-  },
-  {
-    "id": "c0564",
-    "file": "ui/seasonUI.js",
-    "start": 8159,
-    "end": 8159,
-    "label": "gap"
-  },
-  {
-    "id": "c0565",
-    "file": "ui/seasonUI.js",
-    "start": 8160,
-    "end": 8164,
-    "label": "func:showSeasonComp"
-  },
-  {
-    "id": "c0566",
-    "file": "ui/seasonUI.js",
-    "start": 8165,
-    "end": 8165,
-    "label": "gap"
-  },
-  {
-    "id": "c0567",
-    "file": "ui/seasonUI.js",
-    "start": 8166,
-    "end": 8169,
-    "label": "func:showSeasonSubTab"
-  },
-  {
-    "id": "c0568",
-    "file": "ui/seasonUI.js",
-    "start": 8170,
-    "end": 8170,
-    "label": "gap"
-  },
-  {
-    "id": "cx903",
-    "file": "ui/seasonUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:renderFixtureCongestionHTML"
-  },
-  {
-    "id": "c0569",
-    "file": "ui/seasonUI.js",
-    "start": 8171,
-    "end": 8212,
-    "label": "func:renderSeasonDashboard"
-  },
-  {
-    "id": "c0570",
-    "file": "ui/statisticsUI.js",
-    "start": 8213,
-    "end": 8214,
-    "label": "gap"
-  },
-  {
-    "id": "c0571",
-    "file": "ui/statisticsUI.js",
-    "start": 8215,
-    "end": 8217,
-    "label": "func:compStatTop"
-  },
-  {
-    "id": "c0572",
-    "file": "ui/statisticsUI.js",
-    "start": 8218,
-    "end": 8218,
-    "label": "gap"
-  },
-  {
-    "id": "c0573",
-    "file": "ui/statisticsUI.js",
-    "start": 8219,
-    "end": 8222,
-    "label": "func:compApps"
-  },
-  {
-    "id": "c0574",
-    "file": "ui/statisticsUI.js",
-    "start": 8223,
-    "end": 8223,
-    "label": "gap"
-  },
-  {
-    "id": "c0575",
-    "file": "ui/statisticsUI.js",
-    "start": 8224,
-    "end": 8232,
-    "label": "func:renderCompStatTable"
-  },
-  {
-    "id": "c0576",
-    "file": "ui/statisticsUI.js",
-    "start": 8233,
-    "end": 8233,
-    "label": "gap"
-  },
-  {
-    "id": "c0577",
-    "file": "ui/statisticsUI.js",
-    "start": 8234,
-    "end": 8244,
-    "label": "func:renderCompStatsHTML"
-  },
-  {
-    "id": "c0578",
-    "file": "ui/statisticsUI.js",
-    "start": 8245,
-    "end": 8245,
-    "label": "gap"
-  },
-  {
-    "id": "c0579",
-    "file": "ui/statisticsUI.js",
-    "start": 8246,
-    "end": 8265,
-    "label": "func:assignCompAwards"
-  },
-  {
-    "id": "c0580",
-    "file": "ui/statisticsUI.js",
-    "start": 8266,
-    "end": 8266,
-    "label": "gap"
-  },
-  {
-    "id": "c0581",
-    "file": "ui/statisticsUI.js",
-    "start": 8267,
-    "end": 8292,
-    "label": "func:renderCompAwardsHTML"
-  },
-  {
-    "id": "c0582",
-    "file": "ui/seasonUI.js",
-    "start": 8293,
-    "end": 8295,
-    "label": "gap"
-  },
-  {
-    "id": "c0583",
-    "file": "ui/seasonUI.js",
-    "start": 8296,
-    "end": 8316,
-    "label": "func:renderSeasonTrophyRoomHTML"
-  },
-  {
-    "id": "c0584",
-    "file": "ui/seasonUI.js",
-    "start": 8317,
-    "end": 8317,
-    "label": "gap"
-  },
-  {
-    "id": "c0585",
-    "file": "ui/seasonUI.js",
-    "start": 8318,
-    "end": 8328,
-    "label": "func:renderStandingsTable"
-  },
-  {
-    "id": "c0586",
-    "file": "ui/seasonUI.js",
-    "start": 8329,
-    "end": 8329,
-    "label": "gap"
-  },
-  {
-    "id": "c0587",
-    "file": "ui/seasonUI.js",
-    "start": 8330,
-    "end": 8374,
-    "label": "func:renderFixtureList"
-  },
-  {
-    "id": "c0588",
-    "file": "ui/seasonUI.js",
-    "start": 8375,
-    "end": 8375,
-    "label": "gap"
-  },
-  {
-    "id": "c0589",
-    "file": "ui/seasonUI.js",
-    "start": 8376,
-    "end": 8384,
-    "label": "func:renderLeagueCompHTML"
-  },
-  {
-    "id": "c0590",
-    "file": "ui/seasonUI.js",
-    "start": 8385,
-    "end": 8385,
-    "label": "gap"
-  },
-  {
-    "id": "c0591",
-    "file": "ui/seasonUI.js",
-    "start": 8386,
-    "end": 8403,
-    "label": "func:renderKnockoutRoundHTML"
-  },
-  {
-    "id": "c0592",
-    "file": "ui/seasonUI.js",
-    "start": 8404,
-    "end": 8404,
-    "label": "gap"
-  },
-  {
-    "id": "c0593",
-    "file": "ui/seasonUI.js",
-    "start": 8405,
-    "end": 8420,
-    "label": "func:renderUCLSeasonHTML"
-  },
-  {
-    "id": "c0594",
-    "file": "ui/seasonUI.js",
-    "start": 8421,
-    "end": 8421,
-    "label": "gap"
-  },
-  {
-    "id": "c0595",
-    "file": "ui/seasonUI.js",
-    "start": 8422,
-    "end": 8426,
-    "label": "func:viewSeasonReport"
-  },
-  {
-    "id": "c0596",
-    "file": "ui/teamUI.js",
-    "start": 8427,
-    "end": 8427,
-    "label": "gap"
-  },
-  {
-    "id": "c0597",
-    "file": "ui/teamUI.js",
-    "start": 8428,
-    "end": 8443,
-    "label": "func:goToSquadBuilder"
-  },
-  {
-    "id": "ctml01",
-    "file": "ui/teamUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "team-match-log-store"
-  },
-  {
-    "id": "ctml02",
-    "file": "ui/teamUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:renderTeamMatchLogHTML"
-  },
-  {
-    "id": "cp001",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp002",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp003",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp004",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp005",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp006",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp007",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp008",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp009",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp010",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp011",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp012",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp013",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp014",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp015",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp016",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp017",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp018",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp018b",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp018c",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp019",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp020",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp021",
-    "file": "ui/playersUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "players-tab"
-  },
-  {
-    "id": "cp022",
-    "file": "engine/matchEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "player-match-log"
-  },
-  {
-    "id": "cp023",
-    "file": "engine/matchEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "player-match-log"
-  },
-  {
-    "id": "cp024",
-    "file": "engine/matchEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "player-match-log"
-  },
-  {
-    "id": "cp024b",
-    "file": "engine/matchEngine.js",
-    "start": -1,
-    "end": -1,
-    "label": "team-match-log"
-  },
-  {
-    "id": "chos01",
-    "file": "ui/hospitalUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "hospitalFilter state"
-  },
-  {
-    "id": "chos02",
-    "file": "ui/hospitalUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:getHospitalEntries"
-  },
-  {
-    "id": "chos03",
-    "file": "ui/hospitalUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:hospitalSeverityClass"
-  },
-  {
-    "id": "chos04",
-    "file": "ui/hospitalUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:hospitalCauseLine"
-  },
-  {
-    "id": "chos05",
-    "file": "ui/hospitalUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:renderHospitalList"
-  },
-  {
-    "id": "chos06",
-    "file": "ui/hospitalUI.js",
-    "start": -1,
-    "end": -1,
-    "label": "func:searchHospital,filterHospitalSeverity,sortHospital"
-  },
-  {
-    "id": "c0598",
-    "file": "ui/matchUI.js",
-    "start": 8444,
-    "end": 8478,
-    "label": "gap"
-  },
-  {
-    "id": "c0599",
-    "file": "ui/matchUI.js",
-    "start": 8479,
-    "end": 8481,
-    "label": "func:closeAllPanels"
-  },
-  {
-    "id": "c0600",
-    "file": "ui/matchUI.js",
-    "start": 8482,
-    "end": 8482,
-    "label": "gap"
-  },
-  {
-    "id": "c0601",
-    "file": "ui/matchUI.js",
-    "start": 8483,
-    "end": 8493,
-    "label": "func:collectOptions"
-  },
-  {
-    "id": "c0602",
-    "file": "ui/matchUI.js",
-    "start": 8494,
-    "end": 8494,
-    "label": "gap"
-  },
-  {
-    "id": "c0603",
-    "file": "ui/matchUI.js",
-    "start": 8495,
-    "end": 8603,
-    "label": "func:enhanceSelect"
-  },
-  {
-    "id": "c0604",
-    "file": "ui/matchUI.js",
-    "start": 8604,
-    "end": 8607,
-    "label": "gap"
-  },
-  {
-    "id": "c0605",
-    "file": "ui/matchUI.js",
-    "start": 8608,
-    "end": 8610,
-    "label": "func:scanAndEnhance"
-  },
-  {
-    "id": "c0606",
-    "file": "ui/matchUI.js",
-    "start": 8611,
-    "end": 8628,
-    "label": "gap"
-  },
-  {
-    "id": "c0607",
-    "file": "ui/matchUI.js",
-    "start": 8629,
-    "end": 8650,
-    "label": "func:init"
-  },
-  {
-    "id": "c0608",
-    "file": "js/main.js",
-    "start": 8651,
-    "end": 8661,
-    "label": "gap"
-  }
+ {
+  "id": "crng0000",
+  "file": "js/rng.js",
+  "start": -1,
+  "end": -1,
+  "label": "rng"
+ },
+ {
+  "id": "crngcurve",
+  "file": "js/rng.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:curvedStat,curvedAttr"
+ },
+ {
+  "id": "c0000",
+  "file": "js/state.js",
+  "start": 0,
+  "end": 170,
+  "label": "gap"
+ },
+ {
+  "id": "ccomp01",
+  "file": "data/competitions.js",
+  "start": -1,
+  "end": -1,
+  "label": "tournament formats registry"
+ },
+ {
+  "id": "cfat01",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "gap"
+ },
+ {
+  "id": "cfat02",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:ensureFatigueState"
+ },
+ {
+  "id": "cfat03",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:getStamina"
+ },
+ {
+  "id": "cfat04",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:fatigueDrainRate"
+ },
+ {
+  "id": "cfat05",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:updateFatigue"
+ },
+ {
+  "id": "cfat06",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:resetFatigueFor"
+ },
+ {
+  "id": "cfat07",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:teamAvgStamina"
+ },
+ {
+  "id": "cfat08",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:playerMatchSide"
+ },
+ {
+  "id": "cfat09",
+  "file": "engine/fatigue.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:staminaMultiplier"
+ },
+ {
+  "id": "cofs01",
+  "file": "engine/offside.js",
+  "start": -1,
+  "end": -1,
+  "label": "gap"
+ },
+ {
+  "id": "cofs02",
+  "file": "engine/offside.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:playerAdvancement"
+ },
+ {
+  "id": "cofs03",
+  "file": "engine/offside.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:defensiveLineContext"
+ },
+ {
+  "id": "cofs03b",
+  "file": "engine/offside.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:avgLineDefAwareness"
+ },
+ {
+  "id": "cofs04",
+  "file": "engine/offside.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:evaluateOffside"
+ },
+ {
+  "id": "cofs05",
+  "file": "engine/offside.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:checkLiveOffside"
+ },
+ {
+  "id": "csp01",
+  "file": "engine/setpieces.js",
+  "start": -1,
+  "end": -1,
+  "label": "gap"
+ },
+ {
+  "id": "csp02",
+  "file": "engine/setpieces.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:pickFreeKickRoutine"
+ },
+ {
+  "id": "csp03",
+  "file": "engine/setpieces.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:resolveFreeKickRoutine"
+ },
+ {
+  "id": "csp04",
+  "file": "engine/setpieces.js",
+  "start": -1,
+  "end": -1,
+  "label": "gap"
+ },
+ {
+  "id": "csp05",
+  "file": "engine/setpieces.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:resolveThrowIn"
+ },
+ {
+  "id": "csp06",
+  "file": "engine/setpieces.js",
+  "start": -1,
+  "end": -1,
+  "label": "gap"
+ },
+ {
+  "id": "csp07",
+  "file": "engine/setpieces.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:resolveGoalKick"
+ },
+ {
+  "id": "cmr01",
+  "file": "engine/matchRoles.js",
+  "start": -1,
+  "end": -1,
+  "label": "gap"
+ },
+ {
+  "id": "cmr02",
+  "file": "engine/matchRoles.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:assignMatchRoles"
+ },
+ {
+  "id": "cmr03",
+  "file": "engine/matchRoles.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:roleBadgesHTML"
+ },
+ {
+  "id": "c0001",
+  "file": "engine/tactics.js",
+  "start": 171,
+  "end": 185,
+  "label": "func:formationShape"
+ },
+ {
+  "id": "c0002",
+  "file": "engine/tactics.js",
+  "start": 186,
+  "end": 189,
+  "label": "gap"
+ },
+ {
+  "id": "c0003",
+  "file": "engine/tactics.js",
+  "start": 190,
+  "end": 193,
+  "label": "func:formationWideCount"
+ },
+ {
+  "id": "c0004",
+  "file": "engine/tactics.js",
+  "start": 194,
+  "end": 194,
+  "label": "gap"
+ },
+ {
+  "id": "c0005",
+  "file": "engine/tactics.js",
+  "start": 195,
+  "end": 199,
+  "label": "func:lineOf"
+ },
+ {
+  "id": "c0006",
+  "file": "ai/managerAI.js",
+  "start": 200,
+  "end": 249,
+  "label": "gap"
+ },
+ {
+  "id": "c0007",
+  "file": "ai/managerAI.js",
+  "start": 250,
+  "end": 257,
+  "label": "func:getManagerPlaystyle"
+ },
+ {
+  "id": "c0008",
+  "file": "ai/managerAI.js",
+  "start": 258,
+  "end": 258,
+  "label": "gap"
+ },
+ {
+  "id": "c0009",
+  "file": "ai/managerAI.js",
+  "start": 259,
+  "end": 261,
+  "label": "func:getPlaystyleMods"
+ },
+ {
+  "id": "c0010",
+  "file": "data/playerDatabase.js",
+  "start": 262,
+  "end": 284,
+  "label": "gap"
+ },
+ {
+  "id": "c0011",
+  "file": "data/playerDatabase.js",
+  "start": 285,
+  "end": 297,
+  "label": "func:attrPosGroup"
+ },
+ {
+  "id": "c0012",
+  "file": "data/playerDatabase.js",
+  "start": 298,
+  "end": 453,
+  "label": "gap"
+ },
+ {
+  "id": "c0012b",
+  "file": "data/playerDatabase.js",
+  "start": 298,
+  "end": 453,
+  "label": "func:normalizePlayerPlaystyleTags"
+ },
+ {
+  "id": "c0013",
+  "file": "data/playerDatabase.js",
+  "start": 454,
+  "end": 461,
+  "label": "func:attrSheetAverage"
+ },
+ {
+  "id": "c0014",
+  "file": "ai/managerAI.js",
+  "start": 462,
+  "end": 471,
+  "label": "gap"
+ },
+ {
+  "id": "c0015",
+  "file": "ai/managerAI.js",
+  "start": 472,
+  "end": 486,
+  "label": "func:styleSignatureBonus"
+ },
+ {
+  "id": "c0016",
+  "file": "ai/managerAI.js",
+  "start": 487,
+  "end": 492,
+  "label": "gap"
+ },
+ {
+  "id": "c0017",
+  "file": "ai/managerAI.js",
+  "start": 493,
+  "end": 511,
+  "label": "func:applyManagerAttributeBoost"
+ },
+ {
+  "id": "c0018",
+  "file": "ai/managerAI.js",
+  "start": 512,
+  "end": 515,
+  "label": "gap"
+ },
+ {
+  "id": "c0019",
+  "file": "ai/managerAI.js",
+  "start": 516,
+  "end": 518,
+  "label": "func:hasStyle"
+ },
+ {
+  "id": "c0020",
+  "file": "ai/managerAI.js",
+  "start": 519,
+  "end": 525,
+  "label": "gap"
+ },
+ {
+  "id": "c0021",
+  "file": "ai/managerAI.js",
+  "start": 526,
+  "end": 534,
+  "label": "func:styleFlavor"
+ },
+ {
+  "id": "c0022",
+  "file": "data/playerDatabase.js",
+  "start": 535,
+  "end": 611,
+  "label": "gap"
+ },
+ {
+  "id": "c0023",
+  "file": "data/playerDatabase.js",
+  "start": 612,
+  "end": 648,
+  "label": "func:deriveStatsFromAttributes"
+ },
+ {
+  "id": "c0024",
+  "file": "data/playerDatabase.js",
+  "start": 649,
+  "end": 649,
+  "label": "gap"
+ },
+ {
+  "id": "c0025",
+  "file": "data/playerDatabase.js",
+  "start": 650,
+  "end": 654,
+  "label": "func:weightedOverall"
+ },
+ {
+  "id": "c0025b",
+  "file": "data/playerDatabase.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:efootballBoostedOverall + overall system constants"
+ },
+ {
+  "id": "c0025c",
+  "file": "data/playerDatabase.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:positionalRawOverall + POSITION_ATTR_WEIGHTS"
+ },
+ {
+  "id": "c0026",
+  "file": "ai/managerAI.js",
+  "start": 655,
+  "end": 657,
+  "label": "gap"
+ },
+ {
+  "id": "c0027",
+  "file": "ai/managerAI.js",
+  "start": 658,
+  "end": 668,
+  "label": "func:managerAffinityBonus"
+ },
+ {
+  "id": "c0028",
+  "file": "data/playerDatabase.js",
+  "start": 669,
+  "end": 675,
+  "label": "gap"
+ },
+ {
+  "id": "c0029",
+  "file": "data/playerDatabase.js",
+  "start": 676,
+  "end": 714,
+  "label": "func:applyExpandedPlayerAttributes"
+ },
+ {
+  "id": "c0030",
+  "file": "data/playerDatabase.js",
+  "start": 715,
+  "end": 726,
+  "label": "gap"
+ },
+ {
+  "id": "c0031",
+  "file": "data/playerDatabase.js",
+  "start": 727,
+  "end": 729,
+  "label": "func:hasSkill"
+ },
+ {
+  "id": "c0032",
+  "file": "data/playerDatabase.js",
+  "start": 730,
+  "end": 733,
+  "label": "func:xattr"
+ },
+ {
+  "id": "c0032b",
+  "file": "data/playerDatabase.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:matchStateHelpers (skill context)"
+ },
+ {
+  "id": "c0033",
+  "file": "engine/shooting.js",
+  "start": 734,
+  "end": 735,
+  "label": "gap"
+ },
+ {
+  "id": "c0034",
+  "file": "engine/shooting.js",
+  "start": 736,
+  "end": 749,
+  "label": "func:finishingEdge"
+ },
+ {
+  "id": "cshoot01",
+  "file": "engine/shooting.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:positioningEdge"
+ },
+ {
+  "id": "cshoot02",
+  "file": "engine/shooting.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:shotPowerOf"
+ },
+ {
+  "id": "c0035",
+  "file": "engine/shooting.js",
+  "start": 750,
+  "end": 752,
+  "label": "gap"
+ },
+ {
+  "id": "c0036",
+  "file": "engine/shooting.js",
+  "start": 753,
+  "end": 762,
+  "label": "func:aerialSkill"
+ },
+ {
+  "id": "c0037",
+  "file": "engine/goalkeeper.js",
+  "start": 763,
+  "end": 763,
+  "label": "gap"
+ },
+ {
+  "id": "c0038",
+  "file": "engine/goalkeeper.js",
+  "start": 764,
+  "end": 769,
+  "label": "func:gkReflexEdge"
+ },
+ {
+  "id": "c0039",
+  "file": "engine/shooting.js",
+  "start": 770,
+  "end": 771,
+  "label": "gap"
+ },
+ {
+  "id": "c0040",
+  "file": "engine/shooting.js",
+  "start": 772,
+  "end": 778,
+  "label": "func:penTakerEdge"
+ },
+ {
+  "id": "c0041",
+  "file": "engine/goalkeeper.js",
+  "start": 779,
+  "end": 784,
+  "label": "func:penGkEdge"
+ },
+ {
+  "id": "cgk01",
+  "file": "engine/goalkeeper.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:gkPositioningEdge"
+ },
+ {
+  "id": "cgk02",
+  "file": "engine/goalkeeper.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:gkReachEdge"
+ },
+ {
+  "id": "cgk03",
+  "file": "engine/goalkeeper.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:gkCatchChance"
+ },
+ {
+  "id": "cgk04",
+  "file": "engine/goalkeeper.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:gkParryReboundDanger"
+ },
+ {
+  "id": "cgk05",
+  "file": "engine/goalkeeper.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:resolveGkSave"
+ },
+ {
+  "id": "c0042",
+  "file": "engine/shooting.js",
+  "start": 785,
+  "end": 785,
+  "label": "gap"
+ },
+ {
+  "id": "c0043",
+  "file": "engine/shooting.js",
+  "start": 786,
+  "end": 795,
+  "label": "func:fkTakerEdge"
+ },
+ {
+  "id": "c0044",
+  "file": "engine/shooting.js",
+  "start": 796,
+  "end": 796,
+  "label": "gap"
+ },
+ {
+  "id": "c0045",
+  "file": "engine/shooting.js",
+  "start": 797,
+  "end": 806,
+  "label": "func:dribbleSuccessEdge"
+ },
+ {
+  "id": "c0046",
+  "file": "engine/defending.js",
+  "start": 807,
+  "end": 808,
+  "label": "gap"
+ },
+ {
+  "id": "c0047",
+  "file": "engine/defending.js",
+  "start": 809,
+  "end": 823,
+  "label": "func:defActionEdge"
+ },
+ {
+  "id": "cdef01",
+  "file": "engine/defending.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:foulProneness"
+ },
+ {
+  "id": "c0048",
+  "file": "engine/injuries.js",
+  "start": 824,
+  "end": 824,
+  "label": "gap"
+ },
+ {
+  "id": "c0049",
+  "file": "engine/injuries.js",
+  "start": 825,
+  "end": 836,
+  "label": "func:injuryWeightMult"
+ },
+ {
+  "id": "c0050",
+  "file": "engine/possession.js",
+  "start": 837,
+  "end": 839,
+  "label": "gap"
+ },
+ {
+  "id": "c0051",
+  "file": "engine/possession.js",
+  "start": 840,
+  "end": 857,
+  "label": "func:pickPlayerCustomWeighted"
+ },
+ {
+  "id": "c0052",
+  "file": "ui/matchUI.js",
+  "start": 858,
+  "end": 1029,
+  "label": "gap"
+ },
+ {
+  "id": "c0053",
+  "file": "ui/matchUI.js",
+  "start": 1030,
+  "end": 1042,
+  "label": "func:bindNav"
+ },
+ {
+  "id": "c0054",
+  "file": "ui/matchUI.js",
+  "start": 1043,
+  "end": 1043,
+  "label": "gap"
+ },
+ {
+  "id": "c0055",
+  "file": "ui/matchUI.js",
+  "start": 1044,
+  "end": 1056,
+  "label": "func:switchView"
+ },
+ {
+  "id": "c0056",
+  "file": "ui/matchUI.js",
+  "start": 1057,
+  "end": 1057,
+  "label": "gap"
+ },
+ {
+  "id": "c0057",
+  "file": "ui/matchUI.js",
+  "start": 1058,
+  "end": 1079,
+  "label": "func:randomMatch"
+ },
+ {
+  "id": "c0057b",
+  "file": "ui/matchUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:randomizeTeamSide"
+ },
+ {
+  "id": "c0058",
+  "file": "ui/matchUI.js",
+  "start": 1080,
+  "end": 1080,
+  "label": "gap"
+ },
+ {
+  "id": "c0059",
+  "file": "ui/matchUI.js",
+  "start": 1081,
+  "end": 1096,
+  "label": "func:goToMatch"
+ },
+ {
+  "id": "c0060",
+  "file": "ui/seasonUI.js",
+  "start": 1097,
+  "end": 1097,
+  "label": "gap"
+ },
+ {
+  "id": "c0061",
+  "file": "ui/seasonUI.js",
+  "start": 1098,
+  "end": 1113,
+  "label": "func:goToTournament"
+ },
+ {
+  "id": "ccomp02",
+  "file": "ui/seasonUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:selectTournamentFormat"
+ },
+ {
+  "id": "ccomp03",
+  "file": "ui/seasonUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:applyTournamentBranding"
+ },
+ {
+  "id": "ccomp04",
+  "file": "ui/seasonUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:tourEngineBadgeLabel"
+ },
+ {
+  "id": "c0062",
+  "file": "data/teamDatabase.js",
+  "start": 1114,
+  "end": 1114,
+  "label": "gap"
+ },
+ {
+  "id": "c0063",
+  "file": "data/teamDatabase.js",
+  "start": 1115,
+  "end": 1143,
+  "label": "func:populateTeamSelects"
+ },
+ {
+  "id": "c0064",
+  "file": "data/teamDatabase.js",
+  "start": 1144,
+  "end": 1144,
+  "label": "gap"
+ },
+ {
+  "id": "c0065",
+  "file": "data/teamDatabase.js",
+  "start": 1145,
+  "end": 1153,
+  "label": "func:populateFormations"
+ },
+ {
+  "id": "c0066",
+  "file": "data/teamDatabase.js",
+  "start": 1154,
+  "end": 1154,
+  "label": "gap"
+ },
+ {
+  "id": "c0067",
+  "file": "data/teamDatabase.js",
+  "start": 1155,
+  "end": 1156,
+  "label": "func:getTeam"
+ },
+ {
+  "id": "c0068",
+  "file": "data/teamDatabase.js",
+  "start": 1157,
+  "end": 1158,
+  "label": "gap"
+ },
+ {
+  "id": "c0069",
+  "file": "data/teamDatabase.js",
+  "start": 1159,
+  "end": 1160,
+  "label": "func:getStadium"
+ },
+ {
+  "id": "c0070",
+  "file": "ui/playerUI.js",
+  "start": 1161,
+  "end": 1164,
+  "label": "gap"
+ },
+ {
+  "id": "c0071",
+  "file": "ui/playerUI.js",
+  "start": 1165,
+  "end": 1173,
+  "label": "func:teamMark"
+ },
+ {
+  "id": "c0072",
+  "file": "ui/playerUI.js",
+  "start": 1174,
+  "end": 1176,
+  "label": "gap"
+ },
+ {
+  "id": "c0073",
+  "file": "ui/playerUI.js",
+  "start": 1177,
+  "end": 1184,
+  "label": "func:teamAvatarMark"
+ },
+ {
+  "id": "c0074",
+  "file": "ui/playerUI.js",
+  "start": 1185,
+  "end": 1189,
+  "label": "gap"
+ },
+ {
+  "id": "c0075",
+  "file": "ui/playerUI.js",
+  "start": 1190,
+  "end": 1195,
+  "label": "func:resolvePlayerPortrait"
+ },
+ {
+  "id": "c0076",
+  "file": "ui/playerUI.js",
+  "start": 1196,
+  "end": 1201,
+  "label": "gap"
+ },
+ {
+  "id": "c0077",
+  "file": "ui/playerUI.js",
+  "start": 1202,
+  "end": 1207,
+  "label": "func:playerAvatarMark"
+ },
+ {
+  "id": "c0078",
+  "file": "ui/playerUI.js",
+  "start": 1208,
+  "end": 1212,
+  "label": "gap"
+ },
+ {
+  "id": "c0079",
+  "file": "ui/playerUI.js",
+  "start": 1213,
+  "end": 1221,
+  "label": "func:abbreviateName"
+ },
+ {
+  "id": "c0079b",
+  "file": "ui/playerUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:playerNameHTML"
+ },
+ {
+  "id": "c0080",
+  "file": "ui/playerUI.js",
+  "start": 1222,
+  "end": 1230,
+  "label": "gap"
+ },
+ {
+  "id": "c0081",
+  "file": "ui/playerUI.js",
+  "start": 1231,
+  "end": 1233,
+  "label": "func:initialsOf"
+ },
+ {
+  "id": "c0082",
+  "file": "ui/playerUI.js",
+  "start": 1234,
+  "end": 1240,
+  "label": "func:lbAvatar"
+ },
+ {
+  "id": "c0083",
+  "file": "ui/playerUI.js",
+  "start": 1241,
+  "end": 1241,
+  "label": "gap"
+ },
+ {
+  "id": "c0084",
+  "file": "ui/playerUI.js",
+  "start": 1242,
+  "end": 1244,
+  "label": "func:lbPlayerCell"
+ },
+ {
+  "id": "c0085",
+  "file": "ui/playerUI.js",
+  "start": 1245,
+  "end": 1245,
+  "label": "gap"
+ },
+ {
+  "id": "c0086",
+  "file": "ui/playerUI.js",
+  "start": 1246,
+  "end": 1252,
+  "label": "func:rankBadge"
+ },
+ {
+  "id": "c0087",
+  "file": "ui/playerUI.js",
+  "start": 1253,
+  "end": 1256,
+  "label": "gap"
+ },
+ {
+  "id": "c0088",
+  "file": "ui/playerUI.js",
+  "start": 1257,
+  "end": 1265,
+  "label": "func:trophyMark"
+ },
+ {
+  "id": "c0089",
+  "file": "ui/playerUI.js",
+  "start": 1266,
+  "end": 1270,
+  "label": "gap"
+ },
+ {
+  "id": "c0090",
+  "file": "ui/playerUI.js",
+  "start": 1271,
+  "end": 1279,
+  "label": "func:resolveManagerPortrait"
+ },
+ {
+  "id": "c0091",
+  "file": "ui/playerUI.js",
+  "start": 1280,
+  "end": 1286,
+  "label": "gap"
+ },
+ {
+  "id": "c0092",
+  "file": "ui/playerUI.js",
+  "start": 1287,
+  "end": 1292,
+  "label": "func:managerAvatarMark"
+ },
+ {
+  "id": "c0093",
+  "file": "ui/teamUI.js",
+  "start": 1293,
+  "end": 1293,
+  "label": "gap"
+ },
+ {
+  "id": "c0094",
+  "file": "ui/teamUI.js",
+  "start": 1294,
+  "end": 1307,
+  "label": "func:updateTeamPreview"
+ },
+ {
+  "id": "c0095",
+  "file": "engine/tactics.js",
+  "start": 1308,
+  "end": 1316,
+  "label": "gap"
+ },
+ {
+  "id": "c0096",
+  "file": "engine/tactics.js",
+  "start": 1317,
+  "end": 1344,
+  "label": "func:pickTeamFormation"
+ },
+ {
+  "id": "c0097",
+  "file": "ui/teamUI.js",
+  "start": 1345,
+  "end": 1345,
+  "label": "gap"
+ },
+ {
+  "id": "c0098",
+  "file": "ui/teamUI.js",
+  "start": 1346,
+  "end": 1441,
+  "label": "func:buildSquad"
+ },
+ {
+  "id": "c0099",
+  "file": "ui/teamUI.js",
+  "start": 1442,
+  "end": 1442,
+  "label": "gap"
+ },
+ {
+  "id": "c0100",
+  "file": "ui/teamUI.js",
+  "start": 1443,
+  "end": 1446,
+  "label": "func:canPlay"
+ },
+ {
+  "id": "c0101",
+  "file": "ui/teamUI.js",
+  "start": 1447,
+  "end": 1447,
+  "label": "gap"
+ },
+ {
+  "id": "c0102",
+  "file": "ui/teamUI.js",
+  "start": 1448,
+  "end": 1455,
+  "label": "func:shuffleArray"
+ },
+ {
+  "id": "c0103",
+  "file": "ui/teamUI.js",
+  "start": 1456,
+  "end": 1461,
+  "label": "gap"
+ },
+ {
+  "id": "c0104",
+  "file": "ui/teamUI.js",
+  "start": 1462,
+  "end": 1464,
+  "label": "func:onFormationChange"
+ },
+ {
+  "id": "c0105",
+  "file": "ui/teamUI.js",
+  "start": 1465,
+  "end": 1465,
+  "label": "gap"
+ },
+ {
+  "id": "c0106",
+  "file": "ui/teamUI.js",
+  "start": 1466,
+  "end": 1503,
+  "label": "func:openSquadBuilder"
+ },
+ {
+  "id": "c0107",
+  "file": "ui/teamUI.js",
+  "start": 1504,
+  "end": 1504,
+  "label": "gap"
+ },
+ {
+  "id": "c0108",
+  "file": "ui/teamUI.js",
+  "start": 1505,
+  "end": 1509,
+  "label": "func:getUsedInDraft"
+ },
+ {
+  "id": "c0109",
+  "file": "ui/teamUI.js",
+  "start": 1510,
+  "end": 1510,
+  "label": "gap"
+ },
+ {
+  "id": "c0110",
+  "file": "ui/teamUI.js",
+  "start": 1511,
+  "end": 1553,
+  "label": "func:renderSquadBuilderUI"
+ },
+ {
+  "id": "c0111",
+  "file": "ui/teamUI.js",
+  "start": 1554,
+  "end": 1554,
+  "label": "gap"
+ },
+ {
+  "id": "c0111b",
+  "file": "ui/teamUI.js",
+  "start": 1554,
+  "end": 1554,
+  "label": "func:sbEffectiveSlotCode,openSlotRolePicker,setSquadSlotRole"
+ },
+ {
+  "id": "c0112",
+  "file": "ui/teamUI.js",
+  "start": 1555,
+  "end": 1582,
+  "label": "func:openSlotPicker"
+ },
+ {
+  "id": "c0113",
+  "file": "ui/teamUI.js",
+  "start": 1583,
+  "end": 1583,
+  "label": "gap"
+ },
+ {
+  "id": "c0114",
+  "file": "ui/teamUI.js",
+  "start": 1584,
+  "end": 1587,
+  "label": "func:closeSlotPicker"
+ },
+ {
+  "id": "c0115",
+  "file": "ui/teamUI.js",
+  "start": 1588,
+  "end": 1589,
+  "label": "gap"
+ },
+ {
+  "id": "c0116",
+  "file": "ui/teamUI.js",
+  "start": 1590,
+  "end": 1602,
+  "label": "func:setSquadSlot"
+ },
+ {
+  "id": "c0117",
+  "file": "ui/teamUI.js",
+  "start": 1603,
+  "end": 1603,
+  "label": "gap"
+ },
+ {
+  "id": "c0118",
+  "file": "ui/teamUI.js",
+  "start": 1604,
+  "end": 1614,
+  "label": "func:toggleBench"
+ },
+ {
+  "id": "c0119",
+  "file": "ui/teamUI.js",
+  "start": 1615,
+  "end": 1615,
+  "label": "gap"
+ },
+ {
+  "id": "c0120",
+  "file": "ui/teamUI.js",
+  "start": 1616,
+  "end": 1624,
+  "label": "func:autoFillSquadBuilder"
+ },
+ {
+  "id": "c0121",
+  "file": "ui/teamUI.js",
+  "start": 1625,
+  "end": 1625,
+  "label": "gap"
+ },
+ {
+  "id": "c0122",
+  "file": "ui/teamUI.js",
+  "start": 1626,
+  "end": 1656,
+  "label": "func:saveSquadBuilder"
+ },
+ {
+  "id": "c0123",
+  "file": "ui/teamUI.js",
+  "start": 1657,
+  "end": 1657,
+  "label": "gap"
+ },
+ {
+  "id": "c0124",
+  "file": "ui/teamUI.js",
+  "start": 1658,
+  "end": 1662,
+  "label": "func:closeSquadBuilder"
+ },
+ {
+  "id": "c0125",
+  "file": "ui/teamUI.js",
+  "start": 1663,
+  "end": 1663,
+  "label": "gap"
+ },
+ {
+  "id": "c0126",
+  "file": "ui/teamUI.js",
+  "start": 1664,
+  "end": 1677,
+  "label": "func:dedupeSquad"
+ },
+ {
+  "id": "c0127",
+  "file": "engine/matchEngine.js",
+  "start": 1678,
+  "end": 1678,
+  "label": "gap"
+ },
+ {
+  "id": "c0128",
+  "file": "engine/matchEngine.js",
+  "start": 1679,
+  "end": 1758,
+  "label": "func:startMatch"
+ },
+ {
+  "id": "c0129",
+  "file": "engine/matchEngine.js",
+  "start": 1759,
+  "end": 1759,
+  "label": "gap"
+ },
+ {
+  "id": "c0130",
+  "file": "engine/matchEngine.js",
+  "start": 1760,
+  "end": 1762,
+  "label": "func:blankStats"
+ },
+ {
+  "id": "c0131",
+  "file": "ui/matchUI.js",
+  "start": 1763,
+  "end": 1766,
+  "label": "gap"
+ },
+ {
+  "id": "c0132",
+  "file": "ui/matchUI.js",
+  "start": 1767,
+  "end": 1788,
+  "label": "func:showETPrompt"
+ },
+ {
+  "id": "c0133",
+  "file": "ui/matchUI.js",
+  "start": 1789,
+  "end": 1789,
+  "label": "gap"
+ },
+ {
+  "id": "c0134",
+  "file": "ui/matchUI.js",
+  "start": 1790,
+  "end": 1793,
+  "label": "func:hideETPrompt"
+ },
+ {
+  "id": "c0135",
+  "file": "engine/matchEngine.js",
+  "start": 1794,
+  "end": 1794,
+  "label": "gap"
+ },
+ {
+  "id": "c0136",
+  "file": "engine/matchEngine.js",
+  "start": 1795,
+  "end": 1811,
+  "label": "func:continueToET"
+ },
+ {
+  "id": "c0137",
+  "file": "engine/matchEngine.js",
+  "start": 1812,
+  "end": 1812,
+  "label": "gap"
+ },
+ {
+  "id": "c0138",
+  "file": "engine/matchEngine.js",
+  "start": 1813,
+  "end": 1820,
+  "label": "func:continueToPens"
+ },
+ {
+  "id": "c0139",
+  "file": "engine/matchEngine.js",
+  "start": 1821,
+  "end": 1821,
+  "label": "gap"
+ },
+ {
+  "id": "c0140",
+  "file": "engine/matchEngine.js",
+  "start": 1822,
+  "end": 1829,
+  "label": "func:skipETAndEnd"
+ },
+ {
+  "id": "c0141",
+  "file": "engine/shooting.js",
+  "start": 1830,
+  "end": 1831,
+  "label": "gap"
+ },
+ {
+  "id": "c0142",
+  "file": "engine/shooting.js",
+  "start": 1832,
+  "end": 1881,
+  "label": "func:runPenaltyShootout"
+ },
+ {
+  "id": "c0143",
+  "file": "engine/shooting.js",
+  "start": 1882,
+  "end": 1884,
+  "label": "gap"
+ },
+ {
+  "id": "c0144",
+  "file": "engine/shooting.js",
+  "start": 1885,
+  "end": 1898,
+  "label": "func:takePenaltyKick"
+ },
+ {
+  "id": "c0145",
+  "file": "engine/shooting.js",
+  "start": 1899,
+  "end": 1901,
+  "label": "gap"
+ },
+ {
+  "id": "c0146",
+  "file": "engine/shooting.js",
+  "start": 1902,
+  "end": 1935,
+  "label": "func:stepPenaltyShootout"
+ },
+ {
+  "id": "c0147",
+  "file": "engine/shooting.js",
+  "start": 1936,
+  "end": 1936,
+  "label": "gap"
+ },
+ {
+  "id": "c0148",
+  "file": "engine/shooting.js",
+  "start": 1937,
+  "end": 1946,
+  "label": "func:finishPenaltyShootout"
+ },
+ {
+  "id": "c0149",
+  "file": "engine/shooting.js",
+  "start": 1947,
+  "end": 1947,
+  "label": "gap"
+ },
+ {
+  "id": "c0150",
+  "file": "engine/shooting.js",
+  "start": 1948,
+  "end": 1981,
+  "label": "func:maybeOffsideDisallow"
+ },
+ {
+  "id": "c0151",
+  "file": "engine/matchEngine.js",
+  "start": 1982,
+  "end": 1982,
+  "label": "gap"
+ },
+ {
+  "id": "c0152",
+  "file": "engine/matchEngine.js",
+  "start": 1983,
+  "end": 1989,
+  "label": "func:pushGoal"
+ },
+ {
+  "id": "c0153",
+  "file": "ui/matchUI.js",
+  "start": 1990,
+  "end": 1990,
+  "label": "gap"
+ },
+ {
+  "id": "c0154",
+  "file": "ui/matchUI.js",
+  "start": 1991,
+  "end": 2005,
+  "label": "func:renderGoalTimeline"
+ },
+ {
+  "id": "c0155",
+  "file": "engine/matchEngine.js",
+  "start": 2006,
+  "end": 2006,
+  "label": "gap"
+ },
+ {
+  "id": "c0156",
+  "file": "engine/matchEngine.js",
+  "start": 2007,
+  "end": 2027,
+  "label": "func:buildMatchReport"
+ },
+ {
+  "id": "c0157",
+  "file": "ui/matchUI.js",
+  "start": 2028,
+  "end": 2030,
+  "label": "gap"
+ },
+ {
+  "id": "c0158",
+  "file": "ui/matchUI.js",
+  "start": 2031,
+  "end": 2041,
+  "label": "func:renderRatingRow"
+ },
+ {
+  "id": "cx904",
+  "file": "ui/matchUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderCategorizedTeamStatsHTML"
+ },
+ {
+  "id": "c0159",
+  "file": "ui/matchUI.js",
+  "start": 2042,
+  "end": 2044,
+  "label": "gap"
+ },
+ {
+  "id": "c0160",
+  "file": "ui/matchUI.js",
+  "start": 2045,
+  "end": 2117,
+  "label": "func:showMatchReport"
+ },
+ {
+  "id": "c0161",
+  "file": "ui/matchUI.js",
+  "start": 2118,
+  "end": 2119,
+  "label": "gap"
+ },
+ {
+  "id": "c0162",
+  "file": "ui/matchUI.js",
+  "start": 2120,
+  "end": 2124,
+  "label": "func:showMatchReportLeg"
+ },
+ {
+  "id": "c0163",
+  "file": "ui/matchUI.js",
+  "start": 2125,
+  "end": 2125,
+  "label": "gap"
+ },
+ {
+  "id": "c0164",
+  "file": "ui/matchUI.js",
+  "start": 2126,
+  "end": 2132,
+  "label": "func:viewFixtureReport"
+ },
+ {
+  "id": "c0165",
+  "file": "ui/matchUI.js",
+  "start": 2133,
+  "end": 2133,
+  "label": "gap"
+ },
+ {
+  "id": "c0166",
+  "file": "ui/matchUI.js",
+  "start": 2134,
+  "end": 2148,
+  "label": "func:viewKnockoutReport"
+ },
+ {
+  "id": "c0167",
+  "file": "engine/matchEngine.js",
+  "start": 2149,
+  "end": 2150,
+  "label": "gap"
+ },
+ {
+  "id": "c0168",
+  "file": "engine/matchEngine.js",
+  "start": 2151,
+  "end": 2153,
+  "label": "func:blankPlayerMatchStats"
+ },
+ {
+  "id": "cx901",
+  "file": "engine/matchEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:posGroupOf"
+ },
+ {
+  "id": "cx902",
+  "file": "engine/matchEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:deriveExtendedMatchStats"
+ },
+ {
+  "id": "c0169",
+  "file": "engine/shooting.js",
+  "start": 2154,
+  "end": 2154,
+  "label": "gap"
+ },
+ {
+  "id": "c0170",
+  "file": "engine/shooting.js",
+  "start": 2155,
+  "end": 2213,
+  "label": "func:pickGoalMethod"
+ },
+ {
+  "id": "c0171",
+  "file": "engine/shooting.js",
+  "start": 2214,
+  "end": 2214,
+  "label": "gap"
+ },
+ {
+  "id": "c0172",
+  "file": "engine/shooting.js",
+  "start": 2215,
+  "end": 2232,
+  "label": "func:pickMissDesc"
+ },
+ {
+  "id": "c0173",
+  "file": "engine/shooting.js",
+  "start": 2233,
+  "end": 2233,
+  "label": "gap"
+ },
+ {
+  "id": "c0174",
+  "file": "engine/shooting.js",
+  "start": 2234,
+  "end": 2236,
+  "label": "func:sofascoreMiss"
+ },
+ {
+  "id": "c0175",
+  "file": "engine/goalkeeper.js",
+  "start": 2237,
+  "end": 2237,
+  "label": "gap"
+ },
+ {
+  "id": "c0176",
+  "file": "engine/goalkeeper.js",
+  "start": 2238,
+  "end": 2247,
+  "label": "func:sofascoreSave"
+ },
+ {
+  "id": "c0177",
+  "file": "engine/goalkeeper.js",
+  "start": 2248,
+  "end": 2249,
+  "label": "gap"
+ },
+ {
+  "id": "c0178",
+  "file": "engine/goalkeeper.js",
+  "start": 2250,
+  "end": 2261,
+  "label": "func:pickSaveDesc"
+ },
+ {
+  "id": "cgk06",
+  "file": "engine/goalkeeper.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:pickCatchDesc"
+ },
+ {
+  "id": "c0179",
+  "file": "engine/shooting.js",
+  "start": 2262,
+  "end": 2302,
+  "label": "gap"
+ },
+ {
+  "id": "c0180",
+  "file": "engine/shooting.js",
+  "start": 2303,
+  "end": 2331,
+  "label": "func:pickSkillDesc"
+ },
+ {
+  "id": "c0181",
+  "file": "engine/shooting.js",
+  "start": 2332,
+  "end": 2332,
+  "label": "gap"
+ },
+ {
+  "id": "c0182",
+  "file": "engine/shooting.js",
+  "start": 2333,
+  "end": 2356,
+  "label": "func:pickPenOutcome"
+ },
+ {
+  "id": "c0183",
+  "file": "engine/shooting.js",
+  "start": 2357,
+  "end": 2357,
+  "label": "gap"
+ },
+ {
+  "id": "c0184",
+  "file": "engine/shooting.js",
+  "start": 2358,
+  "end": 2375,
+  "label": "func:pickFkOutcome"
+ },
+ {
+  "id": "c0185",
+  "file": "engine/matchEngine.js",
+  "start": 2376,
+  "end": 2377,
+  "label": "gap"
+ },
+ {
+  "id": "c0186",
+  "file": "engine/matchEngine.js",
+  "start": 2378,
+  "end": 2505,
+  "label": "func:calcPlayerRating"
+ },
+ {
+  "id": "c0187",
+  "file": "engine/matchEngine.js",
+  "start": 2506,
+  "end": 2507,
+  "label": "gap"
+ },
+ {
+  "id": "c0188",
+  "file": "engine/matchEngine.js",
+  "start": 2508,
+  "end": 2509,
+  "label": "func:quickSimMatch"
+ },
+ {
+  "id": "c0189",
+  "file": "engine/matchEngine.js",
+  "start": 2510,
+  "end": 2527,
+  "label": "func:toggleSim"
+ },
+ {
+  "id": "c0190",
+  "file": "engine/matchEngine.js",
+  "start": 2528,
+  "end": 2528,
+  "label": "gap"
+ },
+ {
+  "id": "c0191",
+  "file": "engine/matchEngine.js",
+  "start": 2529,
+  "end": 2541,
+  "label": "func:setSpeed"
+ },
+ {
+  "id": "c0192",
+  "file": "engine/matchEngine.js",
+  "start": 2542,
+  "end": 2542,
+  "label": "gap"
+ },
+ {
+  "id": "c0193",
+  "file": "engine/matchEngine.js",
+  "start": 2543,
+  "end": 2562,
+  "label": "func:simToEnd"
+ },
+ {
+  "id": "c0194",
+  "file": "engine/matchEngine.js",
+  "start": 2563,
+  "end": 2570,
+  "label": "gap"
+ },
+ {
+  "id": "c0195",
+  "file": "engine/matchEngine.js",
+  "start": 2571,
+  "end": 2593,
+  "label": "func:finishMatch"
+ },
+ {
+  "id": "c0196",
+  "file": "engine/matchEngine.js",
+  "start": 2594,
+  "end": 2594,
+  "label": "gap"
+ },
+ {
+  "id": "c0197",
+  "file": "engine/matchEngine.js",
+  "start": 2595,
+  "end": 2601,
+  "label": "func:resetMatch"
+ },
+ {
+  "id": "c0198",
+  "file": "engine/matchEngine.js",
+  "start": 2602,
+  "end": 2602,
+  "label": "gap"
+ },
+ {
+  "id": "c0198a",
+  "file": "engine/matchEngine.js",
+  "start": 2603,
+  "end": 2612,
+  "label": "gap"
+ },
+ {
+  "id": "c0198b",
+  "file": "engine/matchEngine.js",
+  "start": 2613,
+  "end": 2637,
+  "label": "func:computeAddedTime"
+ },
+ {
+  "id": "c0198c",
+  "file": "engine/matchEngine.js",
+  "start": 2638,
+  "end": 2642,
+  "label": "gap"
+ },
+ {
+  "id": "c0198d",
+  "file": "engine/matchEngine.js",
+  "start": 2643,
+  "end": 2652,
+  "label": "func:describeAddedTime"
+ },
+ {
+  "id": "c0199",
+  "file": "engine/matchEngine.js",
+  "start": 2603,
+  "end": 2720,
+  "label": "func:tick"
+ },
+ {
+  "id": "c0200",
+  "file": "engine/defending.js",
+  "start": 2721,
+  "end": 2741,
+  "label": "gap"
+ },
+ {
+  "id": "c0201",
+  "file": "engine/defending.js",
+  "start": 2742,
+  "end": 2782,
+  "label": "func:simulateDefensiveActions"
+ },
+ {
+  "id": "c0203",
+  "file": "engine/passing.js",
+  "start": 2787,
+  "end": 2786,
+  "label": "table:LOFTED_PASS_SHARE"
+ },
+ {
+  "id": "c0204b",
+  "file": "engine/passing.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:simulateMinutePassing"
+ },
+ {
+  "id": "c0204",
+  "file": "engine/defending.js",
+  "start": 2857,
+  "end": 2885,
+  "label": "gap"
+ },
+ {
+  "id": "c0205",
+  "file": "engine/defending.js",
+  "start": 2886,
+  "end": 2890,
+  "label": "func:mirrorDefenderPos"
+ },
+ {
+  "id": "c0206",
+  "file": "engine/passing.js",
+  "start": 2891,
+  "end": 2893,
+  "label": "gap"
+ },
+ {
+  "id": "cpass01",
+  "file": "engine/passing.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:groundPassingAbility"
+ },
+ {
+  "id": "cpass02",
+  "file": "engine/passing.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:aerialPassingAbility"
+ },
+ {
+  "id": "c0207",
+  "file": "engine/passing.js",
+  "start": 2894,
+  "end": 2900,
+  "label": "func:passingAbility"
+ },
+ {
+  "id": "c0208",
+  "file": "engine/defending.js",
+  "start": 2901,
+  "end": 2907,
+  "label": "func:defensivePressure"
+ },
+ {
+  "id": "c0209",
+  "file": "engine/passing.js",
+  "start": 2908,
+  "end": 2914,
+  "label": "func:carryingAbility"
+ },
+ {
+  "id": "c0210",
+  "file": "engine/shooting.js",
+  "start": 2915,
+  "end": 2930,
+  "label": "gap"
+ },
+ {
+  "id": "c0211",
+  "file": "engine/shooting.js",
+  "start": 2931,
+  "end": 3025,
+  "label": "func:resolveShot"
+ },
+ {
+  "id": "c0212",
+  "file": "engine/shooting.js",
+  "start": 3026,
+  "end": 3027,
+  "label": "gap"
+ },
+ {
+  "id": "c0213",
+  "file": "engine/shooting.js",
+  "start": 3028,
+  "end": 3056,
+  "label": "func:resolveCorner"
+ },
+ {
+  "id": "c0214",
+  "file": "engine/passing.js",
+  "start": 3057,
+  "end": 3063,
+  "label": "gap"
+ },
+ {
+  "id": "c0215",
+  "file": "engine/passing.js",
+  "start": 3064,
+  "end": 3096,
+  "label": "func:resolveChanceCreation"
+ },
+ {
+  "id": "c0216",
+  "file": "engine/referee.js",
+  "start": 3097,
+  "end": 3107,
+  "label": "gap"
+ },
+ {
+  "id": "c0217",
+  "file": "engine/referee.js",
+  "start": 3108,
+  "end": 3198,
+  "label": "func:resolveFoul"
+ },
+ {
+  "id": "c0218",
+  "file": "engine/transitions.js",
+  "start": 3199,
+  "end": 3203,
+  "label": "gap"
+ },
+ {
+  "id": "c0219",
+  "file": "engine/transitions.js",
+  "start": 3204,
+  "end": 3212,
+  "label": "func:runFastBreak"
+ },
+ {
+  "id": "c0220",
+  "file": "engine/transitions.js",
+  "start": 3213,
+  "end": 3215,
+  "label": "gap"
+ },
+ {
+  "id": "c0221",
+  "file": "engine/transitions.js",
+  "start": 3216,
+  "end": 3260,
+  "label": "func:resolveTurnover"
+ },
+ {
+  "id": "c0222",
+  "file": "engine/possession.js",
+  "start": 3261,
+  "end": 3264,
+  "label": "gap"
+ },
+ {
+  "id": "c0223",
+  "file": "engine/possession.js",
+  "start": 3265,
+  "end": 3324,
+  "label": "func:runPossessionSequence"
+ },
+ {
+  "id": "c0224",
+  "file": "engine/matchEngine.js",
+  "start": 3325,
+  "end": 3329,
+  "label": "gap"
+ },
+ {
+  "id": "c0225",
+  "file": "engine/matchEngine.js",
+  "start": 3330,
+  "end": 3478,
+  "label": "func:maybeSecondaryMatchEvent"
+ },
+ {
+  "id": "c0226",
+  "file": "engine/matchEngine.js",
+  "start": 3479,
+  "end": 3482,
+  "label": "gap"
+ },
+ {
+  "id": "c0227",
+  "file": "engine/matchEngine.js",
+  "start": 3483,
+  "end": 3568,
+  "label": "func:generateEvents"
+ },
+ {
+  "id": "c0228",
+  "file": "engine/tactics.js",
+  "start": 3569,
+  "end": 3572,
+  "label": "gap"
+ },
+ {
+  "id": "c0229",
+  "file": "engine/tactics.js",
+  "start": 3573,
+  "end": 3582,
+  "label": "func:decideOpeningTactic"
+ },
+ {
+  "id": "c0230",
+  "file": "engine/matchEngine.js",
+  "start": 3583,
+  "end": 3583,
+  "label": "gap"
+ },
+ {
+  "id": "c0231",
+  "file": "engine/matchEngine.js",
+  "start": 3584,
+  "end": 3617,
+  "label": "func:calcTeamStrength"
+ },
+ {
+  "id": "c0232",
+  "file": "engine/possession.js",
+  "start": 3618,
+  "end": 3618,
+  "label": "gap"
+ },
+ {
+  "id": "c0233",
+  "file": "engine/possession.js",
+  "start": 3619,
+  "end": 3644,
+  "label": "func:pickPlayer"
+ },
+ {
+  "id": "c0234",
+  "file": "engine/possession.js",
+  "start": 3645,
+  "end": 3662,
+  "label": "gap"
+ },
+ {
+  "id": "c0235",
+  "file": "engine/possession.js",
+  "start": 3663,
+  "end": 3693,
+  "label": "func:pickPlayerWeighted"
+ },
+ {
+  "id": "c0236",
+  "file": "engine/tactics.js",
+  "start": 3694,
+  "end": 3695,
+  "label": "gap"
+ },
+ {
+  "id": "c0237",
+  "file": "engine/tactics.js",
+  "start": 3696,
+  "end": 3803,
+  "label": "func:trySubstitution"
+ },
+ {
+  "id": "c0238",
+  "file": "engine/tactics.js",
+  "start": 3804,
+  "end": 3810,
+  "label": "gap"
+ },
+ {
+  "id": "c0239",
+  "file": "engine/tactics.js",
+  "start": 3811,
+  "end": 3855,
+  "label": "func:handleRedCardReshuffle"
+ },
+ {
+  "id": "c0240",
+  "file": "engine/tactics.js",
+  "start": 3856,
+  "end": 3856,
+  "label": "gap"
+ },
+ {
+  "id": "c0241",
+  "file": "engine/tactics.js",
+  "start": 3857,
+  "end": 3881,
+  "label": "func:changeFormationLive"
+ },
+ {
+  "id": "c0242",
+  "file": "engine/tactics.js",
+  "start": 3882,
+  "end": 3882,
+  "label": "gap"
+ },
+ {
+  "id": "c0243",
+  "file": "engine/tactics.js",
+  "start": 3883,
+  "end": 3891,
+  "label": "func:setTacticsLive"
+ },
+ {
+  "id": "c0244",
+  "file": "engine/tactics.js",
+  "start": 3892,
+  "end": 3895,
+  "label": "gap"
+ },
+ {
+  "id": "c0245",
+  "file": "engine/tactics.js",
+  "start": 3896,
+  "end": 3900,
+  "label": "func:pickMoreAttackingFormation"
+ },
+ {
+  "id": "c0246",
+  "file": "engine/tactics.js",
+  "start": 3901,
+  "end": 3902,
+  "label": "gap"
+ },
+ {
+  "id": "c0247",
+  "file": "engine/tactics.js",
+  "start": 3903,
+  "end": 3907,
+  "label": "func:pickMoreDefensiveFormation"
+ },
+ {
+  "id": "c0248",
+  "file": "engine/tactics.js",
+  "start": 3908,
+  "end": 3919,
+  "label": "gap"
+ },
+ {
+  "id": "c0249",
+  "file": "engine/tactics.js",
+  "start": 3920,
+  "end": 3925,
+  "label": "func:runTacticalAI"
+ },
+ {
+  "id": "c0250",
+  "file": "engine/tactics.js",
+  "start": 3926,
+  "end": 3926,
+  "label": "gap"
+ },
+ {
+  "id": "c0251",
+  "file": "engine/tactics.js",
+  "start": 3927,
+  "end": 3984,
+  "label": "func:evaluateTacticalAI"
+ },
+ {
+  "id": "c0252",
+  "file": "engine/injuries.js",
+  "start": 3985,
+  "end": 3985,
+  "label": "gap"
+ },
+ {
+  "id": "c0253",
+  "file": "engine/injuries.js",
+  "start": 3986,
+  "end": 3989,
+  "label": "func:isPlayerInjured"
+ },
+ {
+  "id": "c0254",
+  "file": "engine/injuries.js",
+  "start": 3990,
+  "end": 3990,
+  "label": "gap"
+ },
+ {
+  "id": "c0255",
+  "file": "engine/injuries.js",
+  "start": 3991,
+  "end": 3994,
+  "label": "func:isPlayerSuspended"
+ },
+ {
+  "id": "c0256",
+  "file": "engine/injuries.js",
+  "start": 3995,
+  "end": 3995,
+  "label": "gap"
+ },
+ {
+  "id": "cinj01",
+  "file": "engine/injuries.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:pickInjuryDef"
+ },
+ {
+  "id": "c0257",
+  "file": "engine/injuries.js",
+  "start": 3996,
+  "end": 4066,
+  "label": "func:tryInjury"
+ },
+ {
+  "id": "c0258",
+  "file": "engine/injuries.js",
+  "start": 4067,
+  "end": 4067,
+  "label": "gap"
+ },
+ {
+  "id": "c0259",
+  "file": "engine/injuries.js",
+  "start": 4068,
+  "end": 4074,
+  "label": "func:removeFromPitch"
+ },
+ {
+  "id": "c0260",
+  "file": "engine/injuries.js",
+  "start": 4075,
+  "end": 4078,
+  "label": "gap"
+ },
+ {
+  "id": "c0261",
+  "file": "engine/injuries.js",
+  "start": 4079,
+  "end": 4084,
+  "label": "func:markLeftPitch"
+ },
+ {
+  "id": "c0262",
+  "file": "ui/matchUI.js",
+  "start": 4085,
+  "end": 4086,
+  "label": "gap"
+ },
+ {
+  "id": "c0263",
+  "file": "ui/matchUI.js",
+  "start": 4087,
+  "end": 4202,
+  "label": "func:renderMomentumAndHeat"
+ },
+ {
+  "id": "c0264",
+  "file": "engine/matchEngine.js",
+  "start": 4203,
+  "end": 4203,
+  "label": "gap"
+ },
+ {
+  "id": "c0265",
+  "file": "engine/matchEngine.js",
+  "start": 4204,
+  "end": 4440,
+  "label": "func:endMatch"
+ },
+ {
+  "id": "c0266",
+  "file": "ui/matchUI.js",
+  "start": 4441,
+  "end": 4441,
+  "label": "gap"
+ },
+ {
+  "id": "c0267",
+  "file": "ui/matchUI.js",
+  "start": 4442,
+  "end": 4456,
+  "label": "func:addEvent"
+ },
+ {
+  "id": "c0268",
+  "file": "ui/matchUI.js",
+  "start": 4457,
+  "end": 4457,
+  "label": "gap"
+ },
+ {
+  "id": "c0269",
+  "file": "ui/matchUI.js",
+  "start": 4458,
+  "end": 4500,
+  "label": "func:updateScoreboard"
+ },
+ {
+  "id": "c0270",
+  "file": "ui/matchUI.js",
+  "start": 4501,
+  "end": 4501,
+  "label": "gap"
+ },
+ {
+  "id": "c0271",
+  "file": "ui/matchUI.js",
+  "start": 4502,
+  "end": 4526,
+  "label": "func:updateStatsPanel"
+ },
+ {
+  "id": "c0272",
+  "file": "ui/matchUI.js",
+  "start": 4527,
+  "end": 4528,
+  "label": "gap"
+ },
+ {
+  "id": "c0273",
+  "file": "ui/matchUI.js",
+  "start": 4529,
+  "end": 4614,
+  "label": "func:renderPitch"
+ },
+ {
+  "id": "c0274",
+  "file": "ui/matchUI.js",
+  "start": 4615,
+  "end": 4616,
+  "label": "gap"
+ },
+ {
+  "id": "c0275",
+  "file": "ui/matchUI.js",
+  "start": 4617,
+  "end": 4629,
+  "label": "func:playerLineIcons"
+ },
+ {
+  "id": "c0276",
+  "file": "ui/matchUI.js",
+  "start": 4630,
+  "end": 4630,
+  "label": "gap"
+ },
+ {
+  "id": "c0277",
+  "file": "ui/matchUI.js",
+  "start": 4631,
+  "end": 4637,
+  "label": "func:liveRatingBadge"
+ },
+ {
+  "id": "c0278",
+  "file": "ui/matchUI.js",
+  "start": 4638,
+  "end": 4638,
+  "label": "gap"
+ },
+ {
+  "id": "c0279",
+  "file": "ui/matchUI.js",
+  "start": 4639,
+  "end": 4738,
+  "label": "func:renderLineups"
+ },
+ {
+  "id": "c0280",
+  "file": "ui/statisticsUI.js",
+  "start": 4739,
+  "end": 4742,
+  "label": "gap"
+ },
+ {
+  "id": "c0281",
+  "file": "ui/statisticsUI.js",
+  "start": 4743,
+  "end": 4745,
+  "label": "func:blankCompStats"
+ },
+ {
+  "id": "c0282",
+  "file": "ui/statisticsUI.js",
+  "start": 4746,
+  "end": 4746,
+  "label": "gap"
+ },
+ {
+  "id": "c0283",
+  "file": "ui/statisticsUI.js",
+  "start": 4747,
+  "end": 4749,
+  "label": "func:bumpStatBucket"
+ },
+ {
+  "id": "c0284",
+  "file": "ui/statisticsUI.js",
+  "start": 4750,
+  "end": 4753,
+  "label": "gap"
+ },
+ {
+  "id": "c0285",
+  "file": "ui/statisticsUI.js",
+  "start": 4754,
+  "end": 4762,
+  "label": "func:bumpStatBucketBy"
+ },
+ {
+  "id": "c0286",
+  "file": "ui/statisticsUI.js",
+  "start": 4763,
+  "end": 4763,
+  "label": "gap"
+ },
+ {
+  "id": "c0287",
+  "file": "ui/statisticsUI.js",
+  "start": 4764,
+  "end": 4774,
+  "label": "func:bumpRatingBucket"
+ },
+ {
+  "id": "c0287b",
+  "file": "ui/statisticsUI.js",
+  "start": 47,
+  "end": 50,
+  "label": "func:bumpRatingBucket"
+ },
+ {
+  "id": "c0287c",
+  "file": "ui/statisticsUI.js",
+  "start": 51,
+  "end": 66,
+  "label": "func:isBigGameContext"
+ },
+ {
+  "id": "c0288",
+  "file": "ui/statisticsUI.js",
+  "start": 4775,
+  "end": 4775,
+  "label": "gap"
+ },
+ {
+  "id": "c0289",
+  "file": "ui/statisticsUI.js",
+  "start": 4776,
+  "end": 4785,
+  "label": "func:recordRating"
+ },
+ {
+  "id": "c0290",
+  "file": "ui/statisticsUI.js",
+  "start": 4786,
+  "end": 4799,
+  "label": "gap"
+ },
+ {
+  "id": "c0291",
+  "file": "ui/statisticsUI.js",
+  "start": 4800,
+  "end": 4815,
+  "label": "func:updatePlayerForm"
+ },
+ {
+  "id": "c0292",
+  "file": "ui/statisticsUI.js",
+  "start": 4816,
+  "end": 4818,
+  "label": "gap"
+ },
+ {
+  "id": "c0293",
+  "file": "ui/statisticsUI.js",
+  "start": 4819,
+  "end": 4826,
+  "label": "func:formArrow"
+ },
+ {
+  "id": "c0294",
+  "file": "ui/statisticsUI.js",
+  "start": 4827,
+  "end": 4827,
+  "label": "gap"
+ },
+ {
+  "id": "c0295",
+  "file": "ui/statisticsUI.js",
+  "start": 4828,
+  "end": 4835,
+  "label": "func:formLabel"
+ },
+ {
+  "id": "c0296",
+  "file": "ui/statisticsUI.js",
+  "start": 4836,
+  "end": 4838,
+  "label": "gap"
+ },
+ {
+  "id": "c0297",
+  "file": "ui/statisticsUI.js",
+  "start": 4839,
+  "end": 4847,
+  "label": "func:collectPlayerFormsMap"
+ },
+ {
+  "id": "c0298",
+  "file": "data/playerDatabase.js",
+  "start": 4848,
+  "end": 4852,
+  "label": "func:persistPlayerForms"
+ },
+ {
+  "id": "c0299",
+  "file": "data/playerDatabase.js",
+  "start": 4853,
+  "end": 4867,
+  "label": "func:restorePlayerForms"
+ },
+ {
+  "id": "c0300",
+  "file": "data/playerDatabase.js",
+  "start": 4868,
+  "end": 4868,
+  "label": "gap"
+ },
+ {
+  "id": "c0301",
+  "file": "data/playerDatabase.js",
+  "start": 4869,
+  "end": 4917,
+  "label": "func:findPlayerTeams"
+ },
+ {
+  "id": "c0302",
+  "file": "ui/statisticsUI.js",
+  "start": 4918,
+  "end": 4918,
+  "label": "gap"
+ },
+ {
+  "id": "c0303",
+  "file": "ui/statisticsUI.js",
+  "start": 4919,
+  "end": 4929,
+  "label": "func:recordStat"
+ },
+ {
+  "id": "c0304",
+  "file": "ui/statisticsUI.js",
+  "start": 4930,
+  "end": 4932,
+  "label": "gap"
+ },
+ {
+  "id": "c0305",
+  "file": "ui/statisticsUI.js",
+  "start": 4933,
+  "end": 4942,
+  "label": "func:recordStatCount"
+ },
+ {
+  "id": "c0306",
+  "file": "simulation/seasonEngine.js",
+  "start": 4943,
+  "end": 4948,
+  "label": "gap"
+ },
+ {
+  "id": "c0307",
+  "file": "simulation/seasonEngine.js",
+  "start": 4949,
+  "end": 4951,
+  "label": "func:saveTrophiesToStorage"
+ },
+ {
+  "id": "c0308",
+  "file": "simulation/seasonEngine.js",
+  "start": 4952,
+  "end": 4957,
+  "label": "func:pushTeamTrophy"
+ },
+ {
+  "id": "c0309",
+  "file": "simulation/seasonEngine.js",
+  "start": 4958,
+  "end": 4964,
+  "label": "func:pushIndividualTrophy"
+ },
+ {
+  "id": "c0310",
+  "file": "simulation/seasonEngine.js",
+  "start": 4965,
+  "end": 4969,
+  "label": "gap"
+ },
+ {
+  "id": "c0311",
+  "file": "simulation/seasonEngine.js",
+  "start": 4970,
+  "end": 4976,
+  "label": "func:pushManagerAward"
+ },
+ {
+  "id": "c0312",
+  "file": "simulation/seasonEngine.js",
+  "start": 4977,
+  "end": 4979,
+  "label": "gap"
+ },
+ {
+  "id": "c0313",
+  "file": "simulation/seasonEngine.js",
+  "start": 4980,
+  "end": 4990,
+  "label": "func:recordIndividualAwardsFromAwardsObject"
+ },
+ {
+  "id": "c0314",
+  "file": "simulation/seasonEngine.js",
+  "start": 4991,
+  "end": 4996,
+  "label": "gap"
+ },
+ {
+  "id": "c0315",
+  "file": "simulation/seasonEngine.js",
+  "start": 4997,
+  "end": 5040,
+  "label": "func:computeBallonRanking"
+ },
+ {
+  "id": "c0315b",
+  "file": "simulation/seasonEngine.js",
+  "start": 5040,
+  "end": 5048,
+  "label": "func:computeBallonRanking"
+ },
+ {
+  "id": "c0316",
+  "file": "simulation/seasonEngine.js",
+  "start": 5041,
+  "end": 5047,
+  "label": "gap"
+ },
+ {
+  "id": "c0317",
+  "file": "simulation/seasonEngine.js",
+  "start": 5048,
+  "end": 5067,
+  "label": "func:archiveAndResetGlobalAwards"
+ },
+ {
+  "id": "c0318",
+  "file": "simulation/seasonEngine.js",
+  "start": 5068,
+  "end": 5072,
+  "label": "gap"
+ },
+ {
+  "id": "c0319",
+  "file": "simulation/seasonEngine.js",
+  "start": 5073,
+  "end": 5080,
+  "label": "func:finalizeSeasonIfComplete"
+ },
+ {
+  "id": "c0320",
+  "file": "simulation/seasonEngine.js",
+  "start": 5081,
+  "end": 5084,
+  "label": "gap"
+ },
+ {
+  "id": "c0321",
+  "file": "simulation/seasonEngine.js",
+  "start": 5085,
+  "end": 5088,
+  "label": "func:isQuotaError"
+ },
+ {
+  "id": "c0322",
+  "file": "simulation/seasonEngine.js",
+  "start": 5089,
+  "end": 5094,
+  "label": "gap"
+ },
+ {
+  "id": "c0323",
+  "file": "simulation/seasonEngine.js",
+  "start": 5095,
+  "end": 5106,
+  "label": "func:safeSetItem"
+ },
+ {
+  "id": "c0324",
+  "file": "simulation/seasonEngine.js",
+  "start": 5107,
+  "end": 5107,
+  "label": "gap"
+ },
+ {
+  "id": "c0325",
+  "file": "simulation/seasonEngine.js",
+  "start": 5108,
+  "end": 5117,
+  "label": "func:saveStats"
+ },
+ {
+  "id": "c0326",
+  "file": "simulation/seasonEngine.js",
+  "start": 5118,
+  "end": 5132,
+  "label": "func:loadStats"
+ },
+ {
+  "id": "c0327",
+  "file": "simulation/seasonEngine.js",
+  "start": 5133,
+  "end": 5140,
+  "label": "gap"
+ },
+ {
+  "id": "c0328",
+  "file": "simulation/seasonEngine.js",
+  "start": 5141,
+  "end": 5157,
+  "label": "func:persistAll"
+ },
+ {
+  "id": "c0329",
+  "file": "simulation/seasonEngine.js",
+  "start": 5158,
+  "end": 5158,
+  "label": "gap"
+ },
+ {
+  "id": "c0330",
+  "file": "simulation/seasonEngine.js",
+  "start": 5159,
+  "end": 5182,
+  "label": "func:loadPersistedGameState"
+ },
+ {
+  "id": "c0331",
+  "file": "simulation/seasonEngine.js",
+  "start": 5183,
+  "end": 5186,
+  "label": "gap"
+ },
+ {
+  "id": "c0332",
+  "file": "simulation/seasonEngine.js",
+  "start": 5187,
+  "end": 5207,
+  "label": "func:restoreTournamentUI"
+ },
+ {
+  "id": "c0333",
+  "file": "simulation/seasonEngine.js",
+  "start": 5208,
+  "end": 5208,
+  "label": "gap"
+ },
+ {
+  "id": "c0334",
+  "file": "simulation/seasonEngine.js",
+  "start": 5209,
+  "end": 5216,
+  "label": "func:restoreSeasonUI"
+ },
+ {
+  "id": "c0335",
+  "file": "simulation/seasonEngine.js",
+  "start": 5217,
+  "end": 5221,
+  "label": "gap"
+ },
+ {
+  "id": "c0336",
+  "file": "simulation/seasonEngine.js",
+  "start": 5222,
+  "end": 5227,
+  "label": "func:setupAutoSave"
+ },
+ {
+  "id": "c0337",
+  "file": "simulation/seasonEngine.js",
+  "start": 5228,
+  "end": 5233,
+  "label": "gap"
+ },
+ {
+  "id": "c0337b",
+  "file": "simulation/seasonEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:toggleSaveMenu"
+ },
+ {
+  "id": "c0338",
+  "file": "simulation/seasonEngine.js",
+  "start": 5234,
+  "end": 5253,
+  "label": "func:manualSave"
+ },
+ {
+  "id": "c0339",
+  "file": "simulation/seasonEngine.js",
+  "start": 5254,
+  "end": 5272,
+  "label": "gap"
+ },
+ {
+  "id": "c0340",
+  "file": "simulation/seasonEngine.js",
+  "start": 5273,
+  "end": 5304,
+  "label": "func:collectExportData"
+ },
+ {
+  "id": "c0341",
+  "file": "simulation/seasonEngine.js",
+  "start": 5305,
+  "end": 5305,
+  "label": "gap"
+ },
+ {
+  "id": "c0342",
+  "file": "simulation/seasonEngine.js",
+  "start": 5306,
+  "end": 5340,
+  "label": "func:exportSave"
+ },
+ {
+  "id": "c0343",
+  "file": "simulation/seasonEngine.js",
+  "start": 5341,
+  "end": 5341,
+  "label": "gap"
+ },
+ {
+  "id": "c0344",
+  "file": "simulation/seasonEngine.js",
+  "start": 5342,
+  "end": 5345,
+  "label": "func:triggerImportSave"
+ },
+ {
+  "id": "c0345",
+  "file": "simulation/seasonEngine.js",
+  "start": 5346,
+  "end": 5346,
+  "label": "gap"
+ },
+ {
+  "id": "c0346",
+  "file": "simulation/seasonEngine.js",
+  "start": 5347,
+  "end": 5395,
+  "label": "func:importSaveFile"
+ },
+ {
+  "id": "c0347",
+  "file": "ui/statisticsUI.js",
+  "start": 5396,
+  "end": 5396,
+  "label": "gap"
+ },
+ {
+  "id": "c0348",
+  "file": "ui/statisticsUI.js",
+  "start": 5397,
+  "end": 5416,
+  "label": "func:resetLeaderboard"
+ },
+ {
+  "id": "c0349",
+  "file": "ui/statisticsUI.js",
+  "start": 5417,
+  "end": 5417,
+  "label": "gap"
+ },
+ {
+  "id": "c0350",
+  "file": "ui/statisticsUI.js",
+  "start": 5418,
+  "end": 5452,
+  "label": "func:showLeaderboard"
+ },
+ {
+  "id": "c0351",
+  "file": "ui/seasonUI.js",
+  "start": 5453,
+  "end": 5453,
+  "label": "gap"
+ },
+ {
+  "id": "c0352",
+  "file": "ui/seasonUI.js",
+  "start": 5454,
+  "end": 5490,
+  "label": "func:renderTournamentTeamSelect"
+ },
+ {
+  "id": "c0353",
+  "file": "ui/seasonUI.js",
+  "start": 5491,
+  "end": 5491,
+  "label": "gap"
+ },
+ {
+  "id": "c0354",
+  "file": "ui/seasonUI.js",
+  "start": 5492,
+  "end": 5509,
+  "label": "func:updateTournamentSelectedCount"
+ },
+ {
+  "id": "c0355",
+  "file": "ui/seasonUI.js",
+  "start": 5510,
+  "end": 5511,
+  "label": "gap"
+ },
+ {
+  "id": "c0356",
+  "file": "ui/seasonUI.js",
+  "start": 5512,
+  "end": 5519,
+  "label": "func:selectAllTeams"
+ },
+ {
+  "id": "c0357",
+  "file": "ui/seasonUI.js",
+  "start": 5520,
+  "end": 5526,
+  "label": "func:deselectAllTeams"
+ },
+ {
+  "id": "c0358",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5527,
+  "end": 5527,
+  "label": "gap"
+ },
+ {
+  "id": "c0359",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5528,
+  "end": 5552,
+  "label": "func:startTournament"
+ },
+ {
+  "id": "c0360",
+  "file": "simulation/worldEngine.js",
+  "start": 5553,
+  "end": 5553,
+  "label": "gap"
+ },
+ {
+  "id": "c0361",
+  "file": "simulation/worldEngine.js",
+  "start": 5554,
+  "end": 5580,
+  "label": "func:startWorldCupTournament"
+ },
+ {
+  "id": "c0362",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5581,
+  "end": 5581,
+  "label": "gap"
+ },
+ {
+  "id": "c0363",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5582,
+  "end": 5617,
+  "label": "func:startUCLTournament"
+ },
+ {
+  "id": "cko0001",
+  "file": "simulation/knockoutEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:startKnockoutTournament"
+ },
+ {
+  "id": "ctle0001",
+  "file": "simulation/leagueTournamentEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:startLeagueTournament"
+ },
+ {
+  "id": "ctle0002",
+  "file": "simulation/leagueTournamentEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:finishLeagueTournament"
+ },
+ {
+  "id": "ctle0003",
+  "file": "simulation/leagueTournamentEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:simLeagueTournamentRound"
+ },
+ {
+  "id": "ctle0004",
+  "file": "simulation/leagueTournamentEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:simAllLeagueTournament"
+ },
+ {
+  "id": "ctle0005",
+  "file": "simulation/leagueTournamentEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:simLeagueTournamentFixture"
+ },
+ {
+  "id": "ctle0006",
+  "file": "simulation/leagueTournamentEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:playLeagueTournamentFixture"
+ },
+ {
+  "id": "ctlu0001",
+  "file": "ui/leagueTournamentUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderLeagueTableTournament"
+ },
+ {
+  "id": "ctlu0002",
+  "file": "ui/leagueTournamentUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderLeagueStandingsTableHTML"
+ },
+ {
+  "id": "ctlu0003",
+  "file": "ui/leagueTournamentUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderLeagueTournamentFixturesHTML"
+ },
+ {
+  "id": "c0364",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5618,
+  "end": 5618,
+  "label": "gap"
+ },
+ {
+  "id": "c0365",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5619,
+  "end": 5658,
+  "label": "func:generateUCLLeagueFixtures"
+ },
+ {
+  "id": "c0366",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5659,
+  "end": 5659,
+  "label": "gap"
+ },
+ {
+  "id": "c0367",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5660,
+  "end": 5662,
+  "label": "func:blankLeagueRow"
+ },
+ {
+  "id": "c0368",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5663,
+  "end": 5663,
+  "label": "gap"
+ },
+ {
+  "id": "c0369",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5664,
+  "end": 5674,
+  "label": "func:applyLeagueResult"
+ },
+ {
+  "id": "c0370",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5675,
+  "end": 5675,
+  "label": "gap"
+ },
+ {
+  "id": "c0371",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5676,
+  "end": 5680,
+  "label": "func:sortedLeague"
+ },
+ {
+  "id": "c0372",
+  "file": "ui/seasonUI.js",
+  "start": 5681,
+  "end": 5681,
+  "label": "gap"
+ },
+ {
+  "id": "c0373",
+  "file": "ui/seasonUI.js",
+  "start": 5682,
+  "end": 5705,
+  "label": "func:renderUCLLeague"
+ },
+ {
+  "id": "c0374",
+  "file": "ui/seasonUI.js",
+  "start": 5706,
+  "end": 5706,
+  "label": "gap"
+ },
+ {
+  "id": "c0375",
+  "file": "ui/seasonUI.js",
+  "start": 5707,
+  "end": 5760,
+  "label": "func:renderUCLFixtures"
+ },
+ {
+  "id": "c0376",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5761,
+  "end": 5762,
+  "label": "gap"
+ },
+ {
+  "id": "c0377",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5763,
+  "end": 5772,
+  "label": "func:generateGroupFixtures"
+ },
+ {
+  "id": "c0378",
+  "file": "ui/seasonUI.js",
+  "start": 5773,
+  "end": 5773,
+  "label": "gap"
+ },
+ {
+  "id": "c0379",
+  "file": "ui/seasonUI.js",
+  "start": 5774,
+  "end": 5820,
+  "label": "func:renderGroups"
+ },
+ {
+  "id": "c0380",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5821,
+  "end": 5821,
+  "label": "gap"
+ },
+ {
+  "id": "c0381",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5822,
+  "end": 5846,
+  "label": "func:simSingleFixture"
+ },
+ {
+  "id": "c0382",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5847,
+  "end": 5847,
+  "label": "gap"
+ },
+ {
+  "id": "c0383",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5848,
+  "end": 5879,
+  "label": "func:playTournamentMatch"
+ },
+ {
+  "id": "c0384",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5880,
+  "end": 5881,
+  "label": "gap"
+ },
+ {
+  "id": "c0385",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5882,
+  "end": 5888,
+  "label": "func:simTournamentRound"
+ },
+ {
+  "id": "c0386",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5889,
+  "end": 5889,
+  "label": "gap"
+ },
+ {
+  "id": "c0387",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5890,
+  "end": 5934,
+  "label": "func:_simTournamentRoundWork"
+ },
+ {
+  "id": "c0388",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5935,
+  "end": 5935,
+  "label": "gap"
+ },
+ {
+  "id": "c0389",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5936,
+  "end": 5941,
+  "label": "func:simAllTournament"
+ },
+ {
+  "id": "c0390",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5942,
+  "end": 5942,
+  "label": "gap"
+ },
+ {
+  "id": "c0391",
+  "file": "simulation/tournamentEngine.js",
+  "start": 5943,
+  "end": 6146,
+  "label": "func:_simAllTournamentWork"
+ },
+ {
+  "id": "c0392",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6147,
+  "end": 6148,
+  "label": "gap"
+ },
+ {
+  "id": "c0393",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6149,
+  "end": 6156,
+  "label": "func:simUCLFixture"
+ },
+ {
+  "id": "c0394",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6157,
+  "end": 6171,
+  "label": "func:_simUCLFixtureWork"
+ },
+ {
+  "id": "c0395",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6172,
+  "end": 6172,
+  "label": "gap"
+ },
+ {
+  "id": "c0396",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6173,
+  "end": 6202,
+  "label": "func:playUCLFixture"
+ },
+ {
+  "id": "c0397",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6203,
+  "end": 6204,
+  "label": "gap"
+ },
+ {
+  "id": "c0398",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6205,
+  "end": 6252,
+  "label": "func:advanceUCLFromLeague"
+ },
+ {
+  "id": "c0399",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6253,
+  "end": 6253,
+  "label": "gap"
+ },
+ {
+  "id": "c0400",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6254,
+  "end": 6280,
+  "label": "func:simPlayoffTie"
+ },
+ {
+  "id": "c0401",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6281,
+  "end": 6281,
+  "label": "gap"
+ },
+ {
+  "id": "c0402",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6282,
+  "end": 6295,
+  "label": "func:finishUCLPlayoffs"
+ },
+ {
+  "id": "c0403",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6296,
+  "end": 6296,
+  "label": "gap"
+ },
+ {
+  "id": "c0404",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6297,
+  "end": 6313,
+  "label": "func:buildUCLKnockoutFromTeams"
+ },
+ {
+  "id": "c0405",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6314,
+  "end": 6314,
+  "label": "gap"
+ },
+ {
+  "id": "c0406",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6315,
+  "end": 6331,
+  "label": "func:makeTwoLegTie"
+ },
+ {
+  "id": "c0407",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6332,
+  "end": 6332,
+  "label": "gap"
+ },
+ {
+  "id": "c0408",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6333,
+  "end": 6353,
+  "label": "func:simTwoLegTie"
+ },
+ {
+  "id": "c0409",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6354,
+  "end": 6354,
+  "label": "gap"
+ },
+ {
+  "id": "c0410",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6355,
+  "end": 6371,
+  "label": "func:simSingleFinal"
+ },
+ {
+  "id": "c0411",
+  "file": "ui/seasonUI.js",
+  "start": 6372,
+  "end": 6372,
+  "label": "gap"
+ },
+ {
+  "id": "c0412",
+  "file": "ui/seasonUI.js",
+  "start": 6373,
+  "end": 6388,
+  "label": "func:viewPlayoffReport"
+ },
+ {
+  "id": "c0413",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6389,
+  "end": 6390,
+  "label": "gap"
+ },
+ {
+  "id": "c0414",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6391,
+  "end": 6433,
+  "label": "func:advanceToKnockout"
+ },
+ {
+  "id": "c0415",
+  "file": "simulation/seasonEngine.js",
+  "start": 6434,
+  "end": 6434,
+  "label": "gap"
+ },
+ {
+  "id": "c0416",
+  "file": "simulation/seasonEngine.js",
+  "start": 6435,
+  "end": 6443,
+  "label": "func:getRoundName"
+ },
+ {
+  "id": "c0417",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6444,
+  "end": 6444,
+  "label": "gap"
+ },
+ {
+  "id": "c0418",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6445,
+  "end": 6456,
+  "label": "func:simKnockoutRound"
+ },
+ {
+  "id": "c0419",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6457,
+  "end": 6457,
+  "label": "gap"
+ },
+ {
+  "id": "c0420",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6458,
+  "end": 6503,
+  "label": "func:_simKnockoutRoundWork"
+ },
+ {
+  "id": "c0421",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6504,
+  "end": 6505,
+  "label": "gap"
+ },
+ {
+  "id": "c0422",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6506,
+  "end": 6526,
+  "label": "func:createNextKnockoutRound"
+ },
+ {
+  "id": "c0423",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6527,
+  "end": 6528,
+  "label": "gap"
+ },
+ {
+  "id": "c0424",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6529,
+  "end": 6559,
+  "label": "func:setChampion"
+ },
+ {
+  "id": "c0425",
+  "file": "ui/seasonUI.js",
+  "start": 6560,
+  "end": 6560,
+  "label": "gap"
+ },
+ {
+  "id": "c0426",
+  "file": "ui/seasonUI.js",
+  "start": 6561,
+  "end": 6594,
+  "label": "func:renderTournamentPodium"
+ },
+ {
+  "id": "c0427",
+  "file": "engine/matchEngine.js",
+  "start": 6595,
+  "end": 6596,
+  "label": "gap"
+ },
+ {
+  "id": "c0428",
+  "file": "engine/matchEngine.js",
+  "start": 6597,
+  "end": 6676,
+  "label": "func:simQuickMatch"
+ },
+ {
+  "id": "c0429",
+  "file": "engine/matchEngine.js",
+  "start": 6677,
+  "end": 6677,
+  "label": "gap"
+ },
+ {
+  "id": "c0430",
+  "file": "engine/matchEngine.js",
+  "start": 6678,
+  "end": 6683,
+  "label": "func:poisson"
+ },
+ {
+  "id": "c0431",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6684,
+  "end": 6685,
+  "label": "gap"
+ },
+ {
+  "id": "c0432",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6686,
+  "end": 6744,
+  "label": "func:assignTournamentAwards"
+ },
+ {
+  "id": "c0433",
+  "file": "ui/seasonUI.js",
+  "start": 6745,
+  "end": 6745,
+  "label": "gap"
+ },
+ {
+  "id": "c0434",
+  "file": "ui/seasonUI.js",
+  "start": 6746,
+  "end": 6769,
+  "label": "func:renderTournamentAwards"
+ },
+ {
+  "id": "c0435",
+  "file": "ui/seasonUI.js",
+  "start": 6770,
+  "end": 6770,
+  "label": "gap"
+ },
+ {
+  "id": "c0436",
+  "file": "ui/seasonUI.js",
+  "start": 6771,
+  "end": 6778,
+  "label": "func:refreshTournamentStatsUI"
+ },
+ {
+  "id": "c0437",
+  "file": "ui/seasonUI.js",
+  "start": 6779,
+  "end": 6779,
+  "label": "gap"
+ },
+ {
+  "id": "c0438",
+  "file": "ui/seasonUI.js",
+  "start": 6780,
+  "end": 6805,
+  "label": "func:renderTournamentLeaderboard"
+ },
+ {
+  "id": "c0439",
+  "file": "ui/seasonUI.js",
+  "start": 6806,
+  "end": 6806,
+  "label": "gap"
+ },
+ {
+  "id": "c0440",
+  "file": "ui/seasonUI.js",
+  "start": 6807,
+  "end": 6842,
+  "label": "func:renderBracket"
+ },
+ {
+  "id": "c0441",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6843,
+  "end": 6844,
+  "label": "gap"
+ },
+ {
+  "id": "c0442",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6845,
+  "end": 6854,
+  "label": "func:simKnockoutMatch"
+ },
+ {
+  "id": "c0443",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6855,
+  "end": 6871,
+  "label": "func:_simKnockoutMatchWork"
+ },
+ {
+  "id": "c0444",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6872,
+  "end": 6872,
+  "label": "gap"
+ },
+ {
+  "id": "c0445",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6873,
+  "end": 6907,
+  "label": "func:playKnockoutMatch"
+ },
+ {
+  "id": "c0446",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6908,
+  "end": 6909,
+  "label": "gap"
+ },
+ {
+  "id": "c0447",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6910,
+  "end": 6958,
+  "label": "func:afterKnockoutMatchPlayed"
+ },
+ {
+  "id": "c0448",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6959,
+  "end": 6960,
+  "label": "gap"
+ },
+ {
+  "id": "c0449",
+  "file": "simulation/tournamentEngine.js",
+  "start": 6961,
+  "end": 6977,
+  "label": "func:resetTournament"
+ },
+ {
+  "id": "c0450",
+  "file": "ui/teamUI.js",
+  "start": 6978,
+  "end": 6983,
+  "label": "gap"
+ },
+ {
+  "id": "c0451",
+  "file": "ui/teamUI.js",
+  "start": 6984,
+  "end": 6988,
+  "label": "func:teamAvgOvr"
+ },
+ {
+  "id": "c0452",
+  "file": "ui/teamUI.js",
+  "start": 6989,
+  "end": 6989,
+  "label": "gap"
+ },
+ {
+  "id": "c0453",
+  "file": "ui/teamUI.js",
+  "start": 6990,
+  "end": 6993,
+  "label": "func:filterTeams"
+ },
+ {
+  "id": "c0454",
+  "file": "ui/teamUI.js",
+  "start": 6994,
+  "end": 6994,
+  "label": "gap"
+ },
+ {
+  "id": "c0455",
+  "file": "ui/teamUI.js",
+  "start": 6995,
+  "end": 6998,
+  "label": "func:searchTeams"
+ },
+ {
+  "id": "c0456",
+  "file": "ui/teamUI.js",
+  "start": 6999,
+  "end": 6999,
+  "label": "gap"
+ },
+ {
+  "id": "c0457",
+  "file": "ui/teamUI.js",
+  "start": 7000,
+  "end": 7003,
+  "label": "func:sortTeams"
+ },
+ {
+  "id": "c0458",
+  "file": "ui/teamUI.js",
+  "start": 7004,
+  "end": 7004,
+  "label": "gap"
+ },
+ {
+  "id": "c0459",
+  "file": "ui/teamUI.js",
+  "start": 7005,
+  "end": 7022,
+  "label": "func:getFilteredTeamsList"
+ },
+ {
+  "id": "c0460",
+  "file": "ui/teamUI.js",
+  "start": 7023,
+  "end": 7023,
+  "label": "gap"
+ },
+ {
+  "id": "c0461",
+  "file": "ui/teamUI.js",
+  "start": 7024,
+  "end": 7047,
+  "label": "func:renderTeamsList"
+ },
+ {
+  "id": "tlu001",
+  "file": "ui/teamUI.js",
+  "start": 7047,
+  "end": 7047,
+  "label": "func:renderTeamLineupPitchHTML+showTeamLineup"
+ },
+ {
+  "id": "c0462",
+  "file": "ui/teamUI.js",
+  "start": 7048,
+  "end": 7048,
+  "label": "gap"
+ },
+ {
+  "id": "c0463",
+  "file": "ui/teamUI.js",
+  "start": 7049,
+  "end": 7052,
+  "label": "func:searchTournamentTeams"
+ },
+ {
+  "id": "c0464",
+  "file": "ui/matchUI.js",
+  "start": 7053,
+  "end": 7054,
+  "label": "gap"
+ },
+ {
+  "id": "c0465",
+  "file": "ui/matchUI.js",
+  "start": 7055,
+  "end": 7068,
+  "label": "func:showLoading"
+ },
+ {
+  "id": "c0466",
+  "file": "ui/matchUI.js",
+  "start": 7069,
+  "end": 7069,
+  "label": "gap"
+ },
+ {
+  "id": "c0467",
+  "file": "ui/matchUI.js",
+  "start": 7070,
+  "end": 7073,
+  "label": "func:hideLoading"
+ },
+ {
+  "id": "c0468",
+  "file": "ui/matchUI.js",
+  "start": 7074,
+  "end": 7074,
+  "label": "gap"
+ },
+ {
+  "id": "c0469",
+  "file": "ui/matchUI.js",
+  "start": 7075,
+  "end": 7097,
+  "label": "func:withLoading"
+ },
+ {
+  "id": "c0469b",
+  "file": "ui/matchUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:withLoadingProgress"
+ },
+ {
+  "id": "c0470",
+  "file": "ui/matchUI.js",
+  "start": 7098,
+  "end": 7098,
+  "label": "gap"
+ },
+ {
+  "id": "c0471",
+  "file": "ui/matchUI.js",
+  "start": 7099,
+  "end": 7107,
+  "label": "func:toast"
+ },
+ {
+  "id": "c0472",
+  "file": "ui/matchUI.js",
+  "start": 7108,
+  "end": 7109,
+  "label": "gap"
+ },
+ {
+  "id": "c0473",
+  "file": "ui/matchUI.js",
+  "start": 7110,
+  "end": 7128,
+  "label": "func:renderPostMatchRatings"
+ },
+ {
+  "id": "c0474",
+  "file": "ui/matchUI.js",
+  "start": 7129,
+  "end": 7129,
+  "label": "gap"
+ },
+ {
+  "id": "c0475",
+  "file": "ui/matchUI.js",
+  "start": 7130,
+  "end": 7151,
+  "label": "func:returnToTournament"
+ },
+ {
+  "id": "c0476",
+  "file": "ui/playerUI.js",
+  "start": 7152,
+  "end": 7155,
+  "label": "gap"
+ },
+ {
+  "id": "c0477",
+  "file": "ui/playerUI.js",
+  "start": 7156,
+  "end": 7163,
+  "label": "func:playerTrophyCabinetHTML"
+ },
+ {
+  "id": "c0478",
+  "file": "ui/playerUI.js",
+  "start": 7164,
+  "end": 7171,
+  "label": "gap"
+ },
+ {
+  "id": "c0478b",
+  "file": "ui/playerUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderPlayerBioHTML"
+ },
+ {
+  "id": "cstat01",
+  "file": "ui/playerUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:statTierClass"
+ },
+ {
+  "id": "c0479",
+  "file": "ui/playerUI.js",
+  "start": 7172,
+  "end": 7196,
+  "label": "func:expandedAttrRowsHTML"
+ },
+ {
+  "id": "c0480",
+  "file": "ui/playerUI.js",
+  "start": 7197,
+  "end": 7197,
+  "label": "gap"
+ },
+ {
+  "id": "c0481",
+  "file": "ui/playerUI.js",
+  "start": 7198,
+  "end": 7301,
+  "label": "func:showPlayerProfile"
+ },
+ {
+  "id": "c0482",
+  "file": "ui/playerUI.js",
+  "start": 7302,
+  "end": 7303,
+  "label": "gap"
+ },
+ {
+  "id": "c0483",
+  "file": "ui/playerUI.js",
+  "start": 7304,
+  "end": 7351,
+  "label": "func:showTeamProfile"
+ },
+ {
+  "id": "c0484",
+  "file": "ui/statisticsUI.js",
+  "start": 7352,
+  "end": 7353,
+  "label": "gap"
+ },
+ {
+  "id": "c0485",
+  "file": "ui/statisticsUI.js",
+  "start": 7354,
+  "end": 7505,
+  "label": "func:showAwards"
+ },
+ {
+  "id": "c0486",
+  "file": "ui/statisticsUI.js",
+  "start": 7506,
+  "end": 7510,
+  "label": "gap"
+ },
+ {
+  "id": "c0487",
+  "file": "ui/statisticsUI.js",
+  "start": 7511,
+  "end": 7515,
+  "label": "func:trophyGroupKey"
+ },
+ {
+  "id": "c0488",
+  "file": "ui/statisticsUI.js",
+  "start": 7516,
+  "end": 7523,
+  "label": "func:trophyGroupLabel"
+ },
+ {
+  "id": "c0489",
+  "file": "ui/statisticsUI.js",
+  "start": 7524,
+  "end": 7524,
+  "label": "gap"
+ },
+ {
+  "id": "c0490",
+  "file": "ui/statisticsUI.js",
+  "start": 7525,
+  "end": 7565,
+  "label": "func:showHistory"
+ },
+ {
+  "id": "c0491",
+  "file": "ui/seasonUI.js",
+  "start": 7566,
+  "end": 7567,
+  "label": "gap"
+ },
+ {
+  "id": "c0492",
+  "file": "ui/seasonUI.js",
+  "start": 7568,
+  "end": 7575,
+  "label": "func:goToSeason"
+ },
+ {
+  "id": "c0493",
+  "file": "simulation/seasonEngine.js",
+  "start": 7576,
+  "end": 7581,
+  "label": "gap"
+ },
+ {
+  "id": "c0494",
+  "file": "simulation/seasonEngine.js",
+  "start": 7582,
+  "end": 7584,
+  "label": "func:isCurrentSeasonSquad"
+ },
+ {
+  "id": "c0495",
+  "file": "simulation/seasonEngine.js",
+  "start": 7585,
+  "end": 7587,
+  "label": "func:seasonClubPool"
+ },
+ {
+  "id": "c0496",
+  "file": "simulation/seasonEngine.js",
+  "start": 7588,
+  "end": 7590,
+  "label": "gap"
+ },
+ {
+  "id": "c0497",
+  "file": "simulation/seasonEngine.js",
+  "start": 7591,
+  "end": 7593,
+  "label": "func:normalizeLeagueName"
+ },
+ {
+  "id": "c0498",
+  "file": "simulation/seasonEngine.js",
+  "start": 7594,
+  "end": 7599,
+  "label": "gap"
+ },
+ {
+  "id": "c0499",
+  "file": "simulation/seasonEngine.js",
+  "start": 7600,
+  "end": 7613,
+  "label": "func:getLeagueTeamPool"
+ },
+ {
+  "id": "c0500",
+  "file": "ui/seasonUI.js",
+  "start": 7614,
+  "end": 7614,
+  "label": "gap"
+ },
+ {
+  "id": "c0501",
+  "file": "ui/seasonUI.js",
+  "start": 7615,
+  "end": 7648,
+  "label": "func:renderSeasonSetup"
+ },
+ {
+  "id": "c0502",
+  "file": "ui/seasonUI.js",
+  "start": 7649,
+  "end": 7649,
+  "label": "gap"
+ },
+ {
+  "id": "c0503",
+  "file": "ui/seasonUI.js",
+  "start": 7650,
+  "end": 7653,
+  "label": "func:searchSeasonTeams"
+ },
+ {
+  "id": "c0504",
+  "file": "ui/seasonUI.js",
+  "start": 7654,
+  "end": 7654,
+  "label": "gap"
+ },
+ {
+  "id": "c0505",
+  "file": "ui/seasonUI.js",
+  "start": 7655,
+  "end": 7665,
+  "label": "func:toggleSeasonTeam"
+ },
+ {
+  "id": "c0506",
+  "file": "ui/seasonUI.js",
+  "start": 7666,
+  "end": 7666,
+  "label": "gap"
+ },
+ {
+  "id": "c0507",
+  "file": "ui/seasonUI.js",
+  "start": 7667,
+  "end": 7687,
+  "label": "func:autoFillSeason"
+ },
+ {
+  "id": "c0508",
+  "file": "ui/seasonUI.js",
+  "start": 7688,
+  "end": 7688,
+  "label": "gap"
+ },
+ {
+  "id": "c0509",
+  "file": "ui/seasonUI.js",
+  "start": 7689,
+  "end": 7692,
+  "label": "func:clearSeasonSetup"
+ },
+ {
+  "id": "c0510",
+  "file": "simulation/seasonEngine.js",
+  "start": 7693,
+  "end": 7694,
+  "label": "gap"
+ },
+ {
+  "id": "c0511",
+  "file": "simulation/seasonEngine.js",
+  "start": 7695,
+  "end": 7714,
+  "label": "func:circleMethodRounds"
+ },
+ {
+  "id": "c0512",
+  "file": "simulation/seasonEngine.js",
+  "start": 7715,
+  "end": 7715,
+  "label": "gap"
+ },
+ {
+  "id": "c0513",
+  "file": "simulation/seasonEngine.js",
+  "start": 7716,
+  "end": 7724,
+  "label": "func:buildDoubleRoundRobinRounds"
+ },
+ {
+  "id": "c0514",
+  "file": "simulation/seasonEngine.js",
+  "start": 7725,
+  "end": 7725,
+  "label": "gap"
+ },
+ {
+  "id": "c0515",
+  "file": "simulation/seasonEngine.js",
+  "start": 7726,
+  "end": 7728,
+  "label": "func:blankSeasonRow"
+ },
+ {
+  "id": "c0516",
+  "file": "simulation/seasonEngine.js",
+  "start": 7729,
+  "end": 7729,
+  "label": "gap"
+ },
+ {
+  "id": "c0517",
+  "file": "simulation/seasonEngine.js",
+  "start": 7730,
+  "end": 7739,
+  "label": "func:applyResultToTable"
+ },
+ {
+  "id": "c0518",
+  "file": "simulation/seasonEngine.js",
+  "start": 7740,
+  "end": 7740,
+  "label": "gap"
+ },
+ {
+  "id": "c0519",
+  "file": "simulation/seasonEngine.js",
+  "start": 7741,
+  "end": 7743,
+  "label": "func:sortedTable"
+ },
+ {
+  "id": "c0520",
+  "file": "simulation/seasonEngine.js",
+  "start": 7744,
+  "end": 7744,
+  "label": "gap"
+ },
+ {
+  "id": "c0521",
+  "file": "simulation/seasonEngine.js",
+  "start": 7745,
+  "end": 7749,
+  "label": "func:bracketSizeFor"
+ },
+ {
+  "id": "c0522",
+  "file": "simulation/seasonEngine.js",
+  "start": 7750,
+  "end": 7750,
+  "label": "gap"
+ },
+ {
+  "id": "c0523",
+  "file": "simulation/seasonEngine.js",
+  "start": 7751,
+  "end": 7755,
+  "label": "func:seedPairsForSize"
+ },
+ {
+  "id": "c0524",
+  "file": "simulation/seasonEngine.js",
+  "start": 7756,
+  "end": 7756,
+  "label": "gap"
+ },
+ {
+  "id": "c0525",
+  "file": "simulation/seasonEngine.js",
+  "start": 7757,
+  "end": 7762,
+  "label": "func:winnerOfResult"
+ },
+ {
+  "id": "c0526",
+  "file": "simulation/seasonEngine.js",
+  "start": 7763,
+  "end": 7763,
+  "label": "gap"
+ },
+ {
+  "id": "c0527",
+  "file": "simulation/seasonEngine.js",
+  "start": 7764,
+  "end": 7777,
+  "label": "func:simulateRoundFixtures"
+ },
+ {
+  "id": "c0528",
+  "file": "simulation/seasonEngine.js",
+  "start": 7778,
+  "end": 7778,
+  "label": "gap"
+ },
+ {
+  "id": "c0529",
+  "file": "simulation/seasonEngine.js",
+  "start": 7779,
+  "end": 7783,
+  "label": "func:buildKnockoutFixtures"
+ },
+ {
+  "id": "c0530",
+  "file": "simulation/seasonEngine.js",
+  "start": 7784,
+  "end": 7784,
+  "label": "gap"
+ },
+ {
+  "id": "c0531",
+  "file": "simulation/seasonEngine.js",
+  "start": 7785,
+  "end": 7794,
+  "label": "func:buildKnockoutFromWinners"
+ },
+ {
+  "id": "c0532",
+  "file": "simulation/seasonEngine.js",
+  "start": 7795,
+  "end": 7799,
+  "label": "gap"
+ },
+ {
+  "id": "c0533",
+  "file": "simulation/seasonEngine.js",
+  "start": 7800,
+  "end": 7807,
+  "label": "func:computeInitialUCLQualifiers"
+ },
+ {
+  "id": "c0534",
+  "file": "simulation/seasonEngine.js",
+  "start": 7808,
+  "end": 7808,
+  "label": "gap"
+ },
+ {
+  "id": "c0535",
+  "file": "simulation/seasonEngine.js",
+  "start": 7809,
+  "end": 7818,
+  "label": "func:computeUCLQualifiersFromStandings"
+ },
+ {
+  "id": "c0536",
+  "file": "simulation/seasonEngine.js",
+  "start": 7819,
+  "end": 7820,
+  "label": "gap"
+ },
+ {
+  "id": "c0537",
+  "file": "simulation/seasonEngine.js",
+  "start": 7821,
+  "end": 7879,
+  "label": "func:startSeason"
+ },
+ {
+  "id": "c0538",
+  "file": "simulation/seasonEngine.js",
+  "start": 7880,
+  "end": 7880,
+  "label": "gap"
+ },
+ {
+  "id": "c0539",
+  "file": "simulation/seasonEngine.js",
+  "start": 7881,
+  "end": 7891,
+  "label": "func:crownLeagueChampion"
+ },
+ {
+  "id": "c0540",
+  "file": "simulation/seasonEngine.js",
+  "start": 7892,
+  "end": 7892,
+  "label": "gap"
+ },
+ {
+  "id": "c0541",
+  "file": "simulation/seasonEngine.js",
+  "start": 7893,
+  "end": 7904,
+  "label": "func:simulateLeagueRound"
+ },
+ {
+  "id": "c0542",
+  "file": "simulation/seasonEngine.js",
+  "start": 7905,
+  "end": 7909,
+  "label": "gap"
+ },
+ {
+  "id": "c0543",
+  "file": "simulation/seasonEngine.js",
+  "start": 7910,
+  "end": 7919,
+  "label": "func:buildUCLBracketFromLeagueTable"
+ },
+ {
+  "id": "c0544",
+  "file": "simulation/seasonEngine.js",
+  "start": 7920,
+  "end": 7920,
+  "label": "gap"
+ },
+ {
+  "id": "c0545",
+  "file": "simulation/seasonEngine.js",
+  "start": 7921,
+  "end": 7967,
+  "label": "func:simulateUCLStep"
+ },
+ {
+  "id": "c0546",
+  "file": "simulation/seasonEngine.js",
+  "start": 7968,
+  "end": 7976,
+  "label": "gap"
+ },
+ {
+  "id": "c0547",
+  "file": "simulation/seasonEngine.js",
+  "start": 7977,
+  "end": 7985,
+  "label": "func:computeSeasonWeek"
+ },
+ {
+  "id": "c0547b",
+  "file": "simulation/seasonEngine.js",
+  "start": 41727,
+  "end": 42903,
+  "label": "func:seasonCompEntries"
+ },
+ {
+  "id": "c0547c",
+  "file": "simulation/seasonEngine.js",
+  "start": 42926,
+  "end": 43363,
+  "label": "func:seasonCompDoneWithMatchday"
+ },
+ {
+  "id": "c0547d",
+  "file": "simulation/seasonEngine.js",
+  "start": 43386,
+  "end": 43867,
+  "label": "func:seasonCompCanPlayNow"
+ },
+ {
+  "id": "c0547e",
+  "file": "simulation/seasonEngine.js",
+  "start": 43890,
+  "end": 44895,
+  "label": "func:seasonMatchesDue"
+ },
+ {
+  "id": "c0548",
+  "file": "simulation/seasonEngine.js",
+  "start": 7986,
+  "end": 7990,
+  "label": "gap"
+ },
+ {
+  "id": "c0549",
+  "file": "simulation/seasonEngine.js",
+  "start": 7991,
+  "end": 8007,
+  "label": "func:advanceSeasonRoundIfComplete"
+ },
+ {
+  "id": "c0550",
+  "file": "simulation/seasonEngine.js",
+  "start": 8008,
+  "end": 8010,
+  "label": "gap"
+ },
+ {
+  "id": "c0551",
+  "file": "simulation/seasonEngine.js",
+  "start": 8011,
+  "end": 8034,
+  "label": "func:simSeasonFixture"
+ },
+ {
+  "id": "c0552",
+  "file": "simulation/seasonEngine.js",
+  "start": 8035,
+  "end": 8038,
+  "label": "gap"
+ },
+ {
+  "id": "c0553",
+  "file": "simulation/seasonEngine.js",
+  "start": 8039,
+  "end": 8075,
+  "label": "func:playSeasonFixture"
+ },
+ {
+  "id": "c0554",
+  "file": "simulation/seasonEngine.js",
+  "start": 8076,
+  "end": 8076,
+  "label": "gap"
+ },
+ {
+  "id": "c0555",
+  "file": "simulation/seasonEngine.js",
+  "start": 8077,
+  "end": 8080,
+  "label": "func:seasonIsComplete"
+ },
+ {
+  "id": "c0556",
+  "file": "simulation/seasonEngine.js",
+  "start": 8081,
+  "end": 8081,
+  "label": "gap"
+ },
+ {
+  "id": "c0557",
+  "file": "simulation/seasonEngine.js",
+  "start": 8082,
+  "end": 8091,
+  "label": "func:simulateSeasonWeek"
+ },
+ {
+  "id": "c0558",
+  "file": "simulation/seasonEngine.js",
+  "start": 8092,
+  "end": 8092,
+  "label": "gap"
+ },
+ {
+  "id": "c0559",
+  "file": "simulation/seasonEngine.js",
+  "start": 8093,
+  "end": 8106,
+  "label": "func:simulateSeasonToEnd"
+ },
+ {
+  "id": "c0560",
+  "file": "simulation/seasonEngine.js",
+  "start": 8107,
+  "end": 8107,
+  "label": "gap"
+ },
+ {
+  "id": "c0561",
+  "file": "simulation/seasonEngine.js",
+  "start": 8108,
+  "end": 8140,
+  "label": "func:startNewSeasonYear"
+ },
+ {
+  "id": "c0562",
+  "file": "simulation/seasonEngine.js",
+  "start": 8141,
+  "end": 8141,
+  "label": "gap"
+ },
+ {
+  "id": "c0563",
+  "file": "simulation/seasonEngine.js",
+  "start": 8142,
+  "end": 8158,
+  "label": "func:resetSeason"
+ },
+ {
+  "id": "c0564",
+  "file": "ui/seasonUI.js",
+  "start": 8159,
+  "end": 8159,
+  "label": "gap"
+ },
+ {
+  "id": "c0565",
+  "file": "ui/seasonUI.js",
+  "start": 8160,
+  "end": 8164,
+  "label": "func:showSeasonComp"
+ },
+ {
+  "id": "c0566",
+  "file": "ui/seasonUI.js",
+  "start": 8165,
+  "end": 8165,
+  "label": "gap"
+ },
+ {
+  "id": "c0567",
+  "file": "ui/seasonUI.js",
+  "start": 8166,
+  "end": 8169,
+  "label": "func:showSeasonSubTab"
+ },
+ {
+  "id": "c0568",
+  "file": "ui/seasonUI.js",
+  "start": 8170,
+  "end": 8170,
+  "label": "gap"
+ },
+ {
+  "id": "cx903",
+  "file": "ui/seasonUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderFixtureCongestionHTML"
+ },
+ {
+  "id": "c0569",
+  "file": "ui/seasonUI.js",
+  "start": 8171,
+  "end": 8212,
+  "label": "func:renderSeasonDashboard"
+ },
+ {
+  "id": "c0570",
+  "file": "ui/statisticsUI.js",
+  "start": 8213,
+  "end": 8214,
+  "label": "gap"
+ },
+ {
+  "id": "c0571",
+  "file": "ui/statisticsUI.js",
+  "start": 8215,
+  "end": 8217,
+  "label": "func:compStatTop"
+ },
+ {
+  "id": "c0572",
+  "file": "ui/statisticsUI.js",
+  "start": 8218,
+  "end": 8218,
+  "label": "gap"
+ },
+ {
+  "id": "c0573",
+  "file": "ui/statisticsUI.js",
+  "start": 8219,
+  "end": 8222,
+  "label": "func:compApps"
+ },
+ {
+  "id": "c0574",
+  "file": "ui/statisticsUI.js",
+  "start": 8223,
+  "end": 8223,
+  "label": "gap"
+ },
+ {
+  "id": "c0575",
+  "file": "ui/statisticsUI.js",
+  "start": 8224,
+  "end": 8232,
+  "label": "func:renderCompStatTable"
+ },
+ {
+  "id": "c0576",
+  "file": "ui/statisticsUI.js",
+  "start": 8233,
+  "end": 8233,
+  "label": "gap"
+ },
+ {
+  "id": "c0577",
+  "file": "ui/statisticsUI.js",
+  "start": 8234,
+  "end": 8244,
+  "label": "func:renderCompStatsHTML"
+ },
+ {
+  "id": "c0578",
+  "file": "ui/statisticsUI.js",
+  "start": 8245,
+  "end": 8245,
+  "label": "gap"
+ },
+ {
+  "id": "c0579",
+  "file": "ui/statisticsUI.js",
+  "start": 8246,
+  "end": 8265,
+  "label": "func:assignCompAwards"
+ },
+ {
+  "id": "c0580",
+  "file": "ui/statisticsUI.js",
+  "start": 8266,
+  "end": 8266,
+  "label": "gap"
+ },
+ {
+  "id": "c0581",
+  "file": "ui/statisticsUI.js",
+  "start": 8267,
+  "end": 8292,
+  "label": "func:renderCompAwardsHTML"
+ },
+ {
+  "id": "c0582",
+  "file": "ui/seasonUI.js",
+  "start": 8293,
+  "end": 8295,
+  "label": "gap"
+ },
+ {
+  "id": "c0583",
+  "file": "ui/seasonUI.js",
+  "start": 8296,
+  "end": 8316,
+  "label": "func:renderSeasonTrophyRoomHTML"
+ },
+ {
+  "id": "c0584",
+  "file": "ui/seasonUI.js",
+  "start": 8317,
+  "end": 8317,
+  "label": "gap"
+ },
+ {
+  "id": "c0585",
+  "file": "ui/seasonUI.js",
+  "start": 8318,
+  "end": 8328,
+  "label": "func:renderStandingsTable"
+ },
+ {
+  "id": "c0586",
+  "file": "ui/seasonUI.js",
+  "start": 8329,
+  "end": 8329,
+  "label": "gap"
+ },
+ {
+  "id": "c0587",
+  "file": "ui/seasonUI.js",
+  "start": 8330,
+  "end": 8374,
+  "label": "func:renderFixtureList"
+ },
+ {
+  "id": "c0588",
+  "file": "ui/seasonUI.js",
+  "start": 8375,
+  "end": 8375,
+  "label": "gap"
+ },
+ {
+  "id": "c0589",
+  "file": "ui/seasonUI.js",
+  "start": 8376,
+  "end": 8384,
+  "label": "func:renderLeagueCompHTML"
+ },
+ {
+  "id": "c0590",
+  "file": "ui/seasonUI.js",
+  "start": 8385,
+  "end": 8385,
+  "label": "gap"
+ },
+ {
+  "id": "c0591",
+  "file": "ui/seasonUI.js",
+  "start": 8386,
+  "end": 8403,
+  "label": "func:renderKnockoutRoundHTML"
+ },
+ {
+  "id": "c0592",
+  "file": "ui/seasonUI.js",
+  "start": 8404,
+  "end": 8404,
+  "label": "gap"
+ },
+ {
+  "id": "c0593",
+  "file": "ui/seasonUI.js",
+  "start": 8405,
+  "end": 8420,
+  "label": "func:renderUCLSeasonHTML"
+ },
+ {
+  "id": "c0594",
+  "file": "ui/seasonUI.js",
+  "start": 8421,
+  "end": 8421,
+  "label": "gap"
+ },
+ {
+  "id": "c0595",
+  "file": "ui/seasonUI.js",
+  "start": 8422,
+  "end": 8426,
+  "label": "func:viewSeasonReport"
+ },
+ {
+  "id": "c0596",
+  "file": "ui/teamUI.js",
+  "start": 8427,
+  "end": 8427,
+  "label": "gap"
+ },
+ {
+  "id": "c0597",
+  "file": "ui/teamUI.js",
+  "start": 8428,
+  "end": 8443,
+  "label": "func:goToSquadBuilder"
+ },
+ {
+  "id": "ctml01",
+  "file": "ui/teamUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "team-match-log-store"
+ },
+ {
+  "id": "ctml02",
+  "file": "ui/teamUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderTeamMatchLogHTML"
+ },
+ {
+  "id": "cp001",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp002",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp003",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp004",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp005",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp006",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp007",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp008",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp009",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp010",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp011",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp012",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp013",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp014",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp015",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp016",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp017",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp018",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp018b",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp018c",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp019",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp020",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp021",
+  "file": "ui/playersUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "players-tab"
+ },
+ {
+  "id": "cp022",
+  "file": "engine/matchEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "player-match-log"
+ },
+ {
+  "id": "cp023",
+  "file": "engine/matchEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "player-match-log"
+ },
+ {
+  "id": "cp024",
+  "file": "engine/matchEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "player-match-log"
+ },
+ {
+  "id": "cp024b",
+  "file": "engine/matchEngine.js",
+  "start": -1,
+  "end": -1,
+  "label": "team-match-log"
+ },
+ {
+  "id": "chos01",
+  "file": "ui/hospitalUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "hospitalFilter state"
+ },
+ {
+  "id": "chos02",
+  "file": "ui/hospitalUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:getHospitalEntries"
+ },
+ {
+  "id": "chos03",
+  "file": "ui/hospitalUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:hospitalSeverityClass"
+ },
+ {
+  "id": "chos04",
+  "file": "ui/hospitalUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:hospitalCauseLine"
+ },
+ {
+  "id": "chos05",
+  "file": "ui/hospitalUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:renderHospitalList"
+ },
+ {
+  "id": "chos06",
+  "file": "ui/hospitalUI.js",
+  "start": -1,
+  "end": -1,
+  "label": "func:searchHospital,filterHospitalSeverity,sortHospital"
+ },
+ {
+  "id": "c0598",
+  "file": "ui/matchUI.js",
+  "start": 8444,
+  "end": 8478,
+  "label": "gap"
+ },
+ {
+  "id": "c0599",
+  "file": "ui/matchUI.js",
+  "start": 8479,
+  "end": 8481,
+  "label": "func:closeAllPanels"
+ },
+ {
+  "id": "c0600",
+  "file": "ui/matchUI.js",
+  "start": 8482,
+  "end": 8482,
+  "label": "gap"
+ },
+ {
+  "id": "c0601",
+  "file": "ui/matchUI.js",
+  "start": 8483,
+  "end": 8493,
+  "label": "func:collectOptions"
+ },
+ {
+  "id": "c0602",
+  "file": "ui/matchUI.js",
+  "start": 8494,
+  "end": 8494,
+  "label": "gap"
+ },
+ {
+  "id": "c0603",
+  "file": "ui/matchUI.js",
+  "start": 8495,
+  "end": 8603,
+  "label": "func:enhanceSelect"
+ },
+ {
+  "id": "c0604",
+  "file": "ui/matchUI.js",
+  "start": 8604,
+  "end": 8607,
+  "label": "gap"
+ },
+ {
+  "id": "c0605",
+  "file": "ui/matchUI.js",
+  "start": 8608,
+  "end": 8610,
+  "label": "func:scanAndEnhance"
+ },
+ {
+  "id": "c0606",
+  "file": "ui/matchUI.js",
+  "start": 8611,
+  "end": 8628,
+  "label": "gap"
+ },
+ {
+  "id": "c0607",
+  "file": "ui/matchUI.js",
+  "start": 8629,
+  "end": 8650,
+  "label": "func:init"
+ },
+ {
+  "id": "c0608",
+  "file": "js/main.js",
+  "start": 8651,
+  "end": 8661,
+  "label": "gap"
+ }
 ]

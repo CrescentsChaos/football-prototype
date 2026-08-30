@@ -2448,3 +2448,52 @@ select.ss-native {
 .tour-themed .bracket-team.winner {
   box-shadow: inset 3px 0 0 var(--tour-color, var(--gold));
 }
+
+/* Format badge — stamped next to the competition title/logo so every
+   tournament visibly announces what KIND of competition it is (league
+   season, knockout cup, group stage, league phase) rather than relying on
+   color alone to tell formats apart. See tourEngineBadgeLabel() in
+   ui/seasonUI.js. */
+.tour-format-badge {
+  font-family: var(--font);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--tour-color-dim, var(--border-strong));
+  color: var(--tour-color, var(--gold));
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Domestic league (table format) standings — a real broadcast-table look:
+   gold row for the champion spot, a blue-tinted band for continental
+   qualification places, a red-tinted band for the relegation zone. Purely
+   visual zone striping (no promotion/relegation mechanic), same spirit as
+   any real league table graphic. */
+.league-standings-table .lg-pos { font-weight: 700; color: var(--text-2); width: 28px; }
+.league-standings-table tr.lg-zone-champion {
+  background: linear-gradient(90deg, rgba(240,193,75,0.16), transparent 70%);
+}
+.league-standings-table tr.lg-zone-champion .lg-pos { color: var(--gold); }
+.league-standings-table tr.lg-zone-continental {
+  background: linear-gradient(90deg, rgba(61,139,253,0.10), transparent 70%);
+}
+.league-standings-table tr.lg-zone-continental .lg-pos { color: var(--blue); }
+.league-standings-table tr.lg-zone-relegation {
+  background: linear-gradient(90deg, rgba(239,68,68,0.10), transparent 70%);
+}
+.league-standings-table tr.lg-zone-relegation .lg-pos { color: var(--red); }
+.lg-table-legend {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  margin-top: 10px; font-size: 0.72rem; color: var(--text-2);
+}
+.lg-legend-item { display: flex; align-items: center; gap: 6px; }
+.lg-legend-item i {
+  display: inline-block; width: 10px; height: 10px; border-radius: 3px; font-style: normal;
+}
+.lg-legend-item i.lg-zone-champion { background: var(--gold); }
+.lg-legend-item i.lg-zone-continental { background: var(--blue); }
+.lg-legend-item i.lg-zone-relegation { background: var(--red); }
