@@ -436,6 +436,16 @@ var App = (() => {
       desc: 'Select national teams. Supports groups (up to 48 teams, World Cup style).' },
     'ucl': { name: 'Champions League', short: 'Champions League', engine: 'league', pool: 'club', leaguesKey: null,
       desc: 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.' },
+    'premier-league': { name: 'Premier League', short: 'Premier League', engine: 'table', pool: 'club', leaguesKey: 'Premier League',
+      desc: 'England\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'la-liga': { name: 'La Liga', short: 'La Liga', engine: 'table', pool: 'club', leaguesKey: 'La Liga',
+      desc: 'Spain\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'serie-a': { name: 'Serie A', short: 'Serie A', engine: 'table', pool: 'club', leaguesKey: 'Serie A',
+      desc: 'Italy\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'bundesliga': { name: 'Bundesliga', short: 'Bundesliga', engine: 'table', pool: 'club', leaguesKey: 'Bundesliga',
+      desc: 'Germany\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'ligue-1': { name: 'Ligue 1', short: 'Ligue 1', engine: 'table', pool: 'club', leaguesKey: 'Ligue 1',
+      desc: 'France\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
     'nations-league': { name: 'Nations League', short: 'Nations League', engine: 'groups', pool: 'national', leaguesKey: 'Nations League',
       desc: 'European nations in groups, then knockout (a 4-group, 16-team League A style split sends both group winners and runners-up straight to the quarter-finals — real UEFA promotion/relegation and the lower-league play-off/final formats aren\u2019t modeled). Team picker is restricted to the eligible nations in leagues.json.' },
     'euros': { name: 'European Championship', short: 'Euros', engine: 'groups', pool: 'national', leaguesKey: 'Euros',
@@ -2776,19 +2786,26 @@ var App = (() => {
   // .tour-themed rules in styles.css, and points the #tour-logo-setup /
   // #tour-logo-live <img> tags at assets/images/<logo>. If the image file
   // hasn't been added yet (or fails to load), the logo just stays hidden —
-  // the color theme still applies on its own.
+  // the color theme still applies on its own. Also stamps a short format
+  // badge ("League Season", "Knockout Cup", "Group Stage", "League Phase")
+  // onto both header rows and toggles the format-specific body class, so a
+  // competition's whole identity — not just its colors — visibly changes
+  // between formats (see .tour-format-* rules in styles.css).
   function applyTournamentBranding(formatKey) {
     const b = getTournamentBranding(formatKey);
     const cfg = TOURNAMENT_FORMATS[formatKey] || {};
+    const badgeText = tourEngineBadgeLabel(cfg.engine);
     [
-      { root: 'tournament-setup', logo: 'tour-logo-setup' },
-      { root: 'tournament-live', logo: 'tour-logo-live' }
-    ].forEach(({ root, logo }) => {
+      { root: 'tournament-setup', logo: 'tour-logo-setup', badge: 'tour-format-badge-setup' },
+      { root: 'tournament-live', logo: 'tour-logo-live', badge: 'tour-format-badge-live' }
+    ].forEach(({ root, logo, badge }) => {
       const rootEl = document.getElementById(root);
       if (rootEl) {
         rootEl.classList.add('tour-themed');
         rootEl.style.setProperty('--tour-color', b.color);
         rootEl.style.setProperty('--tour-color-dim', b.colorDim);
+        TOUR_ENGINE_CLASSES.forEach(c => rootEl.classList.remove(c));
+        rootEl.classList.add('tour-format-' + (cfg.engine || 'groups'));
       }
       const img = document.getElementById(logo);
       if (img) {
@@ -2798,7 +2815,20 @@ var App = (() => {
         img.style.display = '';
         img.src = 'assets/images/' + b.logo;
       }
+      const badgeEl = document.getElementById(badge);
+      if (badgeEl) badgeEl.textContent = badgeText;
     });
+  }
+  const TOUR_ENGINE_CLASSES = ['tour-format-groups', 'tour-format-league', 'tour-format-knockout', 'tour-format-table'];
+
+  // Short human label for a tournament engine type, used for the format
+  // badge stamped next to the competition logo/title so every tournament
+  // visibly announces what kind of competition it is, not just its color.
+  function tourEngineBadgeLabel(engine) {
+    if (engine === 'table') return '⚽ League Season';
+    if (engine === 'league') return '🏆 League Phase + Knockout';
+    if (engine === 'knockout') return '🏆 Knockout Cup';
+    return '🌍 Group Stage';
   }
 
   function populateTeamSelects() {
@@ -4176,7 +4206,7 @@ var App = (() => {
       'Here we go! First whistle blown.'
     ];
     addEvent(0, 'whistle', kickMsgs[Math.floor(seededRandom()*kickMsgs.length)], null);
-    currentMatch.countForLeaderboard = !!(tournament || window._tourFixtureIdx != null || window._koRoundIdx != null || window._seasonFixture != null);
+    currentMatch.countForLeaderboard = !!(tournament || window._tourFixtureIdx != null || window._koRoundIdx != null || window._tourLeagueFixtureIdx != null || window._seasonFixture != null);
     currentMatch.allowET = !!(document.getElementById('opt-et') && document.getElementById('opt-et').checked);
     currentMatch.allowPens = !!(document.getElementById('opt-pens') && document.getElementById('opt-pens').checked);
     const gt = document.getElementById('goal-timeline');
@@ -7564,7 +7594,7 @@ var App = (() => {
     saveStats();
     updateScoreboard();
     updateStatsPanel();
-    if (tournament || window._fromTournament || typeof window._tourFixtureIdx === 'number' || typeof window._koRoundIdx === 'number' || typeof window._uclFixtureIdx === 'number' || window._seasonFixture) {
+    if (tournament || window._fromTournament || typeof window._tourFixtureIdx === 'number' || typeof window._koRoundIdx === 'number' || typeof window._uclFixtureIdx === 'number' || typeof window._tourLeagueFixtureIdx === 'number' || window._seasonFixture) {
       const backBtn = document.getElementById('back-to-tournament');
       if (backBtn) {
         backBtn.style.display = 'flex';
@@ -7587,6 +7617,31 @@ var App = (() => {
         window._uclFixtureIdx = null;
         if (tournament.fixtures.every(x => x.played)) advanceUCLFromLeague();
         refreshTournamentStatsUI();
+      }
+    }
+    // Domestic league (table format) live result — writes back into the
+    // current matchday of tournament.rounds and tournament.table, then
+    // advances to the next matchday (or crowns the champion) once every
+    // fixture in the round has been played. Mirrors the UCL league block
+    // above, but against the plain double round-robin table instead of
+    // tournament.league.
+    if (typeof window._tourLeagueFixtureIdx === 'number' && tournament && tournament.format === 'table') {
+      const round = tournament.rounds[tournament.currentRound];
+      const f = round && round[window._tourLeagueFixtureIdx];
+      if (f && !f.played && currentMatch) {
+        f.played = true;
+        f.homeScore = currentMatch.home.score;
+        f.awayScore = currentMatch.away.score;
+        f.report = buildMatchReport(currentMatch);
+        applyResultToTable(tournament.table, f.home, f.away, f.homeScore, f.awayScore);
+        window._tourLeagueFixtureIdx = null;
+        if (round.every(x => x.played)) {
+          tournament.currentRound++;
+          if (tournament.currentRound >= tournament.rounds.length) finishLeagueTournament();
+        }
+        try { renderLeagueTableTournament(); } catch (e) {}
+        refreshTournamentStatsUI();
+        toast('League match result saved!');
       }
     }
     // Knockout live result
@@ -8657,9 +8712,11 @@ var App = (() => {
     if (select) select.value = tournamentType;
     applyTournamentBranding(tournament.competition || tournamentType);
     try {
+      const bracketCard = document.getElementById('tour-bracket-card');
+      if (bracketCard) bracketCard.style.display = (tournament.format === 'table') ? 'none' : '';
       if (tournament.format === 'league') { renderUCLLeague(); renderUCLFixtures(); }
       else { renderGroups(); }
-      renderBracket();
+      if (tournament.format !== 'table') renderBracket();
       if (tournament.champion) renderTournamentPodium();
       renderTournamentLeaderboard();
     } catch (e) {}
@@ -8679,7 +8736,20 @@ var App = (() => {
   // or closed means nothing is ever more than a couple seconds from being
   // safely on disk, even from an edge case that isn't explicitly wired up.
   function setupAutoSave() {
-    setInterval(persistAll, 4000);
+    // Was firing a full JSON.stringify(season)/JSON.stringify(tournament) —
+    // both of which can be sizeable once several leagues' squads, fixtures
+    // and match reports are loaded — every 4 seconds unconditionally, which
+    // showed up as a periodic stutter unrelated to anything the person was
+    // actually doing. Almost every mutating action already calls persistAll()
+    // directly (see the many call sites elsewhere in this file), so this
+    // timer is only a safety net: it can run far less often, and it skips
+    // the work entirely when the tab isn't visible or there's nothing to
+    // save, instead of paying the stringify cost every tick regardless.
+    setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      if (!season && !tournament) return;
+      persistAll();
+    }, 15000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistAll(); });
     window.addEventListener('beforeunload', persistAll);
     window.addEventListener('pagehide', persistAll);
@@ -9006,6 +9076,7 @@ var App = (() => {
       const engine = cfg && cfg.engine;
       const need = engine === 'league' ? '36 ideal (min 8)'
         : engine === 'knockout' ? 'a power of 2 — 2/4/8/16/32… (min 2)'
+        : engine === 'table' ? 'the full league (18-20 ideal, min 4)'
         : '4+ (8/16/32/48 ideal)';
       el.innerHTML = '<strong>' + n + '</strong> teams selected <span style="color:var(--text-3)">· ' + need + '</span>';
     }
@@ -9042,6 +9113,12 @@ var App = (() => {
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    // The domestic-league (table) format hides the Knockout Bracket card
+    // entirely (there is no bracket) — restore it here before every new
+    // tournament starts, so a leftover hide from a previous league season
+    // doesn't carry over into a cup/groups/UCL tournament.
+    const bracketCard = document.getElementById('tour-bracket-card');
+    if (bracketCard) bracketCard.style.display = '';
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
 
@@ -9049,6 +9126,8 @@ var App = (() => {
       startUCLTournament(selected);
     } else if (cfg.engine === 'knockout') {
       startKnockoutTournament(selected);
+    } else if (cfg.engine === 'table') {
+      startLeagueTournament(selected);
     } else {
       startWorldCupTournament(selected);
     }
@@ -9172,6 +9251,250 @@ var App = (() => {
     const btn = document.getElementById('btn-sim-round');
     if (btn) btn.textContent = 'Simulate Knockout Round';
     toast((cfg.name || 'Knockout') + ': ' + teams.length + ' teams, straight knockout');
+  }
+  function startLeagueTournament(selected) {
+    const teams = shuffleArray([...selected]);
+    const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
+    if (teams.length < 4) { toast((cfg.name || 'League') + ' needs at least 4 clubs'); return; }
+
+    const rounds = buildDoubleRoundRobinRounds(teams);
+    tournament = {
+      type: 'league-table',
+      format: 'table',
+      stage: 'table',
+      groups: [],
+      fixtures: [],
+      knockout: [],
+      playoff: [],
+      table: teams.map(blankSeasonRow),
+      rounds,
+      currentRound: 0,
+      champion: null,
+      competition: tournamentType,
+      competitionName: cfg.name || 'League'
+    };
+
+    const fixEl = document.getElementById('fixture-list');
+    if (fixEl) fixEl.innerHTML = '';
+    const bracketCard = document.getElementById('tour-bracket-card');
+    if (bracketCard) bracketCard.style.display = 'none';
+
+    renderLeagueTableTournament();
+    const stageTitle = document.getElementById('tour-stage-title');
+    if (stageTitle) stageTitle.textContent = 'Matchday 1 of ' + rounds.length;
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) btn.textContent = 'Simulate Matchday';
+    toast((cfg.name || 'League') + ': ' + teams.length + ' clubs, ' + rounds.length + '-matchday season');
+  }
+  // Crowns the table topper once every matchday has been played — mirrors
+  // crownLeagueChampion() in Season Calendar, but routes through the shared
+  // tournament champion/awards/trophy pipeline (setChampion) instead of the
+  // season one, so the trophy lands in the Tournament history, not Season's.
+  function finishLeagueTournament() {
+    if (!tournament || tournament.champion) return;
+    const standings = sortedTable(tournament.table);
+    tournament.stage = 'complete';
+    tournament.runnersUp = standings[1] ? standings[1].team : null;
+    tournament.thirdPlace = standings[2] ? standings[2].team : null;
+    tournament.fourthPlace = standings[3] ? standings[3].team : null;
+    const champ = standings[0] ? standings[0].team : null;
+    if (champ) setChampion(champ);
+  }
+  // Bulk-simulates the current matchday only (the "Simulate Matchday"
+  // button) — called from _simTournamentRoundWork()'s format dispatch.
+  function simLeagueTournamentRound() {
+    if (!tournament || tournament.format !== 'table') return;
+    const round = tournament.rounds[tournament.currentRound];
+    if (!round) { finishLeagueTournament(); refreshTournamentStatsUI(); return; }
+    simulateRoundFixtures(round, { allowET: false, allowPens: false }, (fx) => {
+      applyResultToTable(tournament.table, fx.home, fx.away, fx.homeScore, fx.awayScore);
+    });
+    tournament.currentRound++;
+    if (tournament.currentRound >= tournament.rounds.length) {
+      finishLeagueTournament();
+    } else {
+      renderLeagueTableTournament();
+      const stageTitle = document.getElementById('tour-stage-title');
+      if (stageTitle) stageTitle.textContent = 'Matchday ' + (tournament.currentRound + 1) + ' of ' + tournament.rounds.length;
+    }
+    refreshTournamentStatsUI();
+  }
+  // Simulates every remaining matchday — called from _simAllTournamentWork()'s
+  // format dispatch, which supplies the same progress-bar/yielding helpers
+  // (updateLoading, updateLoadingProgress, simTick) every other bulk-sim path
+  // in that function already uses, so a full-season sim doesn't freeze the tab.
+  async function simAllLeagueTournament(updateLoading, updateLoadingProgress, startTime) {
+    if (!tournament || tournament.format !== 'table') return;
+    const remainingRounds = tournament.rounds.slice(tournament.currentRound);
+    const total = remainingRounds.reduce((sum, r) => sum + r.length, 0);
+    let done = 0;
+    updateLoadingProgress(0, Math.max(total, 1), startTime);
+    updateLoading('Simulating the season…');
+    while (tournament && tournament.currentRound < tournament.rounds.length) {
+      const round = tournament.rounds[tournament.currentRound];
+      simulateRoundFixtures(round, { allowET: false, allowPens: false }, (fx) => {
+        applyResultToTable(tournament.table, fx.home, fx.away, fx.homeScore, fx.awayScore);
+        done++; updateLoadingProgress(done, total, startTime);
+      });
+      tournament.currentRound++;
+      await simTick();
+    }
+    if (!tournament) return;
+    finishLeagueTournament();
+    updateLoadingProgress(Math.max(total, 1), Math.max(total, 1), startTime);
+    try { renderLeagueTableTournament(); } catch (e) {}
+    try { refreshTournamentStatsUI(); } catch (e) {}
+    if (tournament.champion) {
+      const stageTitle = document.getElementById('tour-stage-title');
+      if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
+      toast(tournament.champion.name + ' win the ' + (tournament.competitionName || 'League') + '!');
+    } else {
+      toast('Tournament simulation finished');
+    }
+  }
+  // Instantly simulates one fixture from the current matchday (the
+  // "Instant" button in the fixture list) — same shape as simSeasonFixture.
+  function simLeagueTournamentFixture(idx) {
+    if (!tournament || tournament.format !== 'table') return;
+    const round = tournament.rounds[tournament.currentRound];
+    const f = round && round[idx];
+    if (!f || f.played) return;
+    const home = getTeam(f.home), away = getTeam(f.away);
+    if (!home || !away) { f.played = true; return; }
+    showLoading('Simulating match…');
+    setTimeout(function() {
+      try {
+        const result = simQuickMatch(home, away, { countForLeaderboard: true, allowET: false, allowPens: false });
+        f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report;
+        applyResultToTable(tournament.table, f.home, f.away, result.home, result.away);
+        if (round.every(x => x.played)) {
+          tournament.currentRound++;
+          if (tournament.currentRound >= tournament.rounds.length) finishLeagueTournament();
+        }
+        renderLeagueTableTournament();
+        refreshTournamentStatsUI();
+        persistAll();
+      } finally { hideLoading(); }
+    }, 30);
+  }
+  // Plays one fixture from the current matchday live in the Match view —
+  // mirrors playSeasonFixture/playTournamentMatch, but writes the result
+  // back into tournament.table via window._tourLeagueFixtureIdx (handled in
+  // engine/matchEngine.js's match-finish dispatch) instead of a season
+  // competition or a groups/knockout bracket.
+  function playLeagueTournamentFixture(idx) {
+    if (!tournament || tournament.format !== 'table') return;
+    const round = tournament.rounds[tournament.currentRound];
+    const f = round && round[idx];
+    if (!f || f.played) return;
+    const home = getTeam(f.home), away = getTeam(f.away);
+    if (!home || !away) return;
+    window._tourLeagueFixtureIdx = idx;
+    window._tourFixtureIdx = null;
+    window._uclFixtureIdx = null;
+    window._koRoundIdx = null;
+    window._koMatchIdx = null;
+    window._seasonFixture = null;
+    window._fromTournament = true;
+    window._backTarget = 'tournament';
+    currentSeasonComp = null;
+    switchView('match');
+    const homeSel = document.getElementById('home-team');
+    const awaySel = document.getElementById('away-team');
+    if (homeSel) homeSel.value = home.id;
+    if (awaySel) awaySel.value = away.id;
+    const formKeys = Object.keys(FORMATIONS);
+    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hForm = document.getElementById('home-formation');
+    const aForm = document.getElementById('away-formation');
+    if (hForm) hForm.value = hf;
+    if (aForm) aForm.value = af;
+    customLineups.home = null;
+    customLineups.away = null;
+    updateTeamPreview('home'); updateTeamPreview('away');
+    startMatch();
+    toast((tournament.competitionName || 'League') + ' — live · formations randomized');
+  }
+  function renderLeagueTableTournament() {
+    const groupsEl = document.getElementById('groups-container');
+    const fixEl = document.getElementById('fixture-list');
+    if (!tournament || tournament.format !== 'table') return;
+
+    if (groupsEl) groupsEl.innerHTML = renderLeagueStandingsTableHTML(tournament.table);
+    if (fixEl) fixEl.innerHTML = renderLeagueTournamentFixturesHTML();
+
+    if (tournament.champion) {
+      const stageTitle = document.getElementById('tour-stage-title');
+      if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(tournament.champion, 20) + ' ' + tournament.champion.name;
+    }
+  }
+  // A real league-table look: gold row for top spot, a blue-tinted band for
+  // the next few (continental-qualification feel) and a red-tinted band for
+  // the bottom three (relegation feel) — purely visual zone striping, same
+  // spirit as every real league table broadcast graphic, scaled to however
+  // many clubs are actually in this tournament.
+  function renderLeagueStandingsTableHTML(table) {
+    const sorted = sortedTable(table);
+    const n = sorted.length;
+    const continentalSpots = n >= 10 ? 4 : (n >= 6 ? 2 : 1);
+    const relegationSpots = n >= 10 ? 3 : (n >= 6 ? 1 : 0);
+    let h = '<div class="league-table-wrap"><table class="group-table league-standings-table">' +
+      '<thead><tr><th>#</th><th>Club</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
+    sorted.forEach((r, i) => {
+      const pos = i + 1;
+      const gd = r.gf - r.ga;
+      let zoneClass = '';
+      if (pos === 1) zoneClass = 'lg-zone-champion';
+      else if (pos <= continentalSpots) zoneClass = 'lg-zone-continental';
+      else if (pos > n - relegationSpots) zoneClass = 'lg-zone-relegation';
+      h += `<tr class="${zoneClass}"><td class="lg-pos">${pos}</td><td>${teamMark(r.team, 18)} ${r.team.name}</td>` +
+        `<td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td><td>${r.gf}</td><td>${r.ga}</td>` +
+        `<td>${gd > 0 ? '+' : ''}${gd}</td><td><b>${r.pts}</b></td></tr>`;
+    });
+    h += '</tbody></table>';
+    if (continentalSpots || relegationSpots) {
+      h += '<div class="lg-table-legend">';
+      h += '<span class="lg-legend-item"><i class="lg-zone-champion"></i>Champions</span>';
+      if (continentalSpots > 1) h += '<span class="lg-legend-item"><i class="lg-zone-continental"></i>Continental qualification</span>';
+      if (relegationSpots) h += '<span class="lg-legend-item"><i class="lg-zone-relegation"></i>Relegation zone</span>';
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+  function renderLeagueTournamentFixturesHTML() {
+    const rounds = tournament.rounds || [];
+    const currentRound = tournament.stage === 'complete' ? [] : (rounds[tournament.currentRound] || []);
+    const currentUnplayed = currentRound.filter(f => !f.played);
+    const allFixtures = [].concat(...rounds);
+    const played = allFixtures.filter(f => f.played).slice(-8).reverse();
+    let h = '';
+    if (currentUnplayed.length) {
+      h += `<div class="card-title" style="margin-top:12px">Matchday ${tournament.currentRound + 1} of ${rounds.length}</div>`;
+      currentUnplayed.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const idx = currentRound.indexOf(f);
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span>
+          <button class="btn btn-primary btn-sm" onclick="App.playLeagueTournamentFixture(${idx})">▶ Play Live</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.simLeagueTournamentFixture(${idx})">⚡ Instant</button></div>`;
+      });
+    } else if (tournament.stage !== 'complete') {
+      h += '<div class="card-title" style="margin-top:12px">Matchday Complete</div>';
+    }
+    if (played.length) {
+      h += '<div class="card-title" style="margin-top:12px">Recent Results</div>';
+      played.forEach(f => {
+        const home = getTeam(f.home), away = getTeam(f.away);
+        if (!home || !away) return;
+        const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
+        h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
+      });
+    }
+    return h;
   }
 
   function generateUCLLeagueFixtures(teams, matchesPerTeam) {
@@ -9347,6 +9670,10 @@ var App = (() => {
       renderUCLLeague();
       return;
     }
+    if (tournament && tournament.format === 'table') {
+      renderLeagueTableTournament();
+      return;
+    }
     const el = document.getElementById('groups-container');
     if (!el || !tournament) return;
     el.innerHTML = tournament.groups.map(g => {
@@ -9466,6 +9793,10 @@ var App = (() => {
 
   function _simTournamentRoundWork() {
     if (!tournament) return;
+    if (tournament.format === 'table') {
+      simLeagueTournamentRound();
+      return;
+    }
     if (tournament.format === 'league' || tournament.stage === 'league') {
       const unplayed = (tournament.fixtures || []).filter(f => !f.played);
       if (!unplayed.length) { advanceUCLFromLeague(); return; }
@@ -9543,6 +9874,12 @@ var App = (() => {
     };
     const startTime = Date.now();
     let done = 0;
+
+    // ========== Domestic league (table) format ==========
+    if (tournament.format === 'table') {
+      await simAllLeagueTournament(updateLoading, updateLoadingProgress, startTime);
+      return;
+    }
 
     // ========== UCL / League format ==========
     if (tournament.format === 'league' || tournament.type === 'ucl') {
@@ -10360,10 +10697,12 @@ var App = (() => {
     const prevFixture = window._tourFixtureIdx;
     const prevKoR = window._koRoundIdx;
     const prevKoM = window._koMatchIdx;
+    const prevLeagueFixture = window._tourLeagueFixtureIdx;
     // Prevent live tournament hooks from double-writing during bulk sim
     window._tourFixtureIdx = undefined;
     window._koRoundIdx = undefined;
     window._koMatchIdx = undefined;
+    window._tourLeagueFixtureIdx = undefined;
 
     const hf = opts.homeForm || pickTeamFormation(homeTeam);
     const af = opts.awayForm || pickTeamFormation(awayTeam);
@@ -10432,6 +10771,7 @@ var App = (() => {
     window._tourFixtureIdx = prevFixture;
     window._koRoundIdx = prevKoR;
     window._koMatchIdx = prevKoM;
+    window._tourLeagueFixtureIdx = prevLeagueFixture;
     saveStats();
     return result;
   }
@@ -10708,6 +11048,8 @@ var App = (() => {
     // still show up in the Trophy Room afterward.
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const bracketCard = document.getElementById('tour-bracket-card');
+    if (bracketCard) bracketCard.style.display = '';
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
     persistAll();
@@ -10875,9 +11217,20 @@ var App = (() => {
     modal.classList.add('active');
   }
 
+  // Debounced: the club pool can run to a few hundred teams (all five
+  // domestic leagues' worth once selected), and renderTournamentTeamSelect()
+  // does a full innerHTML rebuild plus re-attaches two listeners per team —
+  // doing that on every single keystroke was the main source of typing lag
+  // in the tournament team search. Waiting a beat after typing stops keeps
+  // the search feeling instant without re-rendering on every keypress.
+  let _tourSearchDebounceTimer = null;
   function searchTournamentTeams(q) {
-    tourTeamsSearch = (q || '').trim().toLowerCase();
-    renderTournamentTeamSelect();
+    const value = (q || '').trim().toLowerCase();
+    clearTimeout(_tourSearchDebounceTimer);
+    _tourSearchDebounceTimer = setTimeout(() => {
+      tourTeamsSearch = value;
+      renderTournamentTeamSelect();
+    }, 160);
   }
 
 
@@ -13348,6 +13701,7 @@ var App = (() => {
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
+    playLeagueTournamentFixture, simLeagueTournamentFixture,
     returnToTournament, showPlayerProfile, showTeamProfile, showTeamLineup, randomMatch, randomizeTeamSide,
     resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
@@ -13362,6 +13716,7 @@ var App = (() => {
     renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
     simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, showMatchReportLeg,
     simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
+    playLeagueTournamentFixture, simLeagueTournamentFixture,
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
     showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
