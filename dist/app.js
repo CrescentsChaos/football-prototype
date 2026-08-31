@@ -2435,9 +2435,24 @@ var App = (() => {
   // below — a single source of truth so a genuinely reckless/aggressive
   // defender reads the same disciplinary risk everywhere in the engine.
   // Aggression is the primary driver (more willing to fly into challenges);
-  // poor Defensive Awareness compounds it (mistimed, rather than measured,
-  // challenges); high Physical Contact adds a little more (more contact,
-  // more free-kicks given away even on well-timed challenges).
+  // Defensive Awareness now genuinely offsets it in BOTH directions —
+  // elite awareness earns a real discount for well-timed challenges, not
+  // just "no extra penalty" — and high Physical Contact adds a little more
+  // (more contact, more free-kicks given away even on well-timed tackles).
+  //
+  // Previously the Awareness term only ever ADDED risk for poor awareness
+  // (max(0, 65 - defAwr)) and did nothing at all once awareness passed 65
+  // — so it could never distinguish a genuinely elite, well-timed tackler
+  // from a merely-average one at the same aggression level. Real top
+  // ball-winning CBs (Konaté, Cubarsí, Huijsen, Rodri, ...) tend to have
+  // BOTH very high aggression AND very high awareness in this data set —
+  // under the old formula that awareness bought them nothing, so their
+  // aggression alone (uncapped per-term, up to +0.56) pushed foulProneness
+  // to ~1.5–1.7, roughly 50–70% more foul-prone than the baseline every
+  // single duel, all season — which is exactly what produced 15-24
+  // yellows / 3-6 reds in 38 matches for these players. Making the
+  // Awareness term signed (it can now reduce v, not just fail to increase
+  // it) brings that same group down to a realistic ~1.1-1.3.
   function foulProneness(p) {
     if (!p || !p.expandedAttrs) {
       return 1 + Math.max(0, (75 - (p && p.def || 70)) / 80) + Math.max(0, (((p && p.phy) || 70) - 80) / 100);
@@ -2445,8 +2460,8 @@ var App = (() => {
     const aggr = xattr(p, 'aggr', 70);
     const defAwr = xattr(p, 'def_awr', 70);
     const phyCon = xattr(p, 'phy_con', 70);
-    let v = 1 + Math.max(0, aggr - 65) / 55 + Math.max(0, 65 - defAwr) / 90 + Math.max(0, phyCon - 78) / 130;
-    return Math.max(0.4, Math.min(2.3, v));
+    let v = 1 + Math.max(0, aggr - 65) / 70 + (65 - defAwr) / 110 + Math.max(0, phyCon - 78) / 150;
+    return Math.max(0.5, Math.min(1.8, v));
   }
   // Injury-proneness multiplier for the "who gets injured" weighted pick.
   function injuryWeightMult(p) {
