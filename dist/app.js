@@ -4580,6 +4580,63 @@ var App = (() => {
     };
   }
 
+  // Lightweight counterpart to buildMatchReport() — used for every
+  // auto-simmed fixture (anything that goes through simQuickMatch, i.e.
+  // any match the user never actually watches). A full report carries a
+  // ~30-field playerMatchStats blob per player plus the entire event log,
+  // which is fine for the handful of matches someone watches live but
+  // balloons storage the instant you bulk-sim a whole tournament or
+  // season — this keeps just what a results page actually needs: final
+  // score, who scored (and when/how), who was booked/sent off, and MOTM.
+  // Marked `light: true` so the report modal (ui/matchUI.js) knows to
+  // skip the sections (team stats, player ratings) it has no data for.
+  function buildLightMatchReport(m) {
+    if (!m) return null;
+    const cardEvents = (m.events || []).filter(e => e.type === 'yellow' || e.type === 'red');
+    const cardsForSide = (side, squad) => {
+      const ids = new Set((squad && squad.all || []).map(p => p.id));
+      const list = [];
+      Object.values(m.playerMatchStats || {}).forEach(ps => {
+        if (!ids.has(ps.id)) return;
+        if (ps.red) list.push({ id: ps.id, player: ps.name, num: ps.num, type: 'red' });
+        else if (ps.yellow) list.push({ id: ps.id, player: ps.name, num: ps.num, type: 'yellow' });
+      });
+      list.forEach(c => {
+        const ev = cardEvents.find(e => e.side === side && e.type === c.type && (e.text || '').indexOf(c.player) !== -1);
+        if (ev) { c.minute = ev.minute; c.dispMin = ev.dispMin; c.dispLabel = ev.dispLabel; }
+      });
+      return list;
+    };
+    // Who performed, in a few words: assist providers and keepers' save
+    // counts. Deliberately just id/name/num/count — not the full per-player
+    // stat blob buildMatchReport captures — so this stays cheap to store
+    // while still answering "who set that up" / "who kept us in it".
+    const performersForSide = (squad) => {
+      const ids = new Set((squad && squad.all || []).map(p => p.id));
+      const assists = [], saves = [];
+      Object.values(m.playerMatchStats || {}).forEach(ps => {
+        if (!ids.has(ps.id)) return;
+        if (ps.assists > 0) assists.push({ id: ps.id, player: ps.name, num: ps.num, count: ps.assists });
+        if (ps.saves > 0) saves.push({ id: ps.id, player: ps.name, num: ps.num, count: ps.saves });
+      });
+      assists.sort((x, y) => y.count - x.count);
+      saves.sort((x, y) => y.count - x.count);
+      return { assists, saves };
+    };
+    const homePerf = performersForSide(m.home.squad);
+    const awayPerf = performersForSide(m.away.squad);
+    return {
+      light: true,
+      venue: getStadium(m.home.team),
+      home: { id: m.home.team.id, name: m.home.team.name, short: m.home.team.short, flag: m.home.team.flag, logo: m.home.team.logo, score: m.home.score, penScore: m.home.penScore, formation: m.home.squad && m.home.squad.formation, assists: homePerf.assists, saves: homePerf.saves },
+      away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, logo: m.away.team.logo, score: m.away.score, penScore: m.away.penScore, formation: m.away.squad && m.away.squad.formation, assists: awayPerf.assists, saves: awayPerf.saves },
+      goals: JSON.parse(JSON.stringify(m.goalList || [])),
+      cards: { home: cardsForSide('home', m.home.squad), away: cardsForSide('away', m.away.squad) },
+      motmId: m.motmId || null,
+      finished: true
+    };
+  }
+
   // Shared row renderer so a tournament/season match report and the live
   // post-match panel render a player's rating line identically.
   function renderRatingRow(p, motmId) {
@@ -4645,6 +4702,51 @@ var App = (() => {
     const goalsH = (report.goals || []).filter(g => g.side === 'home');
     const goalsA = (report.goals || []).filter(g => g.side === 'away');
     const fmtG = (arr) => arr.map(g => `${g.dispLabel || (g.minute + "'")} ${g.player}${g.pen || /^penalty/i.test(g.method || '') ? ' <span class="pen-tag">[Penalty]</span>' : ''}`).join('<br>') || '—';
+    // Auto-simmed fixtures (anything the user didn't watch live) only carry
+    // a lightweight report — score, scorers, cards, MOTM — with none of the
+    // full stat sheet or per-player ratings a watched match's report has.
+    // See buildLightMatchReport() in engine/matchEngine.js.
+    if (report.light) {
+      const fmtCards = (arr) => (arr || []).map(c => `${c.dispLabel || (c.minute != null ? c.minute + "'" : '')} ${c.player} ${c.type === 'red' ? '🟥' : '🟨'}`.trim()).join('<br>') || '—';
+      const fmtCount = (arr) => (arr || []).map(p => `${p.player}${p.count > 1 ? ' x' + p.count : ''}`).join('<br>') || '—';
+      const legTabsHtml2 = (ctx && ctx.legs && ctx.legs.length > 1)
+        ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap">
+            ${ctx.legs.map((leg, i) => `<button class="btn btn-sm ${i === ctx.activeIdx ? 'btn-primary' : 'btn-secondary'}" onclick="App.showMatchReportLeg(${i})">${leg.label}</button>`).join('')}
+          </div>
+          ${ctx.aggText ? `<div style="text-align:center;font-size:0.8rem;color:var(--accent-gold);margin-bottom:8px">${ctx.aggText}</div>` : ''}`
+        : '';
+      content.innerHTML = `
+        <div style="text-align:center;margin-bottom:14px">
+          <div style="font-size:0.85rem;color:var(--text-muted)">Match Summary</div>
+          ${legTabsHtml2}
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px">
+            <div style="flex:1;text-align:left"><div style="font-size:1.4rem">${teamMark(h, 28)}</div><strong>${h.name}</strong><div class="goal-scorers">${fmtG(goalsH)}</div></div>
+            <div style="font-size:1.6rem;font-weight:800;color:var(--accent-gold)">${scoreLine}</div>
+            <div style="flex:1;text-align:right"><div style="font-size:1.4rem">${teamMark(a, 28)}</div><strong>${a.name}</strong><div class="goal-scorers away-scorers">${fmtG(goalsA)}</div></div>
+          </div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">${h.formation||''} vs ${a.formation||''}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">🏟️ ${report.venue || 'Wembley Stadium'}</div>
+        </div>
+        <div class="card-title">Assists</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtCount(h.assists)}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtCount(a.assists)}</div>
+        </div>
+        <div class="card-title">Saves</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtCount(h.saves)}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtCount(a.saves)}</div>
+        </div>
+        <div class="card-title">Cards</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtCards(h.cards || (report.cards && report.cards.home))}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtCards(a.cards || (report.cards && report.cards.away))}</div>
+        </div>
+        <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">This fixture was auto-simmed, so only a lightweight summary was kept — no full ratings or extended stats.</div>
+        <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
+      modal.classList.add('active');
+      return;
+    }
     // Prefer the home/away-split ratings captured by buildMatchReport; fall back
     // to the old flat map for any legacy report objects saved before this split existed.
     const homeRatings = h.ratings || Object.values(report.ratings || {});
@@ -10975,7 +11077,11 @@ var App = (() => {
       endMatch();
     }
 
-    const report = currentMatch ? buildMatchReport(currentMatch) : null;
+    // simQuickMatch is exclusively the auto-sim path (every call site bulk-
+    // simulates fixtures the user hasn't chosen to watch live — see
+    // simulation/tournamentEngine.js, seasonEngine.js, leagueTournamentEngine.js),
+    // so it only ever needs the lightweight report, not the full stat sheet.
+    const report = currentMatch ? buildLightMatchReport(currentMatch) : null;
     const result = {
       home: currentMatch ? currentMatch.home.score : 0,
       away: currentMatch ? currentMatch.away.score : 0,
