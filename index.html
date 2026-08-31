@@ -530,6 +530,16 @@
         </div>
         <input type="file" id="import-save-input" accept="application/json,.json" style="display:none" onchange="App.importSaveFile(event)">
       </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">🏁 End Season</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Close out the current Season Calendar run right now — finishes any fixtures still outstanding, crowns every league &amp; Champions League winner, hands out the season's awards (Golden Boot, Ballon d'Or, Puskás Award and more), then kicks off next season. Past winners stay on record in the History tab.</p>
+        <div style="max-width:320px">
+          <button class="save-btn save-btn-ghost" id="end-season-btn" onclick="App.endSeasonAndAnnounce()" title="End the current season now" aria-label="End season">
+            <span class="save-btn-icon">🏁</span><span class="save-btn-label">End Season</span>
+          </button>
+        </div>
+        <div id="end-season-summary"></div>
+      </div>
     </section>
   </main>
 
