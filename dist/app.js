@@ -4625,6 +4625,27 @@ var App = (() => {
     };
     const homePerf = performersForSide(m.home.squad);
     const awayPerf = performersForSide(m.away.squad);
+    // Injuries: m.injuries is just a list of playerIds picked up this match
+    // (see engine/injuries.js) — cross-reference with injuryBook, which
+    // still holds this match's fresh record for each of them at the point
+    // buildLightMatchReport runs, to pull the injury type and lay-off length.
+    const injuriesForSide = (side, squad) => {
+      const ids = new Set((squad && squad.all || []).map(p => p.id));
+      const list = [];
+      (m.injuries || []).forEach(pid => {
+        if (!ids.has(pid)) return;
+        const rec = injuryBook[pid];
+        list.push({
+          id: pid,
+          player: rec ? rec.playerName : ((squad.all || []).find(p => p.id === pid) || {}).name || '',
+          type: rec ? rec.type : '',
+          severity: rec ? rec.severity : '',
+          matchesOut: rec ? rec.matchesTotal : null,
+          minute: rec ? rec.minute : null
+        });
+      });
+      return list;
+    };
     return {
       light: true,
       venue: getStadium(m.home.team),
@@ -4632,6 +4653,7 @@ var App = (() => {
       away: { id: m.away.team.id, name: m.away.team.name, short: m.away.team.short, flag: m.away.team.flag, logo: m.away.team.logo, score: m.away.score, penScore: m.away.penScore, formation: m.away.squad && m.away.squad.formation, assists: awayPerf.assists, saves: awayPerf.saves },
       goals: JSON.parse(JSON.stringify(m.goalList || [])),
       cards: { home: cardsForSide('home', m.home.squad), away: cardsForSide('away', m.away.squad) },
+      injuries: { home: injuriesForSide('home', m.home.squad), away: injuriesForSide('away', m.away.squad) },
       motmId: m.motmId || null,
       finished: true
     };
@@ -4709,6 +4731,7 @@ var App = (() => {
     if (report.light) {
       const fmtCards = (arr) => (arr || []).map(c => `${c.dispLabel || (c.minute != null ? c.minute + "'" : '')} ${c.player} ${c.type === 'red' ? '🟥' : '🟨'}`.trim()).join('<br>') || '—';
       const fmtCount = (arr) => (arr || []).map(p => `${p.player}${p.count > 1 ? ' x' + p.count : ''}`).join('<br>') || '—';
+      const fmtInjuries = (arr) => (arr || []).map(inj => `${inj.minute != null ? inj.minute + "'" : ''} ${inj.player}${inj.type ? ' — ' + inj.type : ''}${inj.matchesOut ? ` (out ${inj.matchesOut} match${inj.matchesOut > 1 ? 'es' : ''})` : ''}`.trim()).join('<br>') || '—';
       const legTabsHtml2 = (ctx && ctx.legs && ctx.legs.length > 1)
         ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap">
             ${ctx.legs.map((leg, i) => `<button class="btn btn-sm ${i === ctx.activeIdx ? 'btn-primary' : 'btn-secondary'}" onclick="App.showMatchReportLeg(${i})">${leg.label}</button>`).join('')}
@@ -4741,6 +4764,11 @@ var App = (() => {
         <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
           <div style="flex:1;text-align:left;font-size:0.85rem">${fmtCards(h.cards || (report.cards && report.cards.home))}</div>
           <div style="flex:1;text-align:right;font-size:0.85rem">${fmtCards(a.cards || (report.cards && report.cards.away))}</div>
+        </div>
+        <div class="card-title">Injuries</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtInjuries(report.injuries && report.injuries.home)}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtInjuries(report.injuries && report.injuries.away)}</div>
         </div>
         <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">This fixture was auto-simmed, so only a lightweight summary was kept — no full ratings or extended stats.</div>
         <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
@@ -9766,7 +9794,7 @@ var App = (() => {
         if (!home || !away) return;
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away, 18)}</span>
           ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
       });
     }
@@ -9894,7 +9922,7 @@ var App = (() => {
           const home = getTeam(f.home), away = getTeam(f.away);
           const idx = tournament.fixtures.indexOf(f);
           h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})">
-            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away,18)}</span>
             <span style="font-size:0.7rem;color:var(--accent-gold)">Details</span></div>`;
         });
       }
@@ -13280,7 +13308,7 @@ var App = (() => {
         if (!home || !away) return;
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away, 18)}</span>
           ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
       });
     }
@@ -13310,7 +13338,7 @@ var App = (() => {
         const pensTxt = f.pens ? ` (pens ${f.pens.home}-${f.pens.away})` : '';
         const winner = getTeam(f.winnerId);
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away, 18)}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
       }
     });
     return h;
