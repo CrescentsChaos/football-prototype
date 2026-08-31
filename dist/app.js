@@ -8562,7 +8562,16 @@ var App = (() => {
     } catch (e) {}
   }
 
+  // BOLT OPTIMIZATION: Memoization cache for player team affiliations (national + club).
+  // Searching nested team/player arrays on every call is O(teams * players).
+  // Caching lookup results reduces repeated calls to O(1).
+  const _playerTeamsCache = new Map();
+
   function findPlayerTeams(playerId) {
+    if (!playerId) return { national: null, club: null };
+    if (_playerTeamsCache.has(playerId)) {
+      return _playerTeamsCache.get(playerId);
+    }
     let national = null, club = null;
     (teamsData.national || []).forEach(t => {
       if ((t.players || []).some(p => p.id === playerId)) national = t.name;
@@ -8609,7 +8618,9 @@ var App = (() => {
         }
       }
     }
-    return { national, club };
+    const res = { national, club };
+    _playerTeamsCache.set(playerId, res);
+    return res;
   }
 
   function recordStat(type, player, team) {
