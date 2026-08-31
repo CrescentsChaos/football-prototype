@@ -4500,7 +4500,7 @@
     },
     {
       "id": "burkinafaso2026",
-      "name": "Burkina Faso National Team",
+      "name": "Burkina Faso",
       "short": "BFA",
       "flag": "🇧🇫",
       "color": "#EF2B2D",
@@ -48158,7 +48158,7 @@
           "num": 10
         },
         {
-          "id": "mci26_11",
+          "id": "bel14",
           "name": "Jérémy Doku",
           "pos": [
             "LW",
@@ -54651,7 +54651,7 @@
           "num": 43
         },
         {
-          "id": "liv26_9",
+          "id": "swe20",
           "name": "Alexander Isak",
           "pos": [
             "ST"
@@ -82684,7 +82684,7 @@
       "stadium": "San Mamés",
       "players": [
         {
-          "id": "ath27_1",
+          "id": "esp1",
           "name": "Unai Simón",
           "pos": [
             "GK"
@@ -91527,7 +91527,7 @@
           "num": 24
         },
         {
-          "id": "bre27_11",
+          "id": "bfa26_7",
           "name": "Dango Ouattara",
           "pos": [
             "RW",
