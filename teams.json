@@ -46862,7 +46862,7 @@
           "num": 16
         },
         {
-          "id": "bra17",
+          "id": "rma26_7",
           "name": "Vinícius Júnior",
           "pos": [
             "LW",
@@ -48099,7 +48099,7 @@
           "num": 5
         },
         {
-          "id": "mci26_6",
+          "id": "eng5",
           "name": "Marc Guéhi",
           "pos": [
             "CB"
@@ -54921,7 +54921,7 @@
           "num": 12
         },
         {
-          "id": "ars26_33",
+          "id": "ita5",
           "name": "Riccardo Calafiori",
           "pos": [
             "LB",
@@ -58892,7 +58892,7 @@
           "num": 2
         },
         {
-          "id": "int26_20",
+          "id": "tur13",
           "name": "Hakan Çalhanoğlu",
           "pos": [
             "CDM",
@@ -60564,7 +60564,7 @@
           "num": 18
         },
         {
-          "id": "rom26_14",
+          "id": "ned24",
           "name": "Donyell Malen",
           "pos": [
             "ST",
@@ -65742,12 +65742,11 @@
           "num": 22
         },
         {
-          "id": "bha26_10",
-          "name": "Julio Enciso",
+          "id": "bha26_8",
+          "name": "Jack Hinshelwood",
           "pos": [
-            "CAM",
-            "ST",
-            "LW"
+            "CM",
+            "CAM"
           ],
           "ovr": 79,
           "att": 80,
@@ -65755,7 +65754,7 @@
           "phy": 68,
           "pac": 80,
           "tec": 83,
-          "num": 10
+          "num": 8
         },
         {
           "id": "bha26_14",
@@ -92745,6 +92744,21 @@
           "pac": 45,
           "tec": 62,
           "num": 13
+        },{
+          "id": "bha26_10",
+          "name": "Julio Enciso",
+          "pos": [
+            "CAM",
+            "ST",
+            "LW"
+          ],
+          "ovr": 79,
+          "att": 80,
+          "def": 40,
+          "phy": 68,
+          "pac": 80,
+          "tec": 83,
+          "num": 10
         },
         {
           "id": "ips27_28",
@@ -97173,7 +97187,7 @@
           "num": 37
         },
         {
-          "id": "juv27_3",
+          "id": "bra9",
           "name": "Bremer",
           "pos": [
             "CB"
