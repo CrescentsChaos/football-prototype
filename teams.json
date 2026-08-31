@@ -49829,7 +49829,7 @@
         },
         {
           "id": "bar98_4",
-          "name": "Pep Guardiola",
+          "name": "Josep Guardiola",
           "pos": [
             "CDM",
             "CM"
@@ -51886,7 +51886,7 @@
         },
         {
           "id": "bay20_6",
-          "name": "Thiago Alcantara",
+          "name": "Thiago Alcántara",
           "pos": [
             "CM",
             "CDM"
@@ -91157,6 +91157,19 @@
           "pac": 73,
           "tec": 77,
           "num": 18
+        }, {
+          "id": "arg3",
+          "name": "Emiliano Martínez",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 89,
+          "att": 20,
+          "def": 89,
+          "phy": 86,
+          "pac": 55,
+          "tec": 72,
+          "num": 23
         },
         {
           "id": "chelsea2027_new1",
