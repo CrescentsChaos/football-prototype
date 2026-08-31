@@ -4537,7 +4537,12 @@ var App = (() => {
     // stays the raw tick for anything that needs strict chronological order.
     const dispMin = currentMatch.dispMin != null ? currentMatch.dispMin : minute;
     const dispLabel = currentMatch.dispLabel || (minute + "'");
-    currentMatch.goalList.push({ side, player: player.name, num: player.num, minute, dispMin, dispLabel, method: methodDesc || '', pen: isPen });
+    // id is included alongside the name so a saved report can drop the
+    // name and rehydrate it from the id later (see teamRefReplacer /
+    // teamRefReviver in simulation/seasonEngine.js) — this was previously
+    // the single biggest chunk of a match report's persisted size, since
+    // there was no id here to recover the name from at all.
+    currentMatch.goalList.push({ side, player: player.name, id: player.id, num: player.num, minute, dispMin, dispLabel, method: methodDesc || '', pen: isPen });
     renderGoalTimeline();
   }
 
@@ -8918,10 +8923,150 @@ var App = (() => {
     }
   }
 
+  // ========== SAVE-SIZE COMPACTION HELPERS ==========
+  // A league table row, a fixture report, a Season/Tournament state tree —
+  // all of these embed full team objects (id, name, colors, stadium, and
+  // the ENTIRE squad with every player's every attribute) by reference in
+  // memory. That's free at runtime (just a pointer), but JSON.stringify
+  // has no concept of "I've already written this object" — every place a
+  // team is referenced gets the whole squad serialized again from scratch.
+  // A single 20-team league table alone was writing out 20 full squads.
+  //
+  // teamRefReplacer/teamRefReviver are passed straight to JSON.stringify /
+  // JSON.parse's second argument — they run automatically at every nesting
+  // depth, so they compact every team reference throughout `season` /
+  // `tournament` (table rows, fixtures, brackets, groups, ...) without
+  // needing to touch each place that builds those structures individually.
+  // Detection is unambiguous: only a real entry from allTeams has a
+  // `players` array, so nothing else can accidentally match.
+  // A match report's home/away side is a much smaller shape than a full
+  // team object (no `players` array — see teamRefReplacer above), but it
+  // still repeats the same id/name/short/flag/logo on every single played
+  // fixture's report (and a table-format tournament persists one report
+  // per matchday-fixture). Detected by id+name+score co-occurring, since
+  // that combination only shows up on a report's home/away side.
+  function isReportTeamSide(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && typeof v.name === 'string' &&
+      Object.prototype.hasOwnProperty.call(v, 'score') && !Array.isArray(v.players));
+  }
+  function isStrippedReportTeamSide(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && !('name' in v) &&
+      Object.prototype.hasOwnProperty.call(v, 'score'));
+  }
+
+  // Goal/card/assist/save entries inside a report carry a player's name
+  // AND id side by side (see pushGoal()/buildLightMatchReport() in
+  // engine/matchEngine.js) — the id alone is enough to look the name back
+  // up via findPlayerAndTeam(). Keyed off id+player(string)+num(number)
+  // together, since that specific trio only occurs on these entries.
+  function isNamedPlayerRef(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && typeof v.player === 'string' && typeof v.num === 'number');
+  }
+  function isStrippedPlayerRef(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && !('player' in v) && typeof v.num === 'number');
+  }
+  function playerNameById(id) {
+    const found = findPlayerAndTeam(id);
+    return (found && found.player && found.player.name) || '';
+  }
+
+  function teamRefReplacer(key, value) {
+    if (value && typeof value === 'object' && typeof value.id === 'string' && Array.isArray(value.players)) {
+      return { $team: value.id };
+    }
+    if (isReportTeamSide(value)) {
+      const stripped = Object.assign({}, value);
+      delete stripped.name; delete stripped.short; delete stripped.flag; delete stripped.logo;
+      return stripped;
+    }
+    if (isNamedPlayerRef(value)) {
+      const stripped = Object.assign({}, value);
+      delete stripped.player;
+      return stripped;
+    }
+    return value;
+  }
+
+  function teamRefReviver(key, value) {
+    if (value && typeof value === 'object' && typeof value.$team === 'string') {
+      return getTeam(value.$team) || value;
+    }
+    if (isStrippedReportTeamSide(value)) {
+      const t = getTeam(value.id);
+      if (t) return Object.assign({ name: t.name, short: t.short, flag: t.flag, logo: t.logo }, value);
+      return value;
+    }
+    if (isStrippedPlayerRef(value)) {
+      return Object.assign({ player: playerNameById(value.id) }, value);
+    }
+    return value;
+  }
+
+  // Stat "buckets" (apexSimStats / apexTournamentStats — see
+  // ui/statisticsUI.js) are keyed by player id already, but every entry
+  // was ALSO carrying that same player's id/name/team/teamId/national/club
+  // as duplicated strings — all of it re-derivable from the id that's
+  // already the object key, via findPlayerAndTeam()/findPlayerTeams(). Only
+  // the actual counted numbers (count/sum/avg/recent) can't be recomputed,
+  // so those are all that get persisted; compactStatsBook() strips the
+  // rest before saving/exporting, and hydrateStatsBook() rebuilds the full
+  // shape ui/statisticsUI.js's leaderboards/awards code expects, using
+  // current player-database lookups, right after a save is loaded back in.
+  function compactStatsBook(book) {
+    const out = {};
+    Object.keys(book || {}).forEach(cat => {
+      const entries = book[cat] || {};
+      const compactCat = {};
+      Object.keys(entries).forEach(pid => {
+        const e = entries[pid];
+        if (!e) return;
+        const c = { count: e.count || 0 };
+        if (typeof e.sum === 'number') c.sum = e.sum;
+        if (typeof e.avg === 'number') c.avg = e.avg;
+        if (Array.isArray(e.recent) && e.recent.length) c.recent = e.recent;
+        compactCat[pid] = c;
+      });
+      out[cat] = compactCat;
+    });
+    return out;
+  }
+
+  function hydrateStatsBook(book) {
+    const out = {};
+    Object.keys(book || {}).forEach(cat => {
+      const entries = book[cat] || {};
+      const hydratedCat = {};
+      Object.keys(entries).forEach(pid => {
+        const e = entries[pid];
+        if (!e) return;
+        const found = findPlayerAndTeam(pid);
+        const player = found && found.player;
+        const team = found && found.team;
+        const aff = findPlayerTeams(pid);
+        const h = {
+          id: pid,
+          name: player ? player.name : pid,
+          team: team ? team.name : '',
+          teamId: team ? team.id : '',
+          count: e.count || 0,
+          national: aff.national,
+          club: aff.club
+        };
+        if (typeof e.sum === 'number') h.sum = e.sum;
+        if (typeof e.avg === 'number') h.avg = e.avg;
+        if (e.recent) h.recent = e.recent;
+        hydratedCat[pid] = h;
+      });
+      out[cat] = hydratedCat;
+    });
+    return out;
+  }
+
+
   function saveStats() {
     let ok = true;
     try {
-      ok = safeSetItem('apexSimStats', JSON.stringify(stats)) && ok;
+      ok = safeSetItem('apexSimStats', JSON.stringify(compactStatsBook(stats))) && ok;
       ok = safeSetItem('apexInjuryBook', JSON.stringify(injuryBook)) && ok;
       ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
@@ -8933,7 +9078,7 @@ var App = (() => {
   function loadStats() {
     try {
       const s = localStorage.getItem('apexSimStats');
-      if (s) stats = JSON.parse(s);
+      if (s) stats = hydrateStatsBook(JSON.parse(s));
       if (!stats.ratings) stats.ratings = {};
       const t = localStorage.getItem('apexTrophies');
       if (t) trophies = JSON.parse(t);
@@ -8960,12 +9105,12 @@ var App = (() => {
   function persistAll() {
     let ok = true;
     try {
-      if (season) ok = safeSetItem('apexSeason', JSON.stringify(season)) && ok;
+      if (season) ok = safeSetItem('apexSeason', JSON.stringify(season, teamRefReplacer)) && ok;
       else localStorage.removeItem('apexSeason');
-      if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament)) && ok;
+      if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament, teamRefReplacer)) && ok;
       else localStorage.removeItem('apexTournament');
       ok = safeSetItem('apexTournamentType', tournamentType) && ok;
-      ok = safeSetItem('apexTournamentStats', JSON.stringify(tournamentStats)) && ok;
+      ok = safeSetItem('apexTournamentStats', JSON.stringify(compactStatsBook(tournamentStats))) && ok;
       ok = safeSetItem('apexSeasonActiveTab', seasonActiveTab) && ok;
       ok = safeSetItem('apexSeasonActiveSubTab', seasonActiveSubTab) && ok;
       ok = persistPlayerForms() && ok;
@@ -8978,11 +9123,11 @@ var App = (() => {
   function loadPersistedGameState() {
     try {
       const s = localStorage.getItem('apexSeason');
-      if (s) season = JSON.parse(s);
+      if (s) season = JSON.parse(s, teamRefReviver);
     } catch (e) { season = null; }
     try {
       const t = localStorage.getItem('apexTournament');
-      if (t) tournament = JSON.parse(t);
+      if (t) tournament = JSON.parse(t, teamRefReviver);
     } catch (e) { tournament = null; }
     try {
       const tt = localStorage.getItem('apexTournamentType');
@@ -8990,7 +9135,7 @@ var App = (() => {
     } catch (e) {}
     try {
       const ts = localStorage.getItem('apexTournamentStats');
-      if (ts) tournamentStats = JSON.parse(ts);
+      if (ts) tournamentStats = hydrateStatsBook(JSON.parse(ts));
     } catch (e) {}
     try {
       const sat = localStorage.getItem('apexSeasonActiveTab');
@@ -9145,15 +9290,15 @@ var App = (() => {
     // so these always reflect the exact current point — not a possibly
     // stale localStorage copy.
     try {
-      if (season) data.apexSeason = JSON.stringify(season);
+      if (season) data.apexSeason = JSON.stringify(season, teamRefReplacer);
       else delete data.apexSeason;
-      if (tournament) data.apexTournament = JSON.stringify(tournament);
+      if (tournament) data.apexTournament = JSON.stringify(tournament, teamRefReplacer);
       else delete data.apexTournament;
       data.apexTournamentType = tournamentType;
-      data.apexTournamentStats = JSON.stringify(tournamentStats);
+      data.apexTournamentStats = JSON.stringify(compactStatsBook(tournamentStats));
       data.apexSeasonActiveTab = seasonActiveTab;
       data.apexSeasonActiveSubTab = seasonActiveSubTab;
-      data.apexSimStats = JSON.stringify(stats);
+      data.apexSimStats = JSON.stringify(compactStatsBook(stats));
       data.apexTrophies = JSON.stringify(trophies);
       data.apexInjuryBook = JSON.stringify(injuryBook);
       data.apexSuspensionBook = JSON.stringify(suspensionBook);
