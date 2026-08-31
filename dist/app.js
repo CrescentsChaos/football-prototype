@@ -8851,7 +8851,8 @@ var App = (() => {
   }
 
   // Snapshots the current global leaderboard leaders (Golden Boot, Ballon
-  // d'Or, Golden Glove/Yashin, Top Assists, Most MOTM) into the trophy case
+  // d'Or, Golden Glove/Yashin, Top Assists, Most MOTM, Clean Sheet King,
+  // Puskás Award) into the trophy case
   // as individual awards for the season that just ended, then wipes `stats`
   // and `tournamentStats` so the new season's leaderboard & Awards tab start
   // from zero. Team trophies (league/UCL winners) are left untouched — the
@@ -8865,6 +8866,7 @@ var App = (() => {
     pushIndividualTrophy('Most MOTM', topOf('motm'), type, extra);
     pushIndividualTrophy('Golden Glove', topOf('saves'), type, extra);
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
+    pushIndividualTrophy('Puskás Award', topOf('puskas'), type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
     stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
@@ -9414,6 +9416,18 @@ var App = (() => {
 
     applyTournamentBranding(tournamentType);
     tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
+    // Wipe the player/team match logs for the new tournament. These logs
+    // exist to show recent form (last 10, capped at 30) for whatever's
+    // currently being played — carrying entries over from a finished
+    // tournament/season into the next one just eats save space for
+    // history nobody's looking at anymore (this is what was filling up
+    // browser storage after playing through Premier League + a chunk of
+    // La Liga back to back). Clearing here, then persisting immediately,
+    // makes sure the old entries actually leave localStorage/the save
+    // file rather than just being orphaned in memory until autosave.
+    playerMatchLog = {};
+    teamMatchLog = {};
+    saveStats();
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
@@ -9794,7 +9808,7 @@ var App = (() => {
         if (!home || !away) return;
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away, 18)}</span>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
           ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
       });
     }
@@ -9922,7 +9936,7 @@ var App = (() => {
           const home = getTeam(f.home), away = getTeam(f.away);
           const idx = tournament.fixtures.indexOf(f);
           h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})">
-            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away,18)}</span>
+            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
             <span style="font-size:0.7rem;color:var(--accent-gold)">Details</span></div>`;
         });
       }
@@ -12192,6 +12206,32 @@ var App = (() => {
     return t.type || 'History';
   }
 
+  // Renders the "Season N complete" summary card into the Extras tab after
+  // App.endSeasonNow() finishes — the champions crowned and the global
+  // individual awards handed out for the season that just closed (built by
+  // buildSeasonEndSummary()), plus a pointer to the permanent History tab
+  // record and the fact that the next season has already kicked off.
+  function renderSeasonEndAnnouncement(summary) {
+    const el = document.getElementById('end-season-summary');
+    if (!el) return;
+    if (!summary) { el.innerHTML = ''; return; }
+    const champCard = (t) => `<div class="award-card">${trophyMark(t.name, 52)}<div class="award-info"><h4>${t.name}</h4><p class="award-winner">${t.team}</p></div></div>`;
+    const awardMini = (t) => `<div class="award-mini">${trophyMark(t.name, 32)}<div class="am-title">${t.name}</div>` +
+      (t.player ? `<div class="am-name">${t.player}</div><div class="am-meta">${t.team || ''}</div>` : '<div class="am-empty">Unclaimed</div>') + '</div>';
+
+    let h = `<div class="group-card" style="margin-top:16px">`;
+    h += `<h4>🏁 Season Y${summary.year} — Final Awards</h4>`;
+    h += summary.champions.length
+      ? summary.champions.map(champCard).join('')
+      : '<p style="color:var(--text-muted);font-size:0.85rem">No champions were crowned this season.</p>';
+    h += `<h4 style="margin-top:14px">⭐ Individual Awards</h4>`;
+    h += summary.globalAwards.length
+      ? `<div class="awards-row">${summary.globalAwards.map(awardMini).join('')}</div>`
+      : '<p style="color:var(--text-muted);font-size:0.85rem">No individual awards were recorded this season.</p>';
+    h += `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px">Season Y${summary.year + 1} is already underway — the full record is saved under the History tab.</p>`;
+    h += `</div>`;
+    el.innerHTML = h;
+  }
   function showHistory(type) {
     type = type || historyActiveTab || 'team';
     historyActiveTab = type;
@@ -12970,6 +13010,85 @@ var App = (() => {
     persistAll();
   }
 
+  // Snapshots the season that just finished — its champions (from
+  // `trophies`, category 'season', team-only entries) and its global
+  // individual awards (category 'season-global', pushed a moment earlier
+  // by archiveAndResetGlobalAwards) — into one small object the Extras tab
+  // "End Season" announcement can render. Reads back out of the permanent
+  // trophy case rather than the live season/stats objects, since by the
+  // time this is called startNewSeasonYear() may already have replaced
+  // `season` and the global leaderboard has already been wiped.
+  function buildSeasonEndSummary(year) {
+    const champions = trophies.filter(t => t.category === 'season' && t.year === year && !t.player && !t.manager);
+    const globalAwards = trophies.filter(t => t.category === 'season-global' && t.year === year);
+    return { year, champions, globalAwards };
+  }
+
+  // Manual "End Season" action (Extras tab) — a one-click way to close out
+  // the current season right now instead of grinding through remaining
+  // matchdays by hand. Finishes every fixture still outstanding across the
+  // 5 domestic leagues + Champions League (same core loop as
+  // simulateSeasonToEnd), which crowns each competition's champion as it
+  // completes; then finalizes/archives the season's global awards (Golden
+  // Boot, Ballon d'Or, Puskás Award, etc. — wiping the live leaderboard for
+  // the season ahead), immediately kicks off the next season year, and
+  // hands back a summary for the UI to announce.
+  async function endSeasonNow() {
+    if (!season) { toast('Start a season first — there\'s nothing to end yet.'); return null; }
+
+    let summary = null;
+    await withLoadingProgress('Ending season…', async function() {
+      const estimatedWeeks = Math.max(1, ...seasonCompEntries()
+        .map(({ comp }) => (comp && !comp.finished) ? Math.max(0, comp.rounds.length - comp.currentRound) : 0));
+      let safety = 0;
+      const startTime = Date.now();
+      while (!seasonIsComplete() && safety < 1000) {
+        const targetIdx = computeSeasonWeek(season);
+        let playedSomething = false;
+        seasonCompEntries().forEach(({ key, comp }) => {
+          if (!comp || comp.finished) return;
+          if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); playedSomething = true; return; }
+          if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+          if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
+          playedSomething = true;
+        });
+        season.week = computeSeasonWeek(season);
+        safety++;
+        updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
+        await simTick();
+        if (!playedSomething) break;
+      }
+      advanceCongestionSlotIfComplete();
+      finalizeSeasonIfComplete();
+
+      const finishedYear = season.year;
+      summary = buildSeasonEndSummary(finishedYear);
+      startNewSeasonYear();
+      renderSeasonDashboard();
+      persistAll();
+      saveStats();
+    });
+    return summary;
+  }
+  // Extras-tab entry point: confirms with the person (wording adapts to
+  // whether there's actually anything left to force through), runs
+  // endSeasonNow(), then renders the resulting summary card and toasts a
+  // short confirmation. Kept separate from endSeasonNow() itself so other
+  // callers (e.g. a future keyboard shortcut or automated test) can invoke
+  // the underlying action without the confirm()/DOM-render coupling.
+  async function endSeasonAndAnnounce() {
+    if (!season) { toast('Start a season first — there\'s nothing to end yet.'); return; }
+    const already = seasonIsComplete();
+    const msg = already
+      ? 'End Season Y' + season.year + ' now? This hands out the season\'s awards, resets the leaderboard, and kicks off Season Y' + (season.year + 1) + '.'
+      : 'End Season Y' + season.year + ' now? Any fixtures still outstanding will be simulated to their conclusion, this season\'s champions crowned, awards handed out, and the leaderboard reset for Season Y' + (season.year + 1) + '.';
+    if (!confirm(msg)) return;
+    const summary = await endSeasonNow();
+    if (summary) {
+      renderSeasonEndAnnouncement(summary);
+      toast('Season Y' + summary.year + ' complete — awards archived, Season Y' + (summary.year + 1) + ' underway!');
+    }
+  }
   function resetSeason() {
     if (!confirm('Reset the season? All standings and fixtures will be lost.')) return;
     season = null;
@@ -13308,7 +13427,7 @@ var App = (() => {
         if (!home || !away) return;
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away, 18)}</span>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
           ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
       });
     }
@@ -13338,7 +13457,7 @@ var App = (() => {
         const pensTxt = f.pens ? ` (pens ${f.pens.home}-${f.pens.away})` : '';
         const winner = getTeam(f.winnerId);
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short} ${teamMark(away, 18)}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
       }
     });
     return h;
@@ -13385,12 +13504,53 @@ var App = (() => {
   }
 
   // ========== TEAM MATCH LOG ==========
-  // teamMatchLog[teamId] -> [{opponent, opponentShort, opponentLogo,
-  // opponentFlag, competition, scoreFor, scoreAgainst, result}], newest
-  // first, capped per team so persisted save size stays bounded. Populated
-  // at full-time for both sides — see recordTeamMatchLog() in
-  // engine/matchEngine.js.
+  // teamMatchLog[teamId] -> array of entries, newest first, capped per
+  // team so persisted save size stays bounded. Populated at full-time for
+  // both sides — see recordTeamMatchLog() in engine/matchEngine.js.
+  //
+  // Current entries are compact arrays: [opponentTeamId, competition,
+  // scoreFor, scoreAgainst]. Opponent name/short/logo/flag are looked up
+  // from opponentTeamId via getTeam(), and the W/D/L result tag is derived
+  // from scoreFor vs scoreAgainst, instead of persisting all of that on
+  // every entry (see readTeamLogEntry()).
+  //
+  // Saves made before this format change still have plain objects
+  // ({opponent, opponentShort, opponentLogo, opponentFlag, competition,
+  // scoreFor, scoreAgainst, result}) sitting in the 30-entry cap — those
+  // age out naturally as new matches are recorded, and readTeamLogEntry()
+  // understands both shapes in the meantime so old saves keep rendering.
   let teamMatchLog = {};
+
+
+  const TML_OPP = 0, TML_COMP = 1, TML_FOR = 2, TML_AGAINST = 3;
+
+  // Normalizes one teamMatchLog entry (new compact array OR legacy
+  // object) into a plain object the renderer can use uniformly.
+  function readTeamLogEntry(e) {
+    if (Array.isArray(e)) {
+      const opp = getTeam(e[TML_OPP]);
+      const scoreFor = e[TML_FOR], scoreAgainst = e[TML_AGAINST];
+      return {
+        opponentShort: (opp && (opp.short || opp.name)) || '—',
+        opponentLogo: opp ? opp.logo : null,
+        opponentFlag: opp ? opp.flag : null,
+        competition: e[TML_COMP],
+        scoreFor: scoreFor,
+        scoreAgainst: scoreAgainst,
+        result: scoreFor > scoreAgainst ? 'W' : scoreFor < scoreAgainst ? 'L' : 'D'
+      };
+    }
+    // Legacy object-shaped entry from a pre-format-change save.
+    return {
+      opponentShort: e.opponentShort || e.opponent || '—',
+      opponentLogo: e.opponentLogo,
+      opponentFlag: e.opponentFlag,
+      competition: e.competition,
+      scoreFor: e.scoreFor,
+      scoreAgainst: e.scoreAgainst,
+      result: e.result
+    };
+  }
 
 
   // Renders a team's recent-results log (last 10) with a colored W/D/L tag
@@ -13402,11 +13562,12 @@ var App = (() => {
     const log = teamMatchLog[teamId] || [];
     if (!log.length) return '';
     const resultClass = { W: 'result-w', D: 'result-d', L: 'result-l' };
-    const rows = log.slice(0, 10).map(e => {
+    const rows = log.slice(0, 10).map(raw => {
+      const e = readTeamLogEntry(raw);
       const oppMark = teamMark({ logo: e.opponentLogo, flag: e.opponentFlag }, 18);
       return `<div class="team-log-row">
         <span class="result-tag ${resultClass[e.result] || 'result-d'}">${e.result}</span>
-        <span class="tlr-opp">${oppMark}<span class="tlr-opp-abbr">${e.opponentShort || e.opponent || '—'}</span></span>
+        <span class="tlr-opp">${oppMark}<span class="tlr-opp-abbr">${e.opponentShort}</span></span>
         <span class="tlr-score">${e.scoreFor}-${e.scoreAgainst}</span>
         <span class="tlr-comp">${e.competition || ''}</span>
       </div>`;
@@ -13838,21 +13999,68 @@ var App = (() => {
 
 
   // ========== PLAYER MATCH LOG ==========
-  // playerMatchLog[playerId] -> [{opponent, opponentShort, competition,
-  // minutes, goals, assists, shots, xg, rating}], newest first, capped per
+  // playerMatchLog[playerId] -> array of entries, newest first, capped per
   // player so persisted save size stays bounded. Populated at full-time —
   // see recordPlayerMatchLog() in matchEngine.js.
+  //
+  // Current entries are compact arrays: [opponentTeamId, competition,
+  // minutes, goals, assists, shots, xg, rating] — the opponent's
+  // name/short/logo/flag are looked up from opponentTeamId via getTeam()
+  // instead of being persisted on every entry (see readPlayerLogEntry()).
+  //
+  // Saves made before this format change still have plain objects
+  // ({opponent, opponentShort, opponentLogo, opponentFlag, competition,
+  // minutes, ...}) sitting in the 30-entry cap — those age out naturally
+  // as new matches are recorded, and readPlayerLogEntry() understands both
+  // shapes in the meantime so old saves keep rendering correctly.
   let playerMatchLog = {};
+
+
+  const PML_OPP = 0, PML_COMP = 1, PML_MIN = 2, PML_G = 3, PML_A = 4, PML_SH = 5, PML_XG = 6, PML_RTG = 7;
+
+  // Normalizes one playerMatchLog entry (new compact array OR legacy
+  // object) into a plain object the renderer can use uniformly.
+  function readPlayerLogEntry(e) {
+    if (Array.isArray(e)) {
+      const opp = getTeam(e[PML_OPP]);
+      return {
+        opponentShort: (opp && (opp.short || opp.name)) || '—',
+        opponentLogo: opp ? opp.logo : null,
+        opponentFlag: opp ? opp.flag : null,
+        competition: e[PML_COMP],
+        minutes: e[PML_MIN],
+        goals: e[PML_G],
+        assists: e[PML_A],
+        shots: e[PML_SH],
+        xg: e[PML_XG],
+        rating: e[PML_RTG]
+      };
+    }
+    // Legacy object-shaped entry from a pre-format-change save.
+    return {
+      opponentShort: e.opponentShort || e.opponent || '—',
+      opponentLogo: e.opponentLogo,
+      opponentFlag: e.opponentFlag,
+      competition: e.competition,
+      minutes: e.minutes,
+      goals: e.goals,
+      assists: e.assists,
+      shots: e.shots,
+      xg: e.xg,
+      rating: e.rating
+    };
+  }
 
 
   function renderPlayerMatchLogHTML(playerId) {
     const log = playerMatchLog[playerId] || [];
     if (!log.length) return '';
-    const rows = log.slice(0, 10).map(e => {
+    const rows = log.slice(0, 10).map(raw => {
+      const e = readPlayerLogEntry(raw);
       const rc = (e.rating || 0) >= 7.5 ? 'rating-high' : (e.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
       const oppMark = teamMark({ logo: e.opponentLogo, flag: e.opponentFlag }, 16);
       return `<tr>
-        <td><span style="display:inline-flex;align-items:center;gap:4px">${oppMark}${e.opponentShort || e.opponent || '—'}</span></td>
+        <td><span style="display:inline-flex;align-items:center;gap:4px">${oppMark}${e.opponentShort}</span></td>
         <td>${e.competition || ''}</td>
         <td>${e.minutes}'</td>
         <td>${e.goals || 0}</td>
@@ -13907,24 +14115,30 @@ var App = (() => {
   // Appends this match's line to the player's persistent match log (see
   // playerMatchLog in ui/playersUI.js). Called once per involved player at
   // full time, right after their rating for this match is finalised.
+  //
+  // STORAGE FORMAT: each entry is a compact array, NOT an object —
+  // [opponentTeamId, competition, minutes, goals, assists, shots, xg, rating]
+  // (see PML_* index constants below). We used to store the opponent's
+  // full name/short/logo/flag on every single entry, which is what a team
+  // object already gives us for free via getTeam(id) — that redundancy was
+  // most of this save key's size (see renderPlayerMatchLogHTML in
+  // ui/playersUI.js, which resolves the opponent back through getTeam()).
+  // Only the opponent's id needs to be persisted.
   function recordPlayerMatchLog(m, player, team, opponentTeam, ps, side) {
     if (!player || !team) return;
     const minutes = computeMinutesPlayed(m, player.id, player.name, side);
     if (minutes <= 0 && !(ps.goals || ps.assists || ps.shots)) return; // never actually took part
     if (!playerMatchLog[player.id]) playerMatchLog[player.id] = [];
-    playerMatchLog[player.id].unshift({
-      opponent: opponentTeam ? opponentTeam.name : '—',
-      opponentShort: opponentTeam ? (opponentTeam.short || opponentTeam.name) : '—',
-      opponentLogo: opponentTeam ? (opponentTeam.logo || null) : null,
-      opponentFlag: opponentTeam ? (opponentTeam.flag || null) : null,
-      competition: matchCompetitionLabel(m),
-      minutes: minutes,
-      goals: ps.goals || 0,
-      assists: ps.assists || 0,
-      shots: ps.shots || 0,
-      xg: Math.round((ps.xg || 0) * 100) / 100,
-      rating: ps.rating || 0
-    });
+    playerMatchLog[player.id].unshift([
+      opponentTeam ? opponentTeam.id : null,
+      matchCompetitionLabel(m),
+      minutes,
+      ps.goals || 0,
+      ps.assists || 0,
+      ps.shots || 0,
+      Math.round((ps.xg || 0) * 100) / 100,
+      ps.rating || 0
+    ]);
     if (playerMatchLog[player.id].length > 30) playerMatchLog[player.id].length = 30;
   }
 
@@ -13932,20 +14146,21 @@ var App = (() => {
   // Appends this match's line to a team's persistent match log (see
   // teamMatchLog in ui/teamUI.js). Called once per side at full time, right
   // after both players' match logs are recorded, so the two stay in sync.
+  //
+  // STORAGE FORMAT: compact array — [opponentTeamId, competition,
+  // scoreFor, scoreAgainst] (see TML_* index constants below). W/D/L is
+  // derived from scoreFor vs scoreAgainst at render time instead of being
+  // stored, and opponent name/short/logo/flag are resolved via getTeam(id)
+  // — same reasoning as recordPlayerMatchLog above.
   function recordTeamMatchLog(m, team, opponentTeam, scoreFor, scoreAgainst) {
     if (!team || !opponentTeam) return;
     if (!teamMatchLog[team.id]) teamMatchLog[team.id] = [];
-    const result = scoreFor > scoreAgainst ? 'W' : scoreFor < scoreAgainst ? 'L' : 'D';
-    teamMatchLog[team.id].unshift({
-      opponent: opponentTeam.name || '—',
-      opponentShort: opponentTeam.short || opponentTeam.name || '—',
-      opponentLogo: opponentTeam.logo || null,
-      opponentFlag: opponentTeam.flag || null,
-      competition: matchCompetitionLabel(m),
-      scoreFor: scoreFor,
-      scoreAgainst: scoreAgainst,
-      result: result
-    });
+    teamMatchLog[team.id].unshift([
+      opponentTeam.id || null,
+      matchCompetitionLabel(m),
+      scoreFor,
+      scoreAgainst
+    ]);
     if (teamMatchLog[team.id].length > 30) teamMatchLog[team.id].length = 30;
   }
 
@@ -14105,6 +14320,7 @@ var App = (() => {
     playLeagueTournamentFixture, simLeagueTournamentFixture,
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
+    endSeasonNow, endSeasonAndAnnounce, renderSeasonEndAnnouncement,
     showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
     simSeasonFixture, playSeasonFixture,
     searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
