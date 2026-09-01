@@ -830,42 +830,48 @@ var App = (() => {
     idx = Math.max(0, Math.min(LIVE_RATINGS.length - 1, idx));
     p.liveRating = LIVE_RATINGS[idx];
   }
-  // Small ▲/▼/— indicator + longer label, both keyed off liveRating —
-  // same call signature/markup classes as the old numeric-form version
-  // so every existing caller (ui/playerUI.js, ui/playersUI.js) needs no
-  // changes at all.
+  // Small badge + longer label, both keyed off liveRating — same call
+  // signature/markup classes as the old numeric-form version so every
+  // existing caller (ui/playerUI.js, ui/playersUI.js) needs no changes
+  // at all. Wording is deliberately kept distinct from the CONDITIONS
+  // vocabulary below (Excellent/Good/Normal/Poor/Terrible) — liveRating
+  // and per-match condition are two different scales, and sharing words
+  // between them was the actual cause of a player's lineup badge and
+  // profile badge looking like they "didn't match": a match condition
+  // of "Poor" next to a liveRating labelled "Good form" reads as a
+  // straight contradiction even though the two numbers were never meant
+  // to agree. The badge itself is one of the curated PNGs in
+  // assets/images/ (a.png, b.png, c.png, d.png, e.png) via emojiImg(),
+  // same as the condition badge below, rather than a letter/emoji.
   const LIVE_RATING_DISPLAY = {
-    A: { emoji: '🔥', label: 'Excellent form', cls: 'form-hot' },
-    B: { emoji: '▲', label: 'Good form', cls: 'form-up' },
-    C: { emoji: '—', label: 'Steady form', cls: 'form-flat' },
-    D: { emoji: '▼', label: 'Below par', cls: 'form-down' },
-    E: { emoji: '❄️', label: 'Poor form', cls: 'form-cold' }
+    A: { label: 'Rich form', cls: 'form-hot' },
+    B: { label: 'Solid form', cls: 'form-up' },
+    C: { label: 'Average form', cls: 'form-flat' },
+    D: { label: 'Shaky form', cls: 'form-down' },
+    E: { label: 'Out of form', cls: 'form-cold' }
   };
   function formArrow(player) {
     ensurePlayerConditionProfile(player);
-    const d = LIVE_RATING_DISPLAY[player && player.liveRating] || LIVE_RATING_DISPLAY.B;
-    return `<span class="form-arrow ${d.cls}" title="${d.label} (${player ? player.liveRating : 'B'})">${d.emoji}</span>`;
+    const lr = (player && player.liveRating) || 'B';
+    const d = LIVE_RATING_DISPLAY[lr] || LIVE_RATING_DISPLAY.B;
+    return `<span class="form-arrow ${d.cls}" title="${d.label} (${lr}-rating)">${emojiImg(lr.toLowerCase(), lr + '-rating')}</span>`;
   }
   function formLabel(player) {
     ensurePlayerConditionProfile(player);
     const lr = (player && player.liveRating) || 'B';
     const d = LIVE_RATING_DISPLAY[lr] || LIVE_RATING_DISPLAY.B;
-    return `${d.label} · ${lr}-rating ${d.emoji}`;
+    return `${d.label} ${emojiImg(lr.toLowerCase(), lr + '-rating')}`;
   }
   // Pre-match condition badge — shown in the lineup list so a rolled
   // "Excellent"/"Poor"/etc. is visible before kickoff, not just inferred
-  // from how the match plays out.
-  const CONDITION_BADGE_CLASS = {
-    Excellent: 'cond-excellent',
-    Good: 'cond-good',
-    Normal: 'cond-normal',
-    Poor: 'cond-poor',
-    Terrible: 'cond-terrible'
-  };
+  // from how the match plays out. Rendered as one of the curated PNGs in
+  // assets/images/ (excellent.png, good.png, normal.png, poor.png,
+  // terrible.png) via the same emojiImg() helper every other in-app icon
+  // already uses, rather than as plain uppercase text.
   function conditionBadgeHTML(p) {
     const cond = getPlayerCondition(p);
-    const cls = CONDITION_BADGE_CLASS[cond] || 'cond-normal';
-    return `<span class="cond-badge ${cls}" title="Match condition: ${cond}">${cond}</span>`;
+    const file = cond.toLowerCase();
+    return `<span class="cond-badge" title="Match condition: ${cond}">${emojiImg(file, cond)}</span>`;
   }
   // Persistence — only liveRating is stateful/dynamic and needs saving;
   // form is re-derived from player-attributes.json (or defaulted) on
@@ -9345,6 +9351,7 @@ var App = (() => {
       const icons = playerLineIcons(ps, subInfo, on, inj);
       const rating = liveRatingBadge(ps);
       const cond = conditionBadgeHTML(p);
+      const form = formArrow(p);
       const dim = (!on && !inj && !sentOff && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
       const pos = p.slot || (p.pos || [''])[0] || '';
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
@@ -9352,6 +9359,7 @@ var App = (() => {
         <span class="player-pos">${pos}</span>
         <span class="player-name">${playerNameHTML(p)}${roleBadgesHTML(p, side)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         <span class="player-icons">${icons}</span>
+        ${form}
         ${cond}
         ${rating}
       </li>`;
