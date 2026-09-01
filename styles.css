@@ -2073,6 +2073,20 @@ select.ss-native {
 .form-arrow.form-flat { color: var(--text-muted); }
 
 /* ========================================================================
+   MATCH CONDITION BADGE (per-match Excellent/Good/Normal/Poor/Terrible roll)
+   ======================================================================== */
+.cond-badge {
+  display: inline-block; font-size: 0.62rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.3px;
+  padding: 1px 5px; border-radius: 4px; margin: 0 2px;
+}
+.cond-badge.cond-excellent { background: #16a34a; color: #f0fdf4; }
+.cond-badge.cond-good { background: #4ade80; color: #052e16; }
+.cond-badge.cond-normal { background: #6b7280; color: #f9fafb; }
+.cond-badge.cond-poor { background: #f97316; color: #1c1000; }
+.cond-badge.cond-terrible { background: #dc2626; color: #fef2f2; }
+
+/* ========================================================================
    MANAGER AWARD
    ======================================================================== */
 .award-tab[data-award="manager"]::before { content: "👔 "; }

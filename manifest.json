@@ -98,6 +98,90 @@
     "label": "func:staminaMultiplier"
   },
   {
+    "id": "cform01",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "form/condition system overview"
+  },
+  {
+    "id": "cform02",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "form/condition tables"
+  },
+  {
+    "id": "cform03",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:ensurePlayerConditionProfile"
+  },
+  {
+    "id": "cform04",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:ensureAllPlayerConditionProfiles"
+  },
+  {
+    "id": "cform05",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:rollPlayerCondition"
+  },
+  {
+    "id": "cform06",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:rollSquadConditions,rollMatchConditions"
+  },
+  {
+    "id": "cform07",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:getPlayerCondition"
+  },
+  {
+    "id": "cform08",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:conditionMultiplier"
+  },
+  {
+    "id": "cform09",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:updateLiveRatingAfterMatch"
+  },
+  {
+    "id": "cform10",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:formArrow,formLabel"
+  },
+  {
+    "id": "cform11",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:conditionBadgeHTML"
+  },
+  {
+    "id": "cform12",
+    "file": "engine/form.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:collectPlayerFormsMap"
+  },
+  {
     "id": "cofs01",
     "file": "engine/offside.js",
     "start": -1,
@@ -476,6 +560,13 @@
     "label": "func:finishingEdge"
   },
   {
+    "id": "cblitz01",
+    "file": "engine/shooting.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:blitzCurlerEdge"
+  },
+  {
     "id": "cshoot01",
     "file": "engine/shooting.js",
     "start": -1,
@@ -621,6 +712,13 @@
     "start": -1,
     "end": -1,
     "label": "func:foulProneness"
+  },
+  {
+    "id": "cdef01b",
+    "file": "engine/defending.js",
+    "start": -1,
+    "end": -1,
+    "label": "foul-proneness"
   },
   {
     "id": "c0048",
@@ -1834,6 +1932,20 @@
     "label": "func:mirrorDefenderPos"
   },
   {
+    "id": "c0205b",
+    "file": "engine/defending.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:mirrorZoneKey"
+  },
+  {
+    "id": "c0205c",
+    "file": "engine/defending.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:zoneAffinityMultiplier"
+  },
+  {
     "id": "c0206",
     "file": "engine/passing.js",
     "start": 2891,
@@ -1960,6 +2072,48 @@
     "label": "func:resolveTurnover"
   },
   {
+    "id": "cdec01",
+    "file": "engine/decisionModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "doc:decisionModel"
+  },
+  {
+    "id": "cdec02",
+    "file": "engine/decisionModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "table:baseActionWeights"
+  },
+  {
+    "id": "cdec03",
+    "file": "engine/decisionModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:attributeActionScores"
+  },
+  {
+    "id": "cdec04",
+    "file": "engine/decisionModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:evaluateBallActions"
+  },
+  {
+    "id": "cdec05",
+    "file": "engine/decisionModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:chooseWeightedAction"
+  },
+  {
+    "id": "cdec06",
+    "file": "engine/decisionModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:decideBallAction"
+  },
+  {
     "id": "c0222",
     "file": "engine/possession.js",
     "start": 3261,
@@ -2042,6 +2196,13 @@
     "start": 3619,
     "end": 3644,
     "label": "func:pickPlayer"
+  },
+  {
+    "id": "c0233b",
+    "file": "engine/possession.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:pickMarker"
   },
   {
     "id": "c0234",
@@ -2328,6 +2489,13 @@
     "file": "ui/matchUI.js",
     "start": 4529,
     "end": 4614,
+    "label": "func:computeDynamicPosition (pitch positioning model)"
+  },
+  {
+    "id": "c0273b",
+    "file": "ui/matchUI.js",
+    "start": -1,
+    "end": -1,
     "label": "func:renderPitch"
   },
   {
@@ -2700,6 +2868,13 @@
     "start": 5095,
     "end": 5106,
     "label": "func:safeSetItem"
+  },
+  {
+    "id": "c0323b",
+    "file": "simulation/seasonEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "save-compaction-helpers"
   },
   {
     "id": "c0324",
