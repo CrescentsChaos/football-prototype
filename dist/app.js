@@ -677,6 +677,214 @@ var App = (() => {
   }
 
   // ===================================================================
+  // ================ FORM & CONDITION SYSTEM (eFootball-style) ========
+  // ===================================================================
+  // Two persistent, per-player attributes drive this system:
+  //   p.form       — "Unwavering" | "Standard" | "Inconsistent". How
+  //                   consistent this player's day-to-day condition is.
+  //                   Sourced from player-attributes.json (expanded
+  //                   sheet) when present; any player without one
+  //                   defaults to "Inconsistent".
+  //   p.liveRating — "A" | "B" | "C" | "D" | "E". This player's current
+  //                   run of form, starting at "B" and drifting up or
+  //                   down after every match based on how they rated.
+  //
+  // Neither of those is the match-to-match number that actually moves
+  // the needle in a game — that's the ephemeral, per-match "condition"
+  // rolled once at kickoff (rollSquadConditions): "Excellent" | "Good" |
+  // "Normal" | "Poor" | "Terrible". The roll is weighted by liveRating
+  // (a player on "A" form is far more likely to roll Excellent/Good than
+  // one on "E") and spread by form type (Unwavering barely deviates from
+  // what liveRating alone would predict; Inconsistent can swing to
+  // either extreme).
+  //
+  // Condition is intentionally kept OUT of the player object's baseOvr/
+  // ovr entirely — per-match condition is looked up live off
+  // currentMatch.condition (exactly the same pattern engine/fatigue.js
+  // already uses for stamina, see staminaMultiplier()) and only ever
+  // multiplies an *in-match* ability read. A player's card/base stats
+  // and overall never change because of a bad day.
+  const FORM_TYPES = ['Unwavering', 'Standard', 'Inconsistent'];
+  const LIVE_RATINGS = ['A', 'B', 'C', 'D', 'E'];
+  const CONDITIONS = ['Excellent', 'Good', 'Normal', 'Poor', 'Terrible'];
+
+  // Base condition-roll weights per liveRating tier, indexed to match
+  // CONDITIONS above (Excellent..Terrible). A/B skew toward the good end,
+  // C centers on Normal, D/E skew toward the poor end — per spec.
+  const LIVE_RATING_CONDITION_WEIGHTS = {
+    A: [40, 35, 18, 5, 2],
+    B: [22, 33, 30, 11, 4],
+    C: [8, 22, 40, 22, 8],
+    D: [4, 11, 30, 33, 22],
+    E: [2, 5, 18, 35, 40]
+  };
+
+  // How far the roll is allowed to stray from its liveRating-predicted
+  // peak. 1.0 leaves the base weights above untouched ("moderate
+  // variation"); below 1 compresses the roll tightly around the peak
+  // tier ("stable"); above 1 exaggerates the tails so extreme swings
+  // become meaningfully more likely ("extreme variation").
+  const FORM_TYPE_SPREAD = { Unwavering: 0.45, Standard: 1.0, Inconsistent: 1.85 };
+
+  // Flat effective-attribute multiplier per rolled condition — applied
+  // (see conditionMultiplier() below) at the specific shooting/passing/
+  // dribbling/defending/physical/positioning/goalkeeping read sites
+  // spread across the engine, never to baseOvr/ovr.
+  const CONDITION_MULTIPLIER = {
+    Excellent: 1.08,
+    Good: 1.04,
+    Normal: 1.0,
+    Poor: 0.94,
+    Terrible: 0.86
+  };
+  // Makes sure a player carries valid form/liveRating values, deriving
+  // form from their expanded-attribute sheet (player-attributes.json)
+  // the first time this runs for them. Safe to call repeatedly/lazily —
+  // every read site below calls this defensively so nothing ever reads
+  // undefined form data, even for a player added after the startup pass.
+  function ensurePlayerConditionProfile(p) {
+    if (!p) return;
+    if (!FORM_TYPES.includes(p.form)) {
+      const sheetForm = p.expandedAttrs && p.expandedAttrs.form;
+      p.form = FORM_TYPES.includes(sheetForm) ? sheetForm : 'Inconsistent';
+    }
+    if (!LIVE_RATINGS.includes(p.liveRating)) p.liveRating = 'B';
+  }
+  // Startup pass — run once after applyExpandedPlayerAttributes() so
+  // every player's expandedAttrs (and therefore their authored form
+  // type) is already resolved, and after restorePlayerConditionState()
+  // so a previously-earned liveRating is restored before this fills in
+  // anyone still missing one.
+  function ensureAllPlayerConditionProfiles() {
+    allTeams.forEach(t => (t.players || []).forEach(ensurePlayerConditionProfile));
+  }
+  // Weighted random condition roll for one player ahead of kickoff.
+  function rollPlayerCondition(p) {
+    ensurePlayerConditionProfile(p);
+    const base = LIVE_RATING_CONDITION_WEIGHTS[p.liveRating] || LIVE_RATING_CONDITION_WEIGHTS.B;
+    const spread = FORM_TYPE_SPREAD[p.form] != null ? FORM_TYPE_SPREAD[p.form] : 1.0;
+    const peakIdx = base.reduce((best, w, i) => (w > base[best] ? i : best), 0);
+    // Stretch/compress each tier's weight by how far it sits from the
+    // liveRating's own peak tier — see FORM_TYPE_SPREAD comment above.
+    const adjusted = base.map((w, i) => Math.max(0.5, w * Math.pow(spread, Math.abs(i - peakIdx))));
+    const total = adjusted.reduce((a, b) => a + b, 0);
+    let r = seededRandom() * total;
+    for (let i = 0; i < adjusted.length; i++) {
+      r -= adjusted[i];
+      if (r <= 0) return CONDITIONS[i];
+    }
+    return CONDITIONS[CONDITIONS.length - 1];
+  }
+  // Rolls and stores pre-match condition for every player in a squad
+  // (starters + bench — a sub might come on) into currentMatch.condition,
+  // keyed by side then player id. Called once per match from
+  // startMatch(), mirroring how fatigue/stamina state is scoped to
+  // currentMatch rather than stored on the player object itself.
+  function rollSquadConditions(squad) {
+    const out = {};
+    ((squad && squad.all) || []).forEach(p => { out[p.id] = rollPlayerCondition(p); });
+    return out;
+  }
+
+  function rollMatchConditions(m) {
+    if (!m) return;
+    m.condition = {
+      home: rollSquadConditions(m.home.squad),
+      away: rollSquadConditions(m.away.squad)
+    };
+  }
+  // Live lookup of a player's rolled condition for the match currently
+  // in progress. Falls back to "Normal" (neutral) outside of a match, or
+  // for a player this match never rolled a condition for.
+  function getPlayerCondition(p) {
+    const m = currentMatch;
+    if (!m || !p || !m.condition) return 'Normal';
+    const side = playerMatchSide(p);
+    if (!side) return 'Normal';
+    return (m.condition[side] && m.condition[side][p.id]) || 'Normal';
+  }
+  // The single multiplier every condition-aware ability read below
+  // applies, exactly the way staminaMultiplier(p) already gets applied
+  // throughout the engine — never touches baseOvr/ovr, only ever scales
+  // an in-match performance read (shooting/passing/dribbling/defending/
+  // physical/positioning/goalkeeping — see the call sites in
+  // shooting.js, passing.js, defending.js and goalkeeper.js).
+  function conditionMultiplier(p) {
+    const cond = getPlayerCondition(p);
+    return CONDITION_MULTIPLIER[cond] != null ? CONDITION_MULTIPLIER[cond] : 1;
+  }
+  // Post-match progression: a player's liveRating drifts up or down one
+  // or two tiers depending on how they actually rated this match — the
+  // "previous matches' performance upgrades or degrades it" requirement.
+  // A solidly-average showing (6.2-7.2) leaves the tier untouched.
+  function updateLiveRatingAfterMatch(p, rating) {
+    if (!p) return;
+    ensurePlayerConditionProfile(p);
+    let idx = LIVE_RATINGS.indexOf(p.liveRating);
+    if (idx === -1) idx = LIVE_RATINGS.indexOf('B');
+    if (rating >= 8.0) idx -= 2;
+    else if (rating >= 7.2) idx -= 1;
+    else if (rating >= 6.2) idx += 0;
+    else if (rating >= 5.3) idx += 1;
+    else idx += 2;
+    idx = Math.max(0, Math.min(LIVE_RATINGS.length - 1, idx));
+    p.liveRating = LIVE_RATINGS[idx];
+  }
+  // Small ▲/▼/— indicator + longer label, both keyed off liveRating —
+  // same call signature/markup classes as the old numeric-form version
+  // so every existing caller (ui/playerUI.js, ui/playersUI.js) needs no
+  // changes at all.
+  const LIVE_RATING_DISPLAY = {
+    A: { emoji: '🔥', label: 'Excellent form', cls: 'form-hot' },
+    B: { emoji: '▲', label: 'Good form', cls: 'form-up' },
+    C: { emoji: '—', label: 'Steady form', cls: 'form-flat' },
+    D: { emoji: '▼', label: 'Below par', cls: 'form-down' },
+    E: { emoji: '❄️', label: 'Poor form', cls: 'form-cold' }
+  };
+  function formArrow(player) {
+    ensurePlayerConditionProfile(player);
+    const d = LIVE_RATING_DISPLAY[player && player.liveRating] || LIVE_RATING_DISPLAY.B;
+    return `<span class="form-arrow ${d.cls}" title="${d.label} (${player ? player.liveRating : 'B'})">${d.emoji}</span>`;
+  }
+  function formLabel(player) {
+    ensurePlayerConditionProfile(player);
+    const lr = (player && player.liveRating) || 'B';
+    const d = LIVE_RATING_DISPLAY[lr] || LIVE_RATING_DISPLAY.B;
+    return `${d.label} · ${lr}-rating ${d.emoji}`;
+  }
+  // Pre-match condition badge — shown in the lineup list so a rolled
+  // "Excellent"/"Poor"/etc. is visible before kickoff, not just inferred
+  // from how the match plays out.
+  const CONDITION_BADGE_CLASS = {
+    Excellent: 'cond-excellent',
+    Good: 'cond-good',
+    Normal: 'cond-normal',
+    Poor: 'cond-poor',
+    Terrible: 'cond-terrible'
+  };
+  function conditionBadgeHTML(p) {
+    const cond = getPlayerCondition(p);
+    const cls = CONDITION_BADGE_CLASS[cond] || 'cond-normal';
+    return `<span class="cond-badge ${cls}" title="Match condition: ${cond}">${cond}</span>`;
+  }
+  // Persistence — only liveRating is stateful/dynamic and needs saving;
+  // form is re-derived from player-attributes.json (or defaulted) on
+  // every load via ensureAllPlayerConditionProfiles(), so it's never
+  // written here. Function name kept as collectPlayerFormsMap()/
+  // persistPlayerForms()/restorePlayerForms() since simulation/
+  // seasonEngine.js and data/playerDatabase.js already call them by
+  // those names for save/load.
+  function collectPlayerFormsMap() {
+    const map = {};
+    allTeams.forEach(t => (t.players || []).forEach(p => {
+      if (LIVE_RATINGS.includes(p.liveRating) && p.liveRating !== 'B') {
+        map[p.id] = { liveRating: p.liveRating };
+      }
+    }));
+    return map;
+  }
+
+  // ===================================================================
   // ===================== OFFSIDE ENGINE ==============================
   // ===================================================================
   // A genuinely spatial read of the offside law instead of a flat dice
@@ -2053,7 +2261,10 @@ var App = (() => {
           const source = (typeof p.rawOvr === 'number') ? p.rawOvr : (p.baseOvr || p.ovr || 70);
           const scaledBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(source * REGULAR_OVR_MULTIPLIER)));
           p.baseOvr = scaledBase;
-          p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(scaledBase + (p.form || 0))));
+          // Card overall is fixed to baseOvr — the Form & Condition system
+          // (engine/form.js) never adjusts it; only in-match effective
+          // attributes move with a player's rolled condition.
+          p.ovr = scaledBase;
           p.attrBoosted = false;
           return;
         }
@@ -2086,7 +2297,9 @@ var App = (() => {
         const base = positionalRawOverall(attr, posGroup) + signatureBonus;
         const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base)));
         p.baseOvr = boostedBase;
-        p.ovr = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(boostedBase + (p.form || 0))));
+        // Card overall is fixed to baseOvr — see the non-expanded branch
+        // above for why the old form-delta is gone from this line too.
+        p.ovr = boostedBase;
         p.expandedAttrs = attr;
         p.attrBoosted = true;
         p.signatureBonus = signatureBonus;
@@ -2244,7 +2457,7 @@ var App = (() => {
   // as much as jumping ability).
   function positioningEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    return curvedStat(xattr(p, 'off_awr', 70), 70, 29, 1.6) * 0.0522 * staminaMultiplier(p);
+    return curvedStat(xattr(p, 'off_awr', 70), 70, 29, 1.6) * 0.0522 * staminaMultiplier(p) * conditionMultiplier(p);
   }
   // How hard the shot is actually struck, 0-1 — driven by Kicking Power.
   // This is deliberately kept separate from shotQuality (placement/
@@ -2286,7 +2499,7 @@ var App = (() => {
     if (hasStyle(p, 'Target Man')) v += 0.1;
     if (hasStyle(p, 'Anchor Man') || hasStyle(p, 'Destroyer')) v += 0.05;
     // A tired jumper gets up a little less sharply late in the match.
-    v *= staminaMultiplier(p);
+    v *= staminaMultiplier(p) * conditionMultiplier(p);
     return Math.max(0.05, Math.min(0.98, v));
   }
   // GK shot-stopping edges — each one reads a *distinct* goalkeeping
@@ -2383,7 +2596,7 @@ var App = (() => {
       situational += (closeRange || isHeader) ? reflex * 1.3 : reflex * 0.45;
       situational += (isLongRange || isCrossType) ? reach * 1.2 : reach * 0.35;
     }
-    const gkSkillBase = gk ? (curvedAttr(gk.def || 70, 70) * 0.45 + curvedAttr(gk.ovr || 75, 75) * 0.25 + curvedAttr(gk.tec || 70, 70) * 0.15) / 100 : 0.68;
+    const gkSkillBase = (gk ? (curvedAttr(gk.def || 70, 70) * 0.45 + curvedAttr(gk.ovr || 75, 75) * 0.25 + curvedAttr(gk.tec || 70, 70) * 0.15) / 100 : 0.68) * (gk ? conditionMultiplier(gk) : 1);
     const gkSkill = Math.max(0.05, Math.min(0.98, gkSkillBase + posEdge + situational));
     const saveChance = Math.min(0.94, Math.max(0.28,
       0.58 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
@@ -2421,7 +2634,7 @@ var App = (() => {
     if (hasStyle(p, 'Prolific Winger') || hasStyle(p, 'Inside Forward')) edge += 0.04;
     if (hasStyle(p, 'Roaming Flank') || hasStyle(p, 'Dummy Runner')) edge += 0.03;
     if (hasStyle(p, 'Creative Playmaker')) edge += 0.02;
-    edge *= staminaMultiplier(p);
+    edge *= staminaMultiplier(p) * conditionMultiplier(p);
     return edge;
   }
   // Defensive-action edges — specific tackling/interception skills beyond
@@ -2701,6 +2914,7 @@ var App = (() => {
       loadPersistedGameState();
       restorePlayerForms();
       applyExpandedPlayerAttributes();
+      ensureAllPlayerConditionProfiles();
       // Canonicalize every player's position codes (CF -> ST, RWF -> RW,
       // CMF -> CM, DMF -> CDM, SS/AMF -> CAM, etc.) so formation auto-fill,
       // substitutions, and position filters treat every naming variant of
@@ -4261,6 +4475,9 @@ var App = (() => {
     };
     currentMatch.home.roles = assignMatchRoles(currentMatch.home);
     currentMatch.away.roles = assignMatchRoles(currentMatch.away);
+    // Form & Condition system (engine/form.js) — roll every squad member's
+    // match condition once, right here at kickoff, before anything reads it.
+    rollMatchConditions(currentMatch);
     // Opening tactical instructions now come from the matchup, not a flat
     // "balanced" default every time: a clear underdog tends to sit in and
     // be harder to break down, a clear favourite tends to push on, and a
@@ -6283,9 +6500,9 @@ var App = (() => {
       const base = vals.length
         ? curvedAttr(vals.reduce((a, b) => a + b, 0) / vals.length, 70)
         : (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35);
-      return base * staminaMultiplier(p);
+      return base * staminaMultiplier(p) * conditionMultiplier(p);
     }
-    return (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35) * staminaMultiplier(p);
+    return (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35) * staminaMultiplier(p) * conditionMultiplier(p);
   }
   // Aerial/lofted-pass-specific ability — crosses, switches of play, long
   // diagonals. Reads lofted_pass + curl (the whip/bend on a delivery),
@@ -6296,9 +6513,9 @@ var App = (() => {
       const base = vals.length
         ? curvedAttr(vals.reduce((a, b) => a + b, 0) / vals.length, 70)
         : (curvedAttr(p.tec || 70, 70) * 0.6 + curvedAttr(p.ovr || 75, 75) * 0.4);
-      return base * staminaMultiplier(p);
+      return base * staminaMultiplier(p) * conditionMultiplier(p);
     }
-    return (curvedAttr(p.tec || 70, 70) * 0.6 + curvedAttr(p.ovr || 75, 75) * 0.4) * staminaMultiplier(p);
+    return (curvedAttr(p.tec || 70, 70) * 0.6 + curvedAttr(p.ovr || 75, 75) * 0.4) * staminaMultiplier(p) * conditionMultiplier(p);
   }
   function passingAbility(p) {
     if (p && p.expandedAttrs) {
@@ -6323,9 +6540,9 @@ var App = (() => {
       // second half.
       if (hasSkill(p, 'Game-Changing Pass') && playerTeamTrailingOrDrawingSecondHalf(p)) bonus += 3;
       if (isActingSuperSub(p)) bonus += 2;
-      return (base + bonus) * staminaMultiplier(p);
+      return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p);
     }
-    return curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35;
+    return (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35) * conditionMultiplier(p);
   }
   function defensivePressure(p) {
     if (p && p.expandedAttrs) {
@@ -6353,9 +6570,9 @@ var App = (() => {
       if (teamGkHasSkill(p, 'GK Directing Defense')) bonus += 1.5;
       if (teamGkHasSkill(p, 'GK Spirit Roar') && playerTeamLeadingSecondHalf(p)) bonus += 2;
       // A tired defender presses/closes down a yard slower than a fresh one.
-      return (base + bonus) * staminaMultiplier(p);
+      return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p);
     }
-    return curvedAttr(p.def || 70, 70) * 0.7 + curvedAttr(p.ovr || 75, 75) * 0.3;
+    return (curvedAttr(p.def || 70, 70) * 0.7 + curvedAttr(p.ovr || 75, 75) * 0.3) * conditionMultiplier(p);
   }
   function carryingAbility(p) {
     if (p && p.expandedAttrs) {
@@ -6372,9 +6589,9 @@ var App = (() => {
       if (hasSkill(p, 'Acceleration Burst')) bonus += 2;
       if (hasSkill(p, 'Attacking Surge')) bonus += 1.5;
       if (isActingSuperSub(p)) bonus += 1.5;
-      return (base + bonus) * staminaMultiplier(p);
+      return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p);
     }
-    return curvedAttr(p.tec || 70, 70) * 0.5 + curvedAttr(p.pac || 70, 70) * 0.3 + curvedAttr(p.ovr || 75, 75) * 0.2;
+    return (curvedAttr(p.tec || 70, 70) * 0.5 + curvedAttr(p.pac || 70, 70) * 0.3 + curvedAttr(p.ovr || 75, 75) * 0.2) * conditionMultiplier(p);
   }
 
   // ---- Shot-type profile: how a chance was created shapes its baseline
@@ -6424,7 +6641,7 @@ var App = (() => {
           // isn't actually a good finisher. The dedicated finishingEdge()/
           // positioningEdge() skill-specific bonuses below are unchanged.
           (curvedAttr(shooter.att || 70, 70) * 0.62 + curvedAttr(shooter.tec || 70, 70) * 0.10
-            + curvedAttr(shooter.ovr || 75, 75) * 0.18 + curvedAttr(shooter.pac || 70, 70) * 0.10) / 100
+            + curvedAttr(shooter.ovr || 75, 75) * 0.18 + curvedAttr(shooter.pac || 70, 70) * 0.10) / 100 * conditionMultiplier(shooter)
           + finishingEdge(shooter)
           + positioningEdge(shooter)
           + blitzCurlerEdge(shooter)
@@ -8525,7 +8742,7 @@ var App = (() => {
       // OVR) based on how they actually played in this match — the real
       // roster player, not the shallow per-match squad clone, so it sticks.
       const realPlayer = (teamObj.players || []).find(x => x.id === p.id);
-      if (realPlayer) updatePlayerForm(realPlayer, ps.rating);
+      if (realPlayer) updateLiveRatingAfterMatch(realPlayer, ps.rating);
       const oppTeamObj = concededSide === 'home' ? m.away.team : m.home.team;
       recordPlayerMatchLog(m, p, teamObj, oppTeamObj, ps, concededSide);
       // Feed the season-long "Interceptions" leaderboard and Defenders' Award
@@ -9127,6 +9344,7 @@ var App = (() => {
       const sentOff = !!ps.red;
       const icons = playerLineIcons(ps, subInfo, on, inj);
       const rating = liveRatingBadge(ps);
+      const cond = conditionBadgeHTML(p);
       const dim = (!on && !inj && !sentOff && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
       const pos = p.slot || (p.pos || [''])[0] || '';
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
@@ -9134,6 +9352,7 @@ var App = (() => {
         <span class="player-pos">${pos}</span>
         <span class="player-name">${playerNameHTML(p)}${roleBadgesHTML(p, side)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         <span class="player-icons">${icons}</span>
+        ${cond}
         ${rating}
       </li>`;
     };
@@ -9288,72 +9507,32 @@ var App = (() => {
     }
   }
 
-  // ========== DYNAMIC PLAYER FORM ==========
-  // Every player carries a rolling `form` value (-5..+5) that moves after
-  // every match they play based on that match's rating: good performances
-  // push it up, bad ones push it down, and it decays back toward 0 over time
-  // so form always reflects *recent* matches, not a whole career. Form is
-  // then folded straight into the player's `ovr` (clamped to baseOvr ± 5),
-  // which is the single number every other part of the app already reads
-  // for squad strength, squad-builder sorting, and display — so a player who
-  // plays badly for a stretch genuinely gets a lower rating, and a player on
-  // a hot streak genuinely gets a higher one, without a second parallel
-  // "true skill" number anywhere else in the codebase.
-  const FORM_MIN = -5, FORM_MAX = 5;
-  const FORM_DECAY = 0.82;
-  function updatePlayerForm(player, rating) {
-    if (!player) return;
-    if (typeof player.baseOvr !== 'number') player.baseOvr = player.ovr || 70;
-    if (typeof player.form !== 'number') player.form = 0;
-    // Decay first so last match's swing fades before this one is applied.
-    player.form *= FORM_DECAY;
-    if (rating >= 8.2) player.form += 1.6;
-    else if (rating >= 7.4) player.form += 1.0;
-    else if (rating >= 6.7) player.form += 0.45;
-    else if (rating >= 6.1) player.form += 0.1;
-    else if (rating >= 5.5) player.form -= 0.5;
-    else if (rating >= 4.8) player.form -= 1.1;
-    else player.form -= 1.8;
-    player.form = Math.max(FORM_MIN, Math.min(FORM_MAX, Math.round(player.form * 100) / 100));
-    player.ovr = Math.max(40, Math.min(100, Math.round(player.baseOvr + player.form)));
-  }
+  // ========== PLAYER FORM & CONDITION ==========
+  // The old rolling numeric-form-into-OVR system that used to live in this
+  // file has been removed and replaced by the eFootball-style Form &
+  // Condition system in engine/form.js (form type + liveRating tier +
+  // per-match condition roll). See that file for updatePlayerForm's
+  // replacement (updateLiveRatingAfterMatch), formArrow/formLabel, and
+  // collectPlayerFormsMap. Nothing here folds into baseOvr/ovr anymore.
 
-  // Small ▲/▼/— indicator used next to a player's OVR wherever a squad list
-  // renders one, so a slump or a hot streak is visible at a glance.
-  function formArrow(player) {
-    const f = (player && typeof player.form === 'number') ? player.form : 0;
-    if (f >= 2.2) return '<span class="form-arrow form-hot" title="On fire">🔥</span>';
-    if (f >= 0.6) return '<span class="form-arrow form-up" title="Good form">▲</span>';
-    if (f <= -2.2) return '<span class="form-arrow form-cold" title="Poor form">❄️</span>';
-    if (f <= -0.6) return '<span class="form-arrow form-down" title="Below par">▼</span>';
-    return '<span class="form-arrow form-flat" title="Steady form">—</span>';
-  }
-  // Longer text version used in the player profile modal.
-  function formLabel(player) {
-    const f = (player && typeof player.form === 'number') ? player.form : 0;
-    if (f >= 2.2) return 'On fire 🔥';
-    if (f >= 0.6) return 'Good form ▲';
-    if (f <= -2.2) return 'Poor form ❄️';
-    if (f <= -0.6) return 'Below par ▼';
-    return 'Steady —';
-  }
 
-  // Persist every non-zero form value (+ the baseOvr it's measured against)
-  // so a page refresh doesn't silently reset every player back to neutral.
-  function collectPlayerFormsMap() {
-    const map = {};
-    allTeams.forEach(t => (t.players || []).forEach(p => {
-      if (typeof p.form === 'number' && Math.abs(p.form) > 0.01) {
-        map[p.id] = { form: p.form, baseOvr: p.baseOvr, ovr: p.ovr };
-      }
-    }));
-    return map;
-  }
+
+
+
+
+
   function persistPlayerForms() {
     try {
       return safeSetItem('apexPlayerForms', JSON.stringify(collectPlayerFormsMap()));
     } catch (e) { return false; }
   }
+  // Restores each player's persistent liveRating ("A".."E") from a
+  // previous session — see collectPlayerFormsMap() in engine/form.js for
+  // what gets saved. Deliberately only touches liveRating: baseOvr/ovr
+  // are re-derived fresh every load by applyExpandedPlayerAttributes()
+  // (which runs after this), and `form` (Unwavering/Standard/
+  // Inconsistent) is re-derived from player-attributes.json by
+  // ensureAllPlayerConditionProfiles() rather than saved/restored here.
   function restorePlayerForms() {
     try {
       const raw = localStorage.getItem('apexPlayerForms');
@@ -9361,11 +9540,7 @@ var App = (() => {
       const map = JSON.parse(raw);
       allTeams.forEach(t => (t.players || []).forEach(p => {
         const e = map[p.id];
-        if (e) {
-          p.form = e.form;
-          p.baseOvr = (typeof e.baseOvr === 'number') ? e.baseOvr : p.ovr;
-          p.ovr = e.ovr;
-        }
+        if (e && LIVE_RATINGS.includes(e.liveRating)) p.liveRating = e.liveRating;
       }));
     } catch (e) {}
   }
@@ -12056,6 +12231,9 @@ var App = (() => {
     };
     currentMatch.home.roles = assignMatchRoles(currentMatch.home);
     currentMatch.away.roles = assignMatchRoles(currentMatch.away);
+    // Form & Condition system (engine/form.js) — same per-kickoff roll as
+    // the interactive startMatch() path above.
+    rollMatchConditions(currentMatch);
 
     let safety = 0;
     while (currentMatch && !currentMatch.finished && safety < 250) {
