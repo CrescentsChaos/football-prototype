@@ -6204,6 +6204,70 @@ var App = (() => {
     const defThird = third === 'ATT' ? 'DEF' : third === 'DEF' ? 'ATT' : 'MID';
     return ZONE_POS_MAP[defThird + '_' + ch] || ZONE_POS_MAP.MID_C;
   }
+  // The mirrored zone key itself (not just the position list) — needed so
+  // marker selection can apply the same playstyle-based positioning
+  // affinity a carrier gets, e.g. an Anchor Man screening in front of his
+  // own back line should actually be the one found there more often than
+  // whichever teammate merely has the higher generic rating.
+  function mirrorZoneKey(zoneKey) {
+    const [third, ch] = zoneKey.split('_');
+    const defThird = third === 'ATT' ? 'DEF' : third === 'DEF' ? 'ATT' : 'MID';
+    return defThird + '_' + ch;
+  }
+  // Playstyle-driven pitch-positioning affinity: how much more (or less)
+  // likely a player is to actually be the one found in a given zone,
+  // beyond what his base position slot already implies. A Goal Poacher/Fox
+  // in the Box striker realistically doesn't drop into midfield to help
+  // build play, while a Deep-Lying Forward does; a Cross Specialist hugs
+  // the touchline instead of drifting inside; an Anchor Man screens
+  // centrally in front of the back line instead of joining the attack.
+  // Applied as a weight multiplier on top of the normal ability-based
+  // selection in pickPlayer()/pickMarker() wherever a zoneKey is supplied.
+  function zoneAffinityMultiplier(player, zoneKey) {
+    if (!zoneKey || !player || !player.expandedAttrs) return 1;
+    const styles = player.expandedAttrs.playstyle || [];
+    if (!styles.length) return 1;
+    const parts = zoneKey.split('_');
+    const third = parts[0], ch = parts[1];
+    const central = ch === 'C';
+    let mult = 1;
+    styles.forEach((s) => {
+      if (s === 'Goal Poacher' || s === 'Fox in the Box') {
+        if (third === 'ATT' && central) mult *= 1.5;
+        else if (third === 'MID') mult *= 0.55;
+        else if (third === 'DEF') mult *= 0.25;
+      } else if (s === 'Deep-Lying Forward' || s === 'Hole Player') {
+        if (third === 'MID' && central) mult *= 1.4;
+        else if (third === 'ATT' && central) mult *= 0.9;
+      } else if (s === 'Target Man') {
+        if (third === 'ATT' && central) mult *= 1.3;
+        if (!central) mult *= 0.75;
+      } else if (s === 'Dummy Runner' || s === 'Extra Frontman') {
+        if (third === 'ATT') mult *= 1.25;
+      } else if (s === 'Creative Playmaker' || s === 'Classic No. 10' || s === 'Orchestrator') {
+        if (central && third !== 'DEF') mult *= 1.35;
+        else if (!central) mult *= 0.8;
+      } else if (s === 'Prolific Winger' || s === 'Cross Specialist' || s === 'Roaming Flank') {
+        if (!central) mult *= 1.35;
+        else mult *= 0.7;
+      } else if (s === 'Inside Forward') {
+        if (central && third !== 'DEF') mult *= 1.35;
+      } else if (s === 'Box-to-Box') {
+        if (third === 'DEF' || third === 'ATT') mult *= 1.2;
+      } else if (s === 'Destroyer' || s === 'Anchor Man') {
+        if (third === 'ATT') mult *= 0.35;
+        else if (third === 'DEF' || (third === 'MID' && central)) mult *= 1.25;
+      } else if (s === 'Build Up') {
+        if (third === 'DEF') mult *= 1.15;
+      } else if (s === 'Offensive Full-back' || s === 'Full-back Finisher') {
+        if (!central && third !== 'DEF') mult *= 1.4;
+      } else if (s === 'Defensive Full-back') {
+        if (third === 'DEF') mult *= 1.25;
+        else if (third === 'ATT') mult *= 0.6;
+      }
+    });
+    return Math.max(0.15, Math.min(2.2, mult));
+  }
 
   // ---- Attribute-driven ability reads (expanded sheet first, generic
   // derived stat as fallback) that feed every stage of the pipeline below.
@@ -6592,7 +6656,7 @@ var App = (() => {
     // instead of forcing a bad chance? Weighted on the carrier's own
     // attributes/playstyle plus the team's tactical stance, same as the
     // mid-pitch decision in runPossessionSequence().
-    const marker = pickPlayer(defTeam, mirrorDefenderPos('ATT_' + channel));
+    const marker = pickMarker(defTeam, mirrorDefenderPos('ATT_' + channel), null, mirrorZoneKey('ATT_' + channel));
     const decision = decideBallAction(carrier, marker, 'ATT_' + channel, tacSelf, tacOpp, mods,
       ['shoot', 'cross', 'throughball', 'dribble', 'pass']);
 
@@ -6806,7 +6870,7 @@ var App = (() => {
     const m = currentMatch;
     if (!m) return;
     const defTeam = m[defendingSide];
-    const defenderPlayer = winner || pickPlayer(defTeam, mirrorDefenderPos(toThird + '_C'));
+    const defenderPlayer = winner || pickMarker(defTeam, mirrorDefenderPos(toThird + '_C'), null, mirrorZoneKey(toThird + '_C'));
     if (!defenderPlayer) return;
     // The ball just changed hands in defendingSide's own zone — mirror the
     // third (attacker's ATT is the defender's DEF, and vice versa) so the
@@ -6902,15 +6966,88 @@ var App = (() => {
   //     shoot / cross / through ball / dribble / laying it off instead.
   const BALL_ACTIONS = ['pass', 'dribble', 'carry', 'shoot', 'cross', 'throughball', 'backpass', 'switch', 'hold'];
 
-  // Starting weight for each action before attribute/context/tactic factors are
-  // applied, keyed by which third of the pitch the ball is currently in. Every
-  // action keeps a nonzero floor so an unlikely one (a CB shooting from inside
-  // his own half) stays possible at a low rate rather than being hard-excluded —
-  // real matches occasionally produce exactly that kind of moment.
-  function baseActionWeights(third) {
-    if (third === 'DEF') return { pass: 46, dribble: 9, carry: 13, shoot: 0.4, cross: 0.8, throughball: 1.5, backpass: 13, switch: 11, hold: 4.5 };
-    if (third === 'ATT') return { pass: 22, dribble: 15, carry: 9, shoot: 15, cross: 15, throughball: 11, backpass: 2, switch: 3, hold: 3 };
-    return { pass: 42, dribble: 12, carry: 12, shoot: 2, cross: 6, throughball: 8, backpass: 6, switch: 8, hold: 2 }; // MID
+  // Which broad position group a player's decisions get evaluated as. This
+  // is the piece the model was missing: everyone on the ball in midfield
+  // was scored off the *same* base table regardless of whether they were a
+  // CDM or a striker who'd dropped deep — so a poacher who found himself in
+  // midfield behaved (and got dispossessed) like a converted playmaker
+  // instead of doing what strikers actually do there, which is look for the
+  // link/lay-off rather than try to dribble through a crowded middle.
+  function positionGroupOf(p) {
+    const slot = (p && (p.slot || (p.pos || [])[0])) || 'CM';
+    if (slot === 'GK') return 'GK';
+    if (slot === 'CB') return 'CB';
+    if (slot === 'RB' || slot === 'LB' || slot === 'RWB' || slot === 'LWB') return 'FB';
+    if (slot === 'CDM') return 'CDM';
+    if (slot === 'CM') return 'CM';
+    if (slot === 'CAM') return 'CAM';
+    if (slot === 'RM' || slot === 'LM' || slot === 'RW' || slot === 'LW') return 'WIDE';
+    if (slot === 'ST' || slot === 'CF' || slot === 'SS') return 'ST';
+    return 'CM';
+  }
+
+  // Starting weight for each action before attribute/context/tactic factors
+  // are applied, keyed by (a) which third of the pitch the ball is in and
+  // (b) the carrier's own position group — a back-line CB and an out-and-
+  // out striker read a midfield situation completely differently, and this
+  // is what actually encodes that instead of one flat per-third table for
+  // everyone. Every action keeps a nonzero floor so an unlikely one (a CB
+  // shooting from inside his own half) stays possible at a low rate rather
+  // than being hard-excluded — real matches occasionally produce exactly
+  // that kind of moment.
+  const BASE_ACTION_WEIGHTS_BY_POS = {
+    GK: {
+      DEF: { pass: 55, dribble: 0.5, carry: 8,  shoot: 0.05, cross: 0.3, throughball: 0.5, backpass: 20, switch: 14, hold: 1 },
+      MID: { pass: 52, dribble: 0.5, carry: 8,  shoot: 0.1,  cross: 0.5, throughball: 1,   backpass: 18, switch: 14, hold: 2 },
+      ATT: { pass: 46, dribble: 0.5, carry: 6,  shoot: 0.5,  cross: 1,   throughball: 1,    backpass: 12, switch: 10, hold: 3 }
+    },
+    CB: {
+      DEF: { pass: 50, dribble: 3,  carry: 14, shoot: 0.1, cross: 0.3, throughball: 1,   backpass: 18, switch: 12, hold: 3 },
+      MID: { pass: 48, dribble: 4,  carry: 12, shoot: 0.3, cross: 1,   throughball: 2,   backpass: 16, switch: 12, hold: 4 },
+      ATT: { pass: 40, dribble: 3,  carry: 8,  shoot: 3,   cross: 3,   throughball: 2,   backpass: 10, switch: 8,  hold: 3 }
+    },
+    FB: {
+      DEF: { pass: 46, dribble: 6,  carry: 16, shoot: 0.1, cross: 1,   throughball: 1,   backpass: 15, switch: 12, hold: 3 },
+      MID: { pass: 40, dribble: 8,  carry: 16, shoot: 0.3, cross: 4,   throughball: 2,   backpass: 10, switch: 12, hold: 3 },
+      ATT: { pass: 28, dribble: 10, carry: 12, shoot: 1,   cross: 14,  throughball: 3,   backpass: 4,  switch: 6,  hold: 3 }
+    },
+    CDM: {
+      DEF: { pass: 52, dribble: 3,  carry: 12, shoot: 0.1, cross: 0.3, throughball: 1.5, backpass: 18, switch: 12, hold: 4 },
+      MID: { pass: 50, dribble: 5,  carry: 10, shoot: 0.5, cross: 1.5, throughball: 5,   backpass: 14, switch: 12, hold: 6 },
+      ATT: { pass: 34, dribble: 5,  carry: 8,  shoot: 3,   cross: 3,   throughball: 6,   backpass: 6,  switch: 6,  hold: 6 }
+    },
+    CM: {
+      DEF: { pass: 46, dribble: 6,  carry: 14, shoot: 0.2, cross: 0.5, throughball: 2,   backpass: 15, switch: 11, hold: 4 },
+      MID: { pass: 42, dribble: 10, carry: 12, shoot: 1,   cross: 3,   throughball: 8,   backpass: 9,  switch: 10, hold: 4 },
+      ATT: { pass: 26, dribble: 10, carry: 9,  shoot: 8,   cross: 8,   throughball: 9,   backpass: 4,  switch: 4,  hold: 4 }
+    },
+    CAM: {
+      DEF: { pass: 40, dribble: 6,  carry: 12, shoot: 0.2, cross: 0.5, throughball: 3,   backpass: 15, switch: 10, hold: 4 },
+      MID: { pass: 36, dribble: 11, carry: 10, shoot: 2,   cross: 4,   throughball: 14,  backpass: 6,  switch: 8,  hold: 5 },
+      ATT: { pass: 18, dribble: 13, carry: 7,  shoot: 16,  cross: 9,   throughball: 15,  backpass: 2,  switch: 3,  hold: 5 }
+    },
+    WIDE: {
+      DEF: { pass: 40, dribble: 8,  carry: 16, shoot: 0.2, cross: 1,   throughball: 1,   backpass: 13, switch: 12, hold: 3 },
+      MID: { pass: 34, dribble: 16, carry: 16, shoot: 1,   cross: 5,   throughball: 5,   backpass: 8,  switch: 11, hold: 3 },
+      ATT: { pass: 16, dribble: 20, carry: 10, shoot: 12,  cross: 20,  throughball: 6,   backpass: 2,  switch: 6,  hold: 3 }
+    },
+    ST: {
+      // Midfield is a striker's least natural zone to be carrying the ball
+      // in — realistically he isn't trying to dribble through a crowded
+      // middle against a CDM, he's looking to bring it down and lay it off
+      // (hold) or find the simple pass and get back into a threatening
+      // position. That's the specific gap the old flat per-third table
+      // papered over and what was getting strikers/wingers dispossessed
+      // so heavily once every action was actually being attempted.
+      DEF: { pass: 38, dribble: 6,  carry: 14, shoot: 0.1, cross: 0.3, throughball: 0.5, backpass: 14, switch: 10, hold: 7  },
+      MID: { pass: 34, dribble: 8,  carry: 10, shoot: 1.5, cross: 1.5, throughball: 3,   backpass: 8,  switch: 6,  hold: 20 },
+      ATT: { pass: 12, dribble: 10, carry: 6,  shoot: 32,  cross: 4,   throughball: 5,   backpass: 1,  switch: 1,  hold: 8  }
+    }
+  };
+
+  function baseActionWeights(third, posGroup) {
+    const byPos = BASE_ACTION_WEIGHTS_BY_POS[posGroup] || BASE_ACTION_WEIGHTS_BY_POS.CM;
+    return byPos[third] || byPos.MID;
   }
   // Player-attribute contribution to each candidate action, reusing the same
   // ability reads the rest of the engine already relies on (passingAbility,
@@ -6941,7 +7078,8 @@ var App = (() => {
   // player traits) factors on top of the raw attribute read above.
   function evaluateBallActions(player, ctx) {
     const third = (ctx.zoneKey || 'MID_C').split('_')[0];
-    const base = baseActionWeights(third);
+    const posGroup = positionGroupOf(player);
+    const base = baseActionWeights(third, posGroup);
     const attr = attributeActionScores(player);
     const pressure = ctx.marker ? defensivePressure(ctx.marker) : 55;
     const styles = (player.expandedAttrs && player.expandedAttrs.playstyle) || [];
@@ -6994,6 +7132,55 @@ var App = (() => {
       if (action === 'throughball' && styles.some((s) => ['Creative Playmaker', 'Classic No. 10', 'Orchestrator', 'Deep-Lying Forward'].includes(s))) w *= 1.6;
       if (hasSkill(player, 'Attack Trigger') && (action === 'dribble' || action === 'carry' || action === 'throughball')) w *= 1.08;
 
+      // A pure box player wants the ball played into the box for him to
+      // finish, not to drop deep and carry/dribble it up himself — a
+      // Goal Poacher/Fox in the Box receiving it outside the area looks to
+      // get a shot away or get it back into a dangerous area fast rather
+      // than dictate the move.
+      if (styles.includes('Goal Poacher') || styles.includes('Fox in the Box')) {
+        if (action === 'shoot') w *= 1.35;
+        if (action === 'hold') w *= 1.25;
+        if (action === 'dribble' || action === 'carry') w *= 0.7;
+      }
+      // Box-to-box is defined by covering the full length of the pitch —
+      // more willing to carry/drive forward with it himself than a
+      // stay-at-home teammate in the same shirt number.
+      if (styles.includes('Box-to-Box')) {
+        if (action === 'carry') w *= 1.3;
+        if (action === 'dribble') w *= 1.15;
+        if (action === 'backpass' || action === 'hold') w *= 0.85;
+      }
+      // A deep-lying forward/hole player is a false-nine type who drops to
+      // link play — looks to find the pass rather than force a shot.
+      if (styles.includes('Deep-Lying Forward') || styles.includes('Hole Player')) {
+        if (action === 'pass' || action === 'throughball') w *= 1.3;
+        if (action === 'hold') w *= 1.1;
+        if (action === 'shoot') w *= 0.9;
+      }
+      // A target man's whole game is holding the ball up for support to
+      // arrive, not beating a man himself.
+      if (styles.includes('Target Man')) {
+        if (action === 'hold') w *= 1.4;
+        if (action === 'dribble') w *= 0.6;
+      }
+      // Anchor Man/Destroyer sit and screen — they recycle the ball safely
+      // rather than gambling on a risky forward action.
+      if (styles.includes('Anchor Man') || styles.includes('Destroyer')) {
+        if (action === 'backpass' || action === 'pass') w *= 1.2;
+        if (action === 'dribble' || action === 'throughball' || action === 'shoot') w *= 0.6;
+      }
+      // An Orchestrator/Build Up player dictates tempo from deep — favors
+      // the considered pass/switch over trying to run past someone.
+      if (styles.includes('Orchestrator') || styles.includes('Build Up')) {
+        if (action === 'pass' || action === 'switch') w *= 1.25;
+        if (action === 'dribble') w *= 0.8;
+      }
+      // Attacking full-backs/wing-backs bombing forward look to carry the
+      // width and get a cross in more than a standard full-back would.
+      if (styles.includes('Extra Frontman') || styles.includes('Offensive Full-back') || styles.includes('Full-back Finisher')) {
+        if (action === 'carry' || action === 'cross') w *= 1.2;
+      }
+
       scores[action] = Math.max(0.05, w);
     });
     return scores;
@@ -7038,7 +7225,7 @@ var App = (() => {
     const wideBias = Math.max(0.15, Math.min(0.85, 0.42 * attMods.wingBiasMult));
     let channel = seededRandom() < wideBias ? (seededRandom() < 0.5 ? 'L' : 'R') : 'C';
 
-    let carrier = pickPlayer(attTeam, ZONE_POS_MAP['DEF_' + channel]) || pickPlayer(attTeam, ['CB', 'GK']);
+    let carrier = pickPlayer(attTeam, ZONE_POS_MAP['DEF_' + channel], null, 'DEF_' + channel) || pickPlayer(attTeam, ['CB', 'GK']);
     if (!carrier) return;
     // Live ball-location tracking for the pitch view (ui/matchUI.js::
     // renderPitch): a lightweight {side, third, channel} snapshot of where
@@ -7058,7 +7245,7 @@ var App = (() => {
       // ===== Decision phase: the carrier is on the ball right now — what do =====
       // ===== they actually try to do with it? Evaluated fresh every time the
       // ball changes hands, rather than the engine always assuming "pass".
-      const carrierMarker = pickPlayer(defTeam, mirrorDefenderPos(fromThird + '_' + channel));
+      const carrierMarker = pickMarker(defTeam, mirrorDefenderPos(fromThird + '_' + channel), null, mirrorZoneKey(fromThird + '_' + channel));
       const decision = decideBallAction(carrier, carrierMarker, fromThird + '_' + channel, tac, defTac, attMods,
         ['pass', 'dribble', 'carry', 'backpass', 'switch', 'hold']);
 
@@ -7082,7 +7269,7 @@ var App = (() => {
       }
 
       if (decision.action === 'dribble' || decision.action === 'carry') {
-        const runMarker = pickPlayer(defTeam, mirrorDefenderPos(fromThird + '_' + channel));
+        const runMarker = pickMarker(defTeam, mirrorDefenderPos(fromThird + '_' + channel), null, mirrorZoneKey(fromThird + '_' + channel));
         const runPressure = runMarker ? defensivePressure(runMarker) : 60;
         const carryChance = Math.max(0.30, Math.min(0.93,
           0.62 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus));
@@ -7105,7 +7292,7 @@ var App = (() => {
       const targetZone = toThird + '_' + channel;
 
       // ===== Movement phase: who makes themselves available in that zone? =====
-      const targetPlayer = pickPlayer(attTeam, ZONE_POS_MAP[targetZone], carrier.id) || carrier;
+      const targetPlayer = pickPlayer(attTeam, ZONE_POS_MAP[targetZone], carrier.id, targetZone) || carrier;
       // The move is developing into this zone even before the pass is
       // resolved below — a real side shifts its shape toward the ball as
       // it travels, not only once it safely arrives.
@@ -7113,7 +7300,7 @@ var App = (() => {
 
       // ===== Passing phase: can the carrier find them? =====
       const passerSkill = passingAbility(carrier);
-      const marker = pickPlayer(defTeam, mirrorDefenderPos(targetZone));
+      const marker = pickMarker(defTeam, mirrorDefenderPos(targetZone), null, mirrorZoneKey(targetZone));
       const pressure = marker ? defensivePressure(marker) : 60;
       let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus
         + holdBonus + (decision.action === 'switch' ? 0.05 : 0);
@@ -7438,7 +7625,7 @@ var App = (() => {
     };
   }
 
-  function pickPlayer(side, preferredPos, excludeId) {
+  function pickPlayer(side, preferredPos, excludeId, zoneKey) {
     if (!currentMatch || !side) return null;
     const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
     let pool = (side.squad.all || []).filter(p => ids.includes(p.id) && p.id !== excludeId);
@@ -7463,6 +7650,50 @@ var App = (() => {
       const offAwr = p.expandedAttrs ? xattr(p, 'off_awr', null) : null;
       const offAwrNudge = offAwr != null ? (offAwr - 70) * 0.15 : 0;
       let w = Math.pow(Math.max(composite + offAwrNudge, 40) / 92, 1.4) * 92;
+      // Playstyle-driven pitch positioning: only applied when the caller
+      // actually supplies a zoneKey (the possession pipeline's zone-based
+      // carrier/target selection) — every other pickPlayer() call site
+      // (corners, fouls, throw-ins, etc.) is unaffected since it never
+      // passes one.
+      if (zoneKey) w *= zoneAffinityMultiplier(p, zoneKey);
+      return Math.max(5, w);
+    });
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = seededRandom() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }
+  // Marking/pressure selection for the possession pipeline. Distinct from
+  // pickPlayer() above on purpose: pickPlayer's composite leans on
+  // attacking ability (att/tec) which is the right read for "who gets
+  // found/scores/assists", but the wrong one for "who's actually the man
+  // closing this ball carrier down" — that used to mean whichever nearby
+  // player had the flashiest attacking numbers (often, confusingly, an
+  // elite CDM with strong all-around ratings) got selected as marker
+  // essentially every time. This weights by genuine defensive quality
+  // instead, and applies the same playstyle zone affinity so a screening
+  // Anchor Man/Destroyer is realistically the one found there.
+  function pickMarker(side, preferredPos, excludeId, zoneKey) {
+    if (!currentMatch || !side) return null;
+    const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
+    let pool = (side.squad.all || []).filter(p => ids.includes(p.id) && p.id !== excludeId);
+    if (preferredPos && preferredPos.length) {
+      const preferred = pool.filter(p => (p.pos || []).some(pos => preferredPos.includes(pos)) || preferredPos.includes(p.slot));
+      if (preferred.length) pool = preferred;
+    }
+    if (!pool.length) return null;
+    const weights = pool.map(p => {
+      const defAwr = xattr(p, 'def_awr', null);
+      const tack = xattr(p, 'tack', null);
+      const defEng = xattr(p, 'def_eng', null);
+      const composite = (defAwr != null && tack != null && defEng != null)
+        ? (defAwr * 0.4 + tack * 0.35 + defEng * 0.25)
+        : ((p.def || 70) * 0.75 + (p.ovr || 70) * 0.25);
+      let w = Math.pow(Math.max(composite, 40) / 85, 1.3) * 85;
+      if (zoneKey) w *= zoneAffinityMultiplier(p, zoneKey);
       return Math.max(5, w);
     });
     const total = weights.reduce((a, b) => a + b, 0);
