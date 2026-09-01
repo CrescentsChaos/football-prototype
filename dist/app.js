@@ -5892,6 +5892,10 @@ var App = (() => {
     if (seededRandom() < 0.0015) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
     updateScoreboard();
     if (!silent) updateStatsPanel();
+    // Keep the live pitch view's dynamic player markers moving in step with
+    // the simulation — same quietSim guard every other per-tick render uses
+    // (bulk/instant sims skip this entirely, see simToEnd()).
+    if (!m.quietSim) renderPitch();
   }
 
   // Position-based share of a team's passing volume. Higher = touches the ball more often.
@@ -6770,17 +6774,28 @@ var App = (() => {
     const speedEdge = Math.max(-0.05, Math.min(0.09,
       (xattr(shooter, 'spd', shooter.pac || 70) * staminaMultiplier(shooter) - oppPace) / 220));
     addEvent(m.minute, 'pressure', `${breakTeam.team.short} break at real pace!`, breakingSide);
-    resolveChanceCreation(breakingSide, otherSide, shooter, seededRandom() < 0.5 ? 'L' : (seededRandom() < 0.5 ? 'C' : 'R'), speedEdge);
+    const breakChannel = seededRandom() < 0.5 ? 'L' : (seededRandom() < 0.5 ? 'C' : 'R');
+    // A break goes straight at the exposed defence — the ball is already
+    // effectively in the attacking third by the time it's sprung.
+    m.ballZone = { side: breakingSide, third: 'ATT', channel: breakChannel };
+    resolveChanceCreation(breakingSide, otherSide, shooter, breakChannel, speedEdge);
   }
 
   // ===== Duels phase resolution: the ball has been lost (pass cut out, or =====
   // ===== beaten in a 1v1) — who wins it, and does it spring a transition?
-  function resolveTurnover(attackingSide, defendingSide, contestedPlayer, winner, fromThird, toThird, kind) {
+  function resolveTurnover(attackingSide, defendingSide, contestedPlayer, winner, fromThird, toThird, kind, channel) {
     const m = currentMatch;
     if (!m) return;
     const defTeam = m[defendingSide];
     const defenderPlayer = winner || pickPlayer(defTeam, mirrorDefenderPos(toThird + '_C'));
     if (!defenderPlayer) return;
+    // The ball just changed hands in defendingSide's own zone — mirror the
+    // third (attacker's ATT is the defender's DEF, and vice versa) so the
+    // live ball-location snapshot flips to the winning side's perspective.
+    // Purely a rendering aid for ui/matchUI.js::renderPitch (see the note in
+    // possession.js) — never read by the simulation itself.
+    const mirroredThird = toThird === 'ATT' ? 'DEF' : toThird === 'DEF' ? 'ATT' : 'MID';
+    m.ballZone = { side: defendingSide, third: mirroredThird, channel: channel || 'C' };
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[defenderPlayer.id]) m.playerMatchStats[defenderPlayer.id] = blankPlayerMatchStats(defenderPlayer);
     const ps = m.playerMatchStats[defenderPlayer.id];
@@ -6869,6 +6884,12 @@ var App = (() => {
 
     let carrier = pickPlayer(attTeam, ZONE_POS_MAP['DEF_' + channel]) || pickPlayer(attTeam, ['CB', 'GK']);
     if (!carrier) return;
+    // Live ball-location tracking for the pitch view (ui/matchUI.js::
+    // renderPitch): a lightweight {side, third, channel} snapshot of where
+    // the ball currently is, from the possessing side's own perspective.
+    // Purely a rendering aid — nothing in the simulation math reads this
+    // back, so it's safe to update at every phase without affecting results.
+    m.ballZone = { side: attackingSide, third: 'DEF', channel: channel };
     // Attack Trigger: while this player has the ball, the whole team reads
     // the attacking picture better — a small boost to both finding a
     // team-mate and winning the ball back under pressure for as long as
@@ -6883,6 +6904,10 @@ var App = (() => {
 
       // ===== Movement phase: who makes themselves available in that zone? =====
       const targetPlayer = pickPlayer(attTeam, ZONE_POS_MAP[targetZone], carrier.id) || carrier;
+      // The move is developing into this zone even before the pass is
+      // resolved below — a real side shifts its shape toward the ball as
+      // it travels, not only once it safely arrives.
+      m.ballZone = { side: attackingSide, third: toThird, channel: channel };
 
       // ===== Passing phase: can the carrier find them? =====
       const passerSkill = passingAbility(carrier);
@@ -6904,7 +6929,7 @@ var App = (() => {
       passChance = Math.max(0.30, Math.min(0.93, passChance));
 
       if (seededRandom() >= passChance) {
-        resolveTurnover(attackingSide, defendingSide, carrier, marker, fromThird, toThird, 'pass');
+        resolveTurnover(attackingSide, defendingSide, carrier, marker, fromThird, toThird, 'pass', channel);
         return;
       }
 
@@ -6913,7 +6938,7 @@ var App = (() => {
       const duelChance = Math.max(0.35, Math.min(0.95,
         0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0) + attackTriggerBonus));
       if (seededRandom() >= duelChance) {
-        resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel');
+        resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel', channel);
         return;
       } else if (seededRandom() < 0.12) {
         addEvent(m.minute, 'skill', `✨ ${pickSkillDesc(targetPlayer, marker)}`, attackingSide);
@@ -8368,6 +8393,111 @@ var App = (() => {
   }
 
 
+  // ===================================================================
+  // ================= DYNAMIC PITCH POSITIONING MODEL ==================
+  // ===================================================================
+  // Each formation slot's [x,y] in FORMATIONS is now only a *base*/resting
+  // coordinate, not the drawn position. The actual marker position is
+  // recalculated on every renderPitch() call from four live inputs:
+  //   1. Ball location  — m.ballZone (set by engine/possession.js and
+  //      engine/transitions.js as the simulation runs) tells us which
+  //      third/channel of the pitch the ball is currently in, and which
+  //      side has it.
+  //   2. Tactical stance — both sides' m.tactics entries shift how far a
+  //      team pushes up in possession / drops off out of possession, and
+  //      how eagerly it holds a high line under an opponent press.
+  //   3. Role — a winger or full-back roams far more than a centre-back or
+  //      goalkeeper; per-slot mobility tables scale how far each position
+  //      is willing to travel from its base spot.
+  //   4. Teammate/opponent spacing — the existing collision-avoidance pass
+  //      still nudges markers apart from their own teammates so labels
+  //      never overlap; since each side renders on its own mini-pitch
+  //      panel (not a single shared canvas — see .pitch-pair in
+  //      styles.css) there's no literal opposing marker to collide with,
+  //      so opponent influence is folded into the ball-zone/tactic model
+  //      above instead (i.e. a side's shape reacts to how far the OTHER
+  //      side has advanced, which is what actually drives real spacing).
+  // Every player still has a stable "home" position (their formation
+  // coordinate) and only ever *deviates* from it — this keeps the shape
+  // recognizable as the chosen formation while making it visibly breathe
+  // with the run of play instead of sitting frozen.
+  const ROLE_MOBILITY = {
+    //         vertical (forward/back push)   horizontal (width shift)
+    GK:  { v: 0.10, h: 0.10 },
+    CB:  { v: 0.35, h: 0.25 },
+    RB:  { v: 0.70, h: 0.90 }, LB:  { v: 0.70, h: 0.90 },
+    RWB: { v: 0.85, h: 0.95 }, LWB: { v: 0.85, h: 0.95 },
+    CDM: { v: 0.55, h: 0.30 },
+    CM:  { v: 0.80, h: 0.40 },
+    CAM: { v: 0.90, h: 0.35 },
+    RM:  { v: 0.90, h: 0.85 }, LM:  { v: 0.90, h: 0.85 },
+    RW:  { v: 0.90, h: 0.85 }, LW:  { v: 0.90, h: 0.85 },
+    ST:  { v: 0.60, h: 0.30 }, CF:  { v: 0.60, h: 0.30 }
+  };
+  const PHASE_VALUE = { DEF: -1, MID: 0, ATT: 1 };
+  const CHANNEL_VALUE = { L: -1, C: 0, R: 1 };
+  const MAX_VERTICAL_SHIFT = 12;   // percentage points of pitch height
+  const MAX_HORIZONTAL_SHIFT = 9;  // percentage points of pitch width
+  const MIRROR_THIRD = { ATT: 'DEF', DEF: 'ATT', MID: 'MID' };
+
+  // Tiny deterministic hash so the same player/minute combination always
+  // produces the same jitter (no visible flicker on incidental re-renders)
+  // while still changing minute to minute — a stand-in for the constant
+  // small drift real players show even while "holding" a position.
+  function _pitchJitterSeed(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h;
+  }
+
+  // Computes this player's live [x, y] from their formation base coordinate,
+  // the current ball zone, both sides' tactics, and their own role's
+  // mobility. `side` is which mini-pitch panel is being drawn (see the note
+  // above on why that's the unit of "opponent awareness" here).
+  function computeDynamicPosition(baseX, baseY, slotCode, side, playerId) {
+    const m = currentMatch;
+    const zone = (m && m.ballZone) || { side: null, third: 'MID', channel: 'C' };
+    const oppSide = side === 'home' ? 'away' : 'home';
+
+    // This side's own phase of play: directly the ball's third if this side
+    // has it, the mirrored third if the opponent has it (their ATT third is
+    // literally bearing down on our goal, i.e. our DEF third), or neutral
+    // at kickoff/before the ball has moved.
+    const ownPhase = !zone.side ? 'MID' : (zone.side === side ? zone.third : (MIRROR_THIRD[zone.third] || 'MID'));
+    const channel = zone.channel || 'C';
+
+    const tac = (m && m.tactics && m.tactics[side]) || 'balanced';
+    const oppTac = (m && m.tactics && m.tactics[oppSide]) || 'balanced';
+
+    // How far the team pushes up while it has the ball forward of its own
+    // half, and how far it's willing to drop off when it doesn't.
+    const attackMult = tac === 'attack' ? 1.35 : tac === 'press' ? 1.15 : tac === 'defend' ? 0.7 : 1.0;
+    const retreatMult = tac === 'defend' ? 1.3 : tac === 'press' ? 0.55 : tac === 'attack' ? 0.85 : 1.0;
+    // A wide-open opponent (playing Attack) stretches the game both ways;
+    // a packed-in opponent (playing Defend) compresses it. Balanced/Press
+    // are treated as roughly neutral for this specific effect.
+    const spaceFactor = oppTac === 'attack' ? 1.15 : oppTac === 'defend' ? 0.8 : 1.0;
+
+    const phaseVal = PHASE_VALUE[ownPhase] || 0;
+    const vBias = (phaseVal > 0 ? phaseVal * attackMult : phaseVal * retreatMult) * spaceFactor;
+    const hBias = CHANNEL_VALUE[channel] || 0;
+
+    const mob = ROLE_MOBILITY[slotCode] || { v: 0.6, h: 0.5 };
+    // Negative sign: a positive (attacking) phase should pull y DOWN toward
+    // the opponent's goal, which is the lower end of the formation's y
+    // scale (see FORMATIONS — GK sits at y:92, forwards up around y:15-20).
+    const dy = -vBias * mob.v * MAX_VERTICAL_SHIFT;
+    const dx = hBias * mob.h * MAX_HORIZONTAL_SHIFT;
+
+    const seed = _pitchJitterSeed(`${playerId}-${(m && m.minute) || 0}`);
+    const jitterX = ((seed % 100) - 50) / 50 * 1.4;
+    const jitterY = ((Math.floor(seed / 100) % 100) - 50) / 50 * 1.4;
+
+    return [
+      Math.max(6, Math.min(94, baseX + dx + jitterX)),
+      Math.max(6, Math.min(94, baseY + dy + jitterY))
+    ];
+  }
   function renderPitch() {
     if (!currentMatch) return;
     const m = currentMatch;
@@ -8452,7 +8582,11 @@ var App = (() => {
       slotPlayers.forEach((p, idx) => {
         if (!p) return;
         let c = coords[idx] || [50, 50];
-        let x = c[0], y = c[1];
+        // Base/resting coordinate from the formation preset (or a custom
+        // Squad Builder shape) — now only the anchor that
+        // computeDynamicPosition() continuously deviates from, rather than
+        // the drawn position itself. See the model notes above renderPitch().
+        let [x, y] = computeDynamicPosition(c[0], c[1], slots[idx], side, p.id);
         // Collision avoidance: name labels are wider than the dot, so push
         // apart when two dots sit too close together (weighted distance,
         // since labels overflow horizontally more than vertically).
