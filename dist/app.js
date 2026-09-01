@@ -860,7 +860,10 @@ var App = (() => {
     ensurePlayerConditionProfile(player);
     const lr = (player && player.liveRating) || 'B';
     const d = LIVE_RATING_DISPLAY[lr] || LIVE_RATING_DISPLAY.B;
-    return `${d.label} ${emojiImg(lr.toLowerCase(), lr + '-rating')}`;
+    // Text only — the caller (player profile header) already renders the
+    // a.png..e.png badge once via formArrow() right next to this; putting
+    // the same image in here too just showed the rating badge twice.
+    return d.label;
   }
   // Pre-match condition badge — shown in the lineup list so a rolled
   // "Excellent"/"Poor"/etc. is visible before kickoff, not just inferred
@@ -10957,7 +10960,7 @@ var App = (() => {
         if (!home || !away) return;
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${teamMark(away, 18)} ${away.short}</span>
           ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
       });
     }
@@ -11085,7 +11088,7 @@ var App = (() => {
           const home = getTeam(f.home), away = getTeam(f.away);
           const idx = tournament.fixtures.indexOf(f);
           h += `<div class="fixture-item played" style="cursor:pointer" onclick="App.viewFixtureReport(${idx})">
-            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+            <span class="fixture-teams">${teamMark(home,18)} ${home.short} ${f.homeScore}-${f.awayScore} ${teamMark(away,18)} ${away.short}</span>
             <span style="font-size:0.7rem;color:var(--accent-gold)">Details</span></div>`;
         });
       }
@@ -14589,7 +14592,7 @@ var App = (() => {
         if (!home || !away) return;
         const reportIdx = f.report ? seasonReportRegistry.push(f.report) - 1 : -1;
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}</span>
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${teamMark(away, 18)} ${away.short}</span>
           ${reportIdx >= 0 ? '<span style="font-size:0.7rem;color:var(--accent-gold)">Details</span>' : ''}</div>`;
       });
     }
@@ -14619,7 +14622,7 @@ var App = (() => {
         const pensTxt = f.pens ? ` (pens ${f.pens.home}-${f.pens.away})` : '';
         const winner = getTeam(f.winnerId);
         h += `<div class="fixture-item played" style="cursor:${reportIdx >= 0 ? 'pointer' : 'default'}" ${reportIdx >= 0 ? `onclick="App.viewSeasonReport(${reportIdx})"` : ''}>
-          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
+          <span class="fixture-teams">${teamMark(home, 18)} ${home.short} ${f.homeScore}-${f.awayScore} ${teamMark(away, 18)} ${away.short}${pensTxt} <small style="color:var(--accent-gold)">→ ${winner ? winner.short : '?'}</small></span></div>`;
       }
     });
     return h;
