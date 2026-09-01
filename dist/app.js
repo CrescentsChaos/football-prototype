@@ -2124,14 +2124,26 @@ var App = (() => {
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  // Caches normalized skill names to eliminate redundant string regex/replace operations
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
-    const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    let k = _canonSkillCache.get(s);
+    if (k !== undefined) return k;
+    const norm = normSkillKey(s);
+    k = SKILL_NAME_ALIASES[norm] || norm;
+    _canonSkillCache.set(s, k);
+    return k;
   }
+  // Fast O(1) skill lookup using a lazily-initialized Set on p.expandedAttrs.
+  // Reduces match-simulation skill checks from O(N) array scans to O(1) Set lookups.
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    let skillSet = p.expandedAttrs._skillSet;
+    if (!skillSet) {
+      skillSet = new Set((p.expandedAttrs.skills || []).map(canonSkillKey));
+      p.expandedAttrs._skillSet = skillSet;
+    }
+    return skillSet.has(canonSkillKey(skillName));
   }
   function xattr(p, key, fallback) {
     const v = p && p.expandedAttrs && p.expandedAttrs[key];
@@ -11599,10 +11611,15 @@ var App = (() => {
   let teamsSort = 'name';
   let tourTeamsSearch = '';
 
+  // Caches team average OVR to avoid recomputing ps.reduce() thousands of times during team list sorting/rendering
   function teamAvgOvr(t) {
+    if (!t) return 0;
+    if (t._avgOvr !== undefined) return t._avgOvr;
     const ps = t.players || [];
-    if (!ps.length) return 0;
-    return ps.reduce((s, p) => s + (p.ovr || 70), 0) / ps.length;
+    if (!ps.length) return (t._avgOvr = 0);
+    const avg = ps.reduce((s, p) => s + (p.ovr || 70), 0) / ps.length;
+    t._avgOvr = avg;
+    return avg;
   }
 
   function filterTeams(type) {
