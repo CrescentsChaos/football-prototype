@@ -2060,31 +2060,23 @@ select.ss-native {
 }
 
 /* ========================================================================
-   DYNAMIC PLAYER FORM (rolling form -> effective OVR)
+   DYNAMIC PLAYER FORM (liveRating A-E badge, rendered as assets/images/
+   a.png.. e.png via emojiImg() — see engine/form.js formArrow())
    ======================================================================== */
 .form-arrow {
-  display: inline-block; font-size: 0.85em; margin: 0 2px;
-  vertical-align: middle;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin: 0 2px; vertical-align: middle;
 }
-.form-arrow.form-up { color: #4ade80; }
-.form-arrow.form-hot { filter: none; }
-.form-arrow.form-down { color: #f87171; }
-.form-arrow.form-cold { filter: none; }
-.form-arrow.form-flat { color: var(--text-muted); }
+.form-arrow .emoji-icon-img { width: 1.1em; height: 1.1em; }
 
 /* ========================================================================
    MATCH CONDITION BADGE (per-match Excellent/Good/Normal/Poor/Terrible roll)
    ======================================================================== */
 .cond-badge {
-  display: inline-block; font-size: 0.62rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.3px;
-  padding: 1px 5px; border-radius: 4px; margin: 0 2px;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin: 0 2px;
 }
-.cond-badge.cond-excellent { background: #16a34a; color: #f0fdf4; }
-.cond-badge.cond-good { background: #4ade80; color: #052e16; }
-.cond-badge.cond-normal { background: #6b7280; color: #f9fafb; }
-.cond-badge.cond-poor { background: #f97316; color: #1c1000; }
-.cond-badge.cond-terrible { background: #dc2626; color: #fef2f2; }
+.cond-badge .emoji-icon-img { width: 1.1em; height: 1.1em; }
 
 /* ========================================================================
    MANAGER AWARD
