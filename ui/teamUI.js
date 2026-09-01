@@ -501,10 +501,15 @@
 /*@CHUNK:c0450:END*/
 
 /*@CHUNK:c0451:START*/
+  // Caches team average OVR to avoid recomputing ps.reduce() thousands of times during team list sorting/rendering
   function teamAvgOvr(t) {
+    if (!t) return 0;
+    if (t._avgOvr !== undefined) return t._avgOvr;
     const ps = t.players || [];
-    if (!ps.length) return 0;
-    return ps.reduce((s, p) => s + (p.ovr || 70), 0) / ps.length;
+    if (!ps.length) return (t._avgOvr = 0);
+    const avg = ps.reduce((s, p) => s + (p.ovr || 70), 0) / ps.length;
+    t._avgOvr = avg;
+    return avg;
   }
 /*@CHUNK:c0451:END*/
 
