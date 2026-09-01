@@ -945,6 +945,11 @@ var App = (() => {
           pushGoal(attackingSide, scorer, m.minute, 'header from a direct free-kick');
           addEvent(m.minute, 'goal', `Free-kick delivery converted. <span class="player">${scorer.name}</span> heads home`, attackingSide, true);
         }
+      } else {
+        // Delivery defended — a crowded box gives a sliver of a chance
+        // someone in white/red/blue turns it into his own net instead.
+        const ogCulprit = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p, true) * 2);
+        maybeOwnGoal(attackingSide, defendingSide, ogCulprit, 'turns the free-kick delivery into his own net', 0.006);
       }
       return;
     }
@@ -2214,6 +2219,24 @@ var App = (() => {
     edge *= staminaMultiplier(p);
     return edge;
   }
+  // Blitz Curler is a specific finishing identity, not just a flat bonus:
+  // a player with the skill only ever finishes with the trademark blitz
+  // curl strike (see pickGoalMethod below, which forces that outcome for
+  // them), so how good they are at it should come straight from the three
+  // attributes that actually make that finish work — the strike itself
+  // (Finishing), enough bend to beat the keeper (Curl), and enough pace on
+  // it that a strong hand isn't enough to keep it out (Kicking Power) —
+  // rather than from generic finishing/free-kick edges built around a much
+  // wider variety of finishes. Zero for anyone without the skill, so this
+  // has no effect on the wider shooting model.
+  function blitzCurlerEdge(p) {
+    if (!p || !p.expandedAttrs || !hasSkill(p, 'Blitz Curler')) return 0;
+    let edge = curvedStat(xattr(p, 'fin', 70), 70, 29, 1.6) * 0.09
+      + curvedStat(xattr(p, 'curl', 70), 70, 29, 1.6) * 0.09
+      + curvedStat(xattr(p, 'kick_pwr', 70), 70, 29, 1.6) * 0.05;
+    edge *= staminaMultiplier(p);
+    return edge;
+  }
   // Off-the-ball positioning edge — separate from finishing itself. Off
   // Awareness is specifically about getting into the right spot/angle to
   // shoot from in the first place, so it nudges shot quality on every shot
@@ -2363,7 +2386,7 @@ var App = (() => {
     const gkSkillBase = gk ? (curvedAttr(gk.def || 70, 70) * 0.45 + curvedAttr(gk.ovr || 75, 75) * 0.25 + curvedAttr(gk.tec || 70, 70) * 0.15) / 100 : 0.68;
     const gkSkill = Math.max(0.05, Math.min(0.98, gkSkillBase + posEdge + situational));
     const saveChance = Math.min(0.94, Math.max(0.28,
-      0.56 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
+      0.58 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
     if (seededRandom() >= saveChance) return { saved: false };
 
     // A save happened — decide whether it's a clean catch or a parry (and,
@@ -2453,15 +2476,27 @@ var App = (() => {
   // yellows / 3-6 reds in 38 matches for these players. Making the
   // Awareness term signed (it can now reduce v, not just fail to increase
   // it) brings that same group down to a realistic ~1.1-1.3.
+  // Further re-tuned: high-aggression DMs/CBs were still coming out
+  // disproportionately foul/card-heavy over a season even after the signed
+  // Awareness term above — the aggression term's slope (/70) and the 1.8
+  // ceiling let a genuinely elite, high-engagement destroyer (who also
+  // *wins the ball back* far more often than other positions, and so rolls
+  // this disciplinary check far more often — see resolveTurnover in
+  // engine/transitions.js) stack a modestly-elevated per-duel risk into a
+  // large season total. Slope eased (/90) and the ceiling brought down to
+  // 1.5 so aggression still matters — a reckless player is still visibly
+  // more foul-prone than a disciplined one — without letting the volume of
+  // duels a defensive-midfielder/CB naturally wins turn into a
+  // multiplicatively unrealistic disciplinary record.
   function foulProneness(p) {
     if (!p || !p.expandedAttrs) {
-      return 1 + Math.max(0, (75 - (p && p.def || 70)) / 80) + Math.max(0, (((p && p.phy) || 70) - 80) / 100);
+      return 1 + Math.max(0, (75 - (p && p.def || 70)) / 90) + Math.max(0, (((p && p.phy) || 70) - 80) / 120);
     }
     const aggr = xattr(p, 'aggr', 70);
     const defAwr = xattr(p, 'def_awr', 70);
     const phyCon = xattr(p, 'phy_con', 70);
-    let v = 1 + Math.max(0, aggr - 65) / 70 + (65 - defAwr) / 110 + Math.max(0, phyCon - 78) / 150;
-    return Math.max(0.5, Math.min(1.8, v));
+    let v = 1 + Math.max(0, aggr - 65) / 90 + (65 - defAwr) / 130 + Math.max(0, phyCon - 78) / 170;
+    return Math.max(0.55, Math.min(1.5, v));
   }
   // Injury-proneness multiplier for the "who gets injured" weighted pick.
   function injuryWeightMult(p) {
@@ -4489,6 +4524,33 @@ var App = (() => {
     endMatch();
   }
 
+  // ---- Own goals ----
+  // Genuinely rare — real football sees an own goal roughly once every
+  // several dozen matches, not every game — so every call site here rolls
+  // a very small probability and almost always returns false. `culprit`
+  // is the defending player whose action turned it into his own net;
+  // `desc` is a short clause describing how (deflection, header, etc.).
+  // Returns true (and fully resolves the goal) if the own goal happened,
+  // so the caller can bail out of its own normal resolution immediately.
+  function maybeOwnGoal(attackingSide, defendingSide, culprit, desc, chance) {
+    const m = currentMatch;
+    if (!m || !culprit) return false;
+    if (seededRandom() >= (chance != null ? chance : 0.01)) return false;
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    attTeam.score++;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[culprit.id]) m.playerMatchStats[culprit.id] = blankPlayerMatchStats(culprit);
+    // Recorded under its own leaderboard bucket (not 'goals') so it never
+    // inflates the defender's own scoring tally or a top-scorer list —
+    // same convention real stats sites use.
+    recordStat('ownGoals', culprit, defTeam.team);
+    // The goal list/timeline just wants a name to show — tagging it in
+    // the name itself means every existing renderer (timeline, match
+    // report, season history) shows it correctly with no further changes.
+    pushGoal(attackingSide, { id: culprit.id, name: culprit.name + ' (OG)', num: culprit.num }, m.minute, 'own goal');
+    addEvent(m.minute, 'goal', `${emojiImg('goal', 'Own goal')} Own goal! <span class="player">${culprit.name}</span> (${defTeam.team.short}) ${desc || 'turns it into his own net'}.`, attackingSide, true);
+    return true;
+  }
   function maybeOffsideDisallow(side, scorer, minute, moment) {
     const m = currentMatch;
     if (!m) return false;
@@ -5007,7 +5069,16 @@ var App = (() => {
           ps.longBalls = rr(passesC * (isDef ? 0.18 : isMid ? 0.08 : 0.04));
           ps.finalThirdPasses = rr(passesC * (isFwd ? 0.35 : isMid ? 0.3 : isDef ? 0.12 : 0.2));
 
-          ps.clearances = rr(rv((isDef ? 3.2 : isMid ? 0.6 : 0.15) * minFrac, isDef ? 2 : 0.6));
+          // Clearances are now genuinely live-simulated minute-by-minute
+          // (see simulateDefensiveActions in engine/defending.js), which
+          // sets ps._liveClr — this backfill only kicks in as a fallback
+          // for a player that loop never touched (e.g. a slot outside its
+          // table). Retuned toward the real-world per-game average for a
+          // starting CB (~7.3 clearances) rather than the old, much lower
+          // 3.2 mean.
+          if (!ps._liveClr) {
+            ps.clearances = rr(rv((isDef ? 7.3 : isMid ? 1.4 : 0.3) * minFrac, isDef ? 3 : 0.7));
+          }
           ps.headedClearances = rr(ps.clearances * (0.3 + seededRandom() * 0.25));
           ps.defensiveErrors = seededRandom() < (isDef ? 0.05 : 0.02) * minFrac ? 1 : 0;
           ps.recoveries = rr(rv((isDef ? 5 : isMid ? 5.5 : 2.5) * minFrac, 2));
@@ -5069,6 +5140,25 @@ var App = (() => {
       { desc: 'rebound smashed home', xg: 0.42, puskas: false },
       { desc: 'toe-poke under the keeper', xg: 0.40, puskas: false }
     ];
+    // Blitz Curler is a real finishing identity, not just a flavor-pool
+    // nudge — but it shouldn't be the ONLY thing they ever score with
+    // either (a Blitz Curler striker still gets the occasional tap-in,
+    // header, rebound, etc.). So it heavily loads the dice toward the
+    // trademark blitz curl finish rather than forcing it every time, and
+    // how loaded those dice are scales with blitzCurlerEdge() (Finishing/
+    // Curl/Kicking Power) — the same attributes feeding shotQuality
+    // upstream in resolveShot() — so a genuinely elite blitz curler pulls
+    // it off much more often than one who merely has the skill tag.
+    if (hasSkill(shooter, 'Blitz Curler')) {
+      const blitzChance = Math.max(0.35, Math.min(0.8, 0.5 + blitzCurlerEdge(shooter) * 1.5));
+      if (seededRandom() < blitzChance) {
+        const blitz = methods.find(m => m.desc === 'blitz curler into the top corner');
+        const flavor = seededRandom() < 0.35 ? styleFlavor(shooter, GOAL_FLAVOR_SUFFIX) : null;
+        return flavor ? { ...blitz, desc: `${blitz.desc}, ${flavor}` } : blitz;
+      }
+      // Otherwise falls through to the normal pool below, same as any
+      // other player.
+    }
     const spectacular = methods.filter(m => m.puskas);
     const normal = methods.filter(m => !m.puskas);
     const tec = shooter.tec || 70;
@@ -5814,10 +5904,57 @@ var App = (() => {
   // each position, independent of the main event roll above — this is what makes
   // defenders (and holding mids) consistently active across 90 minutes rather than
   // only picking up stats on the rare minutes the main event chain lands on them.
+  // Retuned down from an earlier, much busier version so a typical starting CB's
+  // full-match tackles/interceptions land close to real-world per-game averages
+  // (~3.6 tackles, ~1.5 interceptions) instead of nearly double that.
   const DEF_ACTION_BASE = {
-    CB: 0.075, RB: 0.08, LB: 0.08, RWB: 0.085, LWB: 0.085, CDM: 0.09,
-    CM: 0.05, RM: 0.025, LM: 0.025, RW: 0.018, LW: 0.018, CAM: 0.022, ST: 0.012, GK: 0
+    CB: 0.0207, RB: 0.0219, LB: 0.0219, RWB: 0.0232, LWB: 0.0232, CDM: 0.0246,
+    CM: 0.0138, RM: 0.0067, LM: 0.0067, RW: 0.0049, LW: 0.0049, CAM: 0.0058, ST: 0.0031, GK: 0
   };
+
+  // Per-minute base chance of a *clearance* — a separate off-the-ball action
+  // from the tackle/interception/block roll above: heading or hacking a
+  // dangerous ball out of the danger area rather than winning it off an
+  // opponent's feet. Weighted toward centre-backs, tuned so a starting CB
+  // averages close to the real-world per-game figure (~7.3 clearances).
+  const CLEARANCE_BASE = {
+    CB: 0.085, RB: 0.037, LB: 0.037, RWB: 0.037, LWB: 0.037, CDM: 0.0226,
+    CM: 0.009, RM: 0.0045, LM: 0.0045, RW: 0.0034, LW: 0.0034, CAM: 0.0045, ST: 0.0023, GK: 0
+  };
+
+  // Flavor text for the off-the-ball defensive actions below — these are
+  // genuinely silent, minute-by-minute stat contributions most of the
+  // time (so the feed isn't swamped with routine tackles), but a fraction
+  // of them now surface as an actual event line so live/off-the-ball
+  // defending is visible in the commentary, not just the stat sheet.
+  const OFFBALL_TACKLE_DESC = [
+    (n, t) => `<span class="player">${n}</span> times the challenge perfectly and wins it back (${t})`,
+    (n, t) => `Strong tackle from <span class="player">${n}</span> breaks up the attack`,
+    (n, t) => `<span class="player">${n}</span> (${t}) slides in and comes away with the ball`,
+    (n, t) => `<span class="player">${n}</span> muscles the ball off his man`
+  ];
+  const OFFBALL_INTERCEPT_DESC = [
+    (n, t) => `<span class="player">${n}</span> reads the pass and cuts it out`,
+    (n, t) => `Intercepted! <span class="player">${n}</span> (${t}) steps in front of the ball`,
+    (n, t) => `<span class="player">${n}</span> anticipates the ball into space and snuffs it out`,
+    (n, t) => `Sharp interception from <span class="player">${n}</span> ends the move`
+  ];
+  const OFFBALL_BLOCK_DESC = [
+    (n, t) => `<span class="player">${n}</span> gets a body in the way to block the pass`,
+    (n, t) => `<span class="player">${n}</span> (${t}) throws himself in front of it to cut the ball out`,
+    (n, t) => `Blocked by <span class="player">${n}</span> — the pass never gets through`
+  ];
+  const OFFBALL_CLEARANCE_DESC = [
+    (n, t) => `<span class="player">${n}</span> gets across to clear the danger`,
+    (n, t) => `Last-ditch clearance from <span class="player">${n}</span> (${t})`,
+    (n, t) => `<span class="player">${n}</span> heads it clear from the edge of the box`,
+    (n, t) => `<span class="player">${n}</span> hacks it clear under pressure`,
+    (n, t) => `Composed clearance by <span class="player">${n}</span> (${t})`
+  ];
+  function pickOffBallDesc(bank, p, team) {
+    const f = bank[Math.floor(seededRandom() * bank.length)];
+    return f(p.name, (team && team.team && team.team.short) || '');
+  }
 
   // Gives every defender (and holding mid) on the pitch an independent per-minute
   // roll for a tackle/interception/block, weighted by their defensive ability and
@@ -5870,7 +6007,14 @@ var App = (() => {
         // continuous per-minute defensive loop's own disciplinary risk,
         // separate from (and in addition to) the duel-losing foul chance
         // already modeled in resolveTurnover/resolveFoul.
-        const foulRisk = Math.min(0.2, 0.045 + Math.max(0, xattr(p, 'aggr', 70) - 65) / 200);
+        // Eased alongside foulProneness above: this fires on every one of a
+        // high-engagement position's (CDM in particular has the highest
+        // DEF_ACTION_BASE) many defensive-action attempts per match, so its
+        // aggression slope was compounding with sheer attempt volume to
+        // over-card those positions specifically. Lower base + gentler
+        // slope keeps a reckless player's extra risk real without letting
+        // it multiply out of proportion over 90 minutes of attempts.
+        const foulRisk = Math.min(0.15, 0.035 + Math.max(0, xattr(p, 'aggr', 70) - 65) / 260);
         if (seededRandom() < foulRisk) {
           const victim = pickPlayer(oppTeamData, ['ST', 'CAM', 'RW', 'LW', 'CM'], null);
           resolveFoul(side, oppSide, p, victim, false);
@@ -5879,17 +6023,51 @@ var App = (() => {
         if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
         const ps = m.playerMatchStats[p.id];
         const roll = seededRandom();
-        const interceptCut = Math.min(0.75, 0.5 + actionEdge.interceptBias);
+        // Baseline dropped from 0.5 to 0.35 — interceptions/tackles used to
+        // split roughly 50/50, which pushed a busy CB's interception count
+        // well above real-game averages. Pure interception reading
+        // (def_awr) and specific interception traits still bias this up
+        // per-player, same as before.
+        const interceptCut = Math.min(0.75, 0.235 + actionEdge.interceptBias);
         if (roll < interceptCut) {
           ps.interceptions = (ps.interceptions || 0) + 1;
           ps.tackles = (ps.tackles || 0) + 1;
           team.stats.interceptions = (team.stats.interceptions || 0) + 1;
+          if (seededRandom() < 0.14) addEvent(m.minute, 'whistle', pickOffBallDesc(OFFBALL_INTERCEPT_DESC, p, team), side);
         } else if (roll < 0.85) {
           ps.tackles = (ps.tackles || 0) + 1;
+          if (seededRandom() < 0.14) addEvent(m.minute, 'whistle', pickOffBallDesc(OFFBALL_TACKLE_DESC, p, team), side);
         } else {
           ps.blocks = (ps.blocks || 0) + 1;
           team.stats.blocks = (team.stats.blocks || 0) + 1;
+          if (seededRandom() < 0.14) addEvent(m.minute, 'whistle', pickOffBallDesc(OFFBALL_BLOCK_DESC, p, team), side);
         }
+      });
+
+      // ---- Clearances — a genuinely separate off-the-ball action from the
+      // tackle/interception/block roll above: heading or hacking a
+      // dangerous ball out of the area rather than winning it off a man.
+      // Independent per-minute roll so it doesn't crowd out (or get
+      // crowded out by) the tackle/interception roll on the same player
+      // in the same minute — in real matches a defender can easily both
+      // tackle and clear the danger in the same passage of play.
+      onPitch.forEach(p => {
+        const slot = p.slot || (p.pos || [])[0] || 'CM';
+        const clrBase = CLEARANCE_BASE[slot];
+        if (!clrBase) return;
+        if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+        const ps = m.playerMatchStats[p.id];
+        ps._liveClr = true; // tells deriveExtendedMatchStats not to overwrite this with a random backfill figure
+        const defAwr = xattr(p, 'def_awr', p.def != null ? p.def : 70);
+        const jmp = xattr(p, 'jmp', p.phy != null ? p.phy : 70);
+        const phyCon = xattr(p, 'phy_con', p.phy != null ? p.phy : 70);
+        const clrSkillMult = 0.82 + (curvedAttr(defAwr, 70) * 0.4 + curvedAttr(jmp, 70) * 0.35 + curvedAttr(phyCon, 70) * 0.25) / 100 * 0.4;
+        const clrChance = Math.min(0.22, clrBase * clrSkillMult * pressureMult * staminaMultiplier(p));
+        if (seededRandom() >= clrChance) return;
+        ps.clearances = (ps.clearances || 0) + 1;
+        if (seededRandom() < 0.35) ps.headedClearances = (ps.headedClearances || 0) + 1;
+        team.stats.clearances = (team.stats.clearances || 0) + 1;
+        if (seededRandom() < 0.12) addEvent(m.minute, 'whistle', pickOffBallDesc(OFFBALL_CLEARANCE_DESC, p, team), side);
       });
     });
   }
@@ -6168,10 +6346,20 @@ var App = (() => {
           // so a genuinely elite finisher's rating stops reading as "a
           // decent player plus a flat multiplier" and starts reading as a
           // real tier above a merely-good one.
-          (curvedAttr(shooter.att || 70, 70) * 0.42 + curvedAttr(shooter.tec || 70, 70) * 0.33
-            + curvedAttr(shooter.ovr || 75, 75) * 0.15 + curvedAttr(shooter.pac || 70, 70) * 0.10) / 100
+          // `att` is itself derived from finishing/off-the-ball positioning/
+          // heading/placement/kicking-power (see deriveStatsFromAttributes in
+          // data/playerDatabase.js) — i.e. it IS the shooting-specific
+          // composite — so it now carries most of the weight here. `tec`
+          // (ball control/dribbling/passing/curl) is playmaking ability, not
+          // shooting ability, so it's down-weighted to a small nudge instead
+          // of being able to inflate shotQuality for a technical player who
+          // isn't actually a good finisher. The dedicated finishingEdge()/
+          // positioningEdge() skill-specific bonuses below are unchanged.
+          (curvedAttr(shooter.att || 70, 70) * 0.62 + curvedAttr(shooter.tec || 70, 70) * 0.10
+            + curvedAttr(shooter.ovr || 75, 75) * 0.18 + curvedAttr(shooter.pac || 70, 70) * 0.10) / 100
           + finishingEdge(shooter)
           + positioningEdge(shooter)
+          + blitzCurlerEdge(shooter)
           + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)
           + (chanceType === 'longshot' ? fkTakerEdge(shooter) * 0.6 : 0)));
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
@@ -6187,6 +6375,13 @@ var App = (() => {
     const blockSkill = blocker ? defensivePressure(blocker) / 100 : 0.6;
     const blockChance = Math.max(0.04, Math.min(0.28, 0.15 + blockSkill * 0.10 - shotQuality * 0.10));
     if (seededRandom() < blockChance) {
+      // Extremely rare: a blocking body gets the deflection badly wrong and
+      // loops it past his own keeper. Own goals stay a genuine rarity —
+      // this only fires for a sliver of blocked efforts, same real-world
+      // order of magnitude as own goals actually turning up in football.
+      if (blocker && maybeOwnGoal(attackingSide, defendingSide, blocker, 'deflects the blocked effort into his own net')) {
+        return;
+      }
       defTeam.stats.blocks = (defTeam.stats.blocks || 0) + 1;
       if (blocker) {
         if (!m.playerMatchStats[blocker.id]) m.playerMatchStats[blocker.id] = blankPlayerMatchStats(blocker);
@@ -6326,6 +6521,14 @@ var App = (() => {
     if (!zonal && (routine === 'nearpost' || routine === 'crowd')) chance *= 0.82;
     const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p, true) * 2);
     if (blocker && aerialSkill(blocker, true) > 0.68) chance *= 0.85;
+
+    // The most realistic own-goal source in the whole engine — a crowded
+    // box, bodies flying at a cross under pressure, someone gets the
+    // header/clearance badly wrong off his own man. Still a small
+    // fraction of corners, same as real football.
+    if (blocker && maybeOwnGoal(attackingSide, defendingSide, blocker, `turns ${ROUTINE_LABEL[routine] || 'the corner'} into his own net under pressure`, 0.007)) {
+      return;
+    }
 
     if (seededRandom() >= chance) return;
     // The designated corner-box attackers (Heading/Jump/Physical Contact
@@ -6499,8 +6702,17 @@ var App = (() => {
     // near-coinflip from the first challenge onward. Tuned so a match
     // produces on the order of 2-4 yellows combined and a red roughly once
     // every 3-4 matches, matching real-world discipline rates.
-    let yellowChance = Math.min(0.55, 0.045 * aggression + (foulCount - 1) * 0.09 + (alreadyYellow ? 0.10 : 0) + (foulCount >= 3 ? 0.08 : 0));
-    const straightRedChance = 0.0016 * aggression;
+    // Escalation terms eased further: combined with foulProneness/foul-
+    // selection changes upstream (engine/defending.js, engine/transitions.js)
+    // that already reduce how often the same high-aggression player racks
+    // up a fast foulCount, the old per-repeat/already-yellow bumps could
+    // still stack into an unrealistic run of cards once a player did start
+    // repeat-fouling. The third-foul kicker now only applies from a fourth
+    // foul on, and every increment is smaller, so repeat fouling still
+    // clearly raises the odds of a card without turning into a near-certain
+    // yellow (or a cheap second yellow) by a player's third or fourth foul.
+    let yellowChance = Math.min(0.45, 0.04 * aggression + (foulCount - 1) * 0.06 + (alreadyYellow ? 0.07 : 0) + (foulCount >= 4 ? 0.05 : 0));
+    const straightRedChance = 0.0013 * aggression;
     const roll = seededRandom();
     if (roll < straightRedChance && !alreadyYellow) {
       defTeam.stats.reds++;
@@ -6582,7 +6794,15 @@ var App = (() => {
     // fouls per genuine challenge than this used to model, and the old
     // rate (combined with the independent secondary-event fouls below)
     // was producing far more cards/reds than a real match sees.
-    let foulChance = 0.055 * aggression * (kind === 'duel' ? 1.15 : 0.6);
+    // The 'duel' kind used to carry an extra +15% surcharge on top of
+    // aggression — but a duel win is exactly the outcome a defensive
+    // midfielder/CB records far more often than any other position simply
+    // by doing their job, so that surcharge landed almost entirely on
+    // those positions and made high-aggression DMs disproportionately
+    // likely to be flagged for a foul purely from winning the ball back.
+    // Dropped to parity (1.0) so aggression alone — not the type of
+    // contest a busy defensive position wins most often — drives the risk.
+    let foulChance = 0.05 * aggression * (kind === 'duel' ? 1.0 : 0.6);
     if (contestedPlayer && hasSkill(contestedPlayer, 'Gamesmanship')) foulChance *= 1.2;
     if (seededRandom() < foulChance) {
       resolveFoul(defendingSide, attackingSide, defenderPlayer, contestedPlayer, toThird === 'ATT');
