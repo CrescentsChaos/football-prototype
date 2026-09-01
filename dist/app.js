@@ -3083,6 +3083,7 @@ var App = (() => {
     const select = document.getElementById('tour-format-select');
     if (select && select.value !== tournamentType) select.value = tournamentType;
     tourTeamsSearch = '';
+    tourSelectedTeamIds = new Set();
     const search = document.getElementById('tour-teams-search');
     if (search) search.value = '';
     applyTournamentBranding(tournamentType);
@@ -10467,13 +10468,14 @@ var App = (() => {
     }
     const el = document.getElementById('tournament-teams');
     if (!el) return;
-    // Preserve existing checks
-    const prevChecked = new Set(
-      [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => cb.value)
-    );
-    const firstRender = prevChecked.size === 0 && !tourTeamsSearch;
+    // First-ever render for this format (nothing selected yet, no search
+    // narrowing the pool) defaults every eligible team to checked — same
+    // "select all by default" behavior as before, just driven by
+    // tourSelectedTeamIds instead of a DOM snapshot now.
+    const firstRender = tourSelectedTeamIds.size === 0 && !tourTeamsSearch;
+    if (firstRender) getCompetitionEligiblePool(tournamentType).forEach(t => tourSelectedTeamIds.add(t.id));
     el.innerHTML = pool.map(t => {
-      const checked = firstRender || prevChecked.has(t.id);
+      const checked = tourSelectedTeamIds.has(t.id);
       return `<label class="team-check ${checked ? 'selected' : ''}" data-id="${t.id}">
         <input type="checkbox" value="${t.id}" ${checked ? 'checked' : ''}>
         <span>${teamMark(t, 20)} ${t.name}</span>
@@ -10481,22 +10483,31 @@ var App = (() => {
       </label>`;
     }).join('') || '<div class="empty-state"><p>No teams found</p></div>';
     el.querySelectorAll('.team-check').forEach(l => {
+      const id = l.getAttribute('data-id');
       l.addEventListener('click', (e) => {
         if (e.target.tagName !== 'INPUT') {
           const cb = l.querySelector('input');
           if (cb) cb.checked = !cb.checked;
         }
         const cb = l.querySelector('input');
-        l.classList.toggle('selected', cb && cb.checked);
+        const isChecked = !!(cb && cb.checked);
+        l.classList.toggle('selected', isChecked);
+        if (isChecked) tourSelectedTeamIds.add(id); else tourSelectedTeamIds.delete(id);
         updateTournamentSelectedCount();
       });
-      l.querySelector('input') && l.querySelector('input').addEventListener('change', updateTournamentSelectedCount);
+      l.querySelector('input') && l.querySelector('input').addEventListener('change', (e) => {
+        if (e.target.checked) tourSelectedTeamIds.add(id); else tourSelectedTeamIds.delete(id);
+        updateTournamentSelectedCount();
+      });
     });
     updateTournamentSelectedCount();
   }
 
   function updateTournamentSelectedCount() {
-    const n = document.querySelectorAll('#tournament-teams input:checked').length;
+    // tourSelectedTeamIds is authoritative (see renderTournamentTeamSelect) —
+    // counting DOM checkboxes here would undercount while a search filter
+    // is hiding previously-checked teams.
+    const n = tourSelectedTeamIds.size;
     let el = document.getElementById('tour-selected-count');
     if (!el) {
       const setup = document.getElementById('tournament-setup');
@@ -10524,6 +10535,7 @@ var App = (() => {
     setTimeout(updateTournamentSelectedCount, 0);
     document.querySelectorAll('#tournament-teams input').forEach(cb => {
       cb.checked = true;
+      tourSelectedTeamIds.add(cb.value);
       const parent = cb.closest('.team-check');
       if (parent) parent.classList.add('selected');
     });
@@ -10531,13 +10543,19 @@ var App = (() => {
   function deselectAllTeams() {
     document.querySelectorAll('#tournament-teams input').forEach(cb => {
       cb.checked = false;
+      tourSelectedTeamIds.delete(cb.value);
       const parent = cb.closest('.team-check');
       if (parent) parent.classList.remove('selected');
     });
+    updateTournamentSelectedCount();
   }
 
   function startTournament() {
-    const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
+    // Use the persistent selection set (tourSelectedTeamIds), not a DOM
+    // query — a search filter can currently be hiding some checked teams'
+    // checkboxes entirely, and reading the DOM here would silently drop
+    // them from the tournament instead of just from the visible list.
+    const selected = [...tourSelectedTeamIds].map(id => getTeam(id)).filter(Boolean);
     const cfg = TOURNAMENT_FORMATS[tournamentType] || TOURNAMENT_FORMATS.worldcup;
     // Straight-knockout formats (domestic cups, Super Cups) only need a
     // power-of-2 field as small as 2 (a one-off Super Cup match); every
@@ -12572,6 +12590,16 @@ var App = (() => {
   let teamsSearch = '';
   let teamsSort = 'name';
   let tourTeamsSearch = '';
+  // Authoritative record of which teams are checked for the tournament,
+  // independent of the current search filter. renderTournamentTeamSelect()
+  // only ever renders the pool matching the *current* search text, so a
+  // team checked before a search narrows the list would otherwise vanish
+  // from the DOM entirely — reading "which teams are checked" back off
+  // the DOM after that (the old approach) permanently forgets it, since
+  // its checkbox no longer exists to read. Tracking selection here instead
+  // means a team stays selected across searches until explicitly
+  // unchecked, deselected, or the format/pool changes.
+  let tourSelectedTeamIds = new Set();
 
   function teamAvgOvr(t) {
     const ps = t.players || [];
