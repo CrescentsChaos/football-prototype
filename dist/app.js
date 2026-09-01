@@ -6580,28 +6580,47 @@ var App = (() => {
   function resolveChanceCreation(attackingSide, defendingSide, carrier, channel, extraQualityBonus) {
     const m = currentMatch;
     if (!m) return;
-    const attTeam = m[attackingSide];
-    const styles = (carrier.expandedAttrs && carrier.expandedAttrs.playstyle) || [];
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
     const wide = channel !== 'C';
-    const crossStyle = styles.some(s => ['Cross Specialist', 'Prolific Winger', 'Roaming Flank', 'Offensive Full-back', 'Full-back Finisher'].includes(s));
-    const cutInStyle = styles.some(s => s === 'Inside Forward');
-    const throughBallStyle = styles.some(s => ['Creative Playmaker', 'Classic No. 10', 'Orchestrator', 'Deep-Lying Forward'].includes(s));
+    const tacSelf = (m.tactics && m.tactics[attackingSide]) || 'balanced';
+    const tacOpp = (m.tactics && m.tactics[defendingSide]) || 'balanced';
+    const mods = getPlaystyleMods(attTeam.team);
+
+    // ===== Decision phase: the ball has reached the final third — what does =====
+    // ===== the carrier actually try with it? Shoot himself, cross for a
+    // target, thread a through ball, take a man on, or simply lay it off
+    // instead of forcing a bad chance? Weighted on the carrier's own
+    // attributes/playstyle plus the team's tactical stance, same as the
+    // mid-pitch decision in runPossessionSequence().
+    const marker = pickPlayer(defTeam, mirrorDefenderPos('ATT_' + channel));
+    const decision = decideBallAction(carrier, marker, 'ATT_' + channel, tacSelf, tacOpp, mods,
+      ['shoot', 'cross', 'throughball', 'dribble', 'pass']);
 
     let chanceType, shooter;
-    if (wide && cutInStyle && seededRandom() < 0.55) {
-      chanceType = 'dribble'; shooter = carrier;
-    } else if (wide && (crossStyle || seededRandom() < 0.55)) {
-      chanceType = 'cross';
-      shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'], (p) => aerialSkill(p) * 2, carrier.id)
-        || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
-    } else if (!wide && throughBallStyle && seededRandom() < 0.5) {
-      chanceType = 'throughball';
-      shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
-    } else if (seededRandom() < 0.16) {
-      chanceType = 'longshot'; shooter = carrier;
-    } else {
-      chanceType = 'openplay';
-      shooter = pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id);
+    switch (decision.action) {
+      case 'dribble':
+        chanceType = 'dribble'; shooter = carrier;
+        break;
+      case 'cross':
+        chanceType = 'cross';
+        shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'], (p) => aerialSkill(p) * 2, carrier.id)
+          || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
+        break;
+      case 'throughball':
+        chanceType = 'throughball';
+        shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
+        break;
+      case 'pass':
+        // Opts to recycle rather than force a low-quality look — the chance
+        // fizzles out safely instead of every final-third entry ending in a shot.
+        addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> pulls it back rather than force it`, attackingSide);
+        return;
+      case 'shoot':
+      default:
+        chanceType = wide ? 'openplay' : (seededRandom() < 0.3 ? 'longshot' : 'openplay');
+        shooter = chanceType === 'longshot' ? carrier
+          : pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id);
+        break;
     }
     if (!shooter) shooter = carrier;
 
@@ -6864,6 +6883,143 @@ var App = (() => {
     if (seededRandom() < counterProb) runFastBreak(defendingSide, attackingSide);
   }
 
+  // ===== Dynamic ball-decision model ============================================
+  // Replaces fixed engine branching ("this zone always tries a pass", "wide entry
+  // is always a cross-or-cutback coin flip") with an actual decision: whenever a
+  // player is on the ball, every plausible action gets a weighted score built from
+  // (1) that player's own attributes, (2) the situation around them right now
+  // (pitch zone, marking pressure, which channel, game state), and (3) their
+  // team's tactical stance and manager playstyle. One action is then drawn from
+  // the resulting probability distribution with seededRandom() — so the same
+  // player in the same spot won't always do the same thing, but a genuine
+  // dribbler in space against a tired full-back will *tend* to run at him far
+  // more often than a target man would.
+  //
+  // Used at two points in the possession pipeline:
+  //   - runPossessionSequence() (possession.js): a mid-pitch receiver choosing
+  //     between pass / dribble / carry / backpass / switch / hold.
+  //   - resolveChanceCreation() (passing.js): the final-third decision between
+  //     shoot / cross / through ball / dribble / laying it off instead.
+  const BALL_ACTIONS = ['pass', 'dribble', 'carry', 'shoot', 'cross', 'throughball', 'backpass', 'switch', 'hold'];
+
+  // Starting weight for each action before attribute/context/tactic factors are
+  // applied, keyed by which third of the pitch the ball is currently in. Every
+  // action keeps a nonzero floor so an unlikely one (a CB shooting from inside
+  // his own half) stays possible at a low rate rather than being hard-excluded —
+  // real matches occasionally produce exactly that kind of moment.
+  function baseActionWeights(third) {
+    if (third === 'DEF') return { pass: 46, dribble: 9, carry: 13, shoot: 0.4, cross: 0.8, throughball: 1.5, backpass: 13, switch: 11, hold: 4.5 };
+    if (third === 'ATT') return { pass: 22, dribble: 15, carry: 9, shoot: 15, cross: 15, throughball: 11, backpass: 2, switch: 3, hold: 3 };
+    return { pass: 42, dribble: 12, carry: 12, shoot: 2, cross: 6, throughball: 8, backpass: 6, switch: 8, hold: 2 }; // MID
+  }
+  // Player-attribute contribution to each candidate action, reusing the same
+  // ability reads the rest of the engine already relies on (passingAbility,
+  // carryingAbility, aerialPassingAbility, etc.) so a player who's good at
+  // something here is the same player who's good at it everywhere else in the
+  // simulation. Returned on roughly the same ~60-95 scale as those helpers.
+  function attributeActionScores(p) {
+    const ground = groundPassingAbility(p);
+    const aerial = aerialPassingAbility(p);
+    const carry = carryingAbility(p);
+    const vision = curvedAttr(xattr(p, 'vision', p.tec || 70), 70);
+    const composure = curvedAttr(xattr(p, 'composure', p.tec || 70), 70);
+    const finishing = curvedAttr(xattr(p, 'fin', p.att || 70), 70) * 0.65 + curvedAttr(p.att || 70, 70) * 0.35;
+    return {
+      pass: ground * 0.7 + vision * 0.3,
+      dribble: carry * 0.75 + composure * 0.25,
+      carry: carry * 0.8 + curvedAttr(p.pac || 70, 70) * 0.2,
+      shoot: finishing,
+      cross: aerial,
+      throughball: vision * 0.6 + ground * 0.4,
+      backpass: ground,
+      switch: aerial * 0.5 + vision * 0.5,
+      hold: composure * 0.7 + carry * 0.3
+    };
+  }
+  // Builds the weighted score for every action in `allowed`, folding in the
+  // situational (pressure) and tactical (team stance / manager playstyle /
+  // player traits) factors on top of the raw attribute read above.
+  function evaluateBallActions(player, ctx) {
+    const third = (ctx.zoneKey || 'MID_C').split('_')[0];
+    const base = baseActionWeights(third);
+    const attr = attributeActionScores(player);
+    const pressure = ctx.marker ? defensivePressure(ctx.marker) : 55;
+    const styles = (player.expandedAttrs && player.expandedAttrs.playstyle) || [];
+    const allowed = ctx.allowed || BALL_ACTIONS;
+    // How much heavier pressure discourages (positive) or encourages
+    // (negative, i.e. safety-first actions become relatively more attractive)
+    // each action — a tight man-marking job makes a risky through ball or
+    // dribble far less appealing than simply recycling it.
+    const pressureSensitivity = { pass: 0.28, dribble: 1.0, carry: 0.9, shoot: 0.5, cross: 0.45, throughball: 0.9, backpass: -0.9, switch: -0.5, hold: -0.7 };
+
+    const scores = {};
+    allowed.forEach((action) => {
+      const b = base[action] != null ? base[action] : 1;
+      const a = attr[action] != null ? attr[action] / 70 : 1;
+      let w = b * a;
+
+      const sens = pressureSensitivity[action] || 0;
+      w *= 1 - Math.max(-0.5, Math.min(0.5, sens * ((pressure - 55) / 100)));
+
+      // Tactical stance: an attacking team leans into progressive/risky ball
+      // actions, a defensive one prioritises keeping possession safe.
+      if (ctx.tacticSelf === 'attack') {
+        if (action === 'dribble' || action === 'carry' || action === 'shoot' || action === 'throughball' || action === 'cross') w *= 1.18;
+        if (action === 'backpass') w *= 0.7;
+      } else if (ctx.tacticSelf === 'defend') {
+        if (action === 'backpass' || action === 'hold' || action === 'switch') w *= 1.15;
+        if (action === 'dribble' || action === 'throughball' || action === 'shoot') w *= 0.82;
+      } else if (ctx.tacticSelf === 'press') {
+        if (action === 'pass' || action === 'carry') w *= 1.08;
+      }
+      // Facing a high press makes it harder to justify a slow build-up ball —
+      // safer, quicker options get relatively more attractive.
+      if (ctx.tacticOpp === 'press') {
+        if (action === 'backpass' || action === 'switch') w *= 1.12;
+        if (action === 'throughball') w *= 0.9;
+      }
+
+      // Manager playstyle: wide-leaning sides cross/switch more, direct sides
+      // (Long Ball) favour progressing the ball over patient recycling.
+      if (ctx.mods) {
+        if (action === 'cross' || action === 'switch') w *= ctx.mods.wingBiasMult || 1;
+        if (action === 'backpass') w *= 1 / Math.max(0.6, ctx.mods.passVolMult || 1);
+      }
+
+      // Individual playstyle tags — the same trait tags resolveChanceCreation
+      // already recognised for crossers/cutting-in wingers/creative playmakers
+      // now shape the decision itself instead of just the fixed cascade.
+      if (action === 'dribble' && styles.includes('Inside Forward')) w *= 1.6;
+      if (action === 'cross' && styles.some((s) => ['Cross Specialist', 'Prolific Winger', 'Roaming Flank', 'Offensive Full-back', 'Full-back Finisher'].includes(s))) w *= 1.6;
+      if (action === 'throughball' && styles.some((s) => ['Creative Playmaker', 'Classic No. 10', 'Orchestrator', 'Deep-Lying Forward'].includes(s))) w *= 1.6;
+      if (hasSkill(player, 'Attack Trigger') && (action === 'dribble' || action === 'carry' || action === 'throughball')) w *= 1.08;
+
+      scores[action] = Math.max(0.05, w);
+    });
+    return scores;
+  }
+  // Draws one action from a { action: weight } distribution — this (not a
+  // fixed if/else cascade) is what actually decides the outcome.
+  function chooseWeightedAction(scores) {
+    const entries = Object.entries(scores);
+    if (!entries.length) return 'pass';
+    const total = entries.reduce((s, [, w]) => s + w, 0);
+    if (!(total > 0)) return entries[0][0];
+    let r = seededRandom() * total;
+    for (let i = 0; i < entries.length; i++) {
+      r -= entries[i][1];
+      if (r <= 0) return entries[i][0];
+    }
+    return entries[entries.length - 1][0];
+  }
+  // Convenience wrapper used by the call sites: evaluates candidates, picks
+  // one by weighted probability, and hands back both so callers can narrate
+  // or reuse the scores if they want to.
+  function decideBallAction(player, marker, zoneKey, tacticSelf, tacticOpp, mods, allowed) {
+    const scores = evaluateBallActions(player, { zoneKey, marker, tacticSelf, tacticOpp, mods, allowed });
+    return { action: chooseWeightedAction(scores), scores };
+  }
+
   // ===== The core pipeline: Zones -> Movement -> Passing -> Duels, one =====
   // ===== zone transition at a time, until the ball reaches the final third
   // (Chance Creation) or is lost along the way (Transitions).
@@ -6898,8 +7054,54 @@ var App = (() => {
 
     for (let i = 0; i < 2; i++) { // DEF->MID, then MID->ATT
       const fromThird = PITCH_THIRDS[i], toThird = PITCH_THIRDS[i + 1];
-      // Occasional switch of play between thirds.
-      if (seededRandom() < 0.22) channel = PITCH_CHANNELS[Math.floor(seededRandom() * 3)];
+
+      // ===== Decision phase: the carrier is on the ball right now — what do =====
+      // ===== they actually try to do with it? Evaluated fresh every time the
+      // ball changes hands, rather than the engine always assuming "pass".
+      const carrierMarker = pickPlayer(defTeam, mirrorDefenderPos(fromThird + '_' + channel));
+      const decision = decideBallAction(carrier, carrierMarker, fromThird + '_' + channel, tac, defTac, attMods,
+        ['pass', 'dribble', 'carry', 'backpass', 'switch', 'hold']);
+
+      if (decision.action === 'backpass') {
+        // Plays it safe and recycles — the move fizzles out this minute
+        // rather than being forced forward into a bad situation.
+        addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> plays it back — no risks taken`, attackingSide);
+        return;
+      }
+
+      let holdBonus = 0;
+      if (decision.action === 'switch') {
+        const others = PITCH_CHANNELS.filter((c) => c !== channel);
+        channel = others[Math.floor(seededRandom() * others.length)];
+        const chanName = channel === 'L' ? 'left' : channel === 'R' ? 'right' : 'middle';
+        addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> switches the play out to the ${chanName}`, attackingSide);
+      } else if (seededRandom() < 0.1) {
+        // Small residual drift so channel isn't only ever changed by an
+        // explicit switch decision — real play still meanders a little.
+        channel = PITCH_CHANNELS[Math.floor(seededRandom() * 3)];
+      }
+
+      if (decision.action === 'dribble' || decision.action === 'carry') {
+        const runMarker = pickPlayer(defTeam, mirrorDefenderPos(fromThird + '_' + channel));
+        const runPressure = runMarker ? defensivePressure(runMarker) : 60;
+        const carryChance = Math.max(0.30, Math.min(0.93,
+          0.62 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus));
+        if (seededRandom() >= carryChance) {
+          resolveTurnover(attackingSide, defendingSide, carrier, runMarker, fromThird, toThird, 'carry', channel);
+          return;
+        }
+        if (seededRandom() < 0.25) {
+          addEvent(m.minute, 'skill', `${carrier.name} ${decision.action === 'dribble' ? 'dribbles past a challenge' : 'drives forward with the ball'}`, attackingSide);
+        }
+        m.ballZone = { side: attackingSide, third: toThird, channel: channel };
+        continue; // carrier advances the ball themselves — no pass needed this phase
+      }
+
+      if (decision.action === 'hold') {
+        holdBonus = 0.04;
+        if (seededRandom() < 0.35) addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> shields it and waits for support`, attackingSide);
+      }
+
       const targetZone = toThird + '_' + channel;
 
       // ===== Movement phase: who makes themselves available in that zone? =====
@@ -6913,7 +7115,8 @@ var App = (() => {
       const passerSkill = passingAbility(carrier);
       const marker = pickPlayer(defTeam, mirrorDefenderPos(targetZone));
       const pressure = marker ? defensivePressure(marker) : 60;
-      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus;
+      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus
+        + holdBonus + (decision.action === 'switch' ? 0.05 : 0);
       if (tac === 'attack') passChance -= 0.03;
       if (tac === 'press') passChance -= 0.015;
       if (defTac === 'press') passChance -= 0.05;
