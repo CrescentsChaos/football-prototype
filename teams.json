@@ -21914,8 +21914,8 @@
       "manager": {
         "name": "Vicente del Bosque",
         "ovr": 100,
-        "formation":"4-3-3-cdm",
-        "playstyle":"Possession"
+        "formation": "4-3-3-cdm",
+        "playstyle": "Possession"
       }
     },
     {
@@ -24936,8 +24936,8 @@
       "manager": {
         "name": "Lionel Scaloni",
         "ovr": 98,
-        "formation":"4-3-3-cdm",
-        "playstyle":"Possession"
+        "formation": "4-3-3-cdm",
+        "playstyle": "Possession"
       }
     },
     {
@@ -26073,8 +26073,8 @@
       "manager": {
         "name": "Marcello Lippi",
         "ovr": 100,
-        "formation":"4-4-1-1",
-        "playstyle":"Quick Counter"
+        "formation": "4-4-1-1",
+        "playstyle": "Quick Counter"
       }
     },
     {
@@ -28035,8 +28035,8 @@
       "manager": {
         "name": "Jorge Jesus",
         "ovr": 89,
-        "formation":"4-2-3-1",
-        "playstyle":"Possession"
+        "formation": "4-2-3-1",
+        "playstyle": "Possession"
       }
     },
     {
@@ -28843,8 +28843,8 @@
       "manager": {
         "name": "Jürgen Klopp",
         "ovr": 95,
-        "formation":"4-2-3-1",
-        "playstyle":"Overload"
+        "formation": "4-2-3-1",
+        "playstyle": "Overload"
       }
     },
     {
@@ -38457,7 +38457,8 @@
           "pac": 86,
           "tec": 88,
           "num": 3
-        },  {
+        },
+        {
           "id": "mci2026_new1",
           "name": "Ayyoub Bouaddi",
           "pos": [
@@ -38499,7 +38500,8 @@
           "pac": 88,
           "tec": 79,
           "num": 20
-        },{
+        },
+        {
           "id": "bru27_68",
           "name": "Chemsdine Talbi",
           "pos": [
@@ -46985,6 +46987,297 @@
       "manager": {
         "name": "Carlo Ancelotti",
         "ovr": 88
+      }
+    },
+    {
+      "id": "spainreserve",
+      "name": "Spain Reserve",
+      "short": "ESP",
+      "flag": "🇪🇸",
+      "color": "#aa151b",
+      "secondary": "#f1bf00",
+      "players": [
+        {
+          "id": "spainreserve_new1",
+          "name": "Dean Huijsen",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 82,
+          "att": 50,
+          "def": 83,
+          "phy": 80,
+          "pac": 70,
+          "tec": 80,
+          "num": 4
+        },
+        {
+          "id": "spainreserve_new2",
+          "name": "Isco",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 82,
+          "att": 82,
+          "def": 52,
+          "phy": 68,
+          "pac": 68,
+          "tec": 88,
+          "num": 22
+        },
+        {
+          "id": "spainreserve_new3",
+          "name": "Iago Aspas",
+          "pos": [
+            "ST",
+            "CAM",
+            "RW"
+          ],
+          "ovr": 86,
+          "att": 87,
+          "def": 45,
+          "phy": 68,
+          "pac": 80,
+          "tec": 91,
+          "num": 10
+        },
+        {
+          "id": "spainreserve_new4",
+          "name": "Carlos Espí",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 73,
+          "att": 74,
+          "def": 25,
+          "phy": 72,
+          "pac": 78,
+          "tec": 72,
+          "num": 19
+        },
+        {
+          "id": "spainreserve_new5",
+          "name": "Álvaro Carreras",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 81,
+          "att": 74,
+          "def": 79,
+          "phy": 76,
+          "pac": 83,
+          "tec": 80,
+          "num": 18
+        },
+        {
+          "id": "spainreserve_new6",
+          "name": "Raúl Asencio",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 78,
+          "att": 35,
+          "def": 80,
+          "phy": 78,
+          "pac": 72,
+          "tec": 70,
+          "num": 2
+        },
+        {
+          "id": "spainreserve_new7",
+          "name": "David Soria",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 83,
+          "att": 10,
+          "def": 84,
+          "phy": 80,
+          "pac": 48,
+          "tec": 72,
+          "num": 13
+        },
+        {
+          "id": "spainreserve_new8",
+          "name": "Álex Remiro",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 85,
+          "att": 10,
+          "def": 86,
+          "phy": 81,
+          "pac": 52,
+          "tec": 75,
+          "num": 1
+        },
+        {
+          "id": "spainreserve_new9",
+          "name": "Sergio Martínez",
+          "pos": [
+            "CM"
+          ],
+          "ovr": 78,
+          "att": 73,
+          "def": 78,
+          "phy": 79,
+          "pac": 75,
+          "tec": 78,
+          "num": 36
+        },
+        {
+          "id": "spainreserve_new10",
+          "name": "Fermín López",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 81,
+          "att": 80,
+          "def": 65,
+          "phy": 74,
+          "pac": 80,
+          "tec": 82,
+          "num": 7
+        },
+        {
+          "id": "spainreserve_new11",
+          "name": "Thiago Pitarch",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 75,
+          "att": 74,
+          "def": 52,
+          "phy": 65,
+          "pac": 70,
+          "tec": 82,
+          "num": 27
+        },
+        {
+          "id": "spainreserve_new12",
+          "name": "Alejandro Balde",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 82,
+          "att": 76,
+          "def": 77,
+          "phy": 74,
+          "pac": 91,
+          "tec": 80,
+          "num": 3
+        },
+        {
+          "id": "spainreserve_new13",
+          "name": "Marc Casadó",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 80,
+          "att": 70,
+          "def": 78,
+          "phy": 78,
+          "pac": 74,
+          "tec": 80,
+          "num": 17
+        },
+        {
+          "id": "spainreserve_new14",
+          "name": "Gerard Martín",
+          "pos": [
+            "LB",
+            "CB"
+          ],
+          "ovr": 74,
+          "att": 65,
+          "def": 74,
+          "phy": 72,
+          "pac": 76,
+          "tec": 72
+        },
+        {
+          "id": "spainreserve_new15",
+          "name": "Marc Bernal",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 76,
+          "att": 68,
+          "def": 76,
+          "phy": 76,
+          "pac": 70,
+          "tec": 78
+        },
+        {
+          "id": "spainreserve_new16",
+          "name": "Marc Bartra",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 50,
+          "def": 78,
+          "phy": 75,
+          "pac": 64,
+          "tec": 70,
+          "num": 5
+        },
+        {
+          "id": "spainreserve_new17",
+          "name": "Marcos Alonso",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 83,
+          "att": 55,
+          "def": 85,
+          "phy": 81,
+          "pac": 70,
+          "tec": 80
+        },
+        {
+          "id": "spainreserve_new18",
+          "name": "Robin Le Normand",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 83,
+          "att": 42,
+          "def": 85,
+          "phy": 82,
+          "pac": 68,
+          "tec": 64,
+          "num": 24
+        },
+        {
+          "id": "spainreserve_new19",
+          "name": "Koke",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 81,
+          "att": 75,
+          "def": 78,
+          "phy": 75,
+          "pac": 62,
+          "tec": 84,
+          "num": 6
+        }
+      ],
+      "manager": {
+        "name": "Luis de la Fuente",
+        "ovr": 99,
+        "playstyle": "Possession",
+        "formation": "4-3-3-cdm"
       }
     }
   ],
@@ -57255,6 +57548,20 @@
           "pac": 82,
           "tec": 75,
           "num": 20
+        },
+        {
+          "id": "atm2026_new1",
+          "name": "Jonathan David",
+          "pos": [
+            "ST",
+            "SS"
+          ],
+          "ovr": 88,
+          "att": 93,
+          "def": 42,
+          "phy": 78,
+          "pac": 91,
+          "tec": 88
         }
       ],
       "manager": {
@@ -61485,7 +61792,8 @@
           "pac": 42,
           "tec": 50,
           "num": 40
-        },{
+        },
+        {
           "id": "sco4",
           "name": "Andrew Robertson",
           "pos": [
@@ -85018,7 +85326,7 @@
           "id": "mlg27_8_dot",
           "name": "Carlos Dotor",
           "pos": [
-          "ST",
+            "ST",
             "CM",
             "CDM"
           ],
@@ -85231,8 +85539,8 @@
       "manager": {
         "name": "Juanfran Funes",
         "ovr": 83,
-        "formation":"4-4-2",
-        "playstyle":"Possession"
+        "formation": "4-4-2",
+        "playstyle": "Possession"
       }
     },
     {
@@ -91156,7 +91464,8 @@
           "pac": 73,
           "tec": 77,
           "num": 18
-        }, {
+        },
+        {
           "id": "arg3",
           "name": "Emiliano Martínez",
           "pos": [
@@ -92744,7 +93053,8 @@
           "pac": 45,
           "tec": 62,
           "num": 13
-        },{
+        },
+        {
           "id": "bha26_10",
           "name": "Julio Enciso",
           "pos": [
@@ -93979,7 +94289,8 @@
           "pac": 72,
           "tec": 69,
           "num": 33
-        },{
+        },
+        {
           "id": "bru27_68",
           "name": "Chemsdine Talbi",
           "pos": [
@@ -103615,6 +103926,76 @@
         "name": "Marino Pušić",
         "ovr": 78
       }
+    },
+    {
+      "id": "spain_res",
+      "name": "Spain Reserve",
+      "short": "ESP",
+      "flag": "🇪🇸",
+      "color": "#64748b",
+      "secondary": "#94a3b8",
+      "player": [
+        {
+          "id": "bet26_22",
+          "name": "Isco",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 82,
+          "att": 82,
+          "def": 52,
+          "phy": 68,
+          "pac": 68,
+          "tec": 88,
+          "num": 22
+        }
+      ]
+    },
+    {
+      "id": "england_res",
+      "name": "England Reserve",
+      "short": "ENG",
+      "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+      "color": "#64748b",
+      "secondary": "#94a3b8",
+      "player": []
+    },
+    {
+      "id": "italy_res",
+      "name": "Italy Reserve",
+      "short": "ITA",
+      "flag": "🇮🇹",
+      "color": "#64748b",
+      "secondary": "#94a3b8",
+      "player": []
+    },
+    {
+      "id": "france_res",
+      "name": "France Reserve",
+      "short": "FRA",
+      "flag": "🇫🇷",
+      "color": "#64748b",
+      "secondary": "#94a3b8",
+      "player": []
+    },
+    {
+      "id": "germany_res",
+      "name": "Germany Reserve",
+      "short": "GER",
+      "flag": "🇩🇪",
+      "color": "#64748b",
+      "secondary": "#94a3b8",
+      "player": []
+    },
+    {
+      "id": "brazil_res",
+      "name": "Brazil Reserve",
+      "short": "BRA",
+      "flag": "🇧🇷",
+      "color": "#64748b",
+      "secondary": "#94a3b8",
+      "player": []
     },
     {
       "id": "free_agents",
