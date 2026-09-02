@@ -89992,7 +89992,7 @@
           "num": 9
         },
         {
-          "id": "liv08_18",
+          "id": "ned10_7",
           "name": "Dirk Kuyt",
           "pos": [
             "RW",
@@ -108282,7 +108282,7 @@
   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "color": "#C8102E",
   "secondary": "#FFFFFF",
-  "logo": "liverpool.png",
+  "logo": "liverpool-old.png",
   "stadium": "Anfield",
   "players": [
     {
@@ -108467,7 +108467,7 @@
     },
     {
       "id": "lfc_02_9",
-      "name": "El Hadji Diouf",
+      "name": "El-Hadji Diouf",
       "pos": ["RW", "RM", "ST"],
       "ovr": 79,
       "att": 78,
