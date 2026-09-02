@@ -43909,8 +43909,8 @@
         }
       ],
       "manager": {
-        "name": "Gennaro Gattuso",
-        "ovr": 82
+        "name": "Roberto Mancini",
+        "ovr": 87
       }
     },
     {
@@ -46982,6 +46982,21 @@
           "pac": 78,
           "tec": 74,
           "num": 21
+        },
+        {
+          "id": "bra_new1",
+          "name": "Rayan",
+          "pos": [
+            "RW",
+            "ST"
+          ],
+          "ovr": 77,
+          "att": 77,
+          "def": 38,
+          "phy": 76,
+          "pac": 84,
+          "tec": 78,
+          "num": 37
         }
       ],
       "manager": {
@@ -47043,7 +47058,7 @@
       "secondary": "#f1bf00",
       "players": [
         {
-          "id": "spainreserve_new1",
+          "id": "rma26_4",
           "name": "Dean Huijsen",
           "pos": [
             "CB"
@@ -48077,7 +48092,7 @@
       ],
       "manager": {
         "name": "José Mourinho",
-        "ovr": 86,
+        "ovr": 90,
         "formation": "4-3-3-cdm",
         "playstyle": "Quick Counter"
       }
@@ -48705,7 +48720,7 @@
           "tec": 83
         },
         {
-          "id": "che27_8",
+          "id": "arg18",
           "name": "Enzo Fernández",
           "pos": [
             "CM",
@@ -48718,6 +48733,22 @@
           "pac": 72,
           "tec": 88,
           "num": 8
+        },
+        {
+          "id": "eve27_10",
+          "name": "Iliman Ndiaye",
+          "pos": [
+            "CAM",
+            "LW",
+            "ST"
+          ],
+          "ovr": 81,
+          "att": 81,
+          "def": 48,
+          "phy": 73,
+          "pac": 84,
+          "tec": 85,
+          "num": 10
         }
       ],
       "manager": {
@@ -52018,7 +52049,7 @@
           "num": 22
         },
         {
-          "id": "bay13_25",
+          "id": "ger14_17",
           "name": "Thomas Müller",
           "pos": [
             "CAM",
@@ -52121,7 +52152,7 @@
           "num": 33
         },
         {
-          "id": "bay13_39",
+          "id": "ger14_13",
           "name": "Toni Kroos",
           "pos": [
             "CAM",
@@ -54611,7 +54642,7 @@
           "num": 9
         },
         {
-          "id": "bay26_14",
+          "id": "col22",
           "name": "Luis Díaz",
           "pos": [
             "LW",
@@ -54640,22 +54671,6 @@
           "pac": 83,
           "tec": 88,
           "num": 17
-        },
-        {
-          "id": "bay26_22",
-          "name": "Arijon Ibrahimović",
-          "pos": [
-            "LW",
-            "CAM",
-            "ST"
-          ],
-          "ovr": 73,
-          "att": 73,
-          "def": 42,
-          "phy": 68,
-          "pac": 78,
-          "tec": 76,
-          "num": 22
         },
         {
           "id": "bay26_28",
@@ -54912,7 +54927,7 @@
           "num": 8
         },
         {
-          "id": "liv26_10",
+          "id": "arg17",
           "name": "Alexis Mac Allister",
           "pos": [
             "CM",
@@ -54941,22 +54956,6 @@
           "pac": 78,
           "tec": 84,
           "num": 17
-        },
-        {
-          "id": "liv26_19",
-          "name": "Harvey Elliott",
-          "pos": [
-            "CAM",
-            "RW",
-            "CM"
-          ],
-          "ovr": 82,
-          "att": 81,
-          "def": 52,
-          "phy": 65,
-          "pac": 78,
-          "tec": 85,
-          "num": 19
         },
         {
           "id": "liv26_38",
@@ -55109,6 +55108,20 @@
           "pac": 91,
           "tec": 85,
           "num": 29
+        },
+        {
+          "id": "liv2026_new1",
+          "name": "Ronald Araújo",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 88,
+          "att": 50,
+          "def": 94,
+          "phy": 93,
+          "pac": 88,
+          "tec": 76
         }
       ],
       "manager": {
@@ -55425,21 +55438,6 @@
           "pac": 82,
           "tec": 87,
           "num": 10
-        },
-        {
-          "id": "ars26_11",
-          "name": "Gabriel Martinelli",
-          "pos": [
-            "LW",
-            "LM"
-          ],
-          "ovr": 84,
-          "att": 82,
-          "def": 45,
-          "phy": 76,
-          "pac": 89,
-          "tec": 83,
-          "num": 11
         },
         {
           "id": "ars26_14",
@@ -56596,21 +56594,6 @@
           "pac": 82,
           "tec": 75,
           "num": 47
-        },
-        {
-          "id": "psg26_49",
-          "name": "Ibrahim Mbaye",
-          "pos": [
-            "RW",
-            "LW"
-          ],
-          "ovr": 71,
-          "att": 70,
-          "def": 35,
-          "phy": 60,
-          "pac": 84,
-          "tec": 75,
-          "num": 49
         }
       ],
       "manager": {
@@ -58615,6 +58598,21 @@
           "pac": 86,
           "tec": 78,
           "num": 15
+        },
+        {
+          "id": "psg26_49",
+          "name": "Ibrahim Mbaye",
+          "pos": [
+            "RW",
+            "LW"
+          ],
+          "ovr": 71,
+          "att": 70,
+          "def": 35,
+          "phy": 60,
+          "pac": 84,
+          "tec": 75,
+          "num": 49
         }
       ],
       "manager": {
@@ -58944,7 +58942,7 @@
           "num": 9
         },
         {
-          "id": "mun26_10",
+          "id": "bra20",
           "name": "Matheus Cunha",
           "pos": [
             "ST",
@@ -60199,6 +60197,20 @@
           "pac": 84,
           "tec": 76,
           "num": 20
+        },
+        {
+          "id": "che27_1",
+          "name": "Robert Sánchez",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 82,
+          "att": 10,
+          "def": 83,
+          "phy": 78,
+          "pac": 50,
+          "tec": 72,
+          "num": 1
         }
       ],
       "manager": {
@@ -60286,20 +60298,6 @@
           "pac": 70,
           "tec": 65,
           "num": 4
-        },
-        {
-          "id": "fen26_3",
-          "name": "Diego Carlos",
-          "pos": [
-            "CB"
-          ],
-          "ovr": 79,
-          "att": 42,
-          "def": 80,
-          "phy": 83,
-          "pac": 66,
-          "tec": 62,
-          "num": 3
         },
         {
           "id": "fen26_50",
@@ -61945,21 +61943,6 @@
           "num": 14
         },
         {
-          "id": "tot26_29",
-          "name": "Pape Matar Sarr",
-          "pos": [
-            "CM",
-            "CDM"
-          ],
-          "ovr": 82,
-          "att": 76,
-          "def": 79,
-          "phy": 80,
-          "pac": 80,
-          "tec": 80,
-          "num": 29
-        },
-        {
           "id": "tot26_8",
           "name": "Yves Bissouma",
           "pos": [
@@ -62172,22 +62155,6 @@
           "tec": 76
         },
         {
-          "id": "eve27_10",
-          "name": "Iliman Ndiaye",
-          "pos": [
-            "CAM",
-            "LW",
-            "ST"
-          ],
-          "ovr": 81,
-          "att": 81,
-          "def": 48,
-          "phy": 73,
-          "pac": 84,
-          "tec": 85,
-          "num": 10
-        },
-        {
           "id": "bha26_29",
           "name": "Jan Paul van Hecke",
           "pos": [
@@ -62227,10 +62194,39 @@
           "phy": 74,
           "pac": 48,
           "tec": 60
+        },
+        {
+          "id": "che27_33",
+          "name": "Mykhailo Mudryk",
+          "pos": [
+            "LW",
+            "LM"
+          ],
+          "ovr": 80,
+          "att": 78,
+          "def": 40,
+          "phy": 69,
+          "pac": 92,
+          "tec": 79,
+          "num": 33
+        },
+        {
+          "id": "che27_38",
+          "name": "Tosin Adarabioyo",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 79,
+          "att": 45,
+          "def": 80,
+          "phy": 80,
+          "pac": 68,
+          "tec": 71,
+          "num": 38
         }
       ],
       "manager": {
-        "name": "Ange Postecoglou",
+        "name": "Roberto de Zerbi",
         "ovr": 84
       }
     },
@@ -62895,20 +62891,6 @@
           "pac": 84,
           "tec": 78,
           "num": 7
-        },
-        {
-          "id": "asm26_9",
-          "name": "Folarin Balogun",
-          "pos": [
-            "ST"
-          ],
-          "ovr": 82,
-          "att": 83,
-          "def": 38,
-          "phy": 78,
-          "pac": 84,
-          "tec": 78,
-          "num": 9
         },
         {
           "id": "asm26_39",
@@ -63658,7 +63640,7 @@
           "num": 7
         },
         {
-          "id": "gal26_45",
+          "id": "nga26_9",
           "name": "Victor Osimhen",
           "pos": [
             "ST"
@@ -65241,6 +65223,21 @@
           "pac": 78,
           "tec": 72,
           "num": 18
+        },
+        {
+          "id": "sge27_16",
+          "name": "Hugo Larsson",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 81,
+          "att": 75,
+          "def": 77,
+          "phy": 77,
+          "pac": 78,
+          "tec": 83,
+          "num": 16
         }
       ],
       "manager": {
@@ -65529,21 +65526,6 @@
           "num": 29
         },
         {
-          "id": "new26_10",
-          "name": "Nick Woltemade",
-          "pos": [
-            "ST",
-            "CAM"
-          ],
-          "ovr": 78,
-          "att": 78,
-          "def": 42,
-          "phy": 82,
-          "pac": 70,
-          "tec": 79,
-          "num": 10
-        },
-        {
           "id": "new26_9",
           "name": "Yoane Wissa",
           "pos": [
@@ -65586,6 +65568,21 @@
           "pac": 83,
           "tec": 70,
           "num": 18
+        },
+        {
+          "id": "lil26_9",
+          "name": "Matias Fernández-Pardo",
+          "pos": [
+            "ST",
+            "LW"
+          ],
+          "ovr": 76,
+          "att": 77,
+          "def": 35,
+          "phy": 74,
+          "pac": 82,
+          "tec": 75,
+          "num": 9
         }
       ],
       "manager": {
@@ -65884,6 +65881,20 @@
           "pac": 76,
           "tec": 75,
           "num": 22
+        },
+        {
+          "id": "chelsea2027_new1",
+          "name": "Honest Ahanor",
+          "pos": [
+            "CB"
+          ],
+          "num": 69,
+          "ovr": 75,
+          "att": 47,
+          "def": 80,
+          "phy": 74,
+          "pac": 76,
+          "tec": 69
         }
       ],
       "manager": {
@@ -66477,7 +66488,7 @@
           "num": 30
         },
         {
-          "id": "mia26_10",
+          "id": "arg20",
           "name": "Lionel Messi",
           "pos": [
             "RW",
@@ -66859,20 +66870,6 @@
           "num": 18
         },
         {
-          "id": "hil26_9",
-          "name": "Karim Benzema",
-          "pos": [
-            "ST"
-          ],
-          "ovr": 86,
-          "att": 88,
-          "def": 38,
-          "phy": 74,
-          "pac": 72,
-          "tec": 88,
-          "num": 9
-        },
-        {
           "id": "hil26_10",
           "name": "Malcom",
           "pos": [
@@ -66946,6 +66943,21 @@
           "pac": 77,
           "tec": 71,
           "num": 27
+        },
+        {
+          "id": "bra23",
+          "name": "Gabriel Martinelli",
+          "pos": [
+            "LW",
+            "LM"
+          ],
+          "ovr": 84,
+          "att": 82,
+          "def": 45,
+          "phy": 76,
+          "pac": 89,
+          "tec": 83,
+          "num": 11
         }
       ],
       "manager": {
@@ -67228,7 +67240,7 @@
           "num": 8
         },
         {
-          "id": "nas26_7",
+          "id": "por23",
           "name": "Cristiano Ronaldo",
           "pos": [
             "ST"
@@ -68406,21 +68418,6 @@
           "pac": 76,
           "tec": 72,
           "num": 27
-        },
-        {
-          "id": "lil26_9",
-          "name": "Matias Fernández-Pardo",
-          "pos": [
-            "ST",
-            "LW"
-          ],
-          "ovr": 76,
-          "att": 77,
-          "def": 35,
-          "phy": 74,
-          "pac": 82,
-          "tec": 75,
-          "num": 9
         },
         {
           "id": "lil26_19",
@@ -72143,7 +72140,7 @@
           "num": 20
         },
         {
-          "id": "juv98_21",
+          "id": "fra98_10",
           "name": "Zinedine Zidane",
           "pos": [
             "CAM",
@@ -73830,21 +73827,6 @@
           "pac": 80,
           "tec": 82,
           "num": 7
-        },
-        {
-          "id": "bar26_17",
-          "name": "Marc Casadó",
-          "pos": [
-            "CDM",
-            "CM"
-          ],
-          "ovr": 80,
-          "att": 70,
-          "def": 78,
-          "phy": 78,
-          "pac": 74,
-          "tec": 80,
-          "num": 17
         },
         {
           "id": "esp23",
@@ -77198,7 +77180,7 @@
           "num": 11
         },
         {
-          "id": "aja96_15",
+          "id": "nga96_4",
           "name": "Nwankwo Kanu",
           "pos": [
             "ST",
@@ -78134,7 +78116,7 @@
           "num": 22
         },
         {
-          "id": "che18_10",
+          "id": "bel18_10",
           "name": "Eden Hazard",
           "pos": [
             "LW",
@@ -86965,6 +86947,21 @@
           "pac": 68,
           "tec": 62,
           "num": 2
+        },
+        {
+          "id": "bar26_17",
+          "name": "Marc Casadó",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 80,
+          "att": 70,
+          "def": 78,
+          "phy": 78,
+          "pac": 74,
+          "tec": 80,
+          "num": 17
         }
       ],
       "manager": {
@@ -88176,6 +88173,21 @@
           "pac": 74,
           "tec": 78,
           "num": 28
+        },
+        {
+          "id": "mil27_19",
+          "name": "Youssouf Fofana",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 82,
+          "att": 74,
+          "def": 81,
+          "phy": 84,
+          "pac": 76,
+          "tec": 79,
+          "num": 19
         }
       ],
       "manager": {
@@ -88516,6 +88528,22 @@
           "pac": 79,
           "tec": 75,
           "num": 22
+        },
+        {
+          "id": "liv26_19",
+          "name": "Harvey Elliott",
+          "pos": [
+            "CAM",
+            "RW",
+            "CM"
+          ],
+          "ovr": 82,
+          "att": 81,
+          "def": 52,
+          "phy": 65,
+          "pac": 78,
+          "tec": 85,
+          "num": 19
         }
       ],
       "manager": {
@@ -90345,6 +90373,22 @@
           "pac": 67,
           "tec": 70,
           "num": 15
+        },
+        {
+          "id": "bay26_22",
+          "name": "Arijon Ibrahimović",
+          "pos": [
+            "LW",
+            "CAM",
+            "ST"
+          ],
+          "ovr": 73,
+          "att": 73,
+          "def": 42,
+          "phy": 68,
+          "pac": 78,
+          "tec": 76,
+          "num": 22
         }
       ],
       "manager": {
@@ -90508,21 +90552,6 @@
           "pac": 72,
           "tec": 79,
           "num": 15
-        },
-        {
-          "id": "sge27_16",
-          "name": "Hugo Larsson",
-          "pos": [
-            "CM",
-            "CDM"
-          ],
-          "ovr": 81,
-          "att": 75,
-          "def": 77,
-          "phy": 77,
-          "pac": 78,
-          "tec": 83,
-          "num": 16
         },
         {
           "id": "sge27_18",
@@ -91399,20 +91428,6 @@
       "stadium": "Stamford Bridge",
       "players": [
         {
-          "id": "che27_1",
-          "name": "Robert Sánchez",
-          "pos": [
-            "GK"
-          ],
-          "ovr": 82,
-          "att": 10,
-          "def": 83,
-          "phy": 78,
-          "pac": 50,
-          "tec": 72,
-          "num": 1
-        },
-        {
           "id": "che27_39",
           "name": "Mike Penders",
           "pos": [
@@ -91541,20 +91556,6 @@
           "pac": 85,
           "tec": 72,
           "num": 5
-        },
-        {
-          "id": "che27_38",
-          "name": "Tosin Adarabioyo",
-          "pos": [
-            "CB"
-          ],
-          "ovr": 79,
-          "att": 45,
-          "def": 80,
-          "phy": 80,
-          "pac": 68,
-          "tec": 71,
-          "num": 38
         },
         {
           "id": "che27_19",
@@ -91798,21 +91799,6 @@
           "num": 41
         },
         {
-          "id": "che27_33",
-          "name": "Mykhailo Mudryk",
-          "pos": [
-            "LW",
-            "LM"
-          ],
-          "ovr": 80,
-          "att": 78,
-          "def": 40,
-          "phy": 69,
-          "pac": 92,
-          "tec": 79,
-          "num": 33
-        },
-        {
           "id": "che27_9",
           "name": "João Pedro",
           "pos": [
@@ -91868,20 +91854,6 @@
           "pac": 55,
           "tec": 72,
           "num": 23
-        },
-        {
-          "id": "chelsea2027_new1",
-          "name": "Honest Ahanor",
-          "pos": [
-            "CB"
-          ],
-          "num": 69,
-          "ovr": 75,
-          "att": 47,
-          "def": 80,
-          "phy": 74,
-          "pac": 76,
-          "tec": 69
         }
       ],
       "manager": {
@@ -93041,6 +93013,35 @@
           "pac": 79,
           "tec": 74,
           "num": 21
+        },
+        {
+          "id": "asm26_9",
+          "name": "Folarin Balogun",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 82,
+          "att": 83,
+          "def": 38,
+          "phy": 78,
+          "pac": 84,
+          "tec": 78,
+          "num": 9
+        },
+        {
+          "id": "everton2027_new1",
+          "name": "Jack Grealish",
+          "pos": [
+            "LW",
+            "CAM"
+          ],
+          "ovr": 87,
+          "att": 82,
+          "def": 52,
+          "phy": 73,
+          "pac": 77,
+          "tec": 89,
+          "num": 10
         }
       ],
       "manager": {
@@ -94057,22 +94058,6 @@
           "num": 10
         },
         {
-          "id": "lee27_29",
-          "name": "Wilfried Gnonto",
-          "pos": [
-            "RW",
-            "LW",
-            "ST"
-          ],
-          "ovr": 80,
-          "att": 80,
-          "def": 45,
-          "phy": 76,
-          "pac": 88,
-          "tec": 82,
-          "num": 29
-        },
-        {
           "id": "lee27_7",
           "name": "Daniel James",
           "pos": [
@@ -94833,22 +94818,6 @@
           "num": 20
         },
         {
-          "id": "sun27_8",
-          "name": "Jobe Bellingham",
-          "pos": [
-            "CAM",
-            "CM",
-            "ST"
-          ],
-          "ovr": 80,
-          "att": 80,
-          "def": 68,
-          "phy": 81,
-          "pac": 78,
-          "tec": 81,
-          "num": 8
-        },
-        {
           "id": "sun27_10",
           "name": "Patrick Roberts",
           "pos": [
@@ -94951,6 +94920,19 @@
           "pac": 79,
           "tec": 69,
           "num": 19
+        },
+        {
+          "id": "sunderland2027_new1",
+          "name": "Kevin Danso",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 84,
+          "att": 45,
+          "def": 89,
+          "phy": 90,
+          "pac": 77,
+          "tec": 70
         }
       ],
       "manager": {
@@ -95126,21 +95108,6 @@
           "pac": 78,
           "tec": 72,
           "num": 42
-        },
-        {
-          "id": "mil27_19",
-          "name": "Youssouf Fofana",
-          "pos": [
-            "CDM",
-            "CM"
-          ],
-          "ovr": 82,
-          "att": 74,
-          "def": 81,
-          "phy": 84,
-          "pac": 76,
-          "tec": 79,
-          "num": 19
         },
         {
           "id": "mil27_4",
@@ -95340,7 +95307,7 @@
         }
       ],
       "manager": {
-        "name": "Massimiliano Allegri",
+        "name": "Ruben Amorim",
         "ovr": 84
       }
     },
@@ -96056,6 +96023,22 @@
           "pac": 78,
           "tec": 85,
           "num": 8
+        },
+        {
+          "id": "lee27_29",
+          "name": "Wilfried Gnonto",
+          "pos": [
+            "RW",
+            "LW",
+            "ST"
+          ],
+          "ovr": 80,
+          "att": 80,
+          "def": 45,
+          "phy": 76,
+          "pac": 88,
+          "tec": 82,
+          "num": 29
         }
       ],
       "manager": {
@@ -96400,6 +96383,20 @@
           "pac": 79,
           "tec": 79,
           "num": 99
+        },
+        {
+          "id": "atalanta2027_new1",
+          "name": "Franck Kessié",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 87,
+          "att": 78,
+          "def": 84,
+          "phy": 91,
+          "pac": 76,
+          "tec": 87
         }
       ],
       "manager": {
@@ -98156,6 +98153,36 @@
           "pac": 50,
           "tec": 68,
           "num": 1
+        },
+        {
+          "id": "new26_10",
+          "name": "Nick Woltemade",
+          "pos": [
+            "ST",
+            "CAM"
+          ],
+          "ovr": 78,
+          "att": 78,
+          "def": 42,
+          "phy": 82,
+          "pac": 70,
+          "tec": 79,
+          "num": 10
+        },
+        {
+          "id": "tot26_29",
+          "name": "Pape Matar Sarr",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 82,
+          "att": 76,
+          "def": 79,
+          "phy": 80,
+          "pac": 80,
+          "tec": 80,
+          "num": 29
         }
       ],
       "manager": {
@@ -98523,6 +98550,20 @@
           "pac": 77,
           "tec": 71,
           "num": 23
+        },
+        {
+          "id": "fen26_3",
+          "name": "Diego Carlos",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 79,
+          "att": 42,
+          "def": 80,
+          "phy": 83,
+          "pac": 66,
+          "tec": 62,
+          "num": 3
         }
       ],
       "manager": {
@@ -108216,6 +108257,19 @@
           "pac": 82,
           "tec": 80,
           "num": 22
+        },
+        {
+          "id": "leverkusen2027_new1",
+          "name": "Guéla Doué",
+          "pos": [
+            "RB"
+          ],
+          "ovr": 81,
+          "att": 67,
+          "def": 77,
+          "phy": 79,
+          "pac": 91,
+          "tec": 80
         }
       ],
       "manager": {
@@ -108288,6 +108342,20 @@
           "pac": 79,
           "tec": 87,
           "num": 4
+        },
+        {
+          "id": "hil26_9",
+          "name": "Karim Benzema",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 86,
+          "att": 88,
+          "def": 38,
+          "phy": 74,
+          "pac": 72,
+          "tec": 88,
+          "num": 9
         }
       ]
     }
