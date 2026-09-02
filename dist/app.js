@@ -12467,7 +12467,7 @@ var App = (() => {
     const card = (title, icon, p, extra) => {
       const titleHtml = `<div class="am-title">${trophyMark(title, 32)} ${title}</div>`;
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
-      return `<div class="award-mini">${titleHtml}
+      return `<div class="award-mini" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">${titleHtml}
         ${lbAvatar(p, 44)}
         <div class="am-name">${playerNameHTML(p)}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
@@ -12508,7 +12508,7 @@ var App = (() => {
       return;
     }
     const col = (title, arr) => `<div><div style="font-weight:700;color:var(--accent-gold);margin-bottom:6px">${title}</div>
-      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${playerNameHTML(p)}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
+      ${arr.map((p,i)=>`<div class="lb-mini-row ${i<3?'lb-mini-top rank-'+(i+1):''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">${rankBadge(i)}${lbAvatar(p,26)}<span class="lb-mini-name">${playerNameHTML(p)}</span><span style="color:var(--text-muted);font-size:0.75rem">${p.team||''}</span><b class="lb-mini-count">${p.count}</b></div>`).join('')||'<span style="color:var(--text-muted)">—</span>'}</div>`;
     el.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
         ${col(emojiImg('goal', 'Goal') + ' Golden Boot', g)}
