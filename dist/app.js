@@ -9943,6 +9943,29 @@ var App = (() => {
     Object.values(src.ratings || {}).forEach(p => { if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.3; });
     return Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts);
   }
+  // Golden Glove: real-world criteria is shot-stopping quality across the
+  // whole run, not just a raw save count — a busy keeper facing shot after
+  // shot shouldn't automatically out-rank one who's actually keeping the
+  // door shut. Clean sheets are weighted heavily (the headline stat for
+  // this award), saves count on top as a shot-stopping factor — same
+  // saves/clean-sheet weighting as the Yashin Trophy above, so the two
+  // goalkeeper honors agree on what "quality" means and only diverge
+  // because Yashin also folds in MOTM/rating for a more holistic picture.
+  function computeGoldenGloveRanking(statsSource) {
+    const src = statsSource || stats;
+    const scores = {};
+    Object.values(src.saves || {}).forEach(p => {
+      scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: p.count, clean: 0, count: p.count, pts: p.count * 1.2 };
+    });
+    Object.values(src.cleanSheets || {}).forEach(p => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: 0, clean: 0, count: 0, pts: 0 };
+      scores[p.id].clean = p.count;
+      scores[p.id].pts += p.count * 4;
+    });
+    return Object.values(scores)
+      .filter(p => p.saves > 0 || p.clean > 0)
+      .sort((a,b) => b.pts - a.pts || b.clean - a.clean || b.saves - a.saves);
+  }
 
   // Snapshots the current global leaderboard leaders (Golden Boot, Ballon
   // d'Or, Golden Glove, Yashin Trophy, Top Assists, Most MOTM, Clean Sheet
@@ -12415,7 +12438,6 @@ var App = (() => {
     const top = (key) => Object.values(tournamentStats[key] || {}).sort((a,b) => b.count - a.count);
     const goals = top('goals');
     const assists = top('assists');
-    const saves = top('saves');
     const motm = top('motm');
     const cleanSheets = top('cleanSheets');
     const puskas = top('puskas');
@@ -12448,7 +12470,7 @@ var App = (() => {
     tournament.awards = {
       goldenBoot: goals[0] || null,
       goldenBall: goldenBallData[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
-      goldenGlove: saves[0] || null,
+      goldenGlove: computeGoldenGloveRanking(tournamentStats)[0] || null,
       goldenClean: cleanSheets[0] || null,
       topAssists: assists[0] || null,
       mostMotm: motm[0] || null,
@@ -12479,7 +12501,7 @@ var App = (() => {
         ${card('Golden Ball', '🏆', a.goldenBall, a.goldenBall && (a.goldenBall.goals != null || a.goldenBall.assists != null)
           ? ((a.goldenBall.goals||0) + 'G ' + (a.goldenBall.assists||0) + 'A' + (a.goldenBall.avg ? ' · Avg ' + a.goldenBall.avg.toFixed(2) : ''))
           : (a.goldenBall && a.goldenBall.avg != null ? ('Avg ' + a.goldenBall.avg.toFixed(2)) : ((a.goldenBall && a.goldenBall.count) + ' MOTM')))}
-        ${card('Golden Glove', '🧤', a.goldenGlove, (a.goldenGlove && a.goldenGlove.count) + ' saves')}
+        ${card('Golden Glove', '🧤', a.goldenGlove, a.goldenGlove ? (a.goldenGlove.saves + ' saves · ' + a.goldenGlove.clean + ' CS') : '')}
         ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
       </div>`;
   }
