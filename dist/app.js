@@ -9694,7 +9694,8 @@ var App = (() => {
     const map = [
       ['goldenBoot', 'Golden Boot'], ['goldenBall', 'Golden Ball'], ['goldenGlove', 'Golden Glove'],
       ['goldenClean', 'Clean Sheet King'], ['topAssists', 'Top Assists'], ['mostMotm', 'Most MOTM'],
-      ['bestAvgRating', 'Best Avg Rating']
+      ['bestAvgRating', 'Best Avg Rating'], ['puskas', 'Puskás Award'], ['gerdMuller', 'Gerd Müller Award'],
+      ['yashin', 'Yashin Trophy'], ['ballonDor', "Ballon d'Or"]
     ];
     map.forEach(([key, awardName]) => {
       if (awardsObj[key]) pushIndividualTrophy(awardName, awardsObj[key], type, extra);
@@ -9706,6 +9707,52 @@ var App = (() => {
   // both always agree on who the leader is. Pass in a `stats`-shaped object
   // (global `stats`, a competition's `comp.stats`, etc).
   const BALLON_MIN_APPS = 3;
+  // Real-world trophy prestige, used to weigh a player's career trophy case
+  // in the Ballon d'Or scoring below. A World Cup should move the needle far
+  // more than a domestic cup — this is what separates "won a trophy" from
+  // "won THE trophy" the way the real award does.
+  const TROPHY_VALUE = {
+    'World Cup': 10,
+    'European Championship': 8,
+    'Copa América': 7,
+    'Champions League': 7,
+    'Nations League': 4,
+    'Africa Cup of Nations': 4,
+    'AFC Asian Cup': 4,
+    'CONCACAF Gold Cup': 3,
+    'Premier League': 3, 'La Liga': 3, 'Serie A': 3, 'Bundesliga': 3, 'Ligue 1': 3,
+    'FA Cup': 1.5, 'Copa del Rey': 1.5, 'DFB-Pokal': 1.5, 'Coppa Italia': 1.5, 'Coupe de France': 1.5,
+    'EFL Cup': 1, 'Supercopa de España': 1, 'DFL-Supercup': 1, 'Supercoppa Italiana': 1,
+    'FA Community Shield': 0.6, 'Trophée des Champions': 0.6
+  };
+  const TROPHY_VALUE_DEFAULT = 2; // unrecognized team trophy name (e.g. a custom league/cup) — treat as a mid-tier domestic honor
+  const INDIVIDUAL_AWARD_VALUE = { "Ballon d'Or": 2.5, 'Golden Ball': 1.8 };
+  const INDIVIDUAL_AWARD_VALUE_DEFAULT = 0.7;
+  const CAREER_TROPHY_CAP = 30; // so one long, decorated career can't swamp current-season form entirely
+
+  // Sums a player's permanent trophy case (career-wide, not just this
+  // season/tournament — real Ballon d'Or voting weighs pedigree) into a
+  // single points value: team trophies count only when won with the
+  // player's current club/country (the best proxy available for "won it
+  // themselves" rather than a teammate's medal), weighted by how
+  // prestigious that competition actually is; past individual awards add a
+  // smaller amount on top, with the Ballon d'Or/Golden Ball itself worth
+  // the most since winning it before is the single strongest pedigree signal.
+  function careerTrophyValue(playerName, aff) {
+    let pts = 0;
+    (trophies || []).forEach(t => {
+      if (t.player === playerName) {
+        pts += INDIVIDUAL_AWARD_VALUE[t.name] != null ? INDIVIDUAL_AWARD_VALUE[t.name] : INDIVIDUAL_AWARD_VALUE_DEFAULT;
+        return;
+      }
+      if (t.team && !t.manager) {
+        if ((aff.club && t.team === aff.club) || (aff.national && t.team === aff.national)) {
+          pts += TROPHY_VALUE[t.name] != null ? TROPHY_VALUE[t.name] : TROPHY_VALUE_DEFAULT;
+        }
+      }
+    });
+    return Math.round(Math.min(pts, CAREER_TROPHY_CAP) * 10) / 10;
+  }
 
   // Holistic "best player" scoring shared by the Ballon d'Or ranking (season/
   // global `stats`) and the tournament Golden Ball (`tournamentStats`) — a
@@ -9806,22 +9853,13 @@ var App = (() => {
       });
     });
 
-    // ---- Trophies (team success this season/tournament + individual pedigree) ----
+    // ---- Trophies (real-world Ballon d'Or weighting: what you've actually ----
+    // ---- won, and how prestigious it was, carried across the player's ----
+    // ---- whole career trophy case — not just a flat "won something" flag) ----
     Object.values(scores).forEach(e => {
       const aff = findPlayerTeams(e.id) || {};
-      let trophyPts = 0;
-      if (season && Array.isArray(season.leagues)) {
-        season.leagues.forEach(lg => { if (lg.champion && aff.club === lg.champion.name) trophyPts += 3; });
-        if (season.ucl && season.ucl.champion && aff.club === season.ucl.champion.name) trophyPts += 5;
-      }
-      if (tournament && tournament.champion) {
-        if (tournament.type === 'worldcup' && aff.national === tournament.champion.name) trophyPts += 6;
-        if (tournament.type === 'ucl' && aff.club === tournament.champion.name) trophyPts += 5;
-      }
-      const pastIndividual = (trophies || []).filter(t => t.player === e.name).length;
-      trophyPts += Math.min(pastIndividual, 5) * 0.4;
-      e.pts += trophyPts;
-      e.trophyPts = Math.round(trophyPts * 10) / 10;
+      e.trophyPts = careerTrophyValue(e.name, aff);
+      e.pts += e.trophyPts;
     });
 
     // ---- Consistency (steady quality across recent appearances, not one hot streak) ----
@@ -9865,10 +9903,50 @@ var App = (() => {
       .sort((a,b) => b.pts - a.pts || b.apps - a.apps)
       .slice(0, 50);
   }
+  // Gerd Müller Award (best pure striker) and Yashin Trophy (best
+  // goalkeeper) ranking algorithms — kept in one place so the interactive
+  // Awards tab and the automatic season/tournament-end archiving always
+  // agree on the winner, same pattern as computeBallonRanking above.
+  function computeGerdMullerRanking(statsSource) {
+    const src = statsSource || stats;
+    const scores = {};
+    Object.values(src.goals || {}).forEach(p => {
+      scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: p.count, assists: 0, pts: p.count * 5 };
+    });
+    Object.values(src.assists || {}).forEach(p => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: 0, assists: 0, pts: 0 };
+      scores[p.id].assists = p.count;
+      scores[p.id].pts += p.count * 0.8;
+    });
+    Object.values(scores).forEach(s => {
+      let isST = false;
+      for (const t of allTeams) {
+        const pl = (t.players || []).find(x => x.id === s.id);
+        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
+      }
+      if (isST) s.pts += 2;
+    });
+    return Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals);
+  }
+  function computeYashinRanking(statsSource) {
+    const src = statsSource || stats;
+    const scores = {};
+    Object.values(src.saves || {}).forEach(p => {
+      scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: p.count, clean: 0, pts: p.count * 1.2 };
+    });
+    Object.values(src.cleanSheets || {}).forEach(p => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: 0, clean: 0, pts: 0 };
+      scores[p.id].clean = p.count;
+      scores[p.id].pts += p.count * 4;
+    });
+    Object.values(src.motm || {}).forEach(p => { if (scores[p.id]) scores[p.id].pts += p.count * 3; });
+    Object.values(src.ratings || {}).forEach(p => { if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.3; });
+    return Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts);
+  }
 
   // Snapshots the current global leaderboard leaders (Golden Boot, Ballon
-  // d'Or, Golden Glove/Yashin, Top Assists, Most MOTM, Clean Sheet King,
-  // Puskás Award) into the trophy case
+  // d'Or, Golden Glove, Yashin Trophy, Top Assists, Most MOTM, Clean Sheet
+  // King, Puskás Award, Gerd Müller Award) into the trophy case
   // as individual awards for the season that just ended, then wipes `stats`
   // and `tournamentStats` so the new season's leaderboard & Awards tab start
   // from zero. Team trophies (league/UCL winners) are left untouched — the
@@ -9883,6 +9961,8 @@ var App = (() => {
     pushIndividualTrophy('Golden Glove', topOf('saves'), type, extra);
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
     pushIndividualTrophy('Puskás Award', topOf('puskas'), type, extra);
+    pushIndividualTrophy('Gerd Müller Award', computeGerdMullerRanking(stats)[0] || null, type, extra);
+    pushIndividualTrophy('Yashin Trophy', computeYashinRanking(stats)[0] || null, type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
     stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
@@ -12168,11 +12248,15 @@ var App = (() => {
         tournament.fourthPlace = losers[1] || null;
       }
     }
-    assignTournamentAwards();
     const tName = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
     const runExtra = { category: 'tournament', run: tournament._runId || Date.now() };
+    // Record the team trophy (and manager award) BEFORE computing this
+    // tournament's individual awards — the Ballon d'Or / Gerd Müller /
+    // Yashin scoring below reads the permanent trophy case for career
+    // pedigree, so the cup just won here needs to already be in it.
     pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
     pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
+    assignTournamentAwards();
     recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(team, 20) + ' ' + team.name;
@@ -12351,12 +12435,27 @@ var App = (() => {
       .filter(e => e.pts > 0 && (e.apps >= 3 || e.goals + e.assists + e.motm >= 3))
       .sort((a,b) => b.pts - a.pts || b.apps - a.apps);
 
+    // Ballon d'Or, Gerd Müller Award and Yashin Trophy are season-wide
+    // honors in real life, not single-tournament ones — even when a
+    // tournament finishes with no Season Calendar running at all, they're
+    // computed off the global `stats` bucket (the player's whole body of
+    // work so far) rather than just this tournament's own numbers, same as
+    // the season-end archiving in seasonEngine.js.
+    const ballonDor = computeBallonRanking(stats)[0] || null;
+    const gerdMuller = computeGerdMullerRanking(stats)[0] || null;
+    const yashin = computeYashinRanking(stats)[0] || null;
+
     tournament.awards = {
       goldenBoot: goals[0] || null,
       goldenBall: goldenBallData[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
       goldenGlove: saves[0] || null,
+      goldenClean: cleanSheets[0] || null,
       topAssists: assists[0] || null,
-      mostMotm: motm[0] || null
+      mostMotm: motm[0] || null,
+      puskas: puskas[0] || null,
+      ballonDor,
+      gerdMuller,
+      yashin
     };
   }
 
