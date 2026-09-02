@@ -248,6 +248,16 @@ var App = (() => {
   // once per this player's team's match played while they're sidelined. Full
   // record is what the Hospital tab (ui/hospitalUI.js) renders per player.
   let injuryBook = {};
+  // playerId -> array of past injury records, newest first, capped at 20 per
+  // player so persisted save size stays bounded — unlike injuryBook above
+  // (only ever holds a player's CURRENT injury, deleted once they're fit
+  // again), this is a permanent history that survives recovery, matches,
+  // and End Season alike. Populated alongside injuryBook in tryInjury() (see
+  // engine/injuries.js). Each entry: { defId, type, bodyPart, severity,
+  // cause, opponent, competition, minute, matchesOut, teamName, matchDay }.
+  // Rendered on the player profile by renderPlayerInjuryLogHTML() in
+  // ui/playersUI.js.
+  let injuryLog = {};
   let suspensionBook = {}; // playerId -> { matchesLeft, teamName, playerName } — 1-match ban after a red card
   let globalMatchDay = 1;
   // {name, team, type, date, category:'season'|'season-global'|'tournament', year, player, run}
@@ -8533,7 +8543,29 @@ var App = (() => {
     addEvent(m.minute, 'injury',
       `🩹 <span class="player">${injured.name}</span> ${cause} — ${info.name}. Out for ${outMatches} match${outMatches>1?'es':''}`,
       side);
-    try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
+    // Permanent history entry — see injuryLog's declaration in js/state.js.
+    // injuryBook above gets deleted once the player recovers (engine/
+    // matchEngine.js), so this is the only lasting record of the injury for
+    // the player profile's Injury Log.
+    if (!injuryLog[injured.id]) injuryLog[injured.id] = [];
+    injuryLog[injured.id].unshift({
+      defId: info.id,
+      type: info.name,
+      bodyPart: info.bodyPart || '',
+      severity: info.severity || 'Minor',
+      cause: cause,
+      opponent: opponent,
+      competition: competition,
+      minute: (m.dispMin != null ? m.dispMin : m.minute),
+      matchesOut: outMatches,
+      teamName: sideData.team.name,
+      matchDay: globalMatchDay
+    });
+    if (injuryLog[injured.id].length > 20) injuryLog[injured.id].length = 20;
+    try {
+      localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook));
+      localStorage.setItem('apexInjuryLog', JSON.stringify(injuryLog));
+    } catch(e) {}
     if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
     const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
@@ -10210,6 +10242,7 @@ var App = (() => {
       ok = safeSetItem('apexSimStats', JSON.stringify(compactStatsBook(stats))) && ok;
       ok = safeSetItem('apexCareerStats', JSON.stringify(compactStatsBook(careerStats))) && ok;
       ok = safeSetItem('apexInjuryBook', JSON.stringify(injuryBook)) && ok;
+      ok = safeSetItem('apexInjuryLog', JSON.stringify(injuryLog)) && ok;
       ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
       ok = safeSetItem('apexPlayerMatchLog', JSON.stringify(playerMatchLog)) && ok;
@@ -10239,6 +10272,8 @@ var App = (() => {
       if (t) trophies = JSON.parse(t);
       const ib = localStorage.getItem('apexInjuryBook');
       if (ib) injuryBook = JSON.parse(ib);
+      const il = localStorage.getItem('apexInjuryLog');
+      if (il) injuryLog = JSON.parse(il);
       const sb = localStorage.getItem('apexSuspensionBook');
       if (sb) suspensionBook = JSON.parse(sb);
       const md = localStorage.getItem('apexMatchDay');
@@ -10454,8 +10489,10 @@ var App = (() => {
       data.apexSeasonActiveTab = seasonActiveTab;
       data.apexSeasonActiveSubTab = seasonActiveSubTab;
       data.apexSimStats = JSON.stringify(compactStatsBook(stats));
+      data.apexCareerStats = JSON.stringify(compactStatsBook(careerStats));
       data.apexTrophies = JSON.stringify(trophies);
       data.apexInjuryBook = JSON.stringify(injuryBook);
+      data.apexInjuryLog = JSON.stringify(injuryLog);
       data.apexSuspensionBook = JSON.stringify(suspensionBook);
       data.apexMatchDay = String(globalMatchDay);
       data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
@@ -13384,6 +13421,7 @@ var App = (() => {
       </div>
       ${renderPlayerRatingFormChartHTML(player.id)}
       ${renderPlayerMatchLogHTML(player.id)}
+      ${renderPlayerInjuryLogHTML(player.id)}
       <div style="margin-top:8px">
         ${boosted && player.expandedAttrs
           ? expandedAttrRowsHTML(player)
@@ -15508,6 +15546,38 @@ var App = (() => {
       <div class="match-log-wrap">
         <table class="match-log-table">
           <thead><tr><th>Opp</th><th>Comp</th><th>Min</th><th>G</th><th>A</th><th>Sh</th><th>xG</th><th>Rtg</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+
+  // ========== PLAYER INJURY LOG ==========
+  // injuryLog[playerId] -> array of past injury records, newest first,
+  // capped at 20 — see its declaration in js/state.js and where entries get
+  // pushed in tryInjury() (engine/injuries.js). Unlike injuryBook (which
+  // only ever holds the player's CURRENT injury and is deleted once they're
+  // fit again), this is a permanent history — reuses hospitalSeverityClass()
+  // and hospitalCauseLine() from ui/hospitalUI.js so severity coloring and
+  // the "how it happened" line read identically to the live Hospital tab.
+  function renderPlayerInjuryLogHTML(playerId) {
+    const log = injuryLog[playerId] || [];
+    if (!log.length) return '';
+    const rows = log.slice(0, 10).map(rec => {
+      const out = rec.matchesOut || 1;
+      return `<tr>
+        <td>${rec.type || '—'}</td>
+        <td>${rec.bodyPart || '—'}</td>
+        <td><span class="injury-badge ${hospitalSeverityClass(rec.severity)}">${rec.severity || 'Minor'}</span></td>
+        <td style="max-width:220px;color:var(--text-2);font-size:0.8rem">${hospitalCauseLine(rec)}</td>
+        <td>${out} match${out > 1 ? 'es' : ''}</td>
+        <td>${rec.matchDay ? 'MD ' + rec.matchDay : '—'}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="card-title" style="margin-top:14px">Injury Log <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(last ${Math.min(log.length, 10)})</span></div>
+      <div class="match-log-wrap">
+        <table class="match-log-table">
+          <thead><tr><th>Injury</th><th>Body Part</th><th>Severity</th><th>How it happened</th><th>Out</th><th>MD</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
