@@ -159,6 +159,15 @@ var App = (() => {
   let playerAttributesData = {};
   let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
   let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
+  // Permanent, never-reset per-player totals (goals, assists, apps, etc.)
+  // across every season the save has ever played — this is what the
+  // Players tab / player profile's "Career (competitive)" panel reads from.
+  // `stats` above is deliberately a *season-scoped* leaderboard bucket used
+  // to compute the current season's Golden Boot/Ballon d'Or/etc. and gets
+  // wiped by archiveAndResetGlobalAwards() at every season end; careerStats
+  // uses the exact same shape but is only ever added to, never reset, so
+  // ending a season doesn't erase a player's lifetime totals.
+  let careerStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
   // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
   // can also tally into that competition's own stat bucket (comp.stats), giving each
@@ -9524,14 +9533,20 @@ var App = (() => {
   function recordRating(player, team, rating) {
     if (!player || !team) return;
     const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
-    if (competitive) bumpRatingBucket(stats, player, team, rating);
+    if (competitive) {
+      bumpRatingBucket(stats, player, team, rating);
+      bumpRatingBucket(careerStats, player, team, rating);
+    }
     if (tournament) bumpRatingBucket(tournamentStats, player, team, rating);
     if (currentSeasonComp) {
       if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
       bumpRatingBucket(currentSeasonComp.stats, player, team, rating);
     }
     if (currentMatch && currentMatch.isBigGame) {
-      if (competitive) bumpKeyedAvgBucket(stats, 'bigGames', player, team, rating);
+      if (competitive) {
+        bumpKeyedAvgBucket(stats, 'bigGames', player, team, rating);
+        bumpKeyedAvgBucket(careerStats, 'bigGames', player, team, rating);
+      }
       if (tournament) bumpKeyedAvgBucket(tournamentStats, 'bigGames', player, team, rating);
       if (currentSeasonComp) {
         if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
@@ -9632,7 +9647,10 @@ var App = (() => {
     if (!player || !team) return;
     // Friendlies do not feed global leaderboard — only competitive (tournament/season) matches
     const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
-    if (competitive) bumpStatBucket(stats, type, player, team);
+    if (competitive) {
+      bumpStatBucket(stats, type, player, team);
+      bumpStatBucket(careerStats, type, player, team);
+    }
     if (tournament) bumpStatBucket(tournamentStats, type, player, team);
     if (currentSeasonComp) {
       if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
@@ -9645,7 +9663,10 @@ var App = (() => {
   function recordStatCount(type, player, team, amount) {
     if (!player || !team || !amount) return;
     const competitive = !!(tournament || (currentMatch && currentMatch.countForLeaderboard));
-    if (competitive) bumpStatBucketBy(stats, type, player, team, amount);
+    if (competitive) {
+      bumpStatBucketBy(stats, type, player, team, amount);
+      bumpStatBucketBy(careerStats, type, player, team, amount);
+    }
     if (tournament) bumpStatBucketBy(tournamentStats, type, player, team, amount);
     if (currentSeasonComp) {
       if (!currentSeasonComp.stats) currentSeasonComp.stats = blankCompStats();
@@ -9988,6 +10009,12 @@ var App = (() => {
     pushIndividualTrophy('Yashin Trophy', computeYashinRanking(stats)[0] || null, type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
+    // Only the season-scoped `stats` leaderboard bucket resets here — it's
+    // what feeds each new season's Golden Boot/Golden Glove/Ballon d'Or race
+    // from zero. `careerStats` (a player's lifetime totals, shown on the
+    // Players tab / player profile) is a completely separate, never-reset
+    // bucket — see its declaration in js/state.js — so ending a season no
+    // longer wipes a player's career goals/assists/apps/etc.
     stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
@@ -10181,6 +10208,7 @@ var App = (() => {
     let ok = true;
     try {
       ok = safeSetItem('apexSimStats', JSON.stringify(compactStatsBook(stats))) && ok;
+      ok = safeSetItem('apexCareerStats', JSON.stringify(compactStatsBook(careerStats))) && ok;
       ok = safeSetItem('apexInjuryBook', JSON.stringify(injuryBook)) && ok;
       ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
@@ -10194,6 +10222,19 @@ var App = (() => {
       const s = localStorage.getItem('apexSimStats');
       if (s) stats = hydrateStatsBook(JSON.parse(s));
       if (!stats.ratings) stats.ratings = {};
+      const cs = localStorage.getItem('apexCareerStats');
+      if (cs) {
+        careerStats = hydrateStatsBook(JSON.parse(cs));
+      } else {
+        // Older save with no careerStats record yet — seed it from whatever
+        // is in the current (season-scoped) `stats` bucket so an existing
+        // save doesn't appear to lose everything accrued so far. This can
+        // only recover the current season's tally, not prior seasons that
+        // were already wiped before this fix — there's no data left to
+        // recover those from.
+        careerStats = hydrateStatsBook(compactStatsBook(stats));
+      }
+      if (!careerStats.ratings) careerStats.ratings = {};
       const t = localStorage.getItem('apexTrophies');
       if (t) trophies = JSON.parse(t);
       const ib = localStorage.getItem('apexInjuryBook');
@@ -12433,6 +12474,75 @@ var App = (() => {
   }
 
   
+  // Counts how many matches a given team has actually played so far in the
+  // current standalone Tournament, across whichever structures apply to its
+  // format — a full round-robin table (domestic league tournament), a
+  // league-phase table (Champions League format) and/or a group table
+  // (World Cup format) — plus every knockout-stage round layered on top
+  // (straight cup knockouts, World Cup knockout, Champions League knockout
+  // playoff + bracket). Used below to gauge what share of the team's
+  // matches a given player actually featured in, for Golden Ball eligibility.
+  function tournamentTeamMatchesPlayed(teamId) {
+    if (!tournament || !teamId) return 0;
+    let total = 0;
+    if (tournament.table && tournament.table.length) {
+      const row = tournament.table.find(r => r.team && r.team.id === teamId);
+      return row ? (row.played || 0) : 0;
+    }
+    if (tournament.league && tournament.league.length) {
+      const row = tournament.league.find(r => r.team && r.team.id === teamId);
+      if (row) total += row.played || 0;
+    }
+    if (tournament.groups && tournament.groups.length) {
+      tournament.groups.forEach(g => {
+        const row = (g.teams || []).find(t => t.team && t.team.id === teamId);
+        if (row) total += row.played || 0;
+      });
+    }
+    (tournament.knockout || []).forEach(round => {
+      (round.matches || []).forEach(m => {
+        if (!m.played) return;
+        if ((m.home && m.home.id === teamId) || (m.away && m.away.id === teamId)) total++;
+      });
+    });
+    return total;
+  }
+
+  // Golden Ball ranking for a standalone Tournament. Unlike the Ballon d'Or
+  // (which weighs goals/assists/trophies/consistency holistically off the
+  // player's whole body of work), the tournament Golden Ball is now a
+  // simpler, stricter test of reliability rather than a hot streak of goal
+  // contributions:
+  //  - eligibility requires having appeared in at least 90% of the player's
+  //    own team's matches in this tournament — a super-sub with a couple of
+  //    huge cameos can no longer out-rank the players who started nearly
+  //    every game;
+  //  - among those eligible, the winner is simply whoever has the highest
+  //    average match rating — goals/assists no longer contribute at all;
+  //  - ties (and, deliberately, very close calls) favor a player from the
+  //    tournament-winning team, then whoever made more appearances.
+  function computeTournamentGoldenBallRanking() {
+    if (!tournament) return [];
+    const championId = tournament.champion ? tournament.champion.id : null;
+    return Object.values(tournamentStats.ratings || {})
+      .filter(p => (p.count || 0) > 0)
+      .map(p => {
+        const teamMatches = tournamentTeamMatchesPlayed(p.teamId);
+        return Object.assign({}, p, {
+          teamMatches,
+          appPct: teamMatches > 0 ? (p.count || 0) / teamMatches : 0
+        });
+      })
+      .filter(p => p.appPct >= 0.9)
+      .sort((a, b) => {
+        if (b.avg !== a.avg) return b.avg - a.avg;
+        const aChamp = championId && a.teamId === championId ? 1 : 0;
+        const bChamp = championId && b.teamId === championId ? 1 : 0;
+        if (bChamp !== aChamp) return bChamp - aChamp;
+        return (b.count || 0) - (a.count || 0);
+      });
+  }
+
   function assignTournamentAwards() {
     if (!tournament) return;
     const top = (key) => Object.values(tournamentStats[key] || {}).sort((a,b) => b.count - a.count);
@@ -12445,39 +12555,35 @@ var App = (() => {
       .filter(x => (x.count || 0) > 0)
       .sort((a,b) => b.avg - a.avg || b.count - a.count);
 
-    // Golden Ball: the same holistic "best player" scoring as the Ballon
-    // d'Or (domestic/continental/international context, trophies, consistency,
-    // big-game performances) run against this tournament's own stat bucket —
-    // not just G+A and average rating, so a quiet-but-consistent passer can't
-    // out-rank a genuine standout, and a genuine standout still needs more
-    // than one big night to top a player who was excellent throughout.
-    const goldenScores = computeContextualPlayerScores(tournamentStats, 3);
-    Object.values(goldenScores).forEach(e => { e.count = Math.round(e.pts); });
-    const goldenBallData = Object.values(goldenScores)
-      .filter(e => e.pts > 0 && (e.apps >= 3 || e.goals + e.assists + e.motm >= 3))
-      .sort((a,b) => b.pts - a.pts || b.apps - a.apps);
+    // Golden Ball: 90%-of-team's-matches appearance requirement + highest
+    // average rating, preferring the tournament-winning team's players — see
+    // computeTournamentGoldenBallRanking() above. Falls back to any-rated
+    // player / a repeat MOTM only in the unlikely case nobody clears the
+    // 90% appearance bar (e.g. a very short tournament).
+    const goldenBallRanking = computeTournamentGoldenBallRanking();
 
-    // Ballon d'Or, Gerd Müller Award and Yashin Trophy are season-wide
-    // honors in real life, not single-tournament ones — even when a
-    // tournament finishes with no Season Calendar running at all, they're
-    // computed off the global `stats` bucket (the player's whole body of
-    // work so far) rather than just this tournament's own numbers, same as
-    // the season-end archiving in seasonEngine.js.
-    const ballonDor = computeBallonRanking(stats)[0] || null;
-    const gerdMuller = computeGerdMullerRanking(stats)[0] || null;
-    const yashin = computeYashinRanking(stats)[0] || null;
+    // Ballon d'Or, Gerd Müller Award and Yashin Trophy are deliberately NOT
+    // computed or awarded here. All three are season-wide honors in real
+    // life, not single-tournament ones, so none of them should be handed
+    // out just for winning one standalone Tournament (World Cup / Champions
+    // League run) — they're only ever computed and archived once, off the
+    // global `stats` bucket (the player's whole body of work so far), when
+    // a season actually ends: either automatically
+    // (finalizeSeasonIfComplete) or via the "End Season" button
+    // (endSeasonNow), both in seasonEngine.js. Leaving no `ballonDor`,
+    // `gerdMuller` or `yashin` key on this awards object means
+    // recordIndividualAwardsFromAwardsObject() below won't push any of
+    // those three as a premature extra trophy into the case for this one
+    // tournament.
 
     tournament.awards = {
       goldenBoot: goals[0] || null,
-      goldenBall: goldenBallData[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
+      goldenBall: goldenBallRanking[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
       goldenGlove: computeGoldenGloveRanking(tournamentStats)[0] || null,
       goldenClean: cleanSheets[0] || null,
       topAssists: assists[0] || null,
       mostMotm: motm[0] || null,
-      puskas: puskas[0] || null,
-      ballonDor,
-      gerdMuller,
-      yashin
+      puskas: puskas[0] || null
     };
   }
 
@@ -13184,13 +13290,15 @@ var App = (() => {
         : ((currentMatch.away.squad.all || []).find(p => p.id === playerId) ? currentMatch.away.team : { name: '—', flag: '', color: '#d4af37', secondary: '#fff' });
     }
     if (!player) { toast('Player not found'); return; }
-    const g = (stats.goals[playerId] || {}).count || 0;
-    const a = (stats.assists[playerId] || {}).count || 0;
-    const s = (stats.saves[playerId] || {}).count || 0;
-    const motm = (stats.motm[playerId] || {}).count || 0;
-    const y = (stats.yellows[playerId] || {}).count || 0;
-    const rd = (stats.reds[playerId] || {}).count || 0;
-    const apps = (stats.ratings[playerId] || {}).count || 0;
+    // "Career (competitive)" below reads from careerStats (never reset by
+    // End Season), not the season-scoped `stats` leaderboard bucket.
+    const g = playerCareerCount('goals', playerId);
+    const a = playerCareerCount('assists', playerId);
+    const s = playerCareerCount('saves', playerId);
+    const motm = playerCareerCount('motm', playerId);
+    const y = playerCareerCount('yellows', playerId);
+    const rd = playerCareerCount('reds', playerId);
+    const apps = playerCareerCount('ratings', playerId);
     const primary = (team && team.color) || '#d4af37';
     const secondary = (team && team.secondary) || '#fff';
     const ms = (currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) || null;
@@ -14989,7 +15097,7 @@ var App = (() => {
 
 
   function playerCareerCount(bucket, playerId) {
-    return ((stats[bucket] || {})[playerId] || {}).count || 0;
+    return ((careerStats[bucket] || {})[playerId] || {}).count || 0;
   }
 
 
