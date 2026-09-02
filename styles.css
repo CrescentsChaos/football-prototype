@@ -2159,6 +2159,24 @@ select.ss-native {
 .match-log-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 .match-log-table .rating-badge { padding: 2px 6px; font-size: 0.7rem; }
 
+/* Live rating vs in-match form chart (player profile modal) */
+.rating-form-wrap {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 10px 8px;
+  margin-top: 6px;
+}
+#rating-form-canvas { width: 100%; display: block; border-radius: 8px; background: #0a1210; }
+.rating-form-legend {
+  display: flex; gap: 14px; margin-top: 8px;
+  font-size: 0.68rem; color: var(--text-2);
+}
+.rating-form-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.rf-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.rf-dot-rating { background: #f0c14b; }
+.rf-dot-form { background: #3d8bfd; }
+
 /* ===================================================================
    SQUAD BUILDER — full-page lineup & formation editor
    =================================================================== */
