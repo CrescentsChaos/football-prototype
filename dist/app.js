@@ -15604,14 +15604,14 @@ var App = (() => {
         <td>${rec.type || '—'}</td>
         <td>${rec.bodyPart || '—'}</td>
         <td><span class="injury-badge ${hospitalSeverityClass(rec.severity)}">${rec.severity || 'Minor'}</span></td>
-        <td style="max-width:220px;color:var(--text-2);font-size:0.8rem">${hospitalCauseLine(rec)}</td>
+        <td style="color:var(--text-2);font-size:0.8rem">${hospitalCauseLine(rec)}</td>
         <td>${out} match${out > 1 ? 'es' : ''}</td>
         <td>${rec.matchDay ? 'MD ' + rec.matchDay : '—'}</td>
       </tr>`;
     }).join('');
     return `<div class="card-title" style="margin-top:14px">Injury Log <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(last ${Math.min(log.length, 10)})</span></div>
       <div class="match-log-wrap">
-        <table class="match-log-table">
+        <table class="match-log-table injury-log-table">
           <thead><tr><th>Injury</th><th>Body Part</th><th>Severity</th><th>How it happened</th><th>Out</th><th>MD</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
