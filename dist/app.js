@@ -11487,7 +11487,14 @@ var App = (() => {
       return;
     }
     if (tournament.stage === 'playoff') {
-      tournament.playoff.forEach((p, i) => { if (!p.played) simPlayoffTie(i); });
+      // Same fix as the bulk "Simulate All" loop above: call the actual
+      // simulation work directly rather than simPlayoffTie(), which defers
+      // the real work behind requestAnimationFrame/setTimeout and would
+      // otherwise still be pending when withLoading() (the caller of this
+      // whole function) hides the loading overlay and calls finishUCLPlayoffs()/
+      // renders the bracket — the same race that could truncate or blank
+      // out the Round of 16/Quarter-finals on "Simulate All".
+      tournament.playoff.forEach((p, i) => { if (!p.played) _simPlayoffTieWork(i); });
       return;
     }
     if (tournament.stage === 'groups') {
@@ -11589,11 +11596,39 @@ var App = (() => {
       if (tournament.playoff && tournament.playoff.length) {
         for (let i = 0; i < tournament.playoff.length; i++) {
           if (!tournament.playoff[i].played) {
-            try { simPlayoffTie(i); } catch (e) { console.warn(e); }
+            // Call the actual simulation work directly, NOT simPlayoffTie()
+            // — that one wraps it in withLoading(), which defers the real
+            // work behind two requestAnimationFrame calls plus a 50ms
+            // setTimeout (so a single manual click gets to paint its
+            // spinner first) and returns before any of that has actually
+            // run. Calling it un-awaited here just fired off 8+ overlapping
+            // deferred simulations that raced each other, the "Simulating
+            // knockout rounds…" step right below, and even the overlay
+            // being hidden once withLoadingProgress() (the caller of this
+            // whole function) resolved — which is exactly why R16/QF
+            // results were sometimes still showing "-", why the round of
+            // 16 could end up truncated straight to a Quarter-finals bracket
+            // (finishUCLPlayoffs() below reading still-null p.winner values
+            // and buildUCLKnockoutFromTeams() rounding the resulting
+            // under-16 team count down to the next power of 2), and why the
+            // knockout stage kept visibly simulating after the loading
+            // screen had already gone away. _simPlayoffTieWork() is the
+            // same low-level function withLoading() eventually calls, just
+            // run synchronously in lockstep with this loop — identical to
+            // how the knockout-round loop further below already correctly
+            // calls simTwoLegTie()/simSingleFinal() directly rather than
+            // any UI-wrapped equivalent.
+            try { _simPlayoffTieWork(i); } catch (e) { console.warn(e); }
             done++; updateLoadingProgress(done, total, startTime); await simTick();
           }
         }
-        if (tournament.stage === 'playoff' || tournament.playoff.every(p => p.played)) {
+        // _simPlayoffTieWork() above already calls finishUCLPlayoffs()
+        // itself the moment the last tie finishes (advancing tournament.stage
+        // to 'knockout'), so this only needs to cover the case where every
+        // playoff tie was already played BEFORE this bulk sim even started
+        // (stage never got the chance to advance) — checking stage alone
+        // avoids redundantly rebuilding the R16 bracket a second time.
+        if (tournament.stage === 'playoff') {
           try { finishUCLPlayoffs(); } catch (e) { console.warn(e); }
         }
       }
