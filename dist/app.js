@@ -14921,6 +14921,21 @@ var App = (() => {
         return bv - av;
       });
     }
+    else if (playersSort === 'liveRating') {
+      // Best current form first (A > B > C > D > E — see LIVE_RATINGS /
+      // ensurePlayerConditionProfile() in engine/form.js). Ties (e.g. two
+      // players both on "B") fall back to OVR so the order still feels
+      // stable and meaningful within a tier.
+      const TIER_RANK = { A: 5, B: 4, C: 3, D: 2, E: 1 };
+      list.sort((a, b) => {
+        ensurePlayerConditionProfile(a.player);
+        ensurePlayerConditionProfile(b.player);
+        const av = TIER_RANK[a.player.liveRating] || 0;
+        const bv = TIER_RANK[b.player.liveRating] || 0;
+        if (bv !== av) return bv - av;
+        return (b.player.ovr || 0) - (a.player.ovr || 0);
+      });
+    }
     else list.sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0));
     return list;
   }
