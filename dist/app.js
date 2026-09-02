@@ -686,8 +686,10 @@ var App = (() => {
   //                   sheet) when present; any player without one
   //                   defaults to "Inconsistent".
   //   p.liveRating — "A" | "B" | "C" | "D" | "E". This player's current
-  //                   run of form, starting at "B" and drifting up or
-  //                   down after every match based on how they rated.
+  //                   run of form, starting at "B" and set directly after
+  //                   every match from their rating in that match: 8.9+
+  //                   is A, 7.9+ is B, 6.9+ is C, 5.9+ is D, anything
+  //                   below that is E.
   //
   // Neither of those is the match-to-match number that actually moves
   // the needle in a game — that's the ephemeral, per-match "condition"
@@ -813,22 +815,18 @@ var App = (() => {
     const cond = getPlayerCondition(p);
     return CONDITION_MULTIPLIER[cond] != null ? CONDITION_MULTIPLIER[cond] : 1;
   }
-  // Post-match progression: a player's liveRating drifts up or down one
-  // or two tiers depending on how they actually rated this match — the
-  // "previous matches' performance upgrades or degrades it" requirement.
-  // A solidly-average showing (6.2-7.2) leaves the tier untouched.
+  // Post-match progression: a player's liveRating is set directly from
+  // their rating in the match that just finished — not drifted/eased
+  // toward it — so the tier always reflects the most recent performance:
+  //   8.9+ rating -> A,  7.9+ -> B,  6.9+ -> C,  5.9+ -> D,  else -> E.
   function updateLiveRatingAfterMatch(p, rating) {
     if (!p) return;
     ensurePlayerConditionProfile(p);
-    let idx = LIVE_RATINGS.indexOf(p.liveRating);
-    if (idx === -1) idx = LIVE_RATINGS.indexOf('B');
-    if (rating >= 8.0) idx -= 2;
-    else if (rating >= 7.2) idx -= 1;
-    else if (rating >= 6.2) idx += 0;
-    else if (rating >= 5.3) idx += 1;
-    else idx += 2;
-    idx = Math.max(0, Math.min(LIVE_RATINGS.length - 1, idx));
-    p.liveRating = LIVE_RATINGS[idx];
+    if (rating >= 8.9) p.liveRating = 'A';
+    else if (rating >= 7.9) p.liveRating = 'B';
+    else if (rating >= 6.9) p.liveRating = 'C';
+    else if (rating >= 5.9) p.liveRating = 'D';
+    else p.liveRating = 'E';
   }
   // Small badge + longer label, both keyed off liveRating — same call
   // signature/markup classes as the old numeric-form version so every
@@ -9355,7 +9353,6 @@ var App = (() => {
       const icons = playerLineIcons(ps, subInfo, on, inj);
       const rating = liveRatingBadge(ps);
       const cond = conditionBadgeHTML(p);
-      const form = formArrow(p);
       const dim = (!on && !inj && !sentOff && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
       const pos = p.slot || (p.pos || [''])[0] || '';
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
@@ -9363,7 +9360,6 @@ var App = (() => {
         <span class="player-pos">${pos}</span>
         <span class="player-name">${playerNameHTML(p)}${roleBadgesHTML(p, side)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         <span class="player-icons">${icons}</span>
-        ${form}
         ${cond}
         ${rating}
       </li>`;
