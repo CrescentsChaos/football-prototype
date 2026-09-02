@@ -2605,8 +2605,15 @@ var App = (() => {
     }
     const gkSkillBase = (gk ? (curvedAttr(gk.def || 70, 70) * 0.45 + curvedAttr(gk.ovr || 75, 75) * 0.25 + curvedAttr(gk.tec || 70, 70) * 0.15) / 100 : 0.68) * (gk ? conditionMultiplier(gk) : 1);
     const gkSkill = Math.max(0.05, Math.min(0.98, gkSkillBase + posEdge + situational));
+    // Base raised 0.58 -> 0.62 alongside the possession-pipeline shot-volume
+    // fix (see engine/possession.js passChance/duelChance/carryChance): once
+    // shots started reaching the keeper at something closer to a realistic
+    // rate, the shots-on-target -> goal conversion this produced (~40%) ran
+    // a bit hot versus the ~33% real-world benchmark noted below — this
+    // small bump brings scoring back toward that line without undoing the
+    // shot-volume fix itself.
     const saveChance = Math.min(0.94, Math.max(0.28,
-      0.58 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
+      0.62 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
     if (seededRandom() >= saveChance) return { saved: false };
 
     // A save happened — decide whether it's a clean catch or a parry (and,
@@ -7496,8 +7503,13 @@ var App = (() => {
       if (decision.action === 'dribble' || decision.action === 'carry') {
         const runMarker = pickMarker(defTeam, mirrorDefenderPos(fromThird + '_' + channel), null, mirrorZoneKey(fromThird + '_' + channel));
         const runPressure = runMarker ? defensivePressure(runMarker) : 60;
+        // Base raised from 0.62 -> 0.72 (see passChance/duelChance below for
+        // the full explanation): the old bases made a possession sequence
+        // die out long before reaching the final third far more often than
+        // real buildup play does, starving both ends of the pitch of shots
+        // and, in turn, keepers of saves.
         const carryChance = Math.max(0.30, Math.min(0.93,
-          0.62 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus));
+          0.86 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus));
         if (seededRandom() >= carryChance) {
           resolveTurnover(attackingSide, defendingSide, carrier, runMarker, fromThird, toThird, 'carry', channel);
           return;
@@ -7527,7 +7539,18 @@ var App = (() => {
       const passerSkill = passingAbility(carrier);
       const marker = pickMarker(defTeam, mirrorDefenderPos(targetZone), null, mirrorZoneKey(targetZone));
       const pressure = marker ? defensivePressure(marker) : 60;
-      let passChance = 0.5 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus
+      // Base raised from 0.5 -> 0.62: with two zone transitions (DEF->MID,
+      // MID->ATT) chained together and EACH one gated behind both this pass
+      // check AND the duel check right below, the old 0.5/0.78 bases only
+      // let a sequence survive one full transition ~39% of the time —
+      // squaring that across both transitions meant barely 1 in 6
+      // possessions ever reached the final third at all, which was
+      // starving shot volume (and therefore goals AND keeper saves, since
+      // neither can happen without a shot reaching the box first) well
+      // below a real match's output. This still leaves plenty of turnovers
+      // (see resolveTurnover) — it just stops the pipe from being throttled
+      // this hard before the ball even reaches a dangerous area.
+      let passChance = 0.80 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus
         + holdBonus + (decision.action === 'switch' ? 0.05 : 0);
       if (tac === 'attack') passChance -= 0.03;
       if (tac === 'press') passChance -= 0.015;
@@ -7550,8 +7573,10 @@ var App = (() => {
 
       // ===== Duels phase: even a completed pass can be won back under =====
       // ===== immediate pressure (a 1v1 press right as the ball arrives).
+      // Base raised from 0.78 -> 0.87 — see passChance above for why both
+      // of these needed to come up together.
       const duelChance = Math.max(0.35, Math.min(0.95,
-        0.78 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0) + attackTriggerBonus));
+        0.91 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0) + attackTriggerBonus));
       if (seededRandom() >= duelChance) {
         resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel', channel);
         return;
