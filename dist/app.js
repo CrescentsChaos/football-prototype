@@ -13153,6 +13153,7 @@ var App = (() => {
         <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
         <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
       </div>
+      ${renderPlayerRatingFormChartHTML(player.id)}
       ${renderPlayerMatchLogHTML(player.id)}
       <div style="margin-top:8px">
         ${boosted && player.expandedAttrs
@@ -13164,6 +13165,9 @@ var App = (() => {
       </div>
       ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
+    // Canvas needs real layout dimensions (clientWidth) to size itself —
+    // wait a frame after the modal's just been made visible/laid out.
+    requestAnimationFrame(() => drawPlayerRatingFormChart(player.id));
   }
 
 
@@ -15266,6 +15270,124 @@ var App = (() => {
   }
 
 
+  // ========== LIVE RATING vs IN-MATCH FORM GRAPH ==========
+  // Small canvas chart for the player profile plotting, for each of the
+  // player's last 10 logged matches (oldest -> newest, left to right):
+  //   - their actual rating in that match ("Live rating" — gold line)
+  //   - the liveRating letter tier that rating would produce, per the
+  //     same A/B/C/D/E thresholds updateLiveRatingAfterMatch() uses in
+  //     engine/form.js ("In-match form" — blue dashed line)
+  // so a coach can see at a glance whether a player's raw numbers and
+  // their resulting form tier are trending together or diverging.
+  // Markup only here — actual drawing happens in
+  // drawPlayerRatingFormChart() once the canvas is in the DOM (see
+  // showPlayerProfile() in ui/playerUI.js), same split as
+  // renderMomentumAndHeat()/its canvas in ui/matchUI.js.
+  function renderPlayerRatingFormChartHTML(playerId) {
+    const log = playerMatchLog[playerId] || [];
+    if (!log.length) return '';
+    return `<div class="card-title" style="margin-top:14px">Live Rating vs Form <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(last ${Math.min(log.length, 10)})</span></div>
+      <div class="rating-form-wrap">
+        <canvas id="rating-form-canvas" height="120"></canvas>
+        <div class="rating-form-legend">
+          <span><i class="rf-dot rf-dot-rating"></i>Match rating</span>
+          <span><i class="rf-dot rf-dot-form"></i>Form tier (A–E)</span>
+        </div>
+      </div>`;
+  }
+
+  // Same breakpoints as updateLiveRatingAfterMatch() in engine/form.js —
+  // kept in sync deliberately rather than calling that function, since
+  // that one also *writes* p.liveRating and we only want to read here.
+  function ratingToFormTier(rating) {
+    const r = rating || 0;
+    if (r >= 8.9) return 'A';
+    if (r >= 7.9) return 'B';
+    if (r >= 6.9) return 'C';
+    if (r >= 5.9) return 'D';
+    return 'E';
+  }
+  const RF_TIER_VALUE = { A: 9.5, B: 8.5, C: 7.5, D: 6.5, E: 5.5 };
+
+  function drawPlayerRatingFormChart(playerId) {
+    const canvas = document.getElementById('rating-form-canvas');
+    if (!canvas || !canvas.parentElement) return;
+    const log = (playerMatchLog[playerId] || []).slice(0, 10).map(readPlayerLogEntry).reverse();
+    if (!log.length) return;
+    const w = canvas.parentElement.clientWidth || 300;
+    const h = 120;
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0a1210';
+    ctx.fillRect(0, 0, w, h);
+
+    const padL = 24, padR = 10, padT = 10, padB = 18;
+    const plotW = Math.max(1, w - padL - padR), plotH = h - padT - padB;
+    const minV = 4, maxV = 10;
+    const yFor = (v) => padT + plotH - ((Math.max(minV, Math.min(maxV, v)) - minV) / (maxV - minV)) * plotH;
+    const xFor = (i) => padL + (log.length === 1 ? plotW / 2 : (i / (log.length - 1)) * plotW);
+
+    // Gridlines + scale labels
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.textAlign = 'left';
+    [4, 6, 8, 10].forEach(v => {
+      const y = yFor(v);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      ctx.fillText(String(v), 3, y + 3);
+    });
+
+    // Form-tier line (blue, dashed) — drawn first so the rating line sits
+    // on top where the two series overlap.
+    ctx.beginPath();
+    ctx.setLineDash([4, 3]);
+    log.forEach((e, i) => {
+      const x = xFor(i), y = yFor(RF_TIER_VALUE[ratingToFormTier(e.rating)]);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#3d8bfd';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    log.forEach((e, i) => {
+      const tier = ratingToFormTier(e.rating);
+      const x = xFor(i), y = yFor(RF_TIER_VALUE[tier]);
+      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#3d8bfd'; ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(tier, x, y - 7);
+    });
+
+    // Match rating line (gold)
+    ctx.beginPath();
+    log.forEach((e, i) => {
+      const x = xFor(i), y = yFor(e.rating || 0);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#f0c14b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    log.forEach((e, i) => {
+      const x = xFor(i), y = yFor(e.rating || 0);
+      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f0c14b'; ctx.fill();
+    });
+
+    // X-axis: opponent short name per match
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    log.forEach((e, i) => {
+      ctx.fillText((e.opponentShort || '').slice(0, 3).toUpperCase(), xFor(i), h - 4);
+    });
+    ctx.textAlign = 'left';
+  }
+
+
   // Human-readable name for whatever's currently being simulated, used both
   // for the per-player match log and anywhere else a competition label is
   // needed. Falls back to "Friendly" for a plain Kick Off match.
@@ -15601,6 +15723,15 @@ try { window.App = App; } catch (e) {}
       let items = collectOptions(select);
       if (isTeamSelect && activeCat !== 'all') items = items.filter(i => i.group === activeCat);
       if (q) items = items.filter(i => i.label.toLowerCase().includes(q));
+      // Kickoff team dropdowns: keep results alphabetical by team name
+      // (within each group) instead of raw teams.json order, so a search
+      // like "re" doesn't come back in a random-looking order.
+      if (isTeamSelect) {
+        items = items.slice().sort((a, b) => {
+          if (a.group !== b.group) return (a.group || '').localeCompare(b.group || '');
+          return (a.name || a.label || '').localeCompare(b.name || b.label || '');
+        });
+      }
       if (!items.length) { optionsEl.innerHTML = '<div class="ss-empty">No matches</div>'; return; }
       let html = '';
       let lastGroup;
