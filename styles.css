@@ -2159,6 +2159,21 @@ select.ss-native {
 .match-log-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 .match-log-table .rating-badge { padding: 2px 6px; font-size: 0.7rem; }
 
+/* Injury log table inside the player profile modal — starts from
+   match-log-table's look (border-collapse, sticky header, padding,
+   alternating rows) but the "How it happened" cause line can run long, so
+   this modifier switches cells to wrap instead of match-log-table's
+   nowrap, which was letting that text overflow straight into (and overlap)
+   the neighboring Out/MD columns instead of respecting its own max-width. */
+.injury-log-table { table-layout: fixed; min-width: 480px; }
+.injury-log-table td { white-space: normal; word-break: break-word; vertical-align: top; }
+.injury-log-table th:nth-child(1), .injury-log-table td:nth-child(1) { width: 15%; }
+.injury-log-table th:nth-child(2), .injury-log-table td:nth-child(2) { width: 14%; }
+.injury-log-table th:nth-child(3), .injury-log-table td:nth-child(3) { width: 13%; }
+.injury-log-table th:nth-child(4), .injury-log-table td:nth-child(4) { width: 36%; }
+.injury-log-table th:nth-child(5), .injury-log-table td:nth-child(5) { width: 12%; }
+.injury-log-table th:nth-child(6), .injury-log-table td:nth-child(6) { width: 10%; }
+
 /* Live rating vs in-match form chart (player profile modal) */
 .rating-form-wrap {
   background: var(--bg-2);
