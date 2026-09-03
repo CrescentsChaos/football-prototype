@@ -57267,7 +57267,7 @@
       "stadium": "Riyadh Air Metropolitano",
       "players": [
         {
-          "id": "atm26_13",
+          "id": "svn26_1",
           "name": "Jan Oblak",
           "pos": [
             "GK"
@@ -57354,7 +57354,7 @@
           "num": 18
         },
         {
-          "id": "atm26_14",
+          "id": "esp27_31",
           "name": "Marcos Llorente",
           "pos": [
             "RB",
@@ -57370,7 +57370,7 @@
           "num": 14
         },
         {
-          "id": "atm26_17_romero",
+          "id": "arg8",
           "name": "Cristian Romero",
           "pos": [
             "CB"
@@ -57460,7 +57460,7 @@
           "num": 7
         },
         {
-          "id": "atm26_10",
+          "id": "esp18",
           "name": "Álex Baena",
           "pos": [
             "CAM",
@@ -57505,7 +57505,7 @@
           "num": 15
         },
         {
-          "id": "atm26_19",
+          "id": "arg19",
           "name": "Julián Álvarez",
           "pos": [
             "ST",
@@ -57521,7 +57521,7 @@
           "num": 19
         },
         {
-          "id": "atm26_11",
+          "id": "nga26_7",
           "name": "Ademola Lookman",
           "pos": [
             "LW",
@@ -57537,7 +57537,7 @@
           "num": 11
         },
         {
-          "id": "atm26_9",
+          "id": "nor26",
           "name": "Alexander Sørloth",
           "pos": [
             "ST"
@@ -57567,7 +57567,7 @@
           "num": 20
         },
         {
-          "id": "atm2026_new1",
+          "id": "can10",
           "name": "Jonathan David",
           "pos": [
             "ST",
@@ -83074,7 +83074,7 @@
           "num": 5
         },
         {
-          "id": "ath27_14",
+          "id": "esp6",
           "name": "Aymeric Laporte",
           "pos": [
             "CB"
@@ -86850,7 +86850,7 @@
           "num": 19
         },
         {
-          "id": "dep27_7",
+          "id": "gab26_9",
           "name": "Pierre-Emerick Aubameyang",
           "pos": [
             "ST"
