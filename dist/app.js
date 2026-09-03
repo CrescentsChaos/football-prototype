@@ -2885,6 +2885,18 @@ var App = (() => {
   }
 
   async function init() {
+    // Show a loading overlay for the whole boot sequence — fetching
+    // teams.json (2MB+ with 5,500+ players) and then repairing/normalizing
+    // it, populating every dropdown, and rendering the Teams list plus
+    // whichever Tournament/Season dashboards were left in progress all runs
+    // synchronously below with nothing painted in between, which is what
+    // made a refresh look like the tab had frozen for a couple of seconds.
+    // The double-rAF wait mirrors withLoading()'s trick of giving the
+    // overlay an actual frame to paint before the heavy synchronous work
+    // starts, instead of everything happening back-to-back in one tick.
+    showLoading('Loading Apex…');
+    await simTick();
+    await simTick();
     try {
       const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
       const urlSet = (file) => isHosted
@@ -3003,6 +3015,8 @@ var App = (() => {
     } catch (e) {
       console.error(e);
       alert('Error loading game: ' + e.message);
+    } finally {
+      hideLoading();
     }
   }
 
@@ -11210,7 +11224,7 @@ var App = (() => {
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.textContent = 'Matchday 1 of ' + rounds.length;
     const btn = document.getElementById('btn-sim-round');
-    if (btn) btn.textContent = 'Simulate Matchday';
+    if (btn) { btn.textContent = 'Simulate Matchday'; btn.disabled = false; }
     toast((cfg.name || 'League') + ': ' + teams.length + ' clubs, ' + rounds.length + '-matchday season');
   }
   // Crowns the table topper once every matchday has been played — mirrors
@@ -11232,15 +11246,23 @@ var App = (() => {
   function simLeagueTournamentRound() {
     if (!tournament || tournament.format !== 'table') return;
     const round = tournament.rounds[tournament.currentRound];
-    if (!round) { finishLeagueTournament(); refreshTournamentStatsUI(); return; }
+    if (!round) { finishLeagueTournament(); renderLeagueTableTournament(); refreshTournamentStatsUI(); return; }
     simulateRoundFixtures(round, { allowET: false, allowPens: false }, (fx) => {
       applyResultToTable(tournament.table, fx.home, fx.away, fx.homeScore, fx.awayScore);
     });
     tournament.currentRound++;
     if (tournament.currentRound >= tournament.rounds.length) {
       finishLeagueTournament();
-    } else {
-      renderLeagueTableTournament();
+    }
+    // Always re-render, whether this was an ordinary matchday or the final
+    // one — previously the final-matchday branch skipped this call entirely,
+    // so the standings table/fixture list stayed frozen on the second-to-last
+    // matchday's state (e.g. showing 37 of 38 games played) and the "Simulate
+    // Matchday" button/title never updated to reflect the season being over,
+    // even though tournament.table and tournament.champion were already
+    // correct underneath.
+    renderLeagueTableTournament();
+    if (tournament.currentRound < tournament.rounds.length) {
       const stageTitle = document.getElementById('tour-stage-title');
       if (stageTitle) stageTitle.textContent = 'Matchday ' + (tournament.currentRound + 1) + ' of ' + tournament.rounds.length;
     }
@@ -11350,6 +11372,18 @@ var App = (() => {
 
     if (groupsEl) groupsEl.innerHTML = renderLeagueStandingsTableHTML(tournament.table);
     if (fixEl) fixEl.innerHTML = renderLeagueTournamentFixturesHTML();
+
+    // Once every matchday has actually been played, retire the "Simulate
+    // Matchday" button instead of leaving it sitting there clickable with
+    // nothing left to simulate — previously this was never touched here, so
+    // a stale render (see simLeagueTournamentRound) could also leave a
+    // completed league still showing an active-looking button.
+    const btn = document.getElementById('btn-sim-round');
+    if (btn) {
+      const done = tournament.stage === 'complete' || tournament.currentRound >= tournament.rounds.length;
+      btn.disabled = done;
+      btn.textContent = done ? 'Season Complete' : 'Simulate Matchday';
+    }
 
     if (tournament.champion) {
       const stageTitle = document.getElementById('tour-stage-title');
@@ -13151,7 +13185,7 @@ var App = (() => {
     if (setup) setup.style.display = 'block';
     if (live) live.style.display = 'none';
     const btn = document.getElementById('btn-sim-round');
-    if (btn) btn.textContent = 'Simulate Round';
+    if (btn) { btn.textContent = 'Simulate Round'; btn.disabled = false; }
     // Clear the previous tournament's UI (bracket, podium, groups, fixtures) —
     // this does NOT touch the persistent `trophies` record, so past champions
     // still show up in the Trophy Room afterward.
