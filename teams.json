@@ -47676,7 +47676,9 @@
       ],
       "manager": {
         "name": "Zinedine Zidane",
-        "ovr": 97
+        "ovr": 97,
+        "formation": "4-3-3",
+        "playstyle": "Quick Counter"
       }
     },
     {
@@ -53218,7 +53220,9 @@
       ],
       "manager": {
         "name": "Jürgen Klopp",
-        "ovr": 98
+        "ovr": 98,
+        "formation": "4-3-3",
+        "playstyle": "Overload"
       }
     },
     {
@@ -61927,21 +61931,6 @@
           "num": 14
         },
         {
-          "id": "tot26_8",
-          "name": "Yves Bissouma",
-          "pos": [
-            "CDM",
-            "CM"
-          ],
-          "ovr": 81,
-          "att": 72,
-          "def": 81,
-          "phy": 82,
-          "pac": 76,
-          "tec": 81,
-          "num": 8
-        },
-        {
           "id": "tot26_30",
           "name": "Rodrigo Bentancur",
           "pos": [
@@ -62768,21 +62757,6 @@
           "pac": 74,
           "tec": 76,
           "num": 28
-        },
-        {
-          "id": "asm26_8",
-          "name": "Paul Pogba",
-          "pos": [
-            "CM",
-            "CAM"
-          ],
-          "ovr": 76,
-          "att": 78,
-          "def": 60,
-          "phy": 74,
-          "pac": 58,
-          "tec": 85,
-          "num": 8
         },
         {
           "id": "asm26_37",
@@ -108668,6 +108642,186 @@
           "pac": 72,
           "tec": 88,
           "num": 9
+        },
+        {
+          "id": "freeagents_new1",
+          "name": "Dani Carvajal",
+          "pos": [
+            "RB"
+          ],
+          "ovr": 89,
+          "att": 78,
+          "def": 85,
+          "phy": 82,
+          "pac": 86,
+          "tec": 84,
+          "num": 2
+        },
+        {
+          "id": "asm26_8",
+          "name": "Paul Pogba",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 76,
+          "att": 78,
+          "def": 60,
+          "phy": 74,
+          "pac": 58,
+          "tec": 85,
+          "num": 8
+        },
+        {
+          "id": "freeagents_new2",
+          "name": "Jadon Sancho",
+          "pos": [
+            "RM",
+            "RW",
+            "LM",
+            "LW"
+          ],
+          "ovr": 86,
+          "att": 84,
+          "def": 42,
+          "phy": 64,
+          "pac": 89,
+          "tec": 91
+        },
+        {
+          "id": "freeagents_new3",
+          "name": "Sergio Ramos",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 84,
+          "att": 62,
+          "def": 85,
+          "phy": 82,
+          "pac": 63,
+          "tec": 77
+        },
+        {
+          "id": "freeagents_new4",
+          "name": "David Alaba",
+          "pos": [
+            "CB",
+            "LB",
+            "CM"
+          ],
+          "ovr": 88,
+          "att": 68,
+          "def": 88,
+          "phy": 82,
+          "pac": 78,
+          "tec": 91,
+          "num": 27
+        },
+        {
+          "id": "tot26_8",
+          "name": "Yves Bissouma",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 81,
+          "att": 72,
+          "def": 81,
+          "phy": 82,
+          "pac": 76,
+          "tec": 81,
+          "num": 8
+        },
+        {
+          "id": "freeagents_new5",
+          "name": "Philippe Coutinho",
+          "pos": [
+            "CAM",
+            "LW"
+          ],
+          "ovr": 87,
+          "att": 86,
+          "def": 40,
+          "phy": 68,
+          "pac": 80,
+          "tec": 92,
+          "num": 10
+        },
+        {
+          "id": "freeagents_new6",
+          "name": "Raheem Sterling",
+          "pos": [
+            "RW",
+            "LW",
+            "CAM"
+          ],
+          "ovr": 80,
+          "att": 78,
+          "def": 45,
+          "phy": 64,
+          "pac": 93,
+          "tec": 82,
+          "num": 31
+        },
+        {
+          "id": "freeagents_new7",
+          "name": "Riyad Mahrez",
+          "pos": [
+            "RW",
+            "CAM"
+          ],
+          "ovr": 87,
+          "att": 89,
+          "def": 30,
+          "phy": 70,
+          "pac": 78,
+          "tec": 94
+        },
+        {
+          "id": "freeagents_new8",
+          "name": "Oleksandr Zinchenko",
+          "pos": [
+            "CM",
+            "LB",
+            "CAM"
+          ],
+          "ovr": 80,
+          "att": 76,
+          "def": 74,
+          "phy": 72,
+          "pac": 74,
+          "tec": 85,
+          "num": 17
+        },
+        {
+          "id": "freeagents_new9",
+          "name": "Marcelo Brozović",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 86,
+          "att": 75,
+          "def": 84,
+          "phy": 86,
+          "pac": 76,
+          "tec": 84,
+          "num": 11
+        },
+        {
+          "id": "freeagents_new10",
+          "name": "Renato Sanches",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 80,
+          "att": 77,
+          "def": 75,
+          "phy": 83,
+          "pac": 82,
+          "tec": 82,
+          "num": 18
         }
       ]
     }
