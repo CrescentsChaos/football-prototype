@@ -396,6 +396,15 @@ body::before {
 .congestion-slot.congestion-disabled {
   opacity: 0.45;
 }
+.congestion-slot.congestion-intl {
+  border-color: var(--cyan);
+}
+.congestion-slot.congestion-intl .congestion-comp {
+  color: var(--cyan);
+}
+.congestion-slot.congestion-intl.congestion-now {
+  border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset;
+}
 .congestion-day {
   font-family: var(--display); font-size: 0.68rem; letter-spacing: 1px;
   color: var(--text-muted); text-transform: uppercase;
@@ -836,6 +845,61 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .group-table td { padding: 7px 4px; border-bottom: 1px solid rgba(255,255,255,0.03); transition: background var(--dur-fast) ease; }
 .group-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+/* Official-competition-style standings table (World Cup / qualifying
+   groups) — ranked crest rows, condensed-numeral points column, and a
+   coloured left-edge stripe marking the qualification/wildcard zone, in
+   the spirit of a real broadcast group table rather than a bare table. */
+.fifa-table-wrap { width: 100%; overflow-x: auto; border-radius: 10px; }
+.fifa-table {
+  width: 100%; min-width: 360px; border-collapse: collapse; font-size: 0.78rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+}
+.fifa-table thead th {
+  text-align: center; font-family: var(--display); font-size: 0.62rem;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--bg-0);
+  background: linear-gradient(180deg, var(--gold), var(--gold-dim));
+  padding: 8px 4px; border: none;
+}
+.fifa-table thead th.ft-pos { border-radius: 6px 0 0 0; width: 26px; }
+.fifa-table thead th.ft-team { text-align: left; padding-left: 10px; }
+.fifa-table thead th:last-child { border-radius: 0 6px 0 0; }
+.fifa-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background var(--dur-fast) ease;
+  box-shadow: inset 3px 0 0 transparent;
+}
+.fifa-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.025); }
+.fifa-table tbody tr:hover { background: rgba(240,193,75,0.06); }
+.fifa-table tbody tr.ft-zone-auto { box-shadow: inset 3px 0 0 var(--green); }
+.fifa-table tbody tr.ft-zone-wildcard { box-shadow: inset 3px 0 0 var(--orange); }
+.fifa-table td { text-align: center; padding: 7px 4px; color: var(--text-2); }
+.fifa-table .ft-pos { width: 26px; }
+.fifa-table .ft-pos-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(255,255,255,0.06); color: var(--text); font-weight: 700; font-size: 0.72rem;
+}
+.fifa-table .ft-team {
+  display: flex; align-items: center; gap: 8px; text-align: left; padding-left: 10px;
+  font-weight: 600; color: var(--text); white-space: nowrap;
+}
+.fifa-table .ft-team-name { font-family: var(--font); }
+.fifa-table .ft-pts {
+  font-family: var(--numeral); font-size: 1.05rem; font-weight: 700; color: var(--gold);
+}
+.ft-legend {
+  display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; padding: 0 2px;
+}
+.ft-legend-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.7rem; color: var(--text-muted);
+}
+.ft-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+}
+.ft-dot-auto { background: var(--green); }
+.ft-dot-wildcard { background: var(--orange); }
 
 /* Bracket */
 .bracket, #bracket {
