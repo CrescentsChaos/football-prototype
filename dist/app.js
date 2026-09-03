@@ -1900,7 +1900,7 @@ var App = (() => {
     'Deep-Lying Forward':    ['off_awr', 'ball_con', 'tight_pos', 'low_pass', 'fin', 'place_kick', 'phy_con'],
     'Dummy Runner':          ['off_awr', 'spd', 'accel', 'stam', 'bal', 'tight_pos'],
     'Creative Playmaker':    ['ball_con', 'dribb', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl'],
-    'Hole Player':           ['off_awr', 'tight_pos', 'fin', 'spd', 'accel', 'stam', 'bal'],
+     'Hole Player':           ['off_awr', 'tight_pos', 'ball_con', 'spd', 'dribb', 'stam', 'bal'],
     'Classic No. 10':        ['ball_con', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl', 'fin'],
     'Prolific Winger':       ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'spd', 'accel', 'curl'],
     'Cross Specialist':      ['off_awr', 'ball_con', 'low_pass', 'lofted_pass', 'curl', 'spd', 'stam'],
@@ -10898,8 +10898,12 @@ var App = (() => {
   // for the World Cup itself the next time year % WORLD_CUP_INTERVAL === 0.
   const WORLD_CUP_FIELD_SIZE = 48;
 
+  // Reserve national sides (e.g. "Italy Reserve") exist only as an extra
+  // player pool for club transfers/testing — they're not real qualifying
+  // entrants, so they're filtered out here the same way year-suffixed
+  // "legend" squads are.
   function nationalQualifyingPool() {
-    return (teamsData.national || []).filter(t => t && t.name && !/\d/.test(t.name));
+    return (teamsData.national || []).filter(t => t && t.name && !/\d/.test(t.name) && !/\breserve\b/i.test(t.name));
   }
 
   function startQualifyingCampaign(forYear) {
@@ -10911,6 +10915,7 @@ var App = (() => {
     shuffled.forEach((t, i) => buckets[i % groupCount].push(t));
     qualifiers = {
       forYear,
+      name: 'World Cup Qualifying',
       groups: buckets.filter(b => b.length >= 2).map((teams, idx) => ({
         id: idx, teams,
         table: teams.map(blankSeasonRow),
@@ -10918,15 +10923,21 @@ var App = (() => {
         currentRound: 0
       })),
       qualified: null,
-      finished: false
+      finished: false,
+      stats: blankCompStats()
     };
   }
 
   // Simulates one round across every still-active qualifying group at once.
   // Once every group has exhausted its rounds, computes the qualified list
-  // and marks the campaign finished.
+  // and marks the campaign finished. Only ever called on the congestion
+  // cycle's International slot (see seasonUI.js) — never as a free,
+  // play-anytime action — so qualifying fixtures land on realistic
+  // international-break weeks instead of competing with domestic football.
   function simulateQualifyingRound() {
     if (!qualifiers || qualifiers.finished) return;
+    if (!qualifiers.stats) qualifiers.stats = blankCompStats();
+    currentSeasonComp = qualifiers;
     let allDone = true;
     qualifiers.groups.forEach(g => {
       if (g.currentRound >= g.rounds.length) return;
@@ -10936,6 +10947,7 @@ var App = (() => {
       g.currentRound++;
       allDone = false;
     });
+    currentSeasonComp = null;
     if (!allDone) return;
     const winners = [], wildcards = [];
     qualifiers.groups.forEach(g => {
@@ -10984,7 +10996,7 @@ var App = (() => {
       });
     }
     worldCup = {
-      year, groups, stage: 'groups', knockoutRound: null, roundName: null,
+      year, name: 'World Cup', groups, stage: 'groups', knockoutRound: null, roundName: null,
       champion: null, finished: false, stats: blankCompStats()
     };
   }
@@ -14626,7 +14638,8 @@ var App = (() => {
     const slot = currentCongestionSlot();
     const eligible = seasonKeysForCongestionComp(slot.comp);
     if (!eligible.includes(compKey)) {
-      return "It's " + slot.day + " — " + slot.comp + " fixtures only today. Simulate today's matches first to move on.";
+      const label = slot.comp === 'International' ? 'International Break' : slot.comp;
+      return "It's " + slot.day + " — " + label + " fixtures only today. Simulate today's matches first to move on.";
     }
     if (isCupKey(compKey)) return "Today's cup fixtures aren't ready yet — simulate today's other matches first.";
     const due = seasonMatchesDue();
@@ -15024,19 +15037,31 @@ var App = (() => {
   }
 
 
-  // Repeating 5-slot fixture-congestion pattern: Sat league, Tue continental,
-  // Sat league, Tue domestic cup, Sun league — the busy week-to-week rhythm
-  // real top-flight calendars follow. `season.daySlot` tracks the season's
-  // actual position in this cycle (separate from the Matchday/round counter)
-  // and is what real play is gated against — see seasonCompCanPlayNow and
+  // Repeating 10-slot fixture-congestion pattern: two 5-day domestic weeks
+  // (Sat league, Tue continental, Sat league, Tue domestic cup, Sun league)
+  // followed by a real-world-style international break — a Tue/Sat double
+  // header reserved for World Cup qualifying (or the World Cup finals
+  // themselves) once every ~2 domestic weeks, matching how FIFA windows
+  // actually interrupt the club calendar rather than letting qualifying
+  // play out whenever the person feels like clicking a button.
+  // `season.daySlot` tracks the season's actual position in this cycle
+  // (separate from the Matchday/round counter) and is what real play is
+  // gated against — see seasonCompCanPlayNow and
   // advanceCongestionSlotIfComplete. The Cup slot plays each league's own
   // domestic cup (season.cups) and auto-skips once every cup has finished
-  // for the season, same as the UCL slot once the Champions League is done.
+  // for the season, same as the UCL slot once the Champions League is done,
+  // and the International slot auto-skips once qualifying/the World Cup
+  // isn't running (e.g. right at the very start of Year 1).
   const FIXTURE_CONGESTION_CYCLE = [
     { day: 'Sat', comp: 'League' },
     { day: 'Tue', comp: 'UCL' },
     { day: 'Sat', comp: 'League' },
     { day: 'Tue', comp: 'Cup' },
+    { day: 'Sun', comp: 'League' },
+    { day: 'Sat', comp: 'League' },
+    { day: 'Tue', comp: 'UCL' },
+    { day: 'Sat', comp: 'League' },
+    { day: 'Tue', comp: 'International' },
     { day: 'Sun', comp: 'League' }
   ];
 
@@ -15050,13 +15075,54 @@ var App = (() => {
   // Which season competition keys are eligible to play under a given
   // congestion slot's competition label — 'League' covers all five
   // domestic leagues at once (they're not individually staggered), 'UCL'
-  // is just the Champions League, and 'Cup' never resolves to anything
-  // since that competition isn't implemented yet.
+  // is just the Champions League, 'Cup' is each league's domestic cup, and
+  // 'International' is the national-team World Cup qualifying campaign (or
+  // the World Cup finals themselves) — tracked outside `season.leagues`
+  // entirely, so it's represented here by the synthetic 'world' key.
   function seasonKeysForCongestionComp(compLabel) {
     if (compLabel === 'League') return SEASON_LEAGUE_DEFS.map(d => d.key);
     if (compLabel === 'UCL') return ['ucl'];
     if (compLabel === 'Cup') return season && season.cups ? Object.keys(season.cups).map(k => 'cup_' + k) : [];
+    if (compLabel === 'International') return ['world'];
     return [];
+  }
+
+  // Every still-unplayed fixture in the current round of whichever
+  // national-team competition is live (qualifying groups, or the World Cup
+  // groups/knockout round) — the international-break analogue of
+  // seasonCupMatchesDue(). Returns [] whenever nothing is due, which is
+  // also what lets advanceCongestionSlotIfComplete skip straight past the
+  // International slot when it isn't relevant this cycle.
+  function seasonInternationalMatchesDue() {
+    const due = [];
+    if (worldCup && !worldCup.finished) {
+      if (worldCup.stage === 'groups') {
+        worldCup.groups.forEach(g => {
+          if (g.currentRound >= g.rounds.length) return;
+          (g.rounds[g.currentRound] || []).forEach(f => {
+            if (f.played) return;
+            const home = getTeam(f.home), away = getTeam(f.away);
+            due.push({ compName: 'World Cup', compKey: 'world', home: home ? home.short : '?', away: away ? away.short : '?' });
+          });
+        });
+      } else if (worldCup.knockoutRound && !worldCup.knockoutRound.played) {
+        worldCup.knockoutRound.fixtures.forEach(f => {
+          if (f.played) return;
+          const home = getTeam(f.home), away = getTeam(f.away);
+          due.push({ compName: 'World Cup', compKey: 'world', home: home ? home.short : '?', away: away ? away.short : '?' });
+        });
+      }
+    } else if (qualifiers && !qualifiers.finished) {
+      qualifiers.groups.forEach(g => {
+        if (g.currentRound >= g.rounds.length) return;
+        (g.rounds[g.currentRound] || []).forEach(f => {
+          if (f.played) return;
+          const home = getTeam(f.home), away = getTeam(f.away);
+          due.push({ compName: 'World Cup Qualifying', compKey: 'world', home: home ? home.short : '?', away: away ? away.short : '?' });
+        });
+      });
+    }
+    return due;
   }
 
   // Every domestic-cup fixture still waiting to be played, across every
@@ -15085,7 +15151,9 @@ var App = (() => {
   // for the current matchday regardless of which day's slot they belong to.
   function seasonSlotMatchesDue() {
     if (!season) return [];
-    const keys = new Set(seasonKeysForCongestionComp(currentCongestionSlot().comp));
+    const slotComp = currentCongestionSlot().comp;
+    const keys = new Set(seasonKeysForCongestionComp(slotComp));
+    if (slotComp === 'International') return seasonInternationalMatchesDue();
     return seasonMatchesDue().concat(seasonCupMatchesDue()).filter(d => keys.has(d.compKey));
   }
 
@@ -15116,15 +15184,17 @@ var App = (() => {
     const uclDone = season.ucl && season.ucl.finished;
     const cupsDone = season.cups && Object.keys(season.cups).length &&
       Object.keys(season.cups).every(k => season.cups[k].finished);
-    const items = [0, 1, 2, 3, 4].map(i => {
+    const intlDone = !worldCup && !qualifiers;
+    const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => {
       const slot = fixtureCongestionSlot(i);
       const isCup = slot.comp === 'Cup';
       const isUcl = slot.comp === 'UCL';
-      const disabled = (isCup && cupsDone) || (isUcl && uclDone);
-      const label = isCup ? 'Cup' : slot.comp;
-      const sub = (isCup && cupsDone) ? 'finished' : (isUcl && uclDone) ? 'finished' : '';
-      const cls = 'congestion-slot' + (i === 0 ? ' congestion-now' : '') + (disabled ? ' congestion-disabled' : '');
-      const title = slot.day + ' — ' + slot.comp;
+      const isIntl = slot.comp === 'International';
+      const disabled = (isCup && cupsDone) || (isUcl && uclDone) || (isIntl && intlDone);
+      const label = isCup ? 'Cup' : isIntl ? '🌍 Intl' : slot.comp;
+      const sub = (isCup && cupsDone) ? 'finished' : (isUcl && uclDone) ? 'finished' : (isIntl && intlDone) ? 'idle' : '';
+      const cls = 'congestion-slot' + (i === 0 ? ' congestion-now' : '') + (disabled ? ' congestion-disabled' : '') + (isIntl ? ' congestion-intl' : '');
+      const title = slot.day + ' — ' + (isIntl ? 'International Break' : slot.comp);
       return `<div class="${cls}" title="${title}">
         <div class="congestion-day">${slot.day}</div>
         <div class="congestion-comp">${label}</div>
@@ -15144,13 +15214,19 @@ var App = (() => {
     if (congestionEl) congestionEl.innerHTML = renderFixtureCongestionHTML();
     const dueEl = document.getElementById('season-due-banner');
     if (dueEl) {
-      const due = seasonMatchesDue().concat(currentCongestionSlot().comp === 'Cup' ? seasonCupMatchesDue() : []);
+      const slotComp = currentCongestionSlot().comp;
+      const due = seasonMatchesDue()
+        .concat(slotComp === 'Cup' ? seasonCupMatchesDue() : [])
+        .concat(slotComp === 'International' ? seasonInternationalMatchesDue() : []);
       if (due.length) {
         const byComp = {};
         due.forEach(d => { (byComp[d.compName] = byComp[d.compName] || []).push(d.home + ' vs ' + d.away); });
         const lines = Object.keys(byComp).map(name => `<div style="margin-top:2px"><strong>${name}:</strong> ${byComp[name].join(', ')}</div>`).join('');
+        const heading = slotComp === 'International'
+          ? '⏳ International Break — ' + due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due before club football resumes:'
+          : '⏳ Matchday ' + (season.week + 1) + " isn't complete yet — " + due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due before the day can change:';
         dueEl.innerHTML = `<div class="empty-state" style="text-align:left;padding:10px 14px;margin-top:10px;border:1px solid var(--accent-gold);border-radius:8px">
-          <div style="font-size:0.8rem;color:var(--accent-gold)">⏳ Matchday ${season.week + 1} isn't complete yet — ${due.length} match${due.length === 1 ? '' : 'es'} still due before the day can change:</div>
+          <div style="font-size:0.8rem;color:var(--accent-gold)">${heading}</div>
           ${lines}
         </div>`;
       } else {
@@ -15242,32 +15318,58 @@ var App = (() => {
 
   // World tab: shows whichever national-team competition is currently
   // live — the qualifying campaign feeding the next World Cup, or the
-  // World Cup finals itself once its season arrives.
+  // World Cup finals itself once its season arrives. Simulating a round is
+  // only ever allowed on the congestion cycle's International slot (a
+  // real-world-style international break) — never as a free, play-anytime
+  // action — so the button is disabled with an explanation the rest of the
+  // week.
   function renderWorldCupTabHTML() {
     let h = '';
+    const comp = worldCup || qualifiers;
+    if (!comp) {
+      return '<div class="empty-state"><div class="icon">🌍</div><p>No national-team competition running right now.</p></div>';
+    }
+    const onIntlSlot = !season || currentCongestionSlot().comp === 'International';
+    const subTabs = [{ key: 'table', name: 'Table & Fixtures' }, { key: 'stats', name: 'Stats' }];
+    h += '<div class="leaderboard-tabs" style="margin-bottom:12px">' + subTabs.map(st =>
+      `<button class="lb-tab ${seasonActiveSubTab === st.key ? 'active' : ''}" onclick="App.showSeasonSubTab('${st.key}')">${st.name}</button>`
+    ).join('') + '</div>';
+
+    if (seasonActiveSubTab === 'stats') {
+      if (!comp.stats) comp.stats = blankCompStats();
+      h += renderCompStatsHTML(comp);
+      return h;
+    }
+
+    if (!onIntlSlot) {
+      h += `<div class="empty-state" style="text-align:left;padding:10px 14px;margin-bottom:12px;border:1px solid var(--accent-gold);border-radius:8px">
+        <div style="font-size:0.8rem;color:var(--accent-gold)">🌍 International break fixtures wait for the congestion cycle's Intl slot — check the Fixture Congestion strip above for when the next one lands.</div>
+      </div>`;
+    }
+
     if (worldCup) {
       h += '<div class="group-card league-table-wrap"><h4>🌍 World Cup — Year ' + worldCup.year + '</h4>';
       if (worldCup.finished && worldCup.champion) {
         h += '<p style="font-size:0.9rem">🏆 Champions: <strong>' + worldCup.champion.name + '</strong></p>';
       } else if (worldCup.stage === 'groups') {
-        h += '<p style="font-size:0.8rem;color:var(--text-muted)">Group stage — ' + worldCup.groups.length + ' groups of 4.</p>';
+        h += '<p style="font-size:0.8rem;color:var(--text-muted)">Group stage — ' + worldCup.groups.length + ' groups of 4. Top 2 advance automatically; best third-placed sides fill out the knockout bracket.</p>';
       } else {
         h += '<p style="font-size:0.8rem;color:var(--text-muted)">Knockout stage — ' + (worldCup.roundName || '') + '.</p>';
       }
       if (!worldCup.finished) {
-        h += '<button class="btn btn-primary btn-sm" onclick="App.simulateWorldCupStep(); App.renderSeasonDashboard();">▶ Simulate Next Round</button>';
+        h += `<button class="btn btn-primary btn-sm" ${onIntlSlot ? '' : 'disabled'} onclick="App.simulateWorldCupStep(); App.advanceCongestionSlotIfComplete(); App.renderSeasonDashboard();">▶ Simulate Next Round</button>`;
       }
       h += '</div>';
       if (worldCup.stage === 'groups') {
         worldCup.groups.forEach(g => {
-          h += '<div class="group-card"><h5>Group ' + (g.id + 1) + '</h5>' + renderStandingsTableRows(g.table) + '</div>';
+          h += '<div class="group-card"><h5>Group ' + (g.id + 1) + '</h5>' + renderStandingsTableRows(g.table, { autoQualify: 2, wildcard: 1 }) + '</div>';
         });
       } else if (worldCup.knockoutRound) {
         h += '<div class="group-card"><h5>' + (worldCup.roundName || 'Knockout') + '</h5>' +
           worldCup.knockoutRound.fixtures.map(f => {
             const home = getTeam(f.home), away = getTeam(f.away);
             const score = f.played ? (f.homeScore + ' - ' + f.awayScore) : 'vs';
-            return '<div class="fixture-row"><span>' + (home ? home.name : '?') + '</span><span>' + score + '</span><span>' + (away ? away.name : '?') + '</span></div>';
+            return `<div class="fixture-row"><span>${home ? teamMark(home, 18) + ' ' + home.name : '?'}</span><span>${score}</span><span>${away ? teamMark(away, 18) + ' ' + away.name : '?'}</span></div>`;
           }).join('') + '</div>';
       }
     } else if (qualifiers) {
@@ -15275,29 +15377,46 @@ var App = (() => {
       h += '<p style="font-size:0.8rem;color:var(--text-muted)">' + qualifiers.groups.length +
         ' qualifying groups — group winners qualify automatically, best runners-up fill the 48-team field.</p>';
       if (!qualifiers.finished) {
-        h += '<button class="btn btn-primary btn-sm" onclick="App.simulateQualifyingRound(); App.renderSeasonDashboard();">▶ Simulate Next Round</button>';
+        h += `<button class="btn btn-primary btn-sm" ${onIntlSlot ? '' : 'disabled'} onclick="App.simulateQualifyingRound(); App.advanceCongestionSlotIfComplete(); App.renderSeasonDashboard();">▶ Simulate Next Round</button>`;
       } else {
         h += '<p style="font-size:0.85rem">✅ Qualifying complete — ' + (qualifiers.qualified ? qualifiers.qualified.length : 0) + ' teams through to the World Cup.</p>';
       }
       h += '</div>';
       qualifiers.groups.forEach(g => {
-        h += '<div class="group-card"><h5>Group ' + (g.id + 1) + '</h5>' + renderStandingsTableRows(g.table) + '</div>';
+        h += '<div class="group-card"><h5>Group ' + (g.id + 1) + '</h5>' + renderStandingsTableRows(g.table, { autoQualify: 1, wildcard: g.table.length - 1 }) + '</div>';
       });
-    } else {
-      h += '<div class="empty-state"><div class="icon">🌍</div><p>No national-team competition running right now.</p></div>';
     }
     return h;
   }
 
-  // Tiny standings-table renderer shared by the World Cup/qualifying group
-  // cards — a compact subset of the full league standings table.
-  function renderStandingsTableRows(table) {
+  // Official-competition-style standings table shared by the World Cup and
+  // qualifying group cards — ranked crest rows with a coloured left-edge
+  // qualification stripe (green = qualifies automatically, amber = still
+  // alive for a wildcard/best-runner-up spot), mirroring the look of a real
+  // tournament group table rather than a bare unstyled HTML table.
+  function renderStandingsTableRows(table, opts) {
+    opts = opts || {};
+    const autoQualify = opts.autoQualify || 0;
+    const wildcard = opts.wildcard || 0;
     const sorted = sortedTable(table);
-    let h = '<table class="mini-table"><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
-    sorted.forEach(r => {
-      h += '<tr><td>' + r.team.name + '</td><td>' + r.played + '</td><td>' + r.won + '</td><td>' + r.drawn + '</td><td>' + r.lost + '</td><td>' + (r.gf - r.ga) + '</td><td><strong>' + r.pts + '</strong></td></tr>';
+    let h = '<div class="fifa-table-wrap"><table class="fifa-table"><thead><tr>' +
+      '<th class="ft-pos">#</th><th class="ft-team">Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th>' +
+      '</tr></thead><tbody>';
+    sorted.forEach((r, i) => {
+      const gd = r.gf - r.ga;
+      const zoneCls = i < autoQualify ? ' ft-zone-auto' : (i < autoQualify + wildcard ? ' ft-zone-wildcard' : '');
+      h += `<tr class="${zoneCls}"><td class="ft-pos"><span class="ft-pos-num">${i + 1}</span></td>` +
+        `<td class="ft-team">${teamMark(r.team, 20)}<span class="ft-team-name">${r.team.name}</span></td>` +
+        `<td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td>` +
+        `<td>${r.gf}</td><td>${r.ga}</td><td>${gd > 0 ? '+' + gd : gd}</td><td class="ft-pts">${r.pts}</td></tr>`;
     });
-    h += '</tbody></table>';
+    h += '</tbody></table></div>';
+    if (autoQualify || wildcard) {
+      h += '<div class="ft-legend">' +
+        (autoQualify ? '<span class="ft-legend-item"><i class="ft-dot ft-dot-auto"></i>Qualifies automatically</span>' : '') +
+        (wildcard ? '<span class="ft-legend-item"><i class="ft-dot ft-dot-wildcard"></i>Best-runner-up contention</span>' : '') +
+        '</div>';
+    }
     return h;
   }
 
@@ -16523,7 +16642,7 @@ var App = (() => {
     endSeasonNow, endSeasonAndAnnounce, renderSeasonEndAnnouncement,
     showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
     simSeasonFixture, playSeasonFixture,
-    simulateWorldCupStep, simulateQualifyingRound, renderSeasonDashboard,
+    simulateWorldCupStep, simulateQualifyingRound, renderSeasonDashboard, advanceCongestionSlotIfComplete,
     searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
     togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare,
     renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital
