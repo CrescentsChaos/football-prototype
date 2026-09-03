@@ -287,6 +287,29 @@ var App = (() => {
   // How many table-toppers from each domestic league qualify as Champions
   // League candidates the following season (real-life style qualification).
   const UCL_QUALIFY_PER_LEAGUE = 4;
+  // Each domestic league also runs its own single-elimination domestic cup
+  // (season.cups[leagueKey]) alongside the league table — same club pool,
+  // reusing the exact knockout-bracket machinery the Champions League
+  // knockout stage already uses (buildKnockoutFromWinners/winnerOfResult).
+  const SEASON_CUP_NAMES = {
+    epl: 'FA Cup', laliga: 'Copa del Rey', seriea: 'Coppa Italia',
+    bundesliga: 'DFB-Pokal', ligue1: 'Coupe de France'
+  };
+  // Real top-flight seasons run August through May — used purely for the
+  // "Month" label on the season header, derived from how far through the
+  // league's fixture list the season currently is (see computeSeasonMonth).
+  const FOOTBALL_MONTHS = ['August', 'September', 'October', 'November', 'December',
+    'January', 'February', 'March', 'April', 'May'];
+  // The World Cup is played once every 4 seasons (a real-life-style 4-year
+  // cycle) — see startQualifyingCampaign/startWorldCupFromQualifiers in
+  // simulation/worldEngine.js. Every OTHER season, the pool of senior
+  // national teams (any team in teamsData.national whose name has no year
+  // in it — the "legend"/historic squads all do, e.g. "Brazil 1962") plays
+  // through a qualifying campaign to whittle down to the 48-team World Cup
+  // field, exactly like real FIFA qualifying feeding the finals.
+  const WORLD_CUP_INTERVAL = 4;
+  let worldCup = null; // active World Cup finals object, or null between cycles
+  let qualifiers = null; // active qualifying campaign object, or null
   let season = null; // active season object, or null if not started
   let seasonSetup = {
     selections: { epl: new Set(), laliga: new Set(), seriea: new Set(), bundesliga: new Set(), ligue1: new Set() },
@@ -298,8 +321,8 @@ var App = (() => {
   let historyActiveTab = 'team'; // 'team' | 'individual' — which History sub-tab is showing
 
   const FORMATIONS = {
-    '4-3-3': { name: '4-3-3', slots: ['GK','RB','CB','CB','LB','CM','CDM','CM','RW','ST','LW'],
-      coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[62,50],[50,48],[38,50],[78,28],[50,18],[22,28]] },
+    '4-3-3': { name: '4-3-3', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'CM', 'RW', 'ST', 'LW'],
+    coords: [[50,92],[89.3,70.6],[62,75],[35,75.2],[10.7,70.6],[73.2,43.1],[50.8,57.1],[28.2,43.1],[89.3,24.4],[50,18],[11.8,25]] },
     '4-4-2': { name: '4-4-2', slots: ['GK','RB','CB','CB','LB','RM','CM','CM','LM','ST','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,48],[58,50],[42,50],[18,48],[58,20],[42,20]] },
     '4-2-3-1': { name: '4-2-3-1', slots: ['GK','RB','CB','CB','LB','CDM','CDM','CAM','RW','LW','ST'],
@@ -1877,7 +1900,7 @@ var App = (() => {
     'Deep-Lying Forward':    ['off_awr', 'ball_con', 'tight_pos', 'low_pass', 'fin', 'place_kick', 'phy_con'],
     'Dummy Runner':          ['off_awr', 'spd', 'accel', 'stam', 'bal', 'tight_pos'],
     'Creative Playmaker':    ['ball_con', 'dribb', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl'],
-    'Hole Player':           ['off_awr', 'tight_pos', 'ball_con', 'spd', 'dribb', 'stam', 'bal'],
+    'Hole Player':           ['off_awr', 'tight_pos', 'fin', 'spd', 'accel', 'stam', 'bal'],
     'Classic No. 10':        ['ball_con', 'tight_pos', 'low_pass', 'lofted_pass', 'place_kick', 'curl', 'fin'],
     'Prolific Winger':       ['off_awr', 'ball_con', 'dribb', 'tight_pos', 'spd', 'accel', 'curl'],
     'Cross Specialist':      ['off_awr', 'ball_con', 'low_pass', 'lofted_pass', 'curl', 'spd', 'stam'],
@@ -8998,7 +9021,8 @@ var App = (() => {
     // table, then advances the round once every fixture in it is played.
     if (window._seasonFixture && season) {
       const { compKey, idx } = window._seasonFixture;
-      const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+      const cup = isCupKey(compKey);
+      const comp = resolveSeasonComp(compKey);
       const round = comp && comp.rounds && comp.rounds[comp.currentRound];
       const f = round && round[idx];
       if (f && !f.played && currentMatch) {
@@ -9006,12 +9030,18 @@ var App = (() => {
         f.homeScore = currentMatch.home.score;
         f.awayScore = currentMatch.away.score;
         f.report = buildMatchReport(currentMatch);
-        applyResultToTable(comp.table, f.home, f.away, f.homeScore, f.awayScore);
+        if (cup) {
+          if (currentMatch.home.penScore != null) f.pens = { home: currentMatch.home.penScore, away: currentMatch.away.penScore };
+          const home = getTeam(f.home), away = getTeam(f.away);
+          f.winnerId = winnerOfResult(home, away, { home: f.homeScore, away: f.awayScore, pens: f.pens }).id;
+        } else {
+          applyResultToTable(comp.table, f.home, f.away, f.homeScore, f.awayScore);
+        }
         window._seasonFixture = null;
         currentSeasonComp = null;
         advanceSeasonRoundIfComplete(comp, compKey);
         refreshTournamentStatsUI();
-        toast('Season match result saved!');
+        toast((cup ? 'Cup' : 'Season') + ' match result saved!');
       }
     }
     persistAll();
@@ -10297,6 +10327,10 @@ var App = (() => {
     try {
       if (season) ok = safeSetItem('apexSeason', JSON.stringify(season, teamRefReplacer)) && ok;
       else localStorage.removeItem('apexSeason');
+      if (worldCup) ok = safeSetItem('apexWorldCup', JSON.stringify(worldCup, teamRefReplacer)) && ok;
+      else localStorage.removeItem('apexWorldCup');
+      if (qualifiers) ok = safeSetItem('apexQualifiers', JSON.stringify(qualifiers, teamRefReplacer)) && ok;
+      else localStorage.removeItem('apexQualifiers');
       if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament, teamRefReplacer)) && ok;
       else localStorage.removeItem('apexTournament');
       ok = safeSetItem('apexTournamentType', tournamentType) && ok;
@@ -10315,6 +10349,14 @@ var App = (() => {
       const s = localStorage.getItem('apexSeason');
       if (s) season = JSON.parse(s, teamRefReviver);
     } catch (e) { season = null; }
+    try {
+      const wc = localStorage.getItem('apexWorldCup');
+      if (wc) worldCup = JSON.parse(wc, teamRefReviver);
+    } catch (e) { worldCup = null; }
+    try {
+      const q = localStorage.getItem('apexQualifiers');
+      if (q) qualifiers = JSON.parse(q, teamRefReviver);
+    } catch (e) { qualifiers = null; }
     try {
       const t = localStorage.getItem('apexTournament');
       if (t) tournament = JSON.parse(t, teamRefReviver);
@@ -10843,6 +10885,207 @@ var App = (() => {
     if (bracket) bracket.innerHTML = '<p style="color:var(--text-muted)">Knockout bracket appears after groups.</p>';
     const btn = document.getElementById('btn-sim-round');
     if (btn) btn.textContent = 'Simulate Round';
+  }
+  // ========== NATIONAL-TEAM QUALIFYING + WORLD CUP (every 4 seasons) ==========
+  // Eligible pool: every national team in teams.json whose name has no year
+  // in it — the "legend"/historic squads (e.g. "Brazil 1962", "England
+  // 2010") all carry a year, so this cleanly picks out just the current
+  // senior national sides. That pool works through a qualifying campaign
+  // (single round-robin groups of ~4) in every non-World-Cup season; the
+  // group winner from each group qualifies automatically, and the best
+  // remaining runners-up (by points, then goal difference, then goals for)
+  // fill the field out to 48 — the modern World Cup's finals size — ready
+  // for the World Cup itself the next time year % WORLD_CUP_INTERVAL === 0.
+  const WORLD_CUP_FIELD_SIZE = 48;
+
+  function nationalQualifyingPool() {
+    return (teamsData.national || []).filter(t => t && t.name && !/\d/.test(t.name));
+  }
+
+  function startQualifyingCampaign(forYear) {
+    const pool = nationalQualifyingPool();
+    if (pool.length < 8) { qualifiers = null; return; }
+    const shuffled = shuffleArray([...pool]);
+    const groupCount = Math.max(1, Math.round(shuffled.length / 4));
+    const buckets = Array.from({ length: groupCount }, () => []);
+    shuffled.forEach((t, i) => buckets[i % groupCount].push(t));
+    qualifiers = {
+      forYear,
+      groups: buckets.filter(b => b.length >= 2).map((teams, idx) => ({
+        id: idx, teams,
+        table: teams.map(blankSeasonRow),
+        rounds: buildSingleRoundRobinRounds(teams),
+        currentRound: 0
+      })),
+      qualified: null,
+      finished: false
+    };
+  }
+
+  // Simulates one round across every still-active qualifying group at once.
+  // Once every group has exhausted its rounds, computes the qualified list
+  // and marks the campaign finished.
+  function simulateQualifyingRound() {
+    if (!qualifiers || qualifiers.finished) return;
+    let allDone = true;
+    qualifiers.groups.forEach(g => {
+      if (g.currentRound >= g.rounds.length) return;
+      simulateRoundFixtures(g.rounds[g.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+        applyResultToTable(g.table, fx.home, fx.away, result.home, result.away);
+      });
+      g.currentRound++;
+      allDone = false;
+    });
+    if (!allDone) return;
+    const winners = [], wildcards = [];
+    qualifiers.groups.forEach(g => {
+      const sorted = sortedTable(g.table);
+      if (sorted[0]) winners.push(sorted[0].team);
+      // Every other group finisher becomes a wildcard candidate — needed
+      // because groups of 4 only produce one automatic runner-up each, and
+      // with ~22 groups that alone can't fill a 48-team field (22 winners +
+      // 22 runners-up caps out at 44); pulling in third-placed teams too
+      // gives enough candidates to always reach the full 48.
+      sorted.slice(1).forEach(r => wildcards.push(r));
+    });
+    wildcards.sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    const need = Math.max(0, WORLD_CUP_FIELD_SIZE - winners.length);
+    const qualified = winners.concat(wildcards.slice(0, need).map(r => r.team));
+    qualifiers.qualified = qualified;
+    qualifiers.finished = true;
+  }
+
+  // Simulates the entire qualifying campaign in one go — used when a World
+  // Cup season arrives and qualifying hasn't been played out round by round.
+  function simulateQualifyingToEnd() {
+    if (!qualifiers) return;
+    let guard = 0;
+    while (!qualifiers.finished && guard++ < 100) simulateQualifyingRound();
+  }
+
+  // Builds the World Cup finals bracket seed: groups of 4, single
+  // round-robin, then a knockout bracket from the group winners/runners-up
+  // plus the best third-placed teams — same "best third" shape the
+  // continental competitions elsewhere already use, sized here to feed a
+  // clean Round of 32 (real 2026-format World Cup: 12 groups of 4, top 2
+  // plus the best 8 thirds advance).
+  function startWorldCupFromQualifiers(year, qualifiedTeams) {
+    let teams = shuffleArray([...(qualifiedTeams || [])]);
+    const numGroups = Math.max(1, Math.floor(teams.length / 4));
+    teams = teams.slice(0, numGroups * 4);
+    const groups = [];
+    for (let i = 0; i < numGroups; i++) {
+      const gTeams = teams.slice(i * 4, i * 4 + 4);
+      groups.push({
+        id: i, teams: gTeams,
+        table: gTeams.map(blankSeasonRow),
+        rounds: buildSingleRoundRobinRounds(gTeams),
+        currentRound: 0
+      });
+    }
+    worldCup = {
+      year, groups, stage: 'groups', knockoutRound: null, roundName: null,
+      champion: null, finished: false, stats: blankCompStats()
+    };
+  }
+
+  // Picks the knockout field once every World Cup group has finished:
+  // every group winner + runner-up, plus enough best third-placed teams to
+  // round the field to a power of 2 for a clean bracket.
+  function collectWorldCupKnockoutTeams(groups) {
+    const winners = [], runnersUp = [], thirds = [];
+    groups.forEach(g => {
+      const sorted = sortedTable(g.table);
+      if (sorted[0]) winners.push(sorted[0].team);
+      if (sorted[1]) runnersUp.push(sorted[1].team);
+      if (sorted[2]) thirds.push(sorted[2]);
+    });
+    thirds.sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    let field = winners.concat(runnersUp);
+    let size = bracketSizeFor2(field.length + thirds.length);
+    const thirdsNeeded = Math.max(0, Math.min(thirds.length, size - field.length));
+    field = field.concat(thirds.slice(0, thirdsNeeded).map(r => r.team));
+    while (field.length >= 2 && (field.length & (field.length - 1))) field.pop();
+    return shuffleArray(field);
+  }
+
+  // Like bracketSizeFor() elsewhere, but not capped at 8 — the World Cup
+  // knockout starts much bigger (Round of 32).
+  function bracketSizeFor2(n) {
+    let size = 2;
+    while (size * 2 <= n) size *= 2;
+    return size;
+  }
+
+  // Advances the World Cup one step: a full round of groups, or one
+  // knockout round, mirroring simulateUCLStep's stage machine.
+  function simulateWorldCupStep() {
+    if (!worldCup || worldCup.finished) return;
+    if (!worldCup.stats) worldCup.stats = blankCompStats();
+    currentSeasonComp = worldCup;
+    if (worldCup.stage === 'groups') {
+      let allDone = true;
+      worldCup.groups.forEach(g => {
+        if (g.currentRound >= g.rounds.length) return;
+        simulateRoundFixtures(g.rounds[g.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+          applyResultToTable(g.table, fx.home, fx.away, result.home, result.away);
+        });
+        g.currentRound++;
+        allDone = false;
+      });
+      if (allDone) {
+        const koTeams = collectWorldCupKnockoutTeams(worldCup.groups);
+        if (koTeams.length >= 2) {
+          worldCup.knockoutRound = buildKnockoutFromWinners(koTeams);
+          worldCup.roundName = getRoundName(koTeams.length);
+          worldCup.stage = 'knockout';
+        } else {
+          worldCup.finished = true;
+        }
+      }
+    } else if (worldCup.stage === 'knockout' && worldCup.knockoutRound) {
+      simulateRoundFixtures(worldCup.knockoutRound.fixtures, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+        fx.winnerId = winnerOfResult(h, a, result).id;
+      });
+      worldCup.knockoutRound.played = true;
+      const winners = worldCup.knockoutRound.fixtures.map(f => getTeam(f.winnerId)).filter(Boolean);
+      if (winners.length <= 1) {
+        worldCup.champion = winners[0] || null;
+        worldCup.finished = true;
+        if (worldCup.champion) {
+          const extra = { category: 'worldcup', year: worldCup.year };
+          pushTeamTrophy('World Cup', worldCup.champion.name, 'World Cup (Y' + worldCup.year + ')', extra);
+          pushManagerAward('World Cup Winning Manager', worldCup.champion, 'World Cup (Y' + worldCup.year + ')', extra);
+          recordIndividualAwardsFromAwardsObject(assignCompAwards(worldCup), 'World Cup (Y' + worldCup.year + ')', extra);
+        }
+      } else {
+        worldCup.knockoutRound = buildKnockoutFromWinners(winners);
+        worldCup.roundName = getRoundName(winners.length);
+      }
+    }
+    currentSeasonComp = null;
+  }
+
+  // Called whenever a season starts/rolls over — decides whether this is a
+  // World Cup year (kicks the finals off from whatever qualifying already
+  // produced, force-finishing qualifying first if it somehow hasn't
+  // finished yet) or a qualifying year (starts a fresh campaign, unless one
+  // is already under way for the upcoming World Cup).
+  function ensureNationalCycleForSeason(year) {
+    const isWorldCupYear = year > 0 && year % WORLD_CUP_INTERVAL === 0;
+    if (isWorldCupYear) {
+      if (!worldCup || worldCup.year !== year) {
+        if (!qualifiers || !qualifiers.finished) simulateQualifyingToEnd();
+        const field = (qualifiers && qualifiers.qualified && qualifiers.qualified.length >= 8)
+          ? qualifiers.qualified
+          : shuffleArray([...nationalQualifyingPool()]).slice(0, WORLD_CUP_FIELD_SIZE);
+        startWorldCupFromQualifiers(year, field);
+        qualifiers = null;
+      }
+    } else if (!qualifiers) {
+      const nextWC = year - (year % WORLD_CUP_INTERVAL) + WORLD_CUP_INTERVAL;
+      startQualifyingCampaign(nextWC);
+    }
   }
 
   function startUCLTournament(selected) {
@@ -13923,6 +14166,17 @@ var App = (() => {
     return rounds;
   }
 
+  // Single-leg version of buildDoubleRoundRobinRounds — used for the
+  // national-team qualifying groups, which (like real qualifying groups)
+  // only play each other once, not home-and-away.
+  function buildSingleRoundRobinRounds(teams) {
+    const ids = teams.map(t => t.id);
+    if (ids.length < 2) return [];
+    return circleMethodRounds(ids).map(pairs => pairs.map(([home, away]) => ({
+      home, away, played: false, homeScore: null, awayScore: null, report: null
+    })));
+  }
+
   function buildDoubleRoundRobinRounds(teams) {
     const ids = teams.map(t => t.id);
     if (ids.length < 2) return [];
@@ -13931,6 +14185,41 @@ var App = (() => {
     return [...firstLeg, ...secondLeg].map(pairs => pairs.map(([home, away]) => ({
       home, away, played: false, homeScore: null, awayScore: null, report: null
     })));
+  }
+  // ---------- Domestic cups (season.cups[leagueKey]) ----------
+  // A cup key is namespaced 'cup_<leagueKey>' (e.g. 'cup_epl') wherever it
+  // needs to sit alongside league/UCL compKeys — the season object keeps
+  // domestic leagues, the UCL and cups in three separate dicts, but several
+  // shared code paths (simSeasonFixture, seasonCompCanPlayNow…) take a
+  // single string key, so the 'cup_' prefix disambiguates which dict to
+  // resolve against without colliding with a league's own key.
+  function isCupKey(key) { return typeof key === 'string' && key.indexOf('cup_') === 0; }
+  function cupKeyName(key) { return key.slice(4); }
+  function resolveSeasonComp(key) {
+    if (!season) return null;
+    if (key === 'ucl') return season.ucl;
+    if (isCupKey(key)) return season.cups && season.cups[cupKeyName(key)];
+    return season.leagues && season.leagues[key];
+  }
+
+  // Builds a fresh single-elimination cup from a league's club pool —
+  // shuffled, then trimmed down to the nearest power of 2 (so e.g. a
+  // 20-club league's cup starts from a clean Round of 16) exactly like the
+  // Tournament tab's own knockout formats already do. Reuses
+  // buildKnockoutFromWinners for the actual Round 1 pairing.
+  function buildCupCompetition(name, teams) {
+    let ts = shuffleArray([...teams]);
+    while (ts.length >= 4 && (ts.length & (ts.length - 1))) ts.pop();
+    if (ts.length < 2) return null;
+    return {
+      name, teams: ts,
+      rounds: [buildKnockoutFromWinners(ts).fixtures],
+      currentRound: 0,
+      roundName: getRoundName(ts.length),
+      champion: null,
+      finished: false,
+      stats: blankCompStats()
+    };
   }
 
   function blankSeasonRow(team) {
@@ -14076,9 +14365,16 @@ var App = (() => {
       stats: blankCompStats()
     };
 
-    season = { year: 1, week: 0, daySlot: 0, leagues, ucl };
+    const cups = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const c = buildCupCompetition(SEASON_CUP_NAMES[def.key] || (def.name + ' Cup'), leagueTeams[def.key]);
+      if (c) cups[def.key] = c;
+    });
+
+    season = { year: 1, week: 0, daySlot: 0, leagues, ucl, cups };
     seasonActiveTab = 'epl';
     seasonActiveSubTab = 'table';
+    ensureNationalCycleForSeason(1);
     renderSeasonDashboard();
     const setup = document.getElementById('season-setup');
     const dash = document.getElementById('season-dashboard');
@@ -14111,6 +14407,60 @@ var App = (() => {
     currentSeasonComp = null;
     comp.currentRound++;
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); }
+  }
+  // Simulates one round of a single domestic cup (a whole round at once,
+  // same as the league/UCL "Simulate Matchday" flow) — used by
+  // simulateSeasonWeek/simulateSeasonToEnd/endSeasonNow whenever the
+  // congestion cycle is on its Cup day.
+  function simulateCupRound(compKey, comp) {
+    if (!comp || comp.finished) return;
+    const round = comp.rounds[comp.currentRound];
+    if (!round || !round.length || round.every(f => f.played)) return;
+    if (!comp.stats) comp.stats = blankCompStats();
+    currentSeasonComp = comp;
+    simulateRoundFixtures(round, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+      fx.winnerId = winnerOfResult(h, a, result).id;
+    });
+    currentSeasonComp = null;
+    advanceSeasonRoundIfComplete(comp, compKey);
+  }
+
+  // Simulates every domestic cup's currently-due round in one pass —
+  // returns true if any cup actually had something to play, so callers
+  // (simulateSeasonToEnd/endSeasonNow) know whether progress was made.
+  function simulateAllCupsDueNow() {
+    if (!season || !season.cups) return false;
+    if (currentCongestionSlot().comp !== 'Cup') return false;
+    let played = false;
+    Object.keys(season.cups).forEach(k => {
+      const comp = season.cups[k];
+      if (!comp || comp.finished) return;
+      const round = comp.rounds[comp.currentRound];
+      if (round && round.length && !round.every(f => f.played)) {
+        simulateCupRound('cup_' + k, comp);
+        played = true;
+      }
+    });
+    return played;
+  }
+
+  // Unconditional version for the two bulk "fast-forward" flows
+  // (simulateSeasonToEnd/endSeasonNow), which — like the domestic
+  // leagues/UCL there — deliberately skip past the day-by-day congestion
+  // cadence rather than waiting for the Cup slot to come around.
+  function simulateAllCupRoundsNow() {
+    if (!season || !season.cups) return false;
+    let played = false;
+    Object.keys(season.cups).forEach(k => {
+      const comp = season.cups[k];
+      if (!comp || comp.finished) return;
+      const round = comp.rounds[comp.currentRound];
+      if (round && round.length && !round.every(f => f.played)) {
+        simulateCupRound('cup_' + k, comp);
+        played = true;
+      }
+    });
+    return played;
   }
 
   // Builds the UCL knockout bracket from final league-phase standings.
@@ -14208,6 +14558,19 @@ var App = (() => {
     }
     return Math.min(...active.map(({ comp }) => comp.currentRound));
   }
+  // Derives a real-world-feeling "Month" label (August → May, a 10-month
+  // top-flight calendar) purely from how far the slowest domestic league
+  // has progressed through its own fixture list — no separate calendar
+  // clock is simulated, so this always stays in sync with the Matchday
+  // counter above with zero extra bookkeeping.
+  function computeSeasonMonth(s) {
+    s = s || season;
+    if (!s || !s.leagues) return FOOTBALL_MONTHS[0];
+    const totalRounds = Math.max(1, ...SEASON_LEAGUE_DEFS.map(def => (s.leagues[def.key] && s.leagues[def.key].rounds.length) || 1));
+    const week = typeof s.week === 'number' ? s.week : 0;
+    const idx = Math.max(0, Math.min(FOOTBALL_MONTHS.length - 1, Math.floor((week / totalRounds) * FOOTBALL_MONTHS.length)));
+    return FOOTBALL_MONTHS[idx];
+  }
 
   // ========== STRICT MATCHDAY GATING ==========
   // Every competition that makes up a season (the 5 domestic leagues plus
@@ -14249,6 +14612,10 @@ var App = (() => {
     if (key === 'ucl' && comp.stage !== 'league') return true;
     const slot = currentCongestionSlot();
     if (!seasonKeysForCongestionComp(slot.comp).includes(key)) return false;
+    // A domestic cup's own "round" cadence has nothing to do with the
+    // league/UCL Matchday number (a 16-team cup only has 4 rounds all
+    // season) — it just needs to be its slot in the congestion cycle.
+    if (isCupKey(key)) return true;
     return comp.currentRound <= computeSeasonWeek(season);
   }
 
@@ -14261,6 +14628,7 @@ var App = (() => {
     if (!eligible.includes(compKey)) {
       return "It's " + slot.day + " — " + slot.comp + " fixtures only today. Simulate today's matches first to move on.";
     }
+    if (isCupKey(compKey)) return "Today's cup fixtures aren't ready yet — simulate today's other matches first.";
     const due = seasonMatchesDue();
     return 'Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
       due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first';
@@ -14296,6 +14664,12 @@ var App = (() => {
     if (!comp || !comp.rounds) return;
     const round = comp.rounds[comp.currentRound];
     if (!round || !round.length || !round.every(f => f.played)) return;
+    if (isCupKey(compKey)) {
+      crownCupRoundIfComplete(comp, compKey);
+      if (season) advanceCongestionSlotIfComplete();
+      finalizeSeasonIfComplete();
+      return;
+    }
     comp.currentRound++;
     if (compKey === 'ucl') {
       if (comp.currentRound >= comp.rounds.length) buildUCLBracketFromLeagueTable(comp);
@@ -14309,12 +14683,39 @@ var App = (() => {
     if (season) { season.week = computeSeasonWeek(season); advanceCongestionSlotIfComplete(); }
     finalizeSeasonIfComplete();
   }
+  // A cup round's fixtures just finished — work out the round's winners
+  // (either every winnerId already recorded by the "step" bulk simulator,
+  // or derived here from the score for the individual/live play paths) and
+  // either crown the champion (one team left) or pair up the next round.
+  function crownCupRoundIfComplete(comp, compKey) {
+    const round = comp.rounds[comp.currentRound];
+    const winners = round.map(f => {
+      if (f.winnerId) return getTeam(f.winnerId);
+      const home = getTeam(f.home), away = getTeam(f.away);
+      return winnerOfResult(home, away, { home: f.homeScore, away: f.awayScore, pens: f.pens });
+    }).filter(Boolean);
+    comp.currentRound++;
+    if (winners.length <= 1) {
+      comp.champion = winners[0] || null;
+      comp.finished = true;
+      if (comp.champion) {
+        const year = season ? season.year : 1;
+        const extra = { category: 'season', year };
+        pushTeamTrophy(comp.name, comp.champion.name, 'Cup (Y' + year + ')', extra);
+        pushManagerAward(comp.name + ' Winning Manager', comp.champion, 'Cup (Y' + year + ')', extra);
+        recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
+      }
+    } else {
+      comp.rounds.push(buildKnockoutFromWinners(winners).fixtures);
+      comp.roundName = getRoundName(winners.length);
+    }
+  }
 
   // Simulates a single fixture from the current matchday instantly (no live
   // view), same as the "Instant" option tournaments already offer.
   function simSeasonFixture(compKey, idx) {
     if (!season) return;
-    const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+    const comp = resolveSeasonComp(compKey);
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
       toast(seasonBlockedFixtureMessage(compKey));
@@ -14325,15 +14726,17 @@ var App = (() => {
     if (!f || f.played) return;
     const home = getTeam(f.home), away = getTeam(f.away);
     if (!home || !away) { f.played = true; return; }
+    const cup = isCupKey(compKey);
     showLoading('Simulating match…');
     setTimeout(function() {
       try {
         if (!comp.stats) comp.stats = blankCompStats();
         currentSeasonComp = comp;
-        const result = simQuickMatch(home, away, { countForLeaderboard: true, allowET: false, allowPens: false });
+        const result = simQuickMatch(home, away, { countForLeaderboard: true, allowET: cup, allowPens: cup });
         currentSeasonComp = null;
         f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report; f.pens = result.pens;
-        applyResultToTable(comp.table, f.home, f.away, result.home, result.away);
+        if (cup) f.winnerId = winnerOfResult(home, away, result).id;
+        else applyResultToTable(comp.table, f.home, f.away, result.home, result.away);
         advanceSeasonRoundIfComplete(comp, compKey);
         renderSeasonDashboard();
         persistAll();
@@ -14346,7 +14749,7 @@ var App = (() => {
   // back into the season's league table instead of a tournament bracket.
   function playSeasonFixture(compKey, idx) {
     if (!season) return;
-    const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+    const comp = resolveSeasonComp(compKey);
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
       toast(seasonBlockedFixtureMessage(compKey));
@@ -14388,7 +14791,8 @@ var App = (() => {
 
   function seasonIsComplete() {
     if (!season) return true;
-    return SEASON_LEAGUE_DEFS.every(def => season.leagues[def.key].finished) && season.ucl.finished;
+    const cupsDone = !season.cups || Object.keys(season.cups).every(k => season.cups[k].finished);
+    return SEASON_LEAGUE_DEFS.every(def => season.leagues[def.key].finished) && season.ucl.finished && cupsDone;
   }
 
   function simulateSeasonWeek() {
@@ -14411,6 +14815,7 @@ var App = (() => {
         if (!eligibleKeys.has(key)) return; // not today's competition
         if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
       });
+      simulateAllCupsDueNow();
       season.week = computeSeasonWeek(season);
       advanceCongestionSlotIfComplete();
       finalizeSeasonIfComplete();
@@ -14451,6 +14856,7 @@ var App = (() => {
           if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
           playedSomething = true;
         });
+        if (simulateAllCupRoundsNow()) playedSomething = true;
         season.week = computeSeasonWeek(season);
         safety++;
         updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
@@ -14490,13 +14896,19 @@ var App = (() => {
     const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
     const uclRounds = [];
     for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
+    const cups = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const c = buildCupCompetition(SEASON_CUP_NAMES[def.key] || (def.name + ' Cup'), leagues[def.key].teams);
+      if (c) cups[def.key] = c;
+    });
     season = {
-      year, week: 0, daySlot: 0, leagues,
+      year, week: 0, daySlot: 0, leagues, cups,
       ucl: { key: 'ucl', name: 'Champions League', teams: uclTeams, table: uclTeams.map(blankSeasonRow),
         rounds: uclRounds, currentRound: 0, matchesPerTeam, stage: 'league', bracketSize: null,
         knockout: { qf: null, sf: null, final: null }, champion: null, finished: false,
         stats: blankCompStats() }
     };
+    ensureNationalCycleForSeason(year);
     renderSeasonDashboard();
     toast('Year ' + year + ' kicks off!');
     persistAll();
@@ -14544,6 +14956,7 @@ var App = (() => {
           if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
           playedSomething = true;
         });
+        if (simulateAllCupRoundsNow()) playedSomething = true;
         season.week = computeSeasonWeek(season);
         safety++;
         updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
@@ -14616,9 +15029,9 @@ var App = (() => {
   // real top-flight calendars follow. `season.daySlot` tracks the season's
   // actual position in this cycle (separate from the Matchday/round counter)
   // and is what real play is gated against — see seasonCompCanPlayNow and
-  // advanceCongestionSlotIfComplete. Domestic cup isn't an implemented
-  // competition yet, so that slot is auto-skipped and shown greyed-out
-  // rather than pretending a cup fixture exists.
+  // advanceCongestionSlotIfComplete. The Cup slot plays each league's own
+  // domestic cup (season.cups) and auto-skips once every cup has finished
+  // for the season, same as the UCL slot once the Champions League is done.
   const FIXTURE_CONGESTION_CYCLE = [
     { day: 'Sat', comp: 'League' },
     { day: 'Tue', comp: 'UCL' },
@@ -14642,7 +15055,29 @@ var App = (() => {
   function seasonKeysForCongestionComp(compLabel) {
     if (compLabel === 'League') return SEASON_LEAGUE_DEFS.map(d => d.key);
     if (compLabel === 'UCL') return ['ucl'];
+    if (compLabel === 'Cup') return season && season.cups ? Object.keys(season.cups).map(k => 'cup_' + k) : [];
     return [];
+  }
+
+  // Every domestic-cup fixture still waiting to be played, across every
+  // league's cup — cups sit outside the Matchday/round-count system
+  // entirely (like the UCL knockout stage), so they're tracked separately
+  // from seasonMatchesDue() and only pulled in on the congestion cycle's
+  // Cup day.
+  function seasonCupMatchesDue() {
+    if (!season || !season.cups) return [];
+    const due = [];
+    Object.keys(season.cups).forEach(k => {
+      const comp = season.cups[k];
+      if (!comp || comp.finished) return;
+      const round = comp.rounds[comp.currentRound] || [];
+      round.forEach(f => {
+        if (f.played) return;
+        const home = getTeam(f.home), away = getTeam(f.away);
+        due.push({ compName: comp.name, compKey: 'cup_' + k, home: home ? home.short : '?', away: away ? away.short : '?' });
+      });
+    });
+    return due;
   }
 
   // Every fixture still due for TODAY's congestion slot specifically —
@@ -14651,20 +15086,20 @@ var App = (() => {
   function seasonSlotMatchesDue() {
     if (!season) return [];
     const keys = new Set(seasonKeysForCongestionComp(currentCongestionSlot().comp));
-    return seasonMatchesDue().filter(d => keys.has(d.compKey));
+    return seasonMatchesDue().concat(seasonCupMatchesDue()).filter(d => keys.has(d.compKey));
   }
 
   // Moves the season on to the next day in the congestion cycle once
-  // nothing due today is left to play — auto-skipping the Cup slot (never
-  // has fixtures) so the cycle never stalls waiting on an unimplemented
-  // competition.
+  // nothing due today is left to play. The Cup slot now has real fixtures
+  // (each league's domestic cup) once a season is under way, so it's only
+  // skipped once every domestic cup has actually finished.
   function advanceCongestionSlotIfComplete() {
     if (!season) return;
     if (typeof season.daySlot !== 'number') season.daySlot = 0;
     let guard = 0;
     while (guard++ < FIXTURE_CONGESTION_CYCLE.length) {
       const slot = currentCongestionSlot();
-      if (slot.comp !== 'Cup' && seasonSlotMatchesDue().length) break;
+      if (seasonSlotMatchesDue().length) break;
       season.daySlot++;
     }
   }
@@ -14679,15 +15114,17 @@ var App = (() => {
   function renderFixtureCongestionHTML() {
     if (!season) return '';
     const uclDone = season.ucl && season.ucl.finished;
+    const cupsDone = season.cups && Object.keys(season.cups).length &&
+      Object.keys(season.cups).every(k => season.cups[k].finished);
     const items = [0, 1, 2, 3, 4].map(i => {
       const slot = fixtureCongestionSlot(i);
       const isCup = slot.comp === 'Cup';
       const isUcl = slot.comp === 'UCL';
-      const disabled = isCup || (isUcl && uclDone);
+      const disabled = (isCup && cupsDone) || (isUcl && uclDone);
       const label = isCup ? 'Cup' : slot.comp;
-      const sub = isCup ? 'not available' : (isUcl && uclDone) ? 'finished' : '';
+      const sub = (isCup && cupsDone) ? 'finished' : (isUcl && uclDone) ? 'finished' : '';
       const cls = 'congestion-slot' + (i === 0 ? ' congestion-now' : '') + (disabled ? ' congestion-disabled' : '');
-      const title = isCup ? 'Domestic cup competition is not available yet' : (slot.day + ' — ' + slot.comp);
+      const title = slot.day + ' — ' + slot.comp;
       return `<div class="${cls}" title="${title}">
         <div class="congestion-day">${slot.day}</div>
         <div class="congestion-comp">${label}</div>
@@ -14702,12 +15139,12 @@ var App = (() => {
     if (!season) return;
     seasonReportRegistry = []; // rebuilt fresh each render so onclick indices stay valid
     const title = document.getElementById('season-status-title');
-    if (title) title.textContent = 'Year ' + season.year + ' · Matchday ' + season.week;
+    if (title) title.textContent = 'Year ' + season.year + ' · ' + computeSeasonMonth(season) + ' · Matchday ' + season.week;
     const congestionEl = document.getElementById('season-congestion');
     if (congestionEl) congestionEl.innerHTML = renderFixtureCongestionHTML();
     const dueEl = document.getElementById('season-due-banner');
     if (dueEl) {
-      const due = seasonMatchesDue();
+      const due = seasonMatchesDue().concat(currentCongestionSlot().comp === 'Cup' ? seasonCupMatchesDue() : []);
       if (due.length) {
         const byComp = {};
         due.forEach(d => { (byComp[d.compName] = byComp[d.compName] || []).push(d.home + ' vs ' + d.away); });
@@ -14722,9 +15159,16 @@ var App = (() => {
     }
     const tabsEl = document.getElementById('season-comp-tabs');
     if (tabsEl) {
-      const tabs = [...SEASON_LEAGUE_DEFS, { key: 'ucl', name: 'Champions League' }, { key: 'trophies', name: '🏆 Trophy Room' }];
+      const cupTabs = season.cups ? SEASON_LEAGUE_DEFS.filter(d => season.cups[d.key]).map(d =>
+        ({ key: 'cup_' + d.key, name: season.cups[d.key].name })) : [];
+      const tabs = [...SEASON_LEAGUE_DEFS, ...cupTabs,
+        { key: 'ucl', name: 'Champions League' },
+        { key: 'world', name: '🌍 World' },
+        { key: 'trophies', name: '🏆 Trophy Room' }];
       tabsEl.innerHTML = tabs.map(def => {
-        const comp = def.key === 'ucl' ? season.ucl : (def.key === 'trophies' ? null : season.leagues[def.key]);
+        const comp = def.key === 'ucl' ? season.ucl :
+          (def.key === 'trophies' || def.key === 'world') ? null :
+          resolveSeasonComp(def.key);
         const flag = comp && comp.finished ? ' 🏆' : '';
         return `<button class="lb-tab ${seasonActiveTab === def.key ? 'active' : ''}" onclick="App.showSeasonComp('${def.key}')">${def.name}${flag}</button>`;
       }).join('');
@@ -14735,9 +15179,29 @@ var App = (() => {
       contentEl.innerHTML = renderSeasonTrophyRoomHTML();
       return;
     }
-    const comp = seasonActiveTab === 'ucl' ? season.ucl : season.leagues[seasonActiveTab];
+    if (seasonActiveTab === 'world') {
+      contentEl.innerHTML = renderWorldCupTabHTML();
+      return;
+    }
+    const comp = resolveSeasonComp(seasonActiveTab);
     if (!comp) { contentEl.innerHTML = ''; return; }
     if (!comp.stats) comp.stats = blankCompStats();
+
+    if (isCupKey(seasonActiveTab)) {
+      const subTabs = [
+        { key: 'table', name: 'Bracket & Fixtures' },
+        { key: 'stats', name: 'Stats' },
+        { key: 'awards', name: 'Awards' }
+      ];
+      let h = '<div class="leaderboard-tabs" style="margin-bottom:12px">' + subTabs.map(st =>
+        `<button class="lb-tab ${seasonActiveSubTab === st.key ? 'active' : ''}" onclick="App.showSeasonSubTab('${st.key}')">${st.name}</button>`
+      ).join('') + '</div>';
+      if (seasonActiveSubTab === 'stats') h += renderCompStatsHTML(comp);
+      else if (seasonActiveSubTab === 'awards') h += renderCompAwardsHTML(comp);
+      else h += renderCupCompHTML(comp, seasonActiveTab);
+      contentEl.innerHTML = h;
+      return;
+    }
 
     const subTabs = [
       { key: 'table', name: 'Table & Fixtures' },
@@ -14756,6 +15220,85 @@ var App = (() => {
       h += seasonActiveTab === 'ucl' ? renderUCLSeasonHTML(comp) : renderLeagueCompHTML(comp, seasonActiveTab);
     }
     contentEl.innerHTML = h;
+  }
+
+  // Read-only knockout-bracket summary + fixture list for a single domestic
+  // cup — reuses renderFixtureList as-is (it already works generically off
+  // comp.rounds/comp.currentRound/comp.finished, table-free).
+  function renderCupCompHTML(comp, compKey) {
+    let h = '<div class="group-card league-table-wrap">';
+    h += '<h4>' + comp.name + '</h4>';
+    if (comp.finished && comp.champion) {
+      h += '<p style="font-size:0.85rem">🏆 Champion: <strong>' + comp.champion.name + '</strong></p>';
+    } else {
+      h += '<p style="font-size:0.75rem;color:var(--text-muted)">' + comp.teams.length +
+        '-team knockout — currently ' + (comp.roundName || 'in progress') +
+        ' (extra time + penalties if level).</p>';
+    }
+    h += '</div>';
+    h += renderFixtureList(comp, compKey);
+    return h;
+  }
+
+  // World tab: shows whichever national-team competition is currently
+  // live — the qualifying campaign feeding the next World Cup, or the
+  // World Cup finals itself once its season arrives.
+  function renderWorldCupTabHTML() {
+    let h = '';
+    if (worldCup) {
+      h += '<div class="group-card league-table-wrap"><h4>🌍 World Cup — Year ' + worldCup.year + '</h4>';
+      if (worldCup.finished && worldCup.champion) {
+        h += '<p style="font-size:0.9rem">🏆 Champions: <strong>' + worldCup.champion.name + '</strong></p>';
+      } else if (worldCup.stage === 'groups') {
+        h += '<p style="font-size:0.8rem;color:var(--text-muted)">Group stage — ' + worldCup.groups.length + ' groups of 4.</p>';
+      } else {
+        h += '<p style="font-size:0.8rem;color:var(--text-muted)">Knockout stage — ' + (worldCup.roundName || '') + '.</p>';
+      }
+      if (!worldCup.finished) {
+        h += '<button class="btn btn-primary btn-sm" onclick="App.simulateWorldCupStep(); App.renderSeasonDashboard();">▶ Simulate Next Round</button>';
+      }
+      h += '</div>';
+      if (worldCup.stage === 'groups') {
+        worldCup.groups.forEach(g => {
+          h += '<div class="group-card"><h5>Group ' + (g.id + 1) + '</h5>' + renderStandingsTableRows(g.table) + '</div>';
+        });
+      } else if (worldCup.knockoutRound) {
+        h += '<div class="group-card"><h5>' + (worldCup.roundName || 'Knockout') + '</h5>' +
+          worldCup.knockoutRound.fixtures.map(f => {
+            const home = getTeam(f.home), away = getTeam(f.away);
+            const score = f.played ? (f.homeScore + ' - ' + f.awayScore) : 'vs';
+            return '<div class="fixture-row"><span>' + (home ? home.name : '?') + '</span><span>' + score + '</span><span>' + (away ? away.name : '?') + '</span></div>';
+          }).join('') + '</div>';
+      }
+    } else if (qualifiers) {
+      h += '<div class="group-card league-table-wrap"><h4>🌍 World Cup Qualifying — for Year ' + qualifiers.forYear + '</h4>';
+      h += '<p style="font-size:0.8rem;color:var(--text-muted)">' + qualifiers.groups.length +
+        ' qualifying groups — group winners qualify automatically, best runners-up fill the 48-team field.</p>';
+      if (!qualifiers.finished) {
+        h += '<button class="btn btn-primary btn-sm" onclick="App.simulateQualifyingRound(); App.renderSeasonDashboard();">▶ Simulate Next Round</button>';
+      } else {
+        h += '<p style="font-size:0.85rem">✅ Qualifying complete — ' + (qualifiers.qualified ? qualifiers.qualified.length : 0) + ' teams through to the World Cup.</p>';
+      }
+      h += '</div>';
+      qualifiers.groups.forEach(g => {
+        h += '<div class="group-card"><h5>Group ' + (g.id + 1) + '</h5>' + renderStandingsTableRows(g.table) + '</div>';
+      });
+    } else {
+      h += '<div class="empty-state"><div class="icon">🌍</div><p>No national-team competition running right now.</p></div>';
+    }
+    return h;
+  }
+
+  // Tiny standings-table renderer shared by the World Cup/qualifying group
+  // cards — a compact subset of the full league standings table.
+  function renderStandingsTableRows(table) {
+    const sorted = sortedTable(table);
+    let h = '<table class="mini-table"><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
+    sorted.forEach(r => {
+      h += '<tr><td>' + r.team.name + '</td><td>' + r.played + '</td><td>' + r.won + '</td><td>' + r.drawn + '</td><td>' + r.lost + '</td><td>' + (r.gf - r.ga) + '</td><td><strong>' + r.pts + '</strong></td></tr>';
+    });
+    h += '</tbody></table>';
+    return h;
   }
 
   // ---------- per-competition stats & awards (Season Calendar) ----------
@@ -15980,6 +16523,7 @@ var App = (() => {
     endSeasonNow, endSeasonAndAnnounce, renderSeasonEndAnnouncement,
     showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
     simSeasonFixture, playSeasonFixture,
+    simulateWorldCupStep, simulateQualifyingRound, renderSeasonDashboard,
     searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
     togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare,
     renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital
