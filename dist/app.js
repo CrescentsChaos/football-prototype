@@ -73,7 +73,22 @@
   // callers multiply by whatever weight they need for their own formula.
   // (power > 1 is deliberately "convex": it flattens the middle of the
   // scale and steepens the extremes — the opposite of a flat multiplier.)
+  // Pre-computed lookup table for default curvedStat parameters (baseline 70, span 29, power 1.6).
+  // Avoids Math.pow / Math.abs calculations in hot simulation loops.
+  const _curvedStatDefaultLUT = new Float64Array(101);
+  for (let _i = 0; _i <= 100; _i++) {
+    let _raw = (_i - 70) / 29;
+    _raw = Math.max(-1, Math.min(1, _raw));
+    _curvedStatDefaultLUT[_i] = Math.sign(_raw) * Math.pow(Math.abs(_raw), 1.6);
+  }
+
   function curvedStat(value, baseline, span, power) {
+    if ((baseline == null || baseline === 70) &&
+        (span == null || span === 29) &&
+        (power == null || power === 1.6) &&
+        Number.isInteger(value) && value >= 0 && value <= 100) {
+      return _curvedStatDefaultLUT[value];
+    }
     baseline = baseline != null ? baseline : 70;
     span = span != null ? span : (99 - baseline);
     power = power != null ? power : 1.6;
