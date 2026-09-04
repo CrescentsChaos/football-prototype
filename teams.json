@@ -48111,7 +48111,7 @@
       "manager": {
         "name": "José Mourinho",
         "ovr": 90,
-        "formation": "4-3-3-cdm",
+        "formation": "4-2-3-1",
         "playstyle": "Quick Counter"
       }
     },
@@ -58297,7 +58297,8 @@
       ],
       "manager": {
         "name": "Manuel Pellegrini",
-        "ovr": 84
+        "ovr": 84,
+        "formation":"4-2-3-1"
       }
     },
     {
