@@ -369,25 +369,25 @@ var App = (() => {
     coords: [[50,92],[85,73.9],[62,75],[38,75],[16,75.4],[64.5,39.4],[51.9,56.7],[35.7,38.9],[73.5,16.8],[49.2,17],[25.3,17.1]] }
   };
 
-  const POS_COMPAT = {
-    GK: ['GK'], CB: ['CB','RB','LB'], RB: ['RB','CB','RWB','RM'], LB: ['LB','CB','LWB','LM'],
-    RWB: ['RWB','RB','RM'], LWB: ['LWB','LB','LM'], CDM: ['CDM','CM','CB'], CM: ['CM','CDM','CAM'],
-    CAM: ['CAM','CM','RW','LW','ST','CMF','SS'], RM: ['RM','RW','RWB','CM','RMF'], LM: ['LM','LW','LWB','CM','LMF'],
-    RW: ['RW','RM','ST','CAM','RWF'], LW: ['LW','LM','ST','CAM','LWF'], ST: ['ST','RW','LW','CAM','CF','SS'],
-    // Several FORMATIONS entries use 'CF' as a distinct slot label from
-    // 'ST' (e.g. 4-4-2, 3-5-2, the False 9 shape) even though a player's
-    // own position data is always canonicalized to 'ST' — see
-  };
+  // Player-to-slot eligibility (canPlay(), in ui/teamUI.js) is decided
+  // purely by whether the slot is literally one of the player's own listed
+  // positions (after alias canonicalization below) — there is no separate
+  // "tactically adjacent position" compatibility table. A table like that
+  // used to live here and get consulted for eligibility, which is what let
+  // a player be selected/subbed into a real position he doesn't actually
+  // play (e.g. a pure centre-back at CDM, a pure striker out on the wing)
+  // just because the two positions were deemed broadly similar.
 
   // Sensible in-slot role changes for the squad builder — tapping a
   // position on the pitch (e.g. CM) offers only the handful of role
   // shifts that stay tactically coherent for that same physical slot
   // (CM can push forward to CAM or drop to CDM; it can't become a
-  // winger or a centre-back). This is intentionally narrower than
-  // POS_COMPAT above, which answers a different question ("which
-  // players are eligible to fill this slot") — this answers "what can
-  // this slot itself become". Every list includes its own code first so
-  // callers can always fall back to "no change" as option one.
+  // winger or a centre-back). This is a squad-builder display convenience
+  // only — it answers "what can this slot itself become in the editor",
+  // never "is a given player eligible to fill this slot" (that's canPlay()
+  // above, decided solely by the player's own listed positions). Every
+  // list includes its own code first so callers can always fall back to
+  // "no change" as option one.
   const POS_ROLE_ALTS = {
     GK: ['GK'],
     CB: ['CB'],
@@ -416,14 +416,12 @@ var App = (() => {
   // Different data sources (teams.json, player-attributes.json) name the
   // same real-world position differently — eFootball-style codes (CMF,
   // DMF, AMF, RMF/LMF, RWF/LWF, SS), plain-language ones (AM), even a
-  // sweeper (SW). FORMATIONS/POS_COMPAT/POS_LINE above only ever speak the
+  // sweeper (SW). FORMATIONS/POS_LINE and canPlay() only ever speak the
   // one canonical code per position (e.g. ST, not CF) — so any player whose
   // pos array uses a variant spelling would silently never match a
-  // formation slot by exact position, and would fall through to Pass 2's
-  // compatibility check where THAT variant is equally absent from
-  // POS_COMPAT, so they wouldn't even qualify as a fallback. That's the
-  // "ST gets preferred over CF" bias: normalizePositions() (called once per
-  // team right after teams.json/player-attributes.json load, see init() in
+  // formation slot at all, exact or otherwise. That's the "ST gets
+  // preferred over CF" bias: normalizePositions() (called once per team
+  // right after teams.json/player-attributes.json load, see init() in
   // ui/matchUI.js) rewrites every player's pos array to these canonical
   // codes so the exact same eligibility logic treats every naming variant
   // of a position identically, with no formation-slot code needing to
@@ -3642,9 +3640,23 @@ var App = (() => {
     return { starting: _st, subs: _su, formation: formationKey, all: [..._st, ..._su], rotationProfile: rotationProfile || inferRotationProfile() };
   }
 
+  // A player is eligible for a slot only if that slot is genuinely one of
+  // their own listed positions (already canonicalized by normalizePlayerPos
+  // — see js/state.js — so naming variants like CMF/DMF/RWF are handled
+  // there as true "alternate spelling of the same position" cases, not
+  // here). This used to also consult POS_COMPAT, a table of tactically
+  // *adjacent* but genuinely different positions (RB counted as
+  // RWB/RM-compatible, CB counted as CDM-compatible, ST counted as
+  // RW/LW-compatible, etc.) — which meant a player could be selected or
+  // subbed into a real position they don't actually play (a pure
+  // centre-back at CDM, a pure striker out on the wing) just because the
+  // two positions were deemed "close enough". Positional eligibility
+  // should come only from what the player's own data says he plays, not
+  // from a general tactical-similarity table, so that table no longer
+  // factors in here.
   function canPlay(player, slot) {
     const positions = player.pos || [];
-    return positions.some(p => (POS_COMPAT[slot] || [slot]).includes(p) || p === slot);
+    return positions.includes(slot);
   }
 
   function shuffleArray(arr) {
