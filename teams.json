@@ -26416,7 +26416,7 @@
         },
         {
           "id": "ger14_23",
-          "name": "Mario Gomez",
+          "name": "Mario Gómez",
           "pos": [
             "ST"
           ],
@@ -26446,7 +26446,7 @@
         },
         {
           "id": "ger14_25",
-          "name": "Ilkay Gündoğan",
+          "name": "İlkay Gündoğan",
           "pos": [
             "CM",
             "CAM"
@@ -26462,7 +26462,8 @@
       ],
       "manager": {
         "name": "Joachim Löw",
-        "ovr": 94
+        "ovr": 94,
+        "formation":"4-3-3"
       }
     },
     {
@@ -76361,7 +76362,7 @@
         },
         {
           "id": "bvb13_8",
-          "name": "Ilkay Gündogan",
+          "name": "İlkay Gündoğan",
           "pos": [
             "CM",
             "CAM",
