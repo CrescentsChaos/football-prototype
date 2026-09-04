@@ -18000,7 +18000,7 @@
         },
         {
           "id": "swe06_9",
-          "name": "Fredrik Ljungberg",
+          "name": "Freddie Ljungberg",
           "pos": [
             "LM",
             "RM",
@@ -36602,8 +36602,8 @@
           "id": "cpv15",
           "name": "Sidny Cabral",
           "pos": [
-            "LW",
-            "RW"
+            "LB",
+            "LM"
           ],
           "ovr": 80,
           "att": 82,
@@ -36611,7 +36611,7 @@
           "phy": 70,
           "pac": 92,
           "tec": 86,
-          "num": 21
+          "num": 13
         },
         {
           "id": "cpv16",
@@ -45428,11 +45428,26 @@
           "pac": 76,
           "tec": 64,
           "num": 25
+        },
+        {
+          "id": "ban26",
+          "name": "Hamza Choudhury",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 74,
+          "att": 73,
+          "def": 25,
+          "phy": 70,
+          "pac": 76,
+          "tec": 64,
+          "num": 8
         }
       ],
       "manager": {
-        "name": "Javier Cabrera",
-        "ovr": 72
+        "name": "Thomas Dooley",
+        "ovr": 73
       }
     },
     {
@@ -47693,7 +47708,7 @@
       "stadium": "Estadio Santiago Bernabéu",
       "players": [
         {
-          "id": "rma26_1",
+          "id": "bel1",
           "name": "Thibaut Courtois",
           "pos": [
             "GK"
