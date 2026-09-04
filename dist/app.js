@@ -1692,10 +1692,12 @@ var App = (() => {
     if (natural && formation.slots.includes(natural) && isFree(natural)) return natural;
     const compatSlot = formation.slots.find(s => canPlay(inPlayer, s) && isFree(s));
     if (compatSlot) return compatSlot;
-    // Nothing both comfortable and free — the vacated slot is still the
-    // least-bad landing spot (it's the one guaranteed to actually be open),
-    // even if the incoming player isn't a natural fit for it.
-    return outSlot || natural || 'CM';
+    // Nothing both comfortable and free — a manager never actually sends a
+    // player on to a position they can't play, so there's no safe landing
+    // spot for this particular sub right now. Returning null tells the
+    // caller (trySubstitution) to look for a different incoming player
+    // instead of forcing this one into the vacated slot regardless of fit.
+    return null;
   }
 
 
@@ -3541,9 +3543,19 @@ var App = (() => {
     // and how protected the squad's core is from it, depends on the
     // competition (see ROTATION_PROFILES above).
     allPlayers.forEach(p => { p._recentStarts = Math.max(0, (p._recentStarts || 0) - prof.decay); });
+    // Current run of form (engine/form.js liveRating) also weighs on
+    // selection, not just rotation/OVR — a player who's genuinely out of
+    // form is a weaker pick than his raw OVR alone suggests, so a manager
+    // leans toward a same-position alternative who's in better form when
+    // one is actually available. This is a soft nudge, not a hard bench:
+    // it only tips a genuinely close call, so a clearly-superior player
+    // in poor form still starts over a much weaker one in great form.
+    const FORM_SELECTION_PENALTY = { A: 0, B: 0, C: 0.5, D: 2.5, E: 5.5 };
     const score = (p) => {
       const protect = coreIds.has(p.id) ? prof.coreProtect : 1;
-      return (p.ovr || 70) - (p._recentStarts || 0) * prof.penalty * protect + (seededRandom() * prof.rand - prof.rand / 2);
+      if (typeof ensurePlayerConditionProfile === 'function') ensurePlayerConditionProfile(p);
+      const formPenalty = FORM_SELECTION_PENALTY[p.liveRating] || 0;
+      return (p.ovr || 70) - (p._recentStarts || 0) * prof.penalty * protect - formPenalty + (seededRandom() * prof.rand - prof.rand / 2);
     };
 
     let players = shuffleArray(allPlayers.filter(p => !isPlayerInjured(p.id) && !isPlayerSuspended(p.id)));
@@ -8223,8 +8235,26 @@ var App = (() => {
       }
       return (b.ovr || 70) - (a.ovr || 70);
     });
+    // Only ever commit to an incoming sub who actually has a suitable spot
+    // to land in — never force someone into a position they can't play.
+    // Check the top few candidates (by quality) in order and take the
+    // first one who resolves to a real slot; pickSlotForIncomingSub()
+    // returns null when nothing fits, which this now respects instead of
+    // overriding it with a forced placement.
+    const restOfPitch = onPitch.filter(p => p.id !== outPlayer.id);
     const top = candidatesIn.slice(0, Math.min(3, candidatesIn.length));
-    const inPlayer = top[Math.floor(seededRandom() * top.length)];
+    let inPlayer = null, inSlot = null;
+    for (const cand of top) {
+      const slot = pickSlotForIncomingSub(cand, sideData.squad.formation, outSlot, restOfPitch);
+      if (slot) { inPlayer = cand; inSlot = slot; break; }
+    }
+    if (!inPlayer) {
+      // None of the leading candidates has anywhere position-legal to
+      // play right now — don't sub anyone on. trySubstitution() gets
+      // called again on later minutes, so a fitting sub can still happen
+      // once one becomes available.
+      return;
+    }
     const idx = onPitchIds.indexOf(outPlayer.id);
     if (idx >= 0) onPitchIds[idx] = inPlayer.id;
     markLeftPitch(m, side, outPlayer.id);
@@ -8246,7 +8276,7 @@ var App = (() => {
     // natural slot within the current formation instead (falling back to
     // any formation slot they can actually play if their exact position
     // isn't part of this shape).
-    inPlayer.slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outSlot, onPitch.filter(p => p.id !== outPlayer.id));
+    inPlayer.slot = inSlot;
     const tag = tacticalChange ? (chasing ? ' <span style="opacity:0.6">(attacking change)</span>' : ' <span style="opacity:0.6">(defensive change)</span>') : '';
     // Surface the real reason behind a notable change (booked/tiring) in
     // the event log, same spirit as the tactical tag above.
@@ -8860,6 +8890,20 @@ var App = (() => {
       // with this match's accumulated defensive totals.
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
       if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
+    });
+    // Anyone on either roster who didn't actually feature this match —
+    // unused substitutes, and anyone outside the matchday squad entirely —
+    // has their run of form reset back to neutral ("B") rather than
+    // keeping whatever liveRating they carried in. A hot or cold streak is
+    // about actually playing; sitting a match out doesn't extend it either
+    // way.
+    const featuredIds = new Set(pool.map(p => p.id));
+    [m.home.team, m.away.team].forEach(team => {
+      (team.players || []).forEach(rp => {
+        if (featuredIds.has(rp.id)) return;
+        ensurePlayerConditionProfile(rp);
+        if (rp.liveRating !== 'B') rp.liveRating = 'B';
+      });
     });
     // Fill in the full Attack/Passing/Defense/Physical/Goalkeeping stat sheet
     // for every player who took part, then roll those up into each side's
