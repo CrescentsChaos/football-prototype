@@ -47919,8 +47919,9 @@
           "id": "rma26_15",
           "name": "Arda Güler",
           "pos": [
-            "CAM",
-            "RW"
+            "RW",
+            "RM",
+            "CAM"
           ],
           "ovr": 84,
           "att": 83,
@@ -48082,8 +48083,7 @@
           "id": "rma26_27",
           "name": "Thiago Pitarch",
           "pos": [
-            "CM",
-            "CAM"
+            "CM"
           ],
           "ovr": 75,
           "att": 74,
@@ -58265,7 +58265,7 @@
           "num": 17
         },
         {
-          "id": "bet26_19",
+          "id": "bet26_9",
           "name": "Cucho Hernández",
           "pos": [
             "ST",
@@ -58277,7 +58277,7 @@
           "phy": 78,
           "pac": 82,
           "tec": 79,
-          "num": 19
+          "num": 9
         },
         {
           "id": "bet26_14",
@@ -58293,6 +58293,34 @@
           "pac": 76,
           "tec": 77,
           "num": 14
+        },{
+          "id": "bet26_19",
+          "name": "Troy Parrott",
+          "pos": [
+            "ST",
+            "CF"
+          ],
+          "ovr": 77,
+          "att": 78,
+          "def": 44,
+          "phy": 74,
+          "pac": 76,
+          "tec": 71,
+          "num": 19
+        },     {
+          "id": "bet26_28",
+          "name": "Dani Ceballos",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 81,
+          "att": 71,
+          "def": 71,
+          "phy": 67,
+          "pac": 61,
+          "tec": 81,
+          "num": 28
         }
       ],
       "manager": {
