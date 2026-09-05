@@ -47571,7 +47571,7 @@
         },
         {
           "id": "rma18_15",
-          "name": "Théo Hernandez",
+          "name": "Théo Hernández",
           "pos": [
             "LB"
           ],
@@ -53933,7 +53933,9 @@
       ],
       "manager": {
         "name": "Luis Enrique",
-        "ovr": 96
+        "ovr": 96,
+        "formation":"4-3-3",
+        "playstyle":"Possession"
       }
     },
     {
@@ -70054,7 +70056,7 @@
         },
         {
           "id": "rma03_6",
-          "name": "IVán Helguera",
+          "name": "Iván Helguera",
           "pos": [
             "CB",
             "CDM"
