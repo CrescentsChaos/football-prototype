@@ -109,7 +109,6 @@
       t = setTimeout(() => { t = null; fn.apply(this, args); }, wait);
     };
   }
-
 /* Apex Football Simulator - Fixed (no external fetch) */
 var App = (() => {
   // ========== EMBEDDED TEAMS DATA ==========
@@ -157,8 +156,8 @@ var App = (() => {
   // pac/phy/tec/ovr as read from teams.json for that player are ignored —
   // see applyExpandedPlayerAttributes()).
   let playerAttributesData = {};
-  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
-  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
   // Permanent, never-reset per-player totals (goals, assists, apps, etc.)
   // across every season the save has ever played — this is what the
   // Players tab / player profile's "Career (competitive)" panel reads from.
@@ -167,7 +166,7 @@ var App = (() => {
   // wiped by archiveAndResetGlobalAwards() at every season end; careerStats
   // uses the exact same shape but is only ever added to, never reset, so
   // ending a season doesn't erase a player's lifetime totals.
-  let careerStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
+  let careerStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
   // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
   // can also tally into that competition's own stat bucket (comp.stats), giving each
@@ -3368,7 +3367,8 @@ var App = (() => {
   }
   // Player name + portrait, for use inside a leaderboard/award table cell.
   function lbPlayerCell(p, size) {
-    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${playerNameHTML(p)}</span></div>`;
+    const clickable = p && p.id != null;
+    return `<div class="lb-player-cell${clickable ? ' player-clickable' : ''}"${clickable ? ` onclick="App.showPlayerProfile('${p.id}')"` : ''}>${lbAvatar(p, size)}<span class="lb-player-name">${playerNameHTML(p)}</span></div>`;
   }
   // Rank badge for position i (0-indexed): medal for top 3, plain number after.
   function rankBadge(i) {
@@ -3549,10 +3549,19 @@ var App = (() => {
     // it only tips a genuinely close call, so a clearly-superior player
     // in poor form still starts over a much weaker one in great form.
     const FORM_SELECTION_PENALTY = { A: 0, B: 0, C: 0.5, D: 2.5, E: 5.5 };
+    // A genuinely elite player (high OVR) shouldn't be able to spiral out of
+    // the XI just because a rough scoring/rating patch dropped his liveRating
+    // — real managers keep playing a world-class player through a slump far
+    // more readily than a squad player. This scales the flat form penalty
+    // down the higher a player's OVR is, so a 90+ OVR player barely feels a
+    // bad-form dip while an average player still gets rotated for one
+    // normally. Purely a selection-time nudge — doesn't touch liveRating,
+    // in-match ability, or anything else.
+    const eliteFormProtect = (ovr) => ovr >= 90 ? 0.4 : ovr >= 85 ? 0.65 : ovr >= 80 ? 0.85 : 1;
     const score = (p) => {
       const protect = coreIds.has(p.id) ? prof.coreProtect : 1;
       if (typeof ensurePlayerConditionProfile === 'function') ensurePlayerConditionProfile(p);
-      const formPenalty = FORM_SELECTION_PENALTY[p.liveRating] || 0;
+      const formPenalty = (FORM_SELECTION_PENALTY[p.liveRating] || 0) * eliteFormProtect(p.ovr || 70);
       return (p.ovr || 70) - (p._recentStarts || 0) * prof.penalty * protect - formPenalty + (seededRandom() * prof.rand - prof.rand / 2);
     };
 
@@ -6699,7 +6708,13 @@ var App = (() => {
     // for the full explanation of why these needed to come down.
     openplay:    { baseOnTarget: 0.34, baseXg: 0.08, headerWeight: 0 },
     throughball: { baseOnTarget: 0.42, baseXg: 0.15, headerWeight: 0 },
-    cross:       { baseOnTarget: 0.37, baseXg: 0.11, headerWeight: 0.72 },
+    // headerWeight brought down from 0.72 — at that level nearly three
+    // quarters of every cross-type chance was being resolved purely on
+    // aerialSkill() (Heading/Jump/Phy Contact), sidelining a non-aerial
+    // striker's actual finishing/pace/movement on a huge share of his own
+    // team's chances. 0.45 still makes headers the more likely outcome of a
+    // cross (realistic), just not an near-total lock.
+    cross:       { baseOnTarget: 0.37, baseXg: 0.11, headerWeight: 0.45 },
     dribble:     { baseOnTarget: 0.40, baseXg: 0.13, headerWeight: 0 },
     longshot:    { baseOnTarget: 0.24, baseXg: 0.045, headerWeight: 0 },
     counter:     { baseOnTarget: 0.42, baseXg: 0.16, headerWeight: 0 }
@@ -6717,8 +6732,16 @@ var App = (() => {
 
     // ---- Shots phase: shot quality drawn straight from the shooter's own
     // finishing-relevant attributes and playstyle edges.
+    // Headers used to be scored purely off aerialSkill (Heading/Jump/Phy
+    // Contact) with zero regard for the shooter's actual finishing ability —
+    // so a genuinely elite finisher who isn't primarily an aerial target
+    // (weak Heading rating) got no credit at all for a header chance despite
+    // still being the one steering it goalward. finishingEdge() is folded in
+    // at half weight: heading ability still leads (this is still a header,
+    // not a normal shot), but a top-tier finisher's touch now meaningfully
+    // softens a poor Heading rating instead of being fully overridden by it.
     let shotQuality = isHeader
-      ? Math.max(0.05, Math.min(0.98, aerialSkill(shooter, false) + positioningEdge(shooter)))
+      ? Math.max(0.05, Math.min(0.98, aerialSkill(shooter, false) * 0.8 + positioningEdge(shooter) + finishingEdge(shooter) * 0.5))
       : Math.max(0.05, Math.min(0.98,
           // Every compact stat that feeds a shot runs through the curve
           // before blending — applies to every shooter (expanded sheet or
@@ -6979,7 +7002,14 @@ var App = (() => {
         break;
       case 'cross':
         chanceType = 'cross';
-        shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'], (p) => aerialSkill(p) * 2, carrier.id)
+        // aerialSkill(p) * 2 used to decide the cross target almost purely on
+        // heading ability, regularly passing over a team's actual first-choice
+        // striker in the box for a better header elsewhere on the pitch. A
+        // GOAL_ROLE_WEIGHT term (favors ST/CAM/wide — see possession.js) is
+        // blended in alongside it so a striker's natural spot to attack a
+        // cross from still counts for something, not just who jumps best.
+        shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'],
+          (p) => aerialSkill(p) * 1.3 + (GOAL_ROLE_WEIGHT[p.slot || (p.pos || [])[0]] || 0.5) * 0.5, carrier.id)
           || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
         break;
       case 'throughball':
@@ -8902,6 +8932,10 @@ var App = (() => {
       // with this match's accumulated defensive totals.
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
       if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
+      // Feed the "minutes" bucket so the Avg Rating leaderboard can require
+      // a minimum share of available playing time (see showLeaderboard).
+      const minutesPlayed = computeMinutesPlayed(m, p.id, p.name, concededSide);
+      if (minutesPlayed > 0) recordStatCount('minutes', p, teamObj, minutesPlayed);
     });
     // Anyone on either roster who didn't actually feature this match —
     // unused substitutes, and anyone outside the matchday squad entirely —
@@ -9601,7 +9635,7 @@ var App = (() => {
   // Shape used for every per-competition stat bucket: season leagues, the season's
   // UCL, and (already existing) the global `stats` / `tournamentStats` buckets.
   function blankCompStats() {
-    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
   }
 
   function bumpStatBucket(bucket, type, player, team) {
@@ -10147,12 +10181,12 @@ var App = (() => {
     // Players tab / player profile) is a completely separate, never-reset
     // bucket — see its declaration in js/state.js — so ending a season no
     // longer wipes a player's career goals/assists/apps/etc.
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
     // otherwise this would wipe that tournament's own live leaderboard mid-run.
     if (!tournament || tournament.champion) {
-      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
     }
     saveStats();
   }
@@ -10743,7 +10777,21 @@ var App = (() => {
     document.querySelectorAll('.lb-tab').forEach(t => t.classList.toggle('active', t.dataset.lb === type));
     let data;
     if (type === 'ratings') {
-      data = Object.values(stats.ratings || {}).filter(x => x.count > 0).sort((a, b) => b.avg - a.avg || b.count - a.count).slice(0, 20);
+      // Avg Rating should only reward players with a genuine sample of playing
+      // time, not someone who popped up for 10 minutes and got a lucky rating.
+      // Threshold: at least 60% of the minutes the competitions' busiest
+      // player has racked up so far (the best available stand-in for "total
+      // minutes played in the competitions" without needing a separate
+      // match-count counter).
+      const minutesMap = stats.minutes || {};
+      const maxMinutes = Object.values(minutesMap).reduce((m, x) => Math.max(m, x.count || 0), 0);
+      const minMinutesRequired = maxMinutes * 0.6;
+      data = Object.values(stats.ratings || {}).filter(x => {
+        if (!(x.count > 0)) return false;
+        if (!maxMinutes) return true; // no minutes recorded yet (e.g. older save) — don't hide everyone
+        const played = (minutesMap[x.id] && minutesMap[x.id].count) || 0;
+        return played >= minMinutesRequired;
+      }).sort((a, b) => b.avg - a.avg || b.count - a.count).slice(0, 20);
     } else {
       data = Object.values(stats[type] || {}).sort((a, b) => b.count - a.count).slice(0, 20);
     }
@@ -10757,7 +10805,7 @@ var App = (() => {
     const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
     const top3 = data.slice(0, 3);
     const podium = top3.length ? `<div class="lb-podium">
-      ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1}">
+      ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1} player-clickable" onclick="App.showPlayerProfile('${p.id}')">
           <div class="lb-podium-rank">${i===0?'🥇':i===1?'🥈':'🥉'}</div>
           ${lbAvatar(p, 56)}
           <div class="lb-podium-name">${playerNameHTML(p)}</div>
@@ -10881,7 +10929,7 @@ var App = (() => {
     if (selected.length < minTeams) { toast('Select at least ' + minTeams + ' teams'); return; }
 
     applyTournamentBranding(tournamentType);
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
     // Wipe the player/team match logs for the new tournament. These logs
     // exist to show recent form (last 10, capped at 30) for whatever's
     // currently being played — carrying entries over from a finished
@@ -13879,7 +13927,7 @@ var App = (() => {
     if (type === 'goldenboot') {
       const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">' + emojiImg('goal', 'Goal') + '</div><p>No goals yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Golden Boot', 34) + ' Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
+      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Golden Boot', 34) + ' Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -13892,7 +13940,7 @@ var App = (() => {
         return;
       }
       const leader = data[0];
-      el.innerHTML = '<div class="award-card">' + lbAvatar(leader, 64) + '<div class="award-info"><h4>' + trophyMark("Ballon d'Or", 34) + ' Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
+      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + leader.id + '\')">' + lbAvatar(leader, 64) + '<div class="award-info"><h4>' + trophyMark("Ballon d'Or", 34) + ' Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Noms</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td>'+(p.noms||0)+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -13900,7 +13948,7 @@ var App = (() => {
       // Puskás Award — best/most spectacular individual goal, tallied by nominee count
       const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Puskás Award', 34) + ' Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Puskás Award', 34) + ' Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Nominated Goals</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -13926,7 +13974,7 @@ var App = (() => {
       });
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Gerd Müller Award', 34) + ' Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Gerd Müller Award', 34) + ' Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -13949,7 +13997,7 @@ var App = (() => {
       });
       const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Yashin Trophy', 34) + ' Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Yashin Trophy', 34) + ' Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -13982,7 +14030,7 @@ var App = (() => {
       });
       const data = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧱</div><p>No defensive stats yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark("Defenders' Award", 34) + " Defenders' Award</h4><p class=\"award-winner\">" + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best defender · ' + data[0].interceptions + ' interceptions · ' + data[0].tackles + ' tackles · ' + data[0].team + '</p></div></div>' +
+      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark("Defenders' Award", 34) + " Defenders' Award</h4><p class=\"award-winner\">" + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best defender · ' + data[0].interceptions + ' interceptions · ' + data[0].tackles + ' tackles · ' + data[0].team + '</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Int</th><th>Tkl</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
         data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.interceptions+'</td><td>'+p.tackles+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
         '</tbody></table></div>';
@@ -14018,9 +14066,9 @@ var App = (() => {
       const topAst = Object.values(stats.assists||{}).sort((a,b)=>b.count-a.count)[0];
       const topMotm = Object.values(stats.motm||{}).sort((a,b)=>b.count-a.count)[0];
       el.innerHTML = `
-        <div class="award-card">${topScorer ? lbAvatar(topScorer, 52) : trophyMark('Golden Boot', 68)}<div class="award-info"><h4>${trophyMark('Golden Boot', 30)} Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
-        <div class="award-card">${topAst ? lbAvatar(topAst, 52) : trophyMark('Top Assists', 68)}<div class="award-info"><h4>${trophyMark('Top Assists', 30)} Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
-        <div class="award-card">${topMotm ? lbAvatar(topMotm, 52) : trophyMark('Most MOTM', 68)}<div class="award-info"><h4>${trophyMark('Most MOTM', 30)} Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
+        <div class="award-card${topScorer ? ' player-clickable' : ''}"${topScorer ? ` onclick="App.showPlayerProfile('${topScorer.id}')"` : ''}>${topScorer ? lbAvatar(topScorer, 52) : trophyMark('Golden Boot', 68)}<div class="award-info"><h4>${trophyMark('Golden Boot', 30)} Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
+        <div class="award-card${topAst ? ' player-clickable' : ''}"${topAst ? ` onclick="App.showPlayerProfile('${topAst.id}')"` : ''}>${topAst ? lbAvatar(topAst, 52) : trophyMark('Top Assists', 68)}<div class="award-info"><h4>${trophyMark('Top Assists', 30)} Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
+        <div class="award-card${topMotm ? ' player-clickable' : ''}"${topMotm ? ` onclick="App.showPlayerProfile('${topMotm.id}')"` : ''}>${topMotm ? lbAvatar(topMotm, 52) : trophyMark('Most MOTM', 68)}<div class="award-info"><h4>${trophyMark('Most MOTM', 30)} Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
         <div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Trophies</h4><p class="award-winner">${trophies.length} won</p></div></div>`;
     }
   }
@@ -15568,7 +15616,7 @@ var App = (() => {
     const card = (title, icon, p, extra) => {
       const titleHtml = `<div class="am-title">${trophyMark(title, 32)} ${title}</div>`;
       if (!p) return `<div class="award-mini">${titleHtml}<div class="am-empty">TBD</div></div>`;
-      return `<div class="award-mini">${titleHtml}
+      return `<div class="award-mini player-clickable" onclick="App.showPlayerProfile('${p.id}')">${titleHtml}
         ${lbAvatar(p, 44)}
         <div class="am-name">${playerNameHTML(p)}</div>
         <div class="am-meta">${p.team || ''} · ${extra}</div></div>`;
