@@ -1905,6 +1905,7 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .trophy-cabinet-item .trophy-mark { margin: 0 auto; }
 .trophy-cabinet-item .tc-name { font-size: 0.7rem; font-weight: 700; color: var(--text); line-height: 1.15; }
+.trophy-cabinet-item .tc-count { color: var(--gold); font-weight: 700; }
 .trophy-cabinet-item .tc-type { font-size: 0.62rem; color: var(--text-3); line-height: 1.15; }
 
 /* History tab */
