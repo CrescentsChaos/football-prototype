@@ -1011,6 +1011,10 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   color: var(--bg-0); background: linear-gradient(135deg, var(--gold), var(--gold-dim));
 }
 .lb-player-cell { display: flex; align-items: center; gap: 8px; }
+.player-clickable { cursor: pointer; transition: transform var(--dur-base, 0.15s) var(--ease-smooth, ease), opacity var(--dur-base, 0.15s) var(--ease-smooth, ease); }
+.player-clickable:hover { opacity: 0.82; }
+.lb-player-cell.player-clickable:hover .lb-player-name { text-decoration: underline; }
+.lb-podium-slot.player-clickable:hover, .award-card.player-clickable:hover, .award-mini.player-clickable:hover { transform: translateY(-2px); }
 .lb-player-name { font-weight: 600; }
 .lb-table tr.lb-row-top td { background: rgba(240,193,75,0.05); }
 .lb-table tr.lb-row-top.rank-1 td { background: rgba(240,193,75,0.14); box-shadow: inset 3px 0 0 var(--gold); }
