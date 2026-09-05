@@ -266,6 +266,12 @@ var App = (() => {
   // year    — season year (season/season-global trophies)
   // run     — shared id for every trophy awarded out of the same standalone tournament run
   let trophies = [];
+  // Counter for the "End Season" button's standalone awards cycle — used to
+  // tag/group archived global awards (Golden Boot, Ballon d'Or, etc.) when
+  // it's pressed with no Season Calendar running, so History can still
+  // group them sensibly. Bumped once per standalone press, independent of
+  // any season's own `year`.
+  let standaloneAwardsRound = 0;
   let currentMatch = null;
   let simInterval = null;
   let simSpeed = 400;
@@ -9784,14 +9790,46 @@ var App = (() => {
     } catch (e) {}
   }
 
-  function findPlayerTeams(playerId) {
-    let national = null, club = null;
+
+  // findPlayerTeams() is called once per player for every leaderboard/Ballon
+  // d'Or/career-trophy computation, so it needs to be O(1)-ish rather than
+  // rescanning every national + club roster on every call (that full rescan,
+  // repeated for every player with any stat recorded, is what made the
+  // Awards > Ballon d'Or tab noticeably slow to open). Team rosters
+  // (teamsData.national/.club, allTeams) never change after load — there's
+  // no live transfer/roster-mutation path in this build — so we can build
+  // simple id/name lookup indexes once and reuse them for the life of the
+  // page instead of rebuilding on every call.
+  let _playerTeamIndexBuilt = false;
+  let _nationalById = {};
+  let _clubById = {};
+  let _playerByIdIdx = {};
+  let _nationalByName = {};
+  let _clubByName = {};
+
+  function buildPlayerTeamIndexes() {
+    if (_playerTeamIndexBuilt) return;
+    _nationalById = {}; _clubById = {}; _playerByIdIdx = {};
+    _nationalByName = {}; _clubByName = {};
     (teamsData.national || []).forEach(t => {
-      if ((t.players || []).some(p => p.id === playerId)) national = t.name;
+      (t.players || []).forEach(p => {
+        _nationalById[p.id] = t.name;
+        (_nationalByName[p.name] || (_nationalByName[p.name] = [])).push({ team: t.name, pos: p.pos, id: p.id });
+      });
     });
     (teamsData.club || []).forEach(t => {
-      if ((t.players || []).some(p => p.id === playerId)) club = t.name;
+      (t.players || []).forEach(p => {
+        _clubById[p.id] = t.name;
+        (_clubByName[p.name] || (_clubByName[p.name] = [])).push({ team: t.name, pos: p.pos, id: p.id });
+      });
     });
+    (allTeams || []).forEach(t => (t.players || []).forEach(p => { _playerByIdIdx[p.id] = p; }));
+    _playerTeamIndexBuilt = true;
+  }
+  function findPlayerTeams(playerId) {
+    buildPlayerTeamIndexes();
+    let national = _nationalById[playerId] || null;
+    let club = _clubById[playerId] || null;
     // Same real player may exist as two separate roster entries (club + country)
     // with different ids — fall back to a name match to link them. Because
     // different, unrelated players CAN share an identical name, this fallback
@@ -9800,32 +9838,22 @@ var App = (() => {
     // position. Ambiguous name collisions are left blank rather than risking
     // attributing one player's country/club to a different, same-named player.
     if (!national || !club) {
-      let srcPlayer = null;
-      allTeams.forEach(t => {
-        const p = (t.players || []).find(x => x.id === playerId);
-        if (p) srcPlayer = p;
-      });
+      const srcPlayer = _playerByIdIdx[playerId];
       if (srcPlayer && srcPlayer.name) {
         const pname = srcPlayer.name;
         const srcPos = (srcPlayer.pos || [])[0];
-        const posMatches = (p) => !srcPos || !p.pos || !p.pos.length || p.pos.includes(srcPos);
+        const posMatches = (pos) => !srcPos || !pos || !pos.length || pos.includes(srcPos);
         if (!national) {
-          const matches = [];
-          (teamsData.national || []).forEach(t => {
-            (t.players || []).forEach(p => {
-              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
-            });
-          });
+          const matches = (_nationalByName[pname] || [])
+            .filter(c => c.id !== playerId && posMatches(c.pos))
+            .map(c => c.team);
           const uniqueTeams = [...new Set(matches)];
           if (uniqueTeams.length === 1) national = uniqueTeams[0];
         }
         if (!club) {
-          const matches = [];
-          (teamsData.club || []).forEach(t => {
-            (t.players || []).forEach(p => {
-              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
-            });
-          });
+          const matches = (_clubByName[pname] || [])
+            .filter(c => c.id !== playerId && posMatches(c.pos))
+            .map(c => c.team);
           const uniqueTeams = [...new Set(matches)];
           if (uniqueTeams.length === 1) club = uniqueTeams[0];
         }
@@ -9873,15 +9901,25 @@ var App = (() => {
   function saveTrophiesToStorage() {
     try { return safeSetItem('apexTrophies', JSON.stringify(trophies)); } catch (e) { return false; }
   }
-  function pushTeamTrophy(name, teamName, type, extra) {
-    const t = Object.assign({ name, team: teamName, type, date: Date.now() }, extra || {});
+  // `teamObj` is the actual winning team (not just its name) so we can pull
+  // its full squad's player ids into `playerIds` — that's what lets every
+  // squad member's Trophy Cabinet show this team trophy (World Cup,
+  // Champions League, league titles, cups) as their own, not just the
+  // team's. Accepts a bare string too (falls back to no playerIds) so any
+  // caller that genuinely only has a name doesn't break.
+  function pushTeamTrophy(name, teamObj, type, extra) {
+    const teamName = (teamObj && teamObj.name) || (typeof teamObj === 'string' ? teamObj : '');
+    const playerIds = (teamObj && Array.isArray(teamObj.players))
+      ? teamObj.players.map(p => p.id).filter(Boolean)
+      : [];
+    const t = Object.assign({ name, team: teamName, playerIds, type, date: Date.now() }, extra || {});
     trophies.push(t);
     saveTrophiesToStorage();
     return t;
   }
   function pushIndividualTrophy(awardName, playerObj, type, extra) {
     if (!playerObj || !playerObj.name) return null;
-    const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, type, date: Date.now() }, extra || {});
+    const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, playerId: playerObj.id || null, type, date: Date.now() }, extra || {});
     trophies.push(t);
     saveTrophiesToStorage();
     return t;
@@ -10186,9 +10224,10 @@ var App = (() => {
   // and `tournamentStats` so the new season's leaderboard & Awards tab start
   // from zero. Team trophies (league/UCL winners) are left untouched — the
   // trophy case is a permanent record, only the live leaderboard resets.
-  function archiveAndResetGlobalAwards(year) {
-    const extra = { category: 'season-global', year };
-    const type = 'Season Y' + year + ' (Global)';
+  function archiveAndResetGlobalAwards(year, category) {
+    category = category || 'season-global';
+    const extra = { category, year };
+    const type = (category === 'standalone-global' ? 'Awards Round ' + year : 'Season Y' + year) + ' (Global)';
     const topOf = (key) => Object.values(stats[key] || {}).sort((a,b) => b.count - a.count)[0] || null;
     pushIndividualTrophy('Golden Boot', topOf('goals'), type, extra);
     pushIndividualTrophy('Top Assists', topOf('assists'), type, extra);
@@ -10406,6 +10445,7 @@ var App = (() => {
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
       ok = safeSetItem('apexPlayerMatchLog', JSON.stringify(playerMatchLog)) && ok;
       ok = safeSetItem('apexTeamMatchLog', JSON.stringify(teamMatchLog)) && ok;
+      ok = safeSetItem('apexStandaloneAwardsRound', String(standaloneAwardsRound)) && ok;
     } catch(e) { ok = false; }
     return ok;
   }
@@ -10441,6 +10481,8 @@ var App = (() => {
       if (pml) playerMatchLog = JSON.parse(pml);
       const tml = localStorage.getItem('apexTeamMatchLog');
       if (tml) teamMatchLog = JSON.parse(tml);
+      const sar = localStorage.getItem('apexStandaloneAwardsRound');
+      if (sar) standaloneAwardsRound = parseInt(sar, 10) || 0;
     } catch(e) {}
   }
 
@@ -11209,7 +11251,7 @@ var App = (() => {
         worldCup.finished = true;
         if (worldCup.champion) {
           const extra = { category: 'worldcup', year: worldCup.year };
-          pushTeamTrophy('World Cup', worldCup.champion.name, 'World Cup (Y' + worldCup.year + ')', extra);
+          pushTeamTrophy('World Cup', worldCup.champion, 'World Cup (Y' + worldCup.year + ')', extra);
           pushManagerAward('World Cup Winning Manager', worldCup.champion, 'World Cup (Y' + worldCup.year + ')', extra);
           recordIndividualAwardsFromAwardsObject(assignCompAwards(worldCup), 'World Cup (Y' + worldCup.year + ')', extra);
         }
@@ -12808,7 +12850,7 @@ var App = (() => {
     // tournament's individual awards — the Ballon d'Or / Gerd Müller /
     // Yashin scoring below reads the permanent trophy case for career
     // pedigree, so the cup just won here needs to already be in it.
-    pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
+    pushTeamTrophy(tName, team, 'Tournament', runExtra);
     pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
     assignTournamentAwards();
     recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
@@ -13704,14 +13746,43 @@ var App = (() => {
   }
 
 
-  // Trophy Cabinet: every individual award a player (matched by exact name,
-  // same convention as playerPortraits/trophyImages) has won, newest first.
-  function playerTrophyCabinetHTML(playerName) {
-    const won = trophies.filter(t => t.player === playerName).sort((a, b) => (b.date || 0) - (a.date || 0));
-    if (!won.length) return '';
+  // Trophy Cabinet: every trophy a player has personally won, newest first —
+  // both individual awards (Golden Boot, Ballon d'Or, ...) AND team trophies
+  // (World Cup, Champions League, league titles, cups) earned by any squad
+  // they were part of. Matched by player id (not name) so two different
+  // players who happen to share a name never share a cabinet — trophies
+  // recorded before this fix (with no id/playerIds on file) fall back to a
+  // name match so nothing already won just disappears.
+  function playerWonTrophies(player) {
+    if (!player) return [];
+    return trophies.filter(t => {
+      if (t.playerId != null) return t.playerId === player.id;
+      if (Array.isArray(t.playerIds) && t.playerIds.length) return t.playerIds.includes(player.id);
+      // Legacy entry from before ids were recorded — name is all we have.
+      return t.player === player.name;
+    });
+  }
+  // Groups a player's won trophies by name so winning the same trophy more
+  // than once shows as a single card with a "×N" badge instead of one card
+  // per win. Keeps the most recent date/type for display/sort ordering.
+  function groupPlayerTrophies(list) {
+    const groups = {};
+    list.forEach(t => {
+      const key = t.name;
+      if (!groups[key] || (t.date || 0) > (groups[key].date || 0)) {
+        groups[key] = { name: t.name, type: t.type, date: t.date || 0, count: (groups[key] ? groups[key].count : 0) + 1 };
+      } else {
+        groups[key].count++;
+      }
+    });
+    return Object.values(groups).sort((a, b) => (b.date || 0) - (a.date || 0));
+  }
+  function playerTrophyCabinetHTML(player) {
+    const grouped = groupPlayerTrophies(playerWonTrophies(player));
+    if (!grouped.length) return '';
     return `<div class="card-title" style="margin-top:14px">🏆 Trophy Cabinet</div>
       <div class="trophy-cabinet-grid">
-        ${won.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 56)}<div class="tc-name">${t.name}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
+        ${grouped.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 56)}<div class="tc-name">${t.name}${t.count > 1 ? ` <span class="tc-count">×${t.count}</span>` : ''}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
       </div>`;
   }
 
@@ -13890,7 +13961,7 @@ var App = (() => {
                 <div class="attr-track"><div class="attr-fill ${statTierClass(v)}" style="width:${Math.min(100, v||50)}%"></div></div>
                 <span class="attr-val ${statTierClass(v)}">${v||'-'}</span></div>`).join('')}
       </div>
-      ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
+      ${playerTrophyCabinetHTML(player)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
     // Canvas needs real layout dimensions (clientWidth) to size itself —
     // wait a frame after the modal's just been made visible/laid out.
@@ -13935,7 +14006,7 @@ var App = (() => {
       <div class="card-title" style="margin-top:14px">Squad <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem">(🏆 = trophy cabinet)</span></div>
       <div class="team-squad-list">
         ${players.map(p => {
-          const wonCount = trophies.filter(t => t.player === p.name).length;
+          const wonCount = playerWonTrophies(p).length;
           return `
           <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
             <span class="tsr-avatar">${playerAvatarMark(p)}</span>
@@ -14112,6 +14183,7 @@ var App = (() => {
   function trophyGroupKey(t) {
     if (t.category === 'tournament') return 'tournament-' + (t.run || t.date);
     if (t.category === 'season' || t.category === 'season-global') return 'season-' + (t.year != null ? t.year : '?');
+    if (t.category === 'standalone-global') return 'standalone-' + (t.year != null ? t.year : '?');
     return 'other-' + (t.date || 0);
   }
   function trophyGroupLabel(t) {
@@ -14120,6 +14192,7 @@ var App = (() => {
       return base || 'Tournament';
     }
     if (t.category === 'season' || t.category === 'season-global') return 'Season · Year ' + (t.year != null ? t.year : '?');
+    if (t.category === 'standalone-global') return 'Awards Round ' + (t.year != null ? t.year : '?');
     return t.type || 'History';
   }
 
@@ -14137,15 +14210,21 @@ var App = (() => {
       (t.player ? `<div class="am-name">${t.player}</div><div class="am-meta">${t.team || ''}</div>` : '<div class="am-empty">Unclaimed</div>') + '</div>';
 
     let h = `<div class="group-card" style="margin-top:16px">`;
-    h += `<h4>🏁 Season Y${summary.year} — Final Awards</h4>`;
-    h += summary.champions.length
-      ? summary.champions.map(champCard).join('')
-      : '<p style="color:var(--text-muted);font-size:0.85rem">No champions were crowned this season.</p>';
+    h += summary.standalone
+      ? `<h4>⭐ Awards Round ${summary.year} — Final Awards</h4>`
+      : `<h4>🏁 Season Y${summary.year} — Final Awards</h4>`;
+    if (!summary.standalone) {
+      h += summary.champions.length
+        ? summary.champions.map(champCard).join('')
+        : '<p style="color:var(--text-muted);font-size:0.85rem">No champions were crowned this season.</p>';
+    }
     h += `<h4 style="margin-top:14px">⭐ Individual Awards</h4>`;
     h += summary.globalAwards.length
       ? `<div class="awards-row">${summary.globalAwards.map(awardMini).join('')}</div>`
       : '<p style="color:var(--text-muted);font-size:0.85rem">No individual awards were recorded this season.</p>';
-    h += `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px">Season Y${summary.year + 1} is already underway — the full record is saved under the History tab.</p>`;
+    h += summary.standalone
+      ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px">The leaderboard has been reset — the full record is saved under the History tab.</p>`
+      : `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px">Season Y${summary.year + 1} is already underway — the full record is saved under the History tab.</p>`;
     h += `</div>`;
     el.innerHTML = h;
   }
@@ -14572,7 +14651,7 @@ var App = (() => {
     if (comp.champion) {
       const year = season ? season.year : 1;
       const extra = { category: 'season', year };
-      pushTeamTrophy(comp.name, comp.champion.name, 'League (Y' + year + ')', extra);
+      pushTeamTrophy(comp.name, comp.champion, 'League (Y' + year + ')', extra);
       pushManagerAward(comp.name + ' Manager of the Season', comp.champion, 'League (Y' + year + ')', extra);
       recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
     }
@@ -14700,7 +14779,7 @@ var App = (() => {
       if (champ) {
         const year = season ? season.year : 1;
         const extra = { category: 'season', year };
-        pushTeamTrophy('Champions League', champ.name, 'Season (Y' + year + ')', extra);
+        pushTeamTrophy('Champions League', champ, 'Season (Y' + year + ')', extra);
         pushManagerAward('Champions League Winning Manager', champ, 'Season (Y' + year + ')', extra);
         recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), 'Champions League (Y' + year + ')', extra);
       }
@@ -14884,7 +14963,7 @@ var App = (() => {
       if (comp.champion) {
         const year = season ? season.year : 1;
         const extra = { category: 'season', year };
-        pushTeamTrophy(comp.name, comp.champion.name, 'Cup (Y' + year + ')', extra);
+        pushTeamTrophy(comp.name, comp.champion, 'Cup (Y' + year + ')', extra);
         pushManagerAward(comp.name + ' Winning Manager', comp.champion, 'Cup (Y' + year + ')', extra);
         recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
       }
@@ -15108,73 +15187,97 @@ var App = (() => {
   function buildSeasonEndSummary(year) {
     const champions = trophies.filter(t => t.category === 'season' && t.year === year && !t.player && !t.manager);
     const globalAwards = trophies.filter(t => t.category === 'season-global' && t.year === year);
-    return { year, champions, globalAwards };
+    return { year, champions, globalAwards, standalone: false };
   }
 
-  // Manual "End Season" action (Extras tab) — a one-click way to close out
-  // the current season right now instead of grinding through remaining
-  // matchdays by hand. Finishes every fixture still outstanding across the
-  // 5 domestic leagues + Champions League (same core loop as
-  // simulateSeasonToEnd), which crowns each competition's champion as it
-  // completes; then finalizes/archives the season's global awards (Golden
-  // Boot, Ballon d'Or, Puskás Award, etc. — wiping the live leaderboard for
-  // the season ahead), immediately kicks off the next season year, and
-  // hands back a summary for the UI to announce.
-  async function endSeasonNow() {
-    if (!season) { toast('Start a season first — there\'s nothing to end yet.'); return null; }
+  // Same shape as buildSeasonEndSummary(), for a standalone "End Season"
+  // press with no Season Calendar running — there are no league/cup
+  // champions to report (champions: []), just the archived global awards.
+  function buildStandaloneAwardsSummary(round) {
+    const globalAwards = trophies.filter(t => t.category === 'standalone-global' && t.year === round);
+    return { year: round, champions: [], globalAwards, standalone: true };
+  }
 
+  // Manual "End Season" action (Extras tab) — a one-click way to hand out
+  // and archive awards (Golden Boot, Ballon d'Or, Puskás Award, etc.) right
+  // now instead of waiting for a season to run its course. This used to
+  // require an active Season Calendar run (it would silently no-op
+  // otherwise) — it no longer does: with no season running it still
+  // archives/resets the global leaderboard and announces the awards
+  // immediately, it just has no league/cup champions to crown since no
+  // season is in progress. With a season running, it additionally finishes
+  // every fixture still outstanding across the 5 domestic leagues +
+  // Champions League (same core loop as simulateSeasonToEnd), crowning each
+  // competition's champion as it completes, and kicks off the next season
+  // year.
+  async function endSeasonNow() {
     let summary = null;
     await withLoadingProgress('Ending season…', async function() {
-      const estimatedWeeks = Math.max(1, ...seasonCompEntries()
-        .map(({ comp }) => (comp && !comp.finished) ? Math.max(0, comp.rounds.length - comp.currentRound) : 0));
-      let safety = 0;
-      const startTime = Date.now();
-      while (!seasonIsComplete() && safety < 1000) {
-        const targetIdx = computeSeasonWeek(season);
-        let playedSomething = false;
-        seasonCompEntries().forEach(({ key, comp }) => {
-          if (!comp || comp.finished) return;
-          if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); playedSomething = true; return; }
-          if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
-          if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
-          playedSomething = true;
-        });
-        if (simulateAllCupRoundsNow()) playedSomething = true;
-        season.week = computeSeasonWeek(season);
-        safety++;
-        updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
-        await simTick();
-        if (!playedSomething) break;
-      }
-      advanceCongestionSlotIfComplete();
-      finalizeSeasonIfComplete();
+      if (season) {
+        const estimatedWeeks = Math.max(1, ...seasonCompEntries()
+          .map(({ comp }) => (comp && !comp.finished) ? Math.max(0, comp.rounds.length - comp.currentRound) : 0));
+        let safety = 0;
+        const startTime = Date.now();
+        while (!seasonIsComplete() && safety < 1000) {
+          const targetIdx = computeSeasonWeek(season);
+          let playedSomething = false;
+          seasonCompEntries().forEach(({ key, comp }) => {
+            if (!comp || comp.finished) return;
+            if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); playedSomething = true; return; }
+            if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+            if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
+            playedSomething = true;
+          });
+          if (simulateAllCupRoundsNow()) playedSomething = true;
+          season.week = computeSeasonWeek(season);
+          safety++;
+          updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
+          await simTick();
+          if (!playedSomething) break;
+        }
+        advanceCongestionSlotIfComplete();
+        finalizeSeasonIfComplete();
 
-      const finishedYear = season.year;
-      summary = buildSeasonEndSummary(finishedYear);
-      startNewSeasonYear();
-      renderSeasonDashboard();
+        const finishedYear = season.year;
+        summary = buildSeasonEndSummary(finishedYear);
+        startNewSeasonYear();
+        renderSeasonDashboard();
+      } else {
+        // No Season Calendar running — still hand out and archive this
+        // cycle's global awards immediately, tagged with their own
+        // standalone round counter (independent of any season's year) so
+        // History can still group them sensibly.
+        standaloneAwardsRound = (standaloneAwardsRound || 0) + 1;
+        archiveAndResetGlobalAwards(standaloneAwardsRound, 'standalone-global');
+        summary = buildStandaloneAwardsSummary(standaloneAwardsRound);
+      }
       persistAll();
       saveStats();
     });
     return summary;
   }
   // Extras-tab entry point: confirms with the person (wording adapts to
-  // whether there's actually anything left to force through), runs
-  // endSeasonNow(), then renders the resulting summary card and toasts a
-  // short confirmation. Kept separate from endSeasonNow() itself so other
-  // callers (e.g. a future keyboard shortcut or automated test) can invoke
-  // the underlying action without the confirm()/DOM-render coupling.
+  // whether there's actually anything left to force through, or whether no
+  // season is running at all), runs endSeasonNow(), then renders the
+  // resulting summary card and toasts a short confirmation. Kept separate
+  // from endSeasonNow() itself so other callers (e.g. a future keyboard
+  // shortcut or automated test) can invoke the underlying action without
+  // the confirm()/DOM-render coupling.
   async function endSeasonAndAnnounce() {
-    if (!season) { toast('Start a season first — there\'s nothing to end yet.'); return; }
-    const already = seasonIsComplete();
-    const msg = already
-      ? 'End Season Y' + season.year + ' now? This hands out the season\'s awards, resets the leaderboard, and kicks off Season Y' + (season.year + 1) + '.'
-      : 'End Season Y' + season.year + ' now? Any fixtures still outstanding will be simulated to their conclusion, this season\'s champions crowned, awards handed out, and the leaderboard reset for Season Y' + (season.year + 1) + '.';
+    const hasSeason = !!season;
+    const already = hasSeason && seasonIsComplete();
+    const msg = !hasSeason
+      ? 'Hand out and archive this cycle\'s awards (Golden Boot, Ballon d\'Or, Puskás Award, etc.) now, and reset the leaderboard? No Season Calendar is running, so no league/cup champions will be crowned.'
+      : already
+        ? 'End Season Y' + season.year + ' now? This hands out the season\'s awards, resets the leaderboard, and kicks off Season Y' + (season.year + 1) + '.'
+        : 'End Season Y' + season.year + ' now? Any fixtures still outstanding will be simulated to their conclusion, this season\'s champions crowned, awards handed out, and the leaderboard reset for Season Y' + (season.year + 1) + '.';
     if (!confirm(msg)) return;
     const summary = await endSeasonNow();
     if (summary) {
       renderSeasonEndAnnouncement(summary);
-      toast('Season Y' + summary.year + ' complete — awards archived, Season Y' + (summary.year + 1) + ' underway!');
+      toast(summary.standalone
+        ? 'Awards Round ' + summary.year + ' complete — awards archived and leaderboard reset!'
+        : 'Season Y' + summary.year + ' complete — awards archived, Season Y' + (summary.year + 1) + ' underway!');
     }
   }
   function resetSeason() {
