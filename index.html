@@ -282,6 +282,10 @@
               </optgroup>
             </select>
           </label>
+          <label id="tour-size-wrap" style="display:none;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--text-secondary)">
+            Tournament Size
+            <select id="tour-size-select" onchange="App.selectTournamentSize(this.value)" aria-label="Tournament size" style="min-width:150px"></select>
+          </label>
           <input type="search" id="tour-teams-search" placeholder="Search teams to select..." oninput="App.searchTournamentTeams(this.value)" autocomplete="off" aria-label="Search tournament teams" style="flex:1;min-width:200px">
         </div>
         <div class="teams-checkbox-grid" id="tournament-teams"></div>
@@ -437,6 +441,22 @@
             <option value="national">National</option>
             <option value="club">Clubs</option>
           </select>
+          <select id="teams-league" onchange="App.filterTeamsLeague(this.value)" aria-label="Filter league">
+            <option value="all">All leagues</option>
+            <option value="Premier League">Premier League</option>
+            <option value="La Liga">La Liga</option>
+            <option value="Serie A">Serie A</option>
+            <option value="Bundesliga">Bundesliga</option>
+            <option value="Ligue 1">Ligue 1</option>
+            <option value="other">Other / National</option>
+          </select>
+          <select id="teams-rating" onchange="App.filterTeamsRating(this.value)" aria-label="Filter by strength">
+            <option value="all">All strengths</option>
+            <option value="elite">Elite (85+)</option>
+            <option value="great">Great (75-84)</option>
+            <option value="good">Good (65-74)</option>
+            <option value="dev">Development (&lt;65)</option>
+          </select>
         </div>
         <div id="teams-list" class="teams-checkbox-grid" style="max-height:none"></div>
         <p style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">Tap a team to open its full profile (manager, squad, colors).</p>
@@ -463,15 +483,41 @@
           </select>
           <select id="players-pos" onchange="App.filterPlayersPos(this.value)" aria-label="Filter position">
             <option value="all">All positions</option>
-            <option value="GK">Goalkeepers</option>
-            <option value="DEF">Defenders</option>
-            <option value="MID">Midfielders</option>
-            <option value="FWD">Forwards</option>
+            <option value="GK">Goalkeepers (all)</option>
+            <optgroup label="Defenders">
+              <option value="DEF">All defenders</option>
+              <option value="CB">Centre-Back</option>
+              <option value="RB">Right-Back</option>
+              <option value="LB">Left-Back</option>
+              <option value="RWB">Right Wing-Back</option>
+              <option value="LWB">Left Wing-Back</option>
+            </optgroup>
+            <optgroup label="Midfielders">
+              <option value="MID">All midfielders</option>
+              <option value="CDM">Defensive Mid</option>
+              <option value="CM">Central Mid</option>
+              <option value="CAM">Attacking Mid</option>
+              <option value="RM">Right Mid</option>
+              <option value="LM">Left Mid</option>
+            </optgroup>
+            <optgroup label="Forwards">
+              <option value="FWD">All forwards</option>
+              <option value="RW">Right Wing</option>
+              <option value="LW">Left Wing</option>
+              <option value="ST">Striker</option>
+            </optgroup>
           </select>
           <select id="players-type" onchange="App.filterPlayersType(this.value)" aria-label="Filter team type">
             <option value="all">All teams</option>
             <option value="national">National</option>
             <option value="club">Clubs</option>
+          </select>
+          <select id="players-rating" onchange="App.filterPlayersRating(this.value)" aria-label="Filter by rating">
+            <option value="all">All ratings</option>
+            <option value="elite">Elite (85+)</option>
+            <option value="great">Great (75-84)</option>
+            <option value="good">Good (65-74)</option>
+            <option value="dev">Development (&lt;65)</option>
           </select>
           <button type="button" class="btn btn-secondary btn-sm" id="players-compare-toggle" onclick="App.togglePlayersCompareMode()">⚖️ Compare</button>
         </div>
