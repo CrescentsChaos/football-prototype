@@ -324,6 +324,7 @@ var App = (() => {
   let seasonActiveSubTab = 'table'; // 'table' | 'stats' | 'awards' — sub-view within a league/UCL tab
   let seasonReportRegistry = []; // flat list of match reports referenced by index from season fixture cards
   let historyActiveTab = 'team'; // 'team' | 'individual' — which History sub-tab is showing
+  let historyAwardFilter = 'all'; // 'all' or a specific trophy name — filters the current History sub-tab
 
   const FORMATIONS = {
     '4-3-3': { name: '4-3-3', slots: ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CDM', 'CM', 'RW', 'ST', 'LW'],
@@ -3151,10 +3152,22 @@ var App = (() => {
     if (desc) desc.textContent = cfg.desc;
     const select = document.getElementById('tour-format-select');
     if (select && select.value !== tournamentType) select.value = tournamentType;
-    tourTeamsSearch = '';
-    tourSelectedTeamIds = new Set();
-    const search = document.getElementById('tour-teams-search');
-    if (search) search.value = '';
+    // Only wipe the in-progress team selection on a genuine switch to a
+    // different format's eligible pool (tourSelectedTeamIdsType tracks
+    // which format the current tourSelectedTeamIds belongs to). Re-entering
+    // the Tournament tab with the SAME format — including right after a
+    // hard refresh, once loadPersistedGameState() has restored both
+    // tourSelectedTeamIds and tourSelectedTeamIdsType from storage — must
+    // leave a manually-trimmed selection (say 36 of 48 eligible teams)
+    // exactly as the person left it, instead of silently reverting to
+    // "everyone selected" every time this runs.
+    if (tournamentType !== tourSelectedTeamIdsType) {
+      tourTeamsSearch = '';
+      tourSelectedTeamIds = new Set();
+      tourSelectedTeamIdsType = tournamentType;
+      const search = document.getElementById('tour-teams-search');
+      if (search) search.value = '';
+    }
     applyTournamentBranding(tournamentType);
     renderTournamentTeamSelect();
   }
@@ -10546,6 +10559,21 @@ var App = (() => {
       const sst = localStorage.getItem('apexSeasonActiveSubTab');
       if (sst) seasonActiveSubTab = sst;
     } catch (e) {}
+    try {
+      // Restore the in-progress Tournament setup team selection (e.g. 36 of
+      // 48 eligible teams manually picked) so a hard refresh doesn't lose
+      // it — tourSelectedTeamIdsType lets selectTournamentFormat() (see
+      // ui/seasonUI.js) tell this is the SAME format as before and leave
+      // the selection alone, instead of resetting to "everyone selected".
+      const tst = localStorage.getItem('apexTourSelectedTeams');
+      if (tst) {
+        const parsed = JSON.parse(tst);
+        if (parsed && Array.isArray(parsed.ids)) {
+          tourSelectedTeamIds = new Set(parsed.ids);
+          tourSelectedTeamIdsType = parsed.type || null;
+        }
+      }
+    } catch (e) {}
   }
 
   // Re-hydrates the Tournament view's UI from a restored `tournament` object
@@ -10935,10 +10963,20 @@ var App = (() => {
     updateTournamentSelectedCount();
   }
 
+  // Persists the current tournament team selection (and which format it
+  // belongs to) so a hard refresh restores it via loadPersistedGameState()
+  // instead of losing it — see tourSelectedTeamIdsType in ui/teamUI.js and
+  // selectTournamentFormat() above for how the format-match check on
+  // restore keeps this from being silently reset.
+  function persistTourSelectedTeams() {
+    safeSetItem('apexTourSelectedTeams', JSON.stringify({ type: tournamentType, ids: [...tourSelectedTeamIds] }));
+  }
+
   function updateTournamentSelectedCount() {
     // tourSelectedTeamIds is authoritative (see renderTournamentTeamSelect) —
     // counting DOM checkboxes here would undercount while a search filter
     // is hiding previously-checked teams.
+    persistTourSelectedTeams();
     const n = tourSelectedTeamIds.size;
     let el = document.getElementById('tour-selected-count');
     if (!el) {
@@ -13390,6 +13428,15 @@ var App = (() => {
   // means a team stays selected across searches until explicitly
   // unchecked, deselected, or the format/pool changes.
   let tourSelectedTeamIds = new Set();
+  // Which tournamentType tourSelectedTeamIds currently belongs to — lets
+  // selectTournamentFormat() (below) tell a genuine format switch (pool of
+  // eligible teams actually changed, selection should reset) apart from
+  // just re-entering the Tournament tab with the same format still active
+  // (selection should be left exactly as the person set it). Restored
+  // from storage in loadPersistedGameState() (simulation/seasonEngine.js)
+  // alongside tourSelectedTeamIds itself, so a hard refresh doesn't lose a
+  // manually-trimmed selection (e.g. 36 of 48 eligible teams).
+  let tourSelectedTeamIdsType = null;
 
   function teamAvgOvr(t) {
     const ps = t.players || [];
@@ -13762,13 +13809,33 @@ var App = (() => {
       return t.player === player.name;
     });
   }
-  // Groups a player's won trophies by name so winning the same trophy more
-  // than once shows as a single card with a "×N" badge instead of one card
-  // per win. Keeps the most recent date/type for display/sort ordering.
+  // The `type` recorded alongside a trophy (e.g. "Premier League (Y1)",
+  // "World Cup Tournament", "Season Y2 (Global)") identifies which
+  // competition/run it actually came from. Strips only the
+  // year/round number so the SAME competition repeated across years still
+  // reads as one recurring honor, while two DIFFERENT competitions that
+  // happen to hand out an award with the same name (Golden Boot, Golden
+  // Ball and Golden Glove are each awarded separately by the league, by
+  // the Champions League, by a standalone World Cup, etc.) stay distinct.
+  function trophySeriesKey(t) {
+    const normalized = (t.type || '')
+      .replace(/\(Y\d+\)/g, '')
+      .replace(/Awards Round \d+/, 'Awards Round')
+      .trim();
+    return t.name + '::' + normalized;
+  }
+
+  // Groups a player's won trophies so winning the same trophy in the same
+  // competition/tournament more than once shows as a single card with a
+  // "×N" badge instead of one card per win — but a Golden Boot/Golden
+  // Ball/Golden Glove (or any other award) won in a DIFFERENT competition
+  // or tournament gets its own separate card, keyed by trophySeriesKey()
+  // above rather than by award name alone. Keeps the most recent
+  // date/type for display/sort ordering.
   function groupPlayerTrophies(list) {
     const groups = {};
     list.forEach(t => {
-      const key = t.name;
+      const key = trophySeriesKey(t);
       if (!groups[key] || (t.date || 0) > (groups[key].date || 0)) {
         groups[key] = { name: t.name, type: t.type, date: t.date || 0, count: (groups[key] ? groups[key].count : 0) + 1 };
       } else {
@@ -14027,14 +14094,7 @@ var App = (() => {
     document.querySelectorAll('.award-tab').forEach(t => t.classList.toggle('active', t.dataset.award === type));
     const el = document.getElementById('awards-content');
     if (!el) return;
-    if (type === 'goldenboot') {
-      const data = Object.values(stats.goals || {}).sort((a,b) => b.count - a.count).slice(0, 50);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">' + emojiImg('goal', 'Goal') + '</div><p>No goals yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Golden Boot', 34) + ' Golden Boot</h4><p class="award-winner">' + data[0].name + ' (' + data[0].team + ') — ' + data[0].count + ' goals</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
-        '</tbody></table></div>';
-    } else if (type === 'ballon') {
+    if (type === 'ballon') {
       // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
       const MIN_APPS = BALLON_MIN_APPS;
       const data = computeBallonRanking(stats);
@@ -14164,12 +14224,13 @@ var App = (() => {
       if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
       el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 68) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.manager ? '👔 ' + t.manager + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
     } else {
-      // overview
-      const topScorer = Object.values(stats.goals||{}).sort((a,b)=>b.count-a.count)[0];
+      // overview — Golden Boot deliberately excluded here: it's redundant
+      // with the Gerd Müller Award (also goals-driven, its own tab below),
+      // so the Golden Boot leaderboard/tab only exists per-competition and
+      // per-tournament (Tournaments tab / Season Awards), not here.
       const topAst = Object.values(stats.assists||{}).sort((a,b)=>b.count-a.count)[0];
       const topMotm = Object.values(stats.motm||{}).sort((a,b)=>b.count-a.count)[0];
       el.innerHTML = `
-        <div class="award-card${topScorer ? ' player-clickable' : ''}"${topScorer ? ` onclick="App.showPlayerProfile('${topScorer.id}')"` : ''}>${topScorer ? lbAvatar(topScorer, 52) : trophyMark('Golden Boot', 68)}<div class="award-info"><h4>${trophyMark('Golden Boot', 30)} Golden Boot Leader</h4><p class="award-winner">${topScorer ? topScorer.name + ' — ' + topScorer.count + ' goals' : '—'}</p></div></div>
         <div class="award-card${topAst ? ' player-clickable' : ''}"${topAst ? ` onclick="App.showPlayerProfile('${topAst.id}')"` : ''}>${topAst ? lbAvatar(topAst, 52) : trophyMark('Top Assists', 68)}<div class="award-info"><h4>${trophyMark('Top Assists', 30)} Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
         <div class="award-card${topMotm ? ' player-clickable' : ''}"${topMotm ? ` onclick="App.showPlayerProfile('${topMotm.id}')"` : ''}>${topMotm ? lbAvatar(topMotm, 52) : trophyMark('Most MOTM', 68)}<div class="award-info"><h4>${trophyMark('Most MOTM', 30)} Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
         <div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Trophies</h4><p class="award-winner">${trophies.length} won</p></div></div>`;
@@ -14228,21 +14289,55 @@ var App = (() => {
     h += `</div>`;
     el.innerHTML = h;
   }
+  // Fills the History tab's award filter <select> with every distinct
+  // trophy name present in the current sub-tab's full (unfiltered) list —
+  // e.g. Golden Boot, Ballon d'Or, Gerd Müller Award for Individual Awards,
+  // or Premier League, World Cup, Champions League for Team Trophies.
+  // Keeps the currently-selected filter if it's still a valid option for
+  // this list, otherwise falls back to "All Awards".
+  function renderHistoryAwardFilterOptions(fullList) {
+    const sel = document.getElementById('history-award-filter');
+    if (!sel) return;
+    const names = [...new Set(fullList.map(t => t.name))].sort((a, b) => a.localeCompare(b));
+    if (historyAwardFilter !== 'all' && !names.includes(historyAwardFilter)) historyAwardFilter = 'all';
+    sel.innerHTML = '<option value="all">All Awards</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
+    sel.value = historyAwardFilter;
+  }
+
+  // Called from the History tab's award filter <select> onchange.
+  function filterHistoryAward(name) {
+    historyAwardFilter = name || 'all';
+    showHistory(historyActiveTab);
+  }
+
   function showHistory(type) {
     type = type || historyActiveTab || 'team';
+    // Switching between Team Trophies and Individual Awards means a
+    // completely different set of award names, so any filter picked for
+    // the old sub-tab wouldn't make sense carried over to the new one.
+    if (type !== historyActiveTab) historyAwardFilter = 'all';
     historyActiveTab = type;
     document.querySelectorAll('#view-history .award-tab').forEach(t => t.classList.toggle('active', t.dataset.history === type));
     const el = document.getElementById('history-content');
     if (!el) return;
 
-    const list = type === 'individual'
+    const fullList = type === 'individual'
       ? trophies.filter(t => t.player || t.manager)
       : trophies.filter(t => !t.player && !t.manager);
 
-    if (!list.length) {
+    renderHistoryAwardFilterOptions(fullList);
+
+    if (!fullList.length) {
       el.innerHTML = type === 'individual'
         ? '<div class="empty-state"><div class="icon">⭐</div><p>No individual awards recorded yet — finish a tournament or a season.</p></div>'
         : '<div class="empty-state"><div class="icon">🏆</div><p>No champions crowned yet — finish a tournament or a season.</p></div>';
+      return;
+    }
+
+    const list = historyAwardFilter === 'all' ? fullList : fullList.filter(t => t.name === historyAwardFilter);
+
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>No history yet for that award.</p></div>';
       return;
     }
 
@@ -16158,6 +16253,21 @@ var App = (() => {
         return bv - av;
       });
     }
+    else if (playersSort === 'trophies') {
+      // Counts each player's total trophies won (team trophies via
+      // playerIds + individual awards via playerId) in one pass over the
+      // trophy case, rather than re-filtering the whole `trophies` array
+      // per player (which is what playerWonTrophies() does, and would be
+      // far too slow run once per row across the whole player pool).
+      const counts = {};
+      trophies.forEach(t => {
+        if (t.playerId != null) counts[t.playerId] = (counts[t.playerId] || 0) + 1;
+        else if (Array.isArray(t.playerIds) && t.playerIds.length) {
+          t.playerIds.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+        }
+      });
+      list.sort((a, b) => (counts[b.player.id] || 0) - (counts[a.player.id] || 0));
+    }
     else if (playersSort === 'liveRating') {
       // Best current form first (A > B > C > D > E — see LIVE_RATINGS /
       // ensurePlayerConditionProfile() in engine/form.js). Ties (e.g. two
@@ -16913,7 +17023,7 @@ var App = (() => {
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
     endSeasonNow, endSeasonAndAnnounce, renderSeasonEndAnnouncement,
-    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
+    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory, filterHistoryAward,
     simSeasonFixture, playSeasonFixture,
     simulateWorldCupStep, simulateQualifyingRound, renderSeasonDashboard, advanceCongestionSlotIfComplete,
     searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
