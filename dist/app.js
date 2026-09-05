@@ -8069,7 +8069,7 @@ var App = (() => {
   // than they create, while attacking mids/central mids are the primary creators.
   // Defenders/holding mids chip in occasionally (set pieces, late runs) but rarely lead scoring.
   // NOTE: these weights combine multiplicatively with each player's own attributes
-  // (att/ovr/tec) in pickPlayerWeighted, and strikers/wingers already carry higher
+  // (att/fin/off_awr/ovr/tec — see pickPlayerWeighted) and strikers/wingers already carry higher
   // 'att' ratings than midfielders. A wide spread here compounds with that and makes
   // strikers score far more than real-world scoring share (~ST 35-40%, wide/CAM
   // ~35-40%, CM/deep ~15-20%, defenders ~5-8%). Keep the spread modest.
@@ -8095,16 +8095,25 @@ var App = (() => {
       const slot = p.slot || (p.pos || [])[0] || 'CM';
       const roleW = (roleWeights && roleWeights[slot] != null) ? roleWeights[slot] : 1;
       // Composite quality (0-100ish scale). Raised to a modest power so real
-      // separation in ability (a Mbappe/Haaland-tier ovr/att/tec vs a squad
+      // separation in ability (a Mbappe/Haaland-tier finisher vs a squad
       // fill-in) compounds into a clearly higher share of goals/assists over
       // a season — like real-world Golden Boot races — without ever reducing
       // a lesser player's chance to zero on any single kick. This is
       // symmetric for every player regardless of club, so it favors quality,
-      // not any particular team. Att + tec (a player's actual finishing and
-      // technical ability) together outweigh the flat ovr number — a
-      // specialist finisher should out-score a jack-of-all-trades with the
-      // same overall rating, not just whoever has the bigger single number.
-      const composite = (p.att || 70) * 0.45 + (p.tec || 70) * 0.25 + (p.ovr || 70) * 0.30;
+      // not any particular team.
+      // `tec` (ball control/dribbling/passing/curl) is a playmaking stat, not
+      // a shooting one — it used to carry 25% of this composite, on par with
+      // `att`/`ovr`, which let technical-but-non-clinical players out-score
+      // genuine finishers. Finishing and Offensive Awareness (when the
+      // player has an expanded attribute sheet) now take that weight
+      // instead, since those are what actually make someone a goalscorer;
+      // `tec` is reduced to a minor nudge. Falls back to a still-tec-light
+      // att/ovr/tec blend for players without expanded attributes.
+      const fin = xattr(p, 'fin', null);
+      const offAwr = xattr(p, 'off_awr', null);
+      const composite = (fin != null && offAwr != null)
+        ? ((p.att || 70) * 0.40 + fin * 0.25 + offAwr * 0.15 + (p.ovr || 70) * 0.15 + (p.tec || 70) * 0.05)
+        : ((p.att || 70) * 0.55 + (p.ovr || 70) * 0.30 + (p.tec || 70) * 0.15);
       const w = Math.pow(Math.max(composite, 30) / 70, 2.2) * 100 * roleW;
       return Math.max(1, w);
     });
@@ -13012,10 +13021,7 @@ var App = (() => {
     if (!tournament) return;
     const top = (key) => Object.values(tournamentStats[key] || {}).sort((a,b) => b.count - a.count);
     const goals = top('goals');
-    const assists = top('assists');
     const motm = top('motm');
-    const cleanSheets = top('cleanSheets');
-    const puskas = top('puskas');
     const ratingsAny = Object.values(tournamentStats.ratings || {})
       .filter(x => (x.count || 0) > 0)
       .sort((a,b) => b.avg - a.avg || b.count - a.count);
@@ -13041,14 +13047,25 @@ var App = (() => {
     // those three as a premature extra trophy into the case for this one
     // tournament.
 
+    // Golden Boot, Golden Ball and Golden Glove are the three genuine
+    // single-tournament individual awards real competitions (World Cup,
+    // Euros, Champions League) actually hand out — those stay.
+    //
+    // Top Assists, Most MOTM, Clean Sheet King and the Puskás Award are NOT
+    // standalone-tournament honors in real life — same reasoning as the
+    // Ballon d'Or/Gerd Müller/Yashin exclusion above (Puskás is FIFA's own
+    // annual/season award; "most assists"/"most MOTM"/"most clean sheets"
+    // across a whole season are seasonEngine.js's job via assignCompAwards(),
+    // not something a single World Cup/Champions League run should be
+    // handing out its own trophy for). Leaving these four keys off means
+    // recordIndividualAwardsFromAwardsObject() won't push any of them into
+    // the trophy case for a standalone tournament, and the Tournament
+    // Awards screen won't display a "winner" for something that was never
+    // a real award to begin with.
     tournament.awards = {
       goldenBoot: goals[0] || null,
       goldenBall: goldenBallRanking[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
-      goldenGlove: computeGoldenGloveRanking(tournamentStats)[0] || null,
-      goldenClean: cleanSheets[0] || null,
-      topAssists: assists[0] || null,
-      mostMotm: motm[0] || null,
-      puskas: puskas[0] || null
+      goldenGlove: computeGoldenGloveRanking(tournamentStats)[0] || null
     };
   }
 
@@ -13073,7 +13090,6 @@ var App = (() => {
           ? ((a.goldenBall.goals||0) + 'G ' + (a.goldenBall.assists||0) + 'A' + (a.goldenBall.avg ? ' · Avg ' + a.goldenBall.avg.toFixed(2) : ''))
           : (a.goldenBall && a.goldenBall.avg != null ? ('Avg ' + a.goldenBall.avg.toFixed(2)) : ((a.goldenBall && a.goldenBall.count) + ' MOTM')))}
         ${card('Golden Glove', '🧤', a.goldenGlove, a.goldenGlove ? (a.goldenGlove.saves + ' saves · ' + a.goldenGlove.clean + ' CS') : '')}
-        ${card('Top Assists', '🎯', a.topAssists, (a.topAssists && a.topAssists.count) + ' assists')}
       </div>`;
   }
 
