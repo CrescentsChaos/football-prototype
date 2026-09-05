@@ -48771,7 +48771,8 @@
       ],
       "manager": {
         "name": "Enzo Maresca",
-        "ovr": 97
+        "ovr": 89,
+        "formation":"4-2-3-1"
       }
     },
     {
@@ -73754,7 +73755,7 @@
           "num": 23
         },
         {
-          "id": "bar26_24",
+          "id": "esp9",
           "name": "Eric García",
           "pos": [
             "CB",
@@ -73847,7 +73848,7 @@
           "num": 20
         },
         {
-          "id": "bar26_21",
+          "id": "ned18",
           "name": "Frenkie de Jong",
           "pos": [
             "CM",
@@ -73971,7 +73972,7 @@
           "num": 74
         },
         {
-          "id": "hil26_20",
+          "id": "por4",
           "name": "João Cancelo",
           "pos": [
             "RB",
@@ -74028,7 +74029,7 @@
       "id": "ars2004",
       "name": "Arsenal 2003-04",
       "short": "ARS03",
-      "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+      "flag": "🏴󠁧󠁢󠁥󠁮??󠁿",
       "color": "#EF0107",
       "secondary": "#FFFFFF",
       "logo": "arsenal.png",
