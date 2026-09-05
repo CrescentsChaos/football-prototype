@@ -278,6 +278,14 @@ var App = (() => {
   let isPlaying = false;
   let tournament = null;
   let tournamentType = 'worldcup';
+  // Optional scale-up override for the two formats big enough to have a
+  // real-world field size worth exceeding (World Cup: 48 -> 64/128 teams;
+  // Champions League: 36 -> 72/144 clubs). null means "use the format's
+  // normal real-world size" — see the Tournament Size picker wired up in
+  // selectTournamentFormat()/selectTournamentSize() (ui/seasonUI.js) and
+  // consumed by startWorldCupTournament()/startUCLTournament()
+  // (simulation/tournamentEngine.js). Ignored by every other format.
+  let tournamentSize = null;
 
   // ========== SEASON CALENDAR ==========
   // "name" must match a key in leagues.json exactly so team pools can be
@@ -478,6 +486,24 @@ var App = (() => {
     CDM: 'MID', CM: 'MID', CAM: 'MID', RM: 'MID', LM: 'MID',
     RW: 'FWD', LW: 'FWD', ST: 'FWD', CF: 'FWD'
   };
+  // The four broad-line values POS_LINE can produce — used by the Players
+  // tab position filter to tell a broad-line pick ("all defenders") apart
+  // from a specific-slot pick ("RB" only), since both share the same
+  // <select> (see filterPlayersPos() in ui/playersUI.js).
+  const POS_LINE_GROUPS = ['GK', 'DEF', 'MID', 'FWD'];
+
+  // Shared OVR-tier bucketing for the Players/Teams tab rating filters —
+  // one scale so "Elite"/"Great"/"Good"/"Development" mean the same cutoffs
+  // everywhere they're offered (see filterPlayersRating() in ui/playersUI.js
+  // and filterTeamsRating() in ui/teamUI.js).
+  function ovrTierMatches(ovr, tier) {
+    const v = ovr || 0;
+    if (tier === 'elite') return v >= 85;
+    if (tier === 'great') return v >= 75 && v < 85;
+    if (tier === 'good') return v >= 65 && v < 75;
+    if (tier === 'dev') return v < 65;
+    return true;
+  }
   // ---- Formation shape: how many defensive/midfield/attacking "bodies" a
   // formation actually puts on the pitch, weighted by how central/committed
   // each slot is to that job (a wing-back counts partly for both defence and
@@ -494,9 +520,9 @@ var App = (() => {
   const formationShapeCache = {};
   const TOURNAMENT_FORMATS = {
     'worldcup': { name: 'World Cup', short: 'World Cup', engine: 'groups', pool: 'national', leaguesKey: null,
-      desc: 'Select national teams. Supports groups (up to 48 teams, World Cup style).' },
+      desc: 'Select national teams. Supports groups (48 teams, World Cup style — use the Tournament Size picker below to scale up to a 64- or 128-team field instead).' },
     'ucl': { name: 'Champions League', short: 'Champions League', engine: 'league', pool: 'club', leaguesKey: null,
-      desc: 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.' },
+      desc: 'Champions League 2024+ format: select up to 36 clubs (use the Tournament Size picker below to scale up to 72 or 144). League phase (8 matches each), playoffs, two-leg knockouts, single final.' },
     'premier-league': { name: 'Premier League', short: 'Premier League', engine: 'table', pool: 'club', leaguesKey: 'Premier League',
       desc: 'England\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
     'la-liga': { name: 'La Liga', short: 'La Liga', engine: 'table', pool: 'club', leaguesKey: 'La Liga',
@@ -3167,6 +3193,24 @@ var App = (() => {
       tourSelectedTeamIdsType = tournamentType;
       const search = document.getElementById('tour-teams-search');
       if (search) search.value = '';
+    }
+    // Tournament Size picker — only World Cup/Champions League can scale
+    // past their real-world field size (see SCALABLE_TOURNAMENT_SIZES);
+    // every other format hides the control and always plays its one
+    // real-world size.
+    const sizes = SCALABLE_TOURNAMENT_SIZES[tournamentType];
+    const sizeWrap = document.getElementById('tour-size-wrap');
+    const sizeSelect = document.getElementById('tour-size-select');
+    if (sizes) {
+      if (!tournamentSize || sizes.indexOf(tournamentSize) === -1) tournamentSize = sizes[0];
+      if (sizeSelect) {
+        sizeSelect.innerHTML = sizes.map(s => '<option value="' + s + '">' + s + ' teams' + (s === sizes[0] ? ' (real-world)' : '') + '</option>').join('');
+        sizeSelect.value = String(tournamentSize);
+      }
+      if (sizeWrap) sizeWrap.style.display = '';
+    } else {
+      tournamentSize = null;
+      if (sizeWrap) sizeWrap.style.display = 'none';
     }
     applyTournamentBranding(tournamentType);
     renderTournamentTeamSelect();
@@ -10917,7 +10961,26 @@ var App = (() => {
       }).join('')}
     </tbody></table></div>`;
   }
+  // Formats whose real-world field size the Tournament Size picker can
+  // scale past (see selectTournamentSize() below and startWorldCupTournament()
+  // / startUCLTournament() in simulation/tournamentEngine.js, which read
+  // tournamentSize back off js/state.js). Every other format keeps its one
+  // real-world size and never shows the picker. The first value in each
+  // list is that format's default/real-world size.
+  const SCALABLE_TOURNAMENT_SIZES = {
+    worldcup: [48, 64, 128],
+    ucl: [36, 72, 144]
+  };
 
+  // Applies a Tournament Size pick (only reachable while the picker is
+  // visible, i.e. tournamentType is a key in SCALABLE_TOURNAMENT_SIZES).
+  // Falls back to that format's real-world size on anything unrecognized.
+  function selectTournamentSize(size) {
+    const sizes = SCALABLE_TOURNAMENT_SIZES[tournamentType];
+    const n = parseInt(size, 10);
+    tournamentSize = (sizes && sizes.indexOf(n) !== -1) ? n : (sizes ? sizes[0] : null);
+    updateTournamentSelectedCount();
+  }
   function renderTournamentTeamSelect() {
     let pool = getCompetitionEligiblePool(tournamentType);
     if (tourTeamsSearch) {
@@ -10992,10 +11055,10 @@ var App = (() => {
     if (el) {
       const cfg = TOURNAMENT_FORMATS[tournamentType];
       const engine = cfg && cfg.engine;
-      const need = engine === 'league' ? '36 ideal (min 8)'
+      const need = engine === 'league' ? (tournamentType === 'ucl' ? (tournamentSize || 36) : 36) + ' ideal (min 8)'
         : engine === 'knockout' ? 'a power of 2 — 2/4/8/16/32… (min 2)'
         : engine === 'table' ? 'the full league (18-20 ideal, min 4)'
-        : '4+ (8/16/32/48 ideal)';
+        : (tournamentType === 'worldcup' ? (tournamentSize || 48) + ' ideal (min 4)' : '4+ (8/16/32/48 ideal)');
       el.innerHTML = '<strong>' + n + '</strong> teams selected <span style="color:var(--text-3)">· ' + need + '</span>';
     }
   }
@@ -11078,18 +11141,40 @@ var App = (() => {
     persistAll();
   }
 
+  // Group letter naming, A/B/C… — plain single letters cover the original
+  // 12-group cap (up to L) fine, but a scaled-up World Cup (see
+  // startWorldCupTournament below) can now run up to 32 groups, which would
+  // run past Z into unprintable character codes with a bare
+  // String.fromCharCode(65+i). Past Z this rolls over to A2, B2, C2…
+  // instead, so every group still gets a readable, unique name no matter
+  // how large the Tournament Size pick is.
+  function tournamentGroupName(i) {
+    const letter = String.fromCharCode(65 + (i % 26));
+    const tier = Math.floor(i / 26);
+    return tier === 0 ? letter : letter + (tier + 1);
+  }
+
   function startWorldCupTournament(selected) {
     let teams = shuffleArray([...selected]);
     const groupSize = 4;
+    // World Cup can be scaled past the real-world 48-team finals (12
+    // groups) via the Tournament Size picker (48/64/128 — see
+    // SCALABLE_TOURNAMENT_SIZES in ui/seasonUI.js); every other
+    // 'groups'-engine competition (Nations League, Euros, Copa América,
+    // AFCON, Asian Cup, Gold Cup) keeps the original 12-group/48-team cap
+    // regardless of whatever size was last picked for a World Cup.
+    const maxGroups = (tournamentType === 'worldcup' && tournamentSize)
+      ? Math.max(1, Math.floor(tournamentSize / groupSize))
+      : 12;
     let numGroups = Math.floor(teams.length / groupSize);
     if (numGroups < 1) numGroups = 1;
-    if (numGroups > 12) numGroups = 12;
+    if (numGroups > maxGroups) numGroups = maxGroups;
     teams = teams.slice(0, numGroups * groupSize);
     if (teams.length < 4) { toast('Need at least 4 teams for groups'); return; }
     const groups = [];
     for (let i = 0; i < numGroups; i++) {
       groups.push({
-        name: String.fromCharCode(65 + i),
+        name: tournamentGroupName(i),
         teams: teams.slice(i * groupSize, (i + 1) * groupSize).map(t => ({
           team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
         }))
@@ -11325,18 +11410,23 @@ var App = (() => {
 
   function startUCLTournament(selected) {
     let teams = shuffleArray([...selected]);
-    // Prefer 36; if fewer, use largest even count >= 8 (scale format)
-    if (teams.length >= 36) teams = teams.slice(0, 36);
+    // Champions League can be scaled past the real-world 36-club league
+    // phase via the Tournament Size picker (36/72/144 — see
+    // SCALABLE_TOURNAMENT_SIZES in ui/seasonUI.js); prefer that target, or
+    // the largest even count >= 8 if fewer teams were selected (scale
+    // format).
+    const maxTeams = (tournamentType === 'ucl' && tournamentSize) ? tournamentSize : 36;
+    if (teams.length >= maxTeams) teams = teams.slice(0, maxTeams);
     else if (teams.length % 2 === 1) teams = teams.slice(0, teams.length - 1);
     const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
     const compName = cfg.name || 'Champions League';
-    if (teams.length < 8) { toast(compName + ' needs at least 8 clubs (36 ideal)'); return; }
+    if (teams.length < 8) { toast(compName + ' needs at least 8 clubs (' + maxTeams + ' ideal)'); return; }
 
     const league = teams.map(t => ({
       team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
     }));
 
-    const matchesPerTeam = teams.length >= 36 ? 8 : Math.min(8, teams.length - 1);
+    const matchesPerTeam = teams.length >= maxTeams ? 8 : Math.min(8, teams.length - 1);
     const fixtures = generateUCLLeagueFixtures(teams, matchesPerTeam);
 
     tournament = {
@@ -13444,11 +13534,23 @@ var App = (() => {
     return ps.reduce((s, p) => s + (p.ovr || 70), 0) / ps.length;
   }
 
+  let teamsLeagueFilter = 'all';   // 'all' | one of DOMESTIC_LEAGUES | 'other'
+  let teamsRatingFilter = 'all';   // 'all' | 'elite' | 'great' | 'good' | 'dev' — see ovrTierMatches() (js/state.js)
+
+  // The five domestic leagues teams.json/leagues.json both know about — used
+  // to build the Teams tab's League filter. National teams, and any club not
+  // currently in one of these five (older/other-season squads, cup-only
+  // entries), fall into the 'other' bucket rather than being hidden.
+  const DOMESTIC_LEAGUES = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1'];
+
   function filterTeams(type) {
     teamsFilter = type || 'all';
     renderTeamsList();
   }
-
+  function filterTeamsLeague(league) {
+    teamsLeagueFilter = league || 'all';
+    renderTeamsList();
+  }
   // Debounced — the full team pool can run into the hundreds once every
   // league/competition is loaded, and renderTeamsList() does a full
   // innerHTML rebuild, so filtering + re-rendering on every single
@@ -13458,7 +13560,10 @@ var App = (() => {
     teamsSearch = (q || '').trim().toLowerCase();
     _debouncedRenderTeamsList();
   }
-
+  function filterTeamsRating(tier) {
+    teamsRatingFilter = tier || 'all';
+    renderTeamsList();
+  }
   function sortTeams(mode) {
     teamsSort = mode || 'name';
     renderTeamsList();
@@ -13468,6 +13573,22 @@ var App = (() => {
     let list = allTeams;
     if (teamsFilter === 'national') list = teamsData.national || [];
     if (teamsFilter === 'club') list = teamsData.club || [];
+    if (teamsLeagueFilter !== 'all') {
+      // Reuses getLeagueTeamPool() (simulation/seasonEngine.js) — the same
+      // name-matching Season Calendar auto-fill relies on — so "Premier
+      // League" here means exactly the clubs Season Calendar would offer.
+      if (teamsLeagueFilter === 'other') {
+        const known = new Set();
+        DOMESTIC_LEAGUES.forEach(name => getLeagueTeamPool(name).forEach(t => known.add(t.id)));
+        list = list.filter(t => !known.has(t.id));
+      } else {
+        const ids = new Set(getLeagueTeamPool(teamsLeagueFilter).map(t => t.id));
+        list = list.filter(t => ids.has(t.id));
+      }
+    }
+    if (teamsRatingFilter !== 'all') {
+      list = list.filter(t => ovrTierMatches(teamAvgOvr(t), teamsRatingFilter));
+    }
     if (teamsSearch) {
       list = list.filter(t =>
         (t.name || '').toLowerCase().includes(teamsSearch) ||
@@ -16107,7 +16228,11 @@ var App = (() => {
   // "page" of rows at a time (playersShown), growing it on Load More,
   // instead of ever putting every player into the DOM at once.
   let playersFilter = 'all';       // 'all' | 'national' | 'club'
-  let playersPosFilter = 'all';    // 'all' | 'GK' | 'DEF' | 'MID' | 'FWD'
+  // 'all' | a broad line (GK/DEF/MID/FWD, see POS_LINE_GROUPS) | a specific
+  // slot code (CB, RB, LB, RWB, LWB, CDM, CM, CAM, RM, LM, RW, LW, ST — see
+  // POS_ROLE_NAMES in js/state.js).
+  let playersPosFilter = 'all';
+  let playersRatingFilter = 'all'; // 'all' | 'elite' | 'great' | 'good' | 'dev' — see ovrTierMatches()
   let playersSearch = '';
   let playersSort = 'ovr';
   const PLAYERS_PAGE_SIZE = 40;
@@ -16211,7 +16336,18 @@ var App = (() => {
     if (playersFilter === 'national') list = list.filter(e => e.hasNational);
     else if (playersFilter === 'club') list = list.filter(e => e.hasClub);
     if (playersPosFilter !== 'all') {
-      list = list.filter(e => POS_LINE[(e.player.pos || [])[0]] === playersPosFilter);
+      // A broad line ("all defenders") still matches by primary position
+      // only, same as before; a specific slot code (RB, CDM, ST...) matches
+      // any position in the player's pos array, so a utility player shows
+      // up under every slot they can actually play, not just their first.
+      if (POS_LINE_GROUPS.indexOf(playersPosFilter) !== -1) {
+        list = list.filter(e => POS_LINE[(e.player.pos || [])[0]] === playersPosFilter);
+      } else {
+        list = list.filter(e => (e.player.pos || []).indexOf(playersPosFilter) !== -1);
+      }
+    }
+    if (playersRatingFilter !== 'all') {
+      list = list.filter(e => ovrTierMatches(e.player.ovr, playersRatingFilter));
     }
     if (playersSearch) {
       list = list.filter(e => {
@@ -16313,6 +16449,12 @@ var App = (() => {
 
   function filterPlayersType(type) {
     playersFilter = type || 'all';
+    renderPlayersList(true);
+  }
+
+
+  function filterPlayersRating(tier) {
+    playersRatingFilter = tier || 'all';
     renderPlayersList(true);
   }
 
@@ -16999,10 +17141,10 @@ var App = (() => {
 
   return {
     setRngSeed, getRngSeed,
-    init, switchView, goToMatch, goToTournament, selectTournamentFormat, updateTeamPreview,
+    init, switchView, goToMatch, goToTournament, selectTournamentFormat, selectTournamentSize, updateTeamPreview,
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, finishMatch, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
-    simTournamentRound, simAllTournament, resetTournament, filterTeams,
+    simTournamentRound, simAllTournament, resetTournament, filterTeams, filterTeamsLeague, filterTeamsRating,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     playLeagueTournamentFixture, simLeagueTournamentFixture,
     returnToTournament, showPlayerProfile, showTeamProfile, showTeamLineup, randomMatch, randomizeTeamSide,
@@ -17026,7 +17168,7 @@ var App = (() => {
     showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory, filterHistoryAward,
     simSeasonFixture, playSeasonFixture,
     simulateWorldCupStep, simulateQualifyingRound, renderSeasonDashboard, advanceCongestionSlotIfComplete,
-    searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
+    searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, filterPlayersRating, loadMorePlayers,
     togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare,
     renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital
   };
