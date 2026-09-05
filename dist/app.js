@@ -3636,9 +3636,25 @@ var App = (() => {
 
     // Whoever actually started is now less likely to start again straight
     // away next match (see rotation decay/score above).
+    // Capped rather than left to accumulate freely: the decay above only
+    // ever removes a flat prof.decay (0.15-0.35) per match, while this used
+    // to add a full +1 every time a player started — for anyone who starts
+    // most matches (which a genuine world-class player, by definition,
+    // does) that's a net gain every match with no equilibrium, so
+    // _recentStarts climbed without bound over a season/tournament run
+    // (40+ after 200 matches in testing). Multiplied by prof.penalty, that
+    // eventually buried even a 95+ OVR core player's score under a rotation
+    // penalty far larger than any real ability gap, benching him more often
+    // than not — exactly backwards from the "light nudge" this system is
+    // meant to be. Capping at REC_STARTS_CAP lets the value settle at a
+    // stable ceiling for an ever-present starter instead of growing
+    // forever, while still fully preserving the differences between
+    // ROTATION_PROFILES (a harsher profile's larger `penalty`/smaller
+    // `coreProtect` still bites harder at the same capped counter value).
+    const REC_STARTS_CAP = 3;
     starting.forEach(sp => {
       const orig = allPlayers.find(x => x.id === sp.id);
-      if (orig) orig._recentStarts = (orig._recentStarts || 0) + 1;
+      if (orig) orig._recentStarts = Math.min(REC_STARTS_CAP, (orig._recentStarts || 0) + 1);
     });
 
     const _seen = new Set();
