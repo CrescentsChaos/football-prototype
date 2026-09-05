@@ -385,7 +385,6 @@
         <div class="card-title">Trophies & Awards</div>
         <div class="award-tabs">
           <button class="award-tab active" data-award="overview" onclick="App.showAwards('overview')">Overview</button>
-          <button class="award-tab" data-award="goldenboot" onclick="App.showAwards('goldenboot')">Golden Boot</button>
           <button class="award-tab" data-award="ballon" onclick="App.showAwards('ballon')">Ballon d'Or</button>
           <button class="award-tab" data-award="puskas" onclick="App.showAwards('puskas')">Puskás</button>
           <button class="award-tab" data-award="muller" onclick="App.showAwards('muller')">Gerd Müller</button>
@@ -408,6 +407,11 @@
         <div class="award-tabs">
           <button class="award-tab active" data-history="team" onclick="App.showHistory('team')">🏆 Team Trophies</button>
           <button class="award-tab" data-history="individual" onclick="App.showHistory('individual')">⭐ Individual Awards</button>
+        </div>
+        <div class="teams-toolbar" style="margin:10px 0">
+          <select id="history-award-filter" onchange="App.filterHistoryAward(this.value)" aria-label="Filter by award">
+            <option value="all">All Awards</option>
+          </select>
         </div>
         <div id="history-content">
           <div class="empty-state"><div class="icon">📜</div><p>No history yet — finish a tournament or a season to start the record books.</p></div>
@@ -453,6 +457,7 @@
             <option value="goals">Sort: Goals</option>
             <option value="assists">Sort: Assists</option>
             <option value="apps">Sort: Apps</option>
+            <option value="trophies">Sort: Trophies</option>
             <option value="age">Sort: Age</option>
             <option value="height">Sort: Height</option>
           </select>
