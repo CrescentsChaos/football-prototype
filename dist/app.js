@@ -2294,7 +2294,7 @@ var App = (() => {
   // than the gap between a 60 and a 64.
   const OVR_ELITE_FLOOR = 65;
   const OVR_ELITE_EXP = 1.55;
-  const OVR_ELITE_MULT = 0.03;
+  const OVR_ELITE_MULT = 0.018;
   function eliteValue(v) {
     if (v <= OVR_ELITE_FLOOR) return v;
     return v + OVR_ELITE_MULT * Math.pow(v - OVR_ELITE_FLOOR, OVR_ELITE_EXP);
@@ -2304,27 +2304,40 @@ var App = (() => {
   // (post-elite-curve) key attributes rather than the full weighted blend —
   // this is what lets a concentrated cluster of standout attributes pull
   // the whole number up instead of being diluted by the rest of the sheet.
-  const OVR_TOPN_LEAN = 0.30;
+  const OVR_TOPN_LEAN = 0.35;
   const OVR_TOPN_COUNT = 6;
 
   // Rewards *combinations* of elite attributes among a position's most
-  // important ones — two 90+ key attributes are worth more together than
-  // either alone, reflecting complementary elite tools rather than one
-  // standout number.
-  const OVR_COMBO_ELITE_THRESHOLD = 90;
-  const OVR_COMBO_UNIT = 1.0;
-  const OVR_COMBO_TOPN = 6;
+  // important ones — several attributes sitting near/above ~90 together
+  // are worth more than any one of them alone, reflecting complementary
+  // elite tools rather than one standout number. Deliberately SMOOTH
+  // (a sigmoid per attribute, summed) rather than a hard ">= 90 counts,
+  // 89 doesn't" cutoff — a hard threshold meant two players with near-
+  // identical sheets (e.g. one attribute at 89 vs 90) could get wildly
+  // different bonuses purely from which side of the line they landed on.
+  const OVR_ELITE_MASS_CENTER = 90;
+  const OVR_ELITE_MASS_SCALE = 4;
+  const OVR_ELITE_MASS_UNIT = 0.35;
+  const OVR_ELITE_MASS_TOPN = 6;
+  function eliteMassContribution(v) {
+    return 1 / (1 + Math.exp(-(v - OVR_ELITE_MASS_CENTER) / OVR_ELITE_MASS_SCALE));
+  }
 
   // Rewards a sheet with no real weak link among its key attributes — a
-  // player whose *worst* important attribute is still comfortably strong
-  // reads as a genuinely complete card even without a single 90+ spike
-  // (this is what gets an all-round-excellent profile like Gullit's up
-  // near a spikier, higher-peak profile like Hazard's despite a lower raw
-  // average and no single attribute over 91).
-  const OVR_FLOOR_BONUS_THRESHOLD = 76;
-  const OVR_FLOOR_BONUS_EXP = 1.7;
-  const OVR_FLOOR_BONUS_MULT = 0.6;
-  const OVR_FLOOR_BONUS_CAP = 20;
+  // "complete" profile with no glaring hole reads as genuinely elite even
+  // without a single 90+ spike (this is part of what gets an all-round-
+  // excellent profile like Gullit's up near a spikier, higher-peak profile
+  // like Hazard's despite a lower raw average and no single attribute over
+  // 91). Based on the AVERAGE of the position's attributes outside its top
+  // 3 (the "supporting cast"), not the single worst one — a strict minimum
+  // meant one merely-good attribute (say 84 instead of 90) could swing this
+  // bonus by more than the attribute gap itself justified, since the power
+  // curve was applied to that one point in isolation. Averaging several
+  // attributes first smooths that out.
+  const OVR_SUPPORT_THRESHOLD = 76;
+  const OVR_SUPPORT_EXP = 1.25;
+  const OVR_SUPPORT_MULT = 0.8;
+  const OVR_SUPPORT_CAP = 12;
 
   // A handful of positions (goalkeeper especially, with only 5 key
   // attributes instead of 9-10) can stack every bonus above at once when a
@@ -2354,12 +2367,11 @@ var App = (() => {
     const keys = Object.keys(weights);
     const rawVals = [];
     const curved = [];
-    let sum = 0, wsum = 0, floorVal = Infinity;
+    let sum = 0, wsum = 0;
     keys.forEach((k) => {
       const v = attr[k];
       if (typeof v !== 'number') return;
       rawVals.push(v);
-      if (v < floorVal) floorVal = v;
       const cv = eliteValue(v);
       curved.push(cv);
       sum += cv * weights[k];
@@ -2372,14 +2384,24 @@ var App = (() => {
     const topNAvg = topN.reduce((a, b) => a + b, 0) / topN.length;
     const leaned = base + (topNAvg - base) * OVR_TOPN_LEAN;
 
-    const comboKeys = keys.slice(0, Math.min(OVR_COMBO_TOPN, keys.length));
-    const eliteCount = comboKeys.filter((k) => typeof attr[k] === 'number' && attr[k] >= OVR_COMBO_ELITE_THRESHOLD).length;
-    const comboBonus = eliteCount >= 2 ? (eliteCount - 1) * OVR_COMBO_UNIT : 0;
+    const massKeys = keys.slice(0, Math.min(OVR_ELITE_MASS_TOPN, keys.length));
+    let eliteMass = 0;
+    massKeys.forEach((k) => {
+      const v = attr[k];
+      if (typeof v !== 'number') return;
+      eliteMass += eliteMassContribution(v);
+    });
+    const massBonus = eliteMass * OVR_ELITE_MASS_UNIT;
 
-    const floorGap = (floorVal === Infinity) ? 0 : Math.max(0, floorVal - OVR_FLOOR_BONUS_THRESHOLD);
-    const floorBonus = Math.min(OVR_FLOOR_BONUS_CAP, OVR_FLOOR_BONUS_MULT * Math.pow(floorGap, OVR_FLOOR_BONUS_EXP));
+    const sortedDesc = rawVals.slice().sort((a, b) => b - a);
+    const supporting = sortedDesc.slice(3);
+    const supportAvg = supporting.length
+      ? supporting.reduce((a, b) => a + b, 0) / supporting.length
+      : (sortedDesc.reduce((a, b) => a + b, 0) / (sortedDesc.length || 1));
+    const supportGap = Math.max(0, supportAvg - OVR_SUPPORT_THRESHOLD);
+    const supportBonus = Math.min(OVR_SUPPORT_CAP, OVR_SUPPORT_MULT * Math.pow(supportGap, OVR_SUPPORT_EXP));
 
-    return leaned + comboBonus + floorBonus;
+    return leaned + massBonus + supportBonus;
   }
 
 
