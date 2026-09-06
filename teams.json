@@ -1,8 +1,8 @@
 {
   "national": [{
   "id": "chile2015",
-  "name": "Chile 2015 Copa América",
-  "short": "CHI",
+  "name": "Chile 2015",
+  "short": "CHI15",
   "flag": "🇨🇱",
   "color": "#D52B1E",
   "secondary": "#FFFFFF",
@@ -281,8 +281,8 @@
 }
 ,{
   "id": "brazil2006",
-  "name": "Brazil 2006 World Cup",
-  "short": "BRA",
+  "name": "Brazil 2006",
+  "short": "BRA06",
   "flag": "🇧🇷",
   "color": "#FFDC02",
   "secondary": "#002776",
