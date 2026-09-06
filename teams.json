@@ -1,5 +1,285 @@
 {
-  "national": [
+  "national": [{
+  "id": "brazil2006",
+  "name": "Brazil 2006 World Cup",
+  "short": "BRA",
+  "flag": "🇧🇷",
+  "color": "#FFDC02",
+  "secondary": "#002776",
+  "logo": "brazil.png",
+  "stadium": "Germany",
+  "players": [
+    {
+      "id": "bra_06_1",
+      "name": "Dida",
+      "pos": ["GK"],
+      "ovr": 88,
+      "att": 10,
+      "def": 89,
+      "phy": 82,
+      "pac": 50,
+      "tec": 72,
+      "num": 1
+    },
+    {
+      "id": "bra_06_12",
+      "name": "Rogério Ceni",
+      "pos": ["GK"],
+      "ovr": 81,
+      "att": 35,
+      "def": 82,
+      "phy": 75,
+      "pac": 42,
+      "tec": 78,
+      "num": 12
+    },
+    {
+      "id": "bra_06_22",
+      "name": "Júlio César",
+      "pos": ["GK"],
+      "ovr": 80,
+      "att": 10,
+      "def": 81,
+      "phy": 76,
+      "pac": 48,
+      "tec": 68,
+      "num": 22
+    },
+    {
+      "id": "bra_06_3",
+      "name": "Lúcio",
+      "pos": ["CB"],
+      "ovr": 88,
+      "att": 68,
+      "def": 89,
+      "phy": 87,
+      "pac": 80,
+      "tec": 76,
+      "num": 3
+    },
+    {
+      "id": "bra_06_4",
+      "name": "Juan",
+      "pos": ["CB"],
+      "ovr": 85,
+      "att": 55,
+      "def": 87,
+      "phy": 83,
+      "pac": 74,
+      "tec": 72,
+      "num": 4
+    },
+    {
+      "id": "bra_06_13",
+      "name": "Cicinho",
+      "pos": ["RB", "RWB"],
+      "ovr": 81,
+      "att": 80,
+      "def": 70,
+      "phy": 74,
+      "pac": 88,
+      "tec": 82,
+      "num": 13
+    },
+    {
+      "id": "bra_06_2",
+      "name": "Cafu",
+      "pos": ["RB", "RWB"],
+      "ovr": 86,
+      "att": 82,
+      "def": 83,
+      "phy": 84,
+      "pac": 82,
+      "tec": 83,
+      "num": 2
+    },
+    {
+      "id": "bra_06_6",
+      "name": "Roberto Carlos",
+      "pos": ["LB", "LWB"],
+      "ovr": 88,
+      "att": 86,
+      "def": 82,
+      "phy": 86,
+      "pac": 90,
+      "tec": 85,
+      "num": 6
+    },
+    {
+      "id": "bra_06_16",
+      "name": "Gilberto",
+      "pos": ["LB", "LWB"],
+      "ovr": 78,
+      "att": 74,
+      "def": 75,
+      "phy": 76,
+      "pac": 81,
+      "tec": 76,
+      "num": 16
+    },
+    {
+      "id": "bra_06_14",
+      "name": "Luisão",
+      "pos": ["CB"],
+      "ovr": 82,
+      "att": 45,
+      "def": 84,
+      "phy": 86,
+      "pac": 62,
+      "tec": 65,
+      "num": 14
+    },
+    {
+      "id": "bra_06_15",
+      "name": "Cris",
+      "pos": ["CB"],
+      "ovr": 83,
+      "att": 48,
+      "def": 84,
+      "phy": 84,
+      "pac": 68,
+      "tec": 67,
+      "num": 15
+    },
+    {
+      "id": "bra_06_5",
+      "name": "Emerson",
+      "pos": ["CDM", "CM"],
+      "ovr": 85,
+      "att": 68,
+      "def": 87,
+      "phy": 85,
+      "pac": 70,
+      "tec": 78,
+      "num": 5
+    },
+    {
+      "id": "bra_06_17",
+      "name": "Gilberto Silva",
+      "pos": ["CDM", "CM"],
+      "ovr": 86,
+      "att": 66,
+      "def": 88,
+      "phy": 84,
+      "pac": 72,
+      "tec": 79,
+      "num": 17
+    },
+    {
+      "id": "bra_06_8",
+      "name": "Kaká",
+      "pos": ["CAM", "CF"],
+      "ovr": 90,
+      "att": 88,
+      "def": 45,
+      "phy": 78,
+      "pac": 91,
+      "tec": 90,
+      "num": 8
+    },
+    {
+      "id": "bra_06_10",
+      "name": "Ronaldinho",
+      "pos": ["CAM", "LW", "SS"],
+      "ovr": 93,
+      "att": 91,
+      "def": 38,
+      "phy": 76,
+      "pac": 89,
+      "tec": 97,
+      "num": 10
+    },
+    {
+      "id": "bra_06_19",
+      "name": "Juninho Pernambucano",
+      "pos": ["CM", "CAM"],
+      "ovr": 85,
+      "att": 82,
+      "def": 65,
+      "phy": 72,
+      "pac": 72,
+      "tec": 92,
+      "num": 19
+    },
+    {
+      "id": "bra_06_18",
+      "name": "Mineiro",
+      "pos": ["CDM", "CM"],
+      "ovr": 78,
+      "att": 64,
+      "def": 78,
+      "phy": 78,
+      "pac": 74,
+      "tec": 74,
+      "num": 18
+    },
+    {
+      "id": "bra_06_20",
+      "name": "Ricardinho",
+      "pos": ["CAM", "CM"],
+      "ovr": 78,
+      "att": 76,
+      "def": 55,
+      "phy": 68,
+      "pac": 70,
+      "tec": 82,
+      "num": 20
+    },
+    {
+      "id": "bra_06_9",
+      "name": "Ronaldo Nazário",
+      "pos": ["ST"],
+      "ovr": 89,
+      "att": 92,
+      "def": 32,
+      "phy": 80,
+      "pac": 84,
+      "tec": 91,
+      "num": 9
+    },
+    {
+      "id": "bra_06_7",
+      "name": "Adriano",
+      "pos": ["ST"],
+      "ovr": 88,
+      "att": 90,
+      "def": 35,
+      "phy": 92,
+      "pac": 85,
+      "tec": 84,
+      "num": 7
+    },
+    {
+      "id": "bra_06_23",
+      "name": "Robinho",
+      "pos": ["LW", "RW", "ST"],
+      "ovr": 84,
+      "att": 83,
+      "def": 30,
+      "phy": 60,
+      "pac": 90,
+      "tec": 91,
+      "num": 23
+    },
+    {
+      "id": "bra_06_21",
+      "name": "Fred",
+      "pos": ["ST"],
+      "ovr": 79,
+      "att": 81,
+      "def": 30,
+      "phy": 78,
+      "pac": 75,
+      "tec": 76,
+      "num": 21
+    }
+  ],
+  "manager": {
+    "name": "Carlos Alberto Parreira",
+    "ovr": 86
+  }
+}
+,
     {
       "id": "slovenia2026",
       "name": "Slovenia",
@@ -51217,7 +51497,7 @@
           "num": 7
         },
         {
-          "id": "acm07_8",
+          "id": "ita06_13",
           "name": "Gennaro Gattuso",
           "pos": [
             "CDM",
@@ -54290,7 +54570,7 @@
       "stadium": "Allianz Arena",
       "players": [
         {
-          "id": "bay26_1",
+          "id": "ger1",
           "name": "Manuel Neuer",
           "pos": [
             "GK"
@@ -54728,7 +55008,7 @@
       "stadium": "Anfield",
       "players": [
         {
-          "id": "liv26_1",
+          "id": "bra1",
           "name": "Alisson Becker",
           "pos": [
             "GK"
@@ -60264,7 +60544,7 @@
       "stadium": "Ülker Stadyumu",
       "players": [
         {
-          "id": "fen26_31",
+          "id": "bra2",
           "name": "Ederson Moraes",
           "pos": [
             "GK"
@@ -79644,7 +79924,7 @@
           "num": 21
         },
         {
-          "id": "asr06_16",
+          "id": "ita06_14",
           "name": "Daniele De Rossi",
           "pos": [
             "CDM",
@@ -108285,7 +108565,7 @@
       "id": "lfc2002",
       "name": "Liverpool FC 2002-03",
       "short": "LIV02",
-      "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+      "flag": "🏴??󠁢󠁥󠁮󠁧󠁿",
       "color": "#C8102E",
       "secondary": "#FFFFFF",
       "logo": "liverpool-old.png",
