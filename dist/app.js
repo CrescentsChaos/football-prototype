@@ -267,7 +267,7 @@ var App = (() => {
   // run     — shared id for every trophy awarded out of the same standalone tournament run
   let trophies = [];
   // Counter for the "End Season" button's standalone awards cycle — used to
-  // tag/group archived global awards (Golden Boot, Ballon d'Or, etc.) when
+  // tag/group archived global awards (Ballon d'Or, Gerd Müller Award, etc.) when
   // it's pressed with no Season Calendar running, so History can still
   // group them sensibly. Bumped once per standalone press, independent of
   // any season's own `year`.
@@ -2019,16 +2019,14 @@ var App = (() => {
     const nums = keys.map(k => attr[k]).filter(v => typeof v === 'number');
     return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 65;
   }
-  // The core "signature attributes push overall up" rule: for each
-  // playstyle tag a player has, compare the average of that style's key
-  // attributes against the player's own sheet average. Only positive gaps
-  // count (a style whose key attributes are actually average or below
-  // gives no bonus) and each style's contribution is amplified well beyond
-  // the flat +1..+3 PLAYSTYLE_STAT_MODS nudge, so a player built around
-  // their style's signature attributes reads as meaningfully better than
-  // a same-position player with a flatter, generic spread — even at the
-  // same rough attribute total. Multiple matching styles stack, capped so
-  // it stays a strong-but-bounded identity bonus rather than unbounded.
+  // Playstyle synergy modifier — deliberately small. The card's overall
+  // now comes almost entirely from the raw attribute sheet itself (see
+  // positionalRawOverall in data/playerDatabase.js: the elite-value curve,
+  // top-N lean, elite-combo bonus, and no-weak-link floor bonus). Playstyle
+  // no longer drives the rating; it only adds a light nudge when a
+  // player's own signature attributes for their tagged style(s) run above
+  // their sheet average, reflecting a well-fitted identity rather than
+  // being a second source of major inflation.
   function styleSignatureBonus(attr, styles, isGK) {
     if (!styles || !styles.length) return 0;
     const sheetAvg = attrSheetAverage(attr, isGK);
@@ -2040,9 +2038,9 @@ var App = (() => {
       if (!vals.length) return;
       const keyAvg = vals.reduce((a, b) => a + b, 0) / vals.length;
       const gap = keyAvg - sheetAvg;
-      if (gap > 0) bonus += gap * 0.55;
+      if (gap > 0) bonus += gap * 0.15;
     });
-    return Math.max(0, Math.min(14, Math.round(bonus)));
+    return Math.max(0, Math.min(4, Math.round(bonus)));
   }
 
 
@@ -2187,29 +2185,32 @@ var App = (() => {
     return { pac: clamp(pacAdj), phy: clamp(phyAdj), tec: clamp(tecAdj), att: clamp(attAdj), def: clamp(defAdj) };
   }
 
+  // Legacy 5-stat (att/def/pac/phy/tec) positional weights. No longer read
+  // by the OVR pipeline (see c0025c below) — the position-based raw-
+  // attribute calc replaced this — but ATTR_POS_WEIGHTS/attrPosGroup above
+  // are left alone since nothing in the OVR formula depends on this
+  // function anymore.
   function weightedOverall(derived, posArr) {
     const w = ATTR_POS_WEIGHTS[attrPosGroup(posArr)] || ATTR_POS_WEIGHTS.CM;
     return Math.round(derived.att * w.att + derived.def * w.def + derived.pac * w.pac +
       derived.phy * w.phy + derived.tec * w.tec);
   }
-  // ===== eFootball-style overall boost =====
-  // A flat positional weighted-average (weightedOverall above) treats every
-  // stat as interchangeable, so a genuine standout attribute gets diluted
-  // into the mean instead of standing out — nothing in a plain average can
-  // ever land near the top of the scale. eFootball's overall calc instead
-  // leans the final number toward a player's best stats, so a truly special
-  // attribute pulls the whole rating up with it. OVERALL_BOOST_LEAN controls
-  // how much of the gap between the flat average and the player's peak stat
-  // gets folded back in — 0 would be a pure average (old behavior), 1 would
-  // just be "OVR = best stat". Only expanded-attribute (enhanced) players
-  // run through this; everyone else keeps the plain teams.json number.
-  const OVERALL_BOOST_LEAN = 0.38;
-  // Raised from 100: individual derived attributes (att/def/pac/phy/tec)
-  // are allowed a small amount of headroom above the old "perfect card"
-  // ceiling, since PLAYSTYLE_STAT_MODS nudges (see clamp() in
-  // deriveStatsFromAttributes) can still occasionally push an already-99
-  // stat a couple of points over.
-  const OVERALL_CAP = 105;
+  // ===== eFootball-style INFLATED overall (positional, nonlinear) =====
+  // Replaces the old flat-average-plus-38%-peak-lean calc. A plain weighted
+  // average (even one leaning partway toward the single best stat) always
+  // regresses a player back toward the middle of their attribute spread —
+  // it can never explain why a card with a mid-80s average sits near the
+  // very top of the scale. eFootball's real inflated positional rating
+  // instead treats the position's *most relevant* attributes nonlinearly:
+  // elite values in them are worth much more than an equivalent step at a
+  // mediocre level, several elite attributes together are worth more than
+  // the sum of their parts, and a sheet with no real weakness in its key
+  // attributes (even without a single 90+ spike) gets rewarded for that
+  // completeness. See positionalRawOverall() in c0025c for the actual calc.
+  // Sits above the OVR_SOFT_KNEE asymptote (c0025c) as a hard safety net —
+  // in normal play the soft knee keeps everything comfortably under this,
+  // so this ceiling is essentially never actually reached.
+  const OVERALL_CAP = 124;
   const OVERALL_FLOOR = 40;
   // Ceiling for individual derived attributes (att/def/pac/phy/tec) — see
   // clamp() in deriveStatsFromAttributes. A plain (non-boosted) player's
@@ -2220,67 +2221,57 @@ var App = (() => {
   // enhanced/expanded-attribute roster so the boosted players read as
   // genuinely special rather than everyone converging on the same numbers.
   const REGULAR_OVR_MULTIPLIER = 0.95;
-
-  function efootballBoostedOverall(derived, posArr) {
-    const flatAvg = weightedOverall(derived, posArr);
-    const peak = Math.max(derived.att, derived.def, derived.pac, derived.phy, derived.tec);
-    return flatAvg + (peak - flatAvg) * OVERALL_BOOST_LEAN;
-  }
   // ===== eFootball-2027-style POSITION-based overall (raw attributes) =====
-  // weightedOverall/efootballBoostedOverall above compute OVR from the 5
-  // *compact* gameplay stats (att/def/pac/phy/tec) — a coarse blend that
-  // can't tell "Finishing" from "Heading" once both are folded into "att".
-  // Real eFootball instead weighs a fixed, position-specific list of raw
-  // attributes directly, so a CF's overall genuinely hinges on Finishing/
-  // Off. Awareness/Ball Control etc. while a CB's hinges on Def. Awareness/
-  // Tackling/Heading — different players in the same broad area of the
-  // pitch (an AMF vs a CMF, a CF vs an SS) get visibly different emphasis
-  // instead of collapsing into one generic "attacking mid" or "striker"
-  // bucket. This is now the primary OVR base for expanded-attribute
-  // players (see applyExpandedPlayerAttributes); weightedOverall/
-  // efootballBoostedOverall above are left in place but no longer feed OVR.
+  // Weighs a fixed, position-specific list of raw attributes directly, so a
+  // CF's overall genuinely hinges on Finishing/Off. Awareness/Ball Control
+  // etc. while a CB's hinges on Def. Awareness/Tackling/Heading — different
+  // players in the same broad area of the pitch get visibly different
+  // emphasis instead of collapsing into one generic bucket. This is the
+  // primary OVR base for expanded-attribute players (see
+  // applyExpandedPlayerAttributes).
   //
   // Each list below is ordered strongest-value-first (as specified) and
-  // converted to descending linear weights (first attribute weighted most,
-  // last weighted least) that sum to 1 per position — the closest
-  // approximation to eFootball's real per-position emphasis without access
-  // to their exact proprietary weighting.
-  function makeDescendingWeights(orderedKeys) {
-    const n = orderedKeys.length;
-    const denom = (n * (n + 1)) / 2;
+  // converted to NONLINEAR (geometrically decaying) weights rather than a
+  // flat descending ramp — the single most important attribute for a
+  // position carries dramatically more pull than the tenth-most-important
+  // one, instead of a mild 10-vs-1 ratio.
+  const POSITION_WEIGHT_DECAY = 0.80;
+  function makeNonlinearWeights(orderedKeys) {
+    const raw = orderedKeys.map((_, i) => Math.pow(POSITION_WEIGHT_DECAY, i));
+    const total = raw.reduce((a, b) => a + b, 0);
     const weights = {};
-    orderedKeys.forEach((k, i) => { weights[k] = (n - i) / denom; });
+    orderedKeys.forEach((k, i) => { weights[k] = raw[i] / total; });
     return weights;
   }
   const POSITION_ATTR_WEIGHTS = {
     // CF (Centre Forward — covers raw 'CF'/'ST' sheets)
-    CF: makeDescendingWeights(['fin', 'off_awr', 'ball_con', 'dribb', 'tight_pos', 'spd', 'accel', 'phy_con', 'head', 'jmp']),
+    CF: makeNonlinearWeights(['fin', 'off_awr', 'ball_con', 'dribb', 'tight_pos', 'spd', 'accel', 'phy_con', 'head', 'jmp']),
     // SS (Second Striker) — kept distinct from AMF per eFootball's own split
-    SS: makeDescendingWeights(['off_awr', 'ball_con', 'dribb', 'tight_pos', 'low_pass', 'fin', 'spd', 'accel', 'curl']),
+    SS: makeNonlinearWeights(['off_awr', 'ball_con', 'dribb', 'tight_pos', 'low_pass', 'fin', 'spd', 'accel', 'curl']),
     // LWF/RWF (wide forwards) — also used for RM/LM (wide mid) sheets,
     // the closest match given no separate wide-mid list was specified.
-    WF: makeDescendingWeights(['dribb', 'ball_con', 'tight_pos', 'spd', 'accel', 'off_awr', 'low_pass', 'fin', 'curl']),
+    WF: makeNonlinearWeights(['dribb', 'ball_con', 'tight_pos', 'spd', 'accel', 'off_awr', 'low_pass', 'fin', 'curl']),
     // AMF
-    AMF: makeDescendingWeights(['ball_con', 'dribb', 'tight_pos', 'low_pass', 'lofted_pass', 'off_awr', 'fin', 'curl', 'spd', 'accel']),
+    AMF: makeNonlinearWeights(['ball_con', 'dribb', 'tight_pos', 'low_pass', 'lofted_pass', 'off_awr', 'fin', 'curl', 'spd', 'accel']),
     // CMF
-    CMF: makeDescendingWeights(['low_pass', 'lofted_pass', 'ball_con', 'stam', 'def_awr', 'def_eng', 'dribb', 'tight_pos', 'off_awr']),
+    CMF: makeNonlinearWeights(['low_pass', 'lofted_pass', 'ball_con', 'stam', 'def_awr', 'def_eng', 'dribb', 'tight_pos', 'off_awr']),
     // DMF
-    DMF: makeDescendingWeights(['def_awr', 'def_eng', 'tack', 'phy_con', 'stam', 'low_pass', 'ball_con', 'aggr', 'head']),
+    DMF: makeNonlinearWeights(['def_awr', 'def_eng', 'tack', 'phy_con', 'stam', 'low_pass', 'ball_con', 'aggr', 'head']),
     // CB
-    CB: makeDescendingWeights(['def_awr', 'tack', 'def_eng', 'phy_con', 'head', 'jmp', 'spd', 'accel', 'bal']),
+    CB: makeNonlinearWeights(['def_awr', 'tack', 'def_eng', 'phy_con', 'head', 'jmp', 'spd', 'accel', 'bal']),
     // LB/RB (also used for wing-backs — no separate list was specified)
-    FB: makeDescendingWeights(['def_awr', 'tack', 'def_eng', 'spd', 'accel', 'stam', 'low_pass', 'phy_con', 'bal']),
+    FB: makeNonlinearWeights(['def_awr', 'tack', 'def_eng', 'spd', 'accel', 'stam', 'low_pass', 'phy_con', 'bal']),
     // GK — ONLY the 5 goalkeeper-specific ratings, nothing outfield mixed in.
-    GK: makeDescendingWeights(['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach'])
+    GK: makeNonlinearWeights(['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach'])
   };
 
   // Maps a player's raw (pre-canonicalization) position string to one of
-  // the position groups above. Deliberately reads posArr[0] BEFORE
-  // normalizeAllPositions() runs (see init() in ui/matchUI.js — expanded
-  // attributes are applied first) so 'SS' is never collapsed into 'CAM'/
-  // 'AMF' here the way the broader canonPos() system does elsewhere; this
-  // resolver is scoped to the OVR calc only and doesn't affect formation/
-  // substitution logic.
+  // the position groups above. Deliberately reads posArr[0] — the primary
+  // position — BEFORE normalizeAllPositions() runs (see init() in
+  // ui/matchUI.js — expanded attributes are applied first) so 'SS' is
+  // never collapsed into 'CAM'/'AMF' here the way the broader canonPos()
+  // system does elsewhere; this resolver is scoped to the OVR calc only
+  // and doesn't affect formation/substitution logic.
   function resolveAttrPositionGroup(posArr) {
     const raw = String((posArr && posArr[0]) || 'CM').toUpperCase();
     if (raw === 'GK') return 'GK';
@@ -2295,24 +2286,100 @@ var App = (() => {
     return 'CMF';
   }
 
+  // ----- Elite-value curve -----
+  // Below OVR_ELITE_FLOOR an attribute counts at face value. Above it, each
+  // extra point is worth progressively more (a convex/power curve), so a
+  // 90+ stat contributes far more to the rating than the flat gap over an
+  // 80 would suggest, and the gap between a 95 and a 99 matters much more
+  // than the gap between a 60 and a 64.
+  const OVR_ELITE_FLOOR = 65;
+  const OVR_ELITE_EXP = 1.55;
+  const OVR_ELITE_MULT = 0.03;
+  function eliteValue(v) {
+    if (v <= OVR_ELITE_FLOOR) return v;
+    return v + OVR_ELITE_MULT * Math.pow(v - OVR_ELITE_FLOOR, OVR_ELITE_EXP);
+  }
+
+  // How much the rating leans toward the average of the player's best few
+  // (post-elite-curve) key attributes rather than the full weighted blend —
+  // this is what lets a concentrated cluster of standout attributes pull
+  // the whole number up instead of being diluted by the rest of the sheet.
+  const OVR_TOPN_LEAN = 0.30;
+  const OVR_TOPN_COUNT = 6;
+
+  // Rewards *combinations* of elite attributes among a position's most
+  // important ones — two 90+ key attributes are worth more together than
+  // either alone, reflecting complementary elite tools rather than one
+  // standout number.
+  const OVR_COMBO_ELITE_THRESHOLD = 90;
+  const OVR_COMBO_UNIT = 1.0;
+  const OVR_COMBO_TOPN = 6;
+
+  // Rewards a sheet with no real weak link among its key attributes — a
+  // player whose *worst* important attribute is still comfortably strong
+  // reads as a genuinely complete card even without a single 90+ spike
+  // (this is what gets an all-round-excellent profile like Gullit's up
+  // near a spikier, higher-peak profile like Hazard's despite a lower raw
+  // average and no single attribute over 91).
+  const OVR_FLOOR_BONUS_THRESHOLD = 76;
+  const OVR_FLOOR_BONUS_EXP = 1.7;
+  const OVR_FLOOR_BONUS_MULT = 0.6;
+  const OVR_FLOOR_BONUS_CAP = 20;
+
+  // A handful of positions (goalkeeper especially, with only 5 key
+  // attributes instead of 9-10) can stack every bonus above at once when a
+  // sheet is elite across the board, pushing the raw pre-clamp score far
+  // past what a hard Math.min ceiling would show cleanly — several very
+  // different "all-time great" sheets would otherwise all round to the
+  // exact same capped number instead of reading as distinct. Above
+  // OVR_SOFT_KNEE, each extra point of raw score is worth progressively
+  // less (a saturating curve toward, but never quite reaching,
+  // OVR_SOFT_KNEE + OVR_SOFT_KNEE_SCALE) instead of being truncated
+  // outright — genuinely special sheets still separate from each other
+  // near the top instead of collapsing into one shared ceiling number.
+  // Below the knee (which sits comfortably above where a standout-but-not-
+  // freakish card like the Gullit/Hazard examples land) nothing changes.
+  const OVR_SOFT_KNEE = 111;
+  const OVR_SOFT_KNEE_SCALE = 10;
+  function applySoftKnee(raw) {
+    if (raw <= OVR_SOFT_KNEE) return raw;
+    const over = raw - OVR_SOFT_KNEE;
+    return OVR_SOFT_KNEE + (over * OVR_SOFT_KNEE_SCALE) / (OVR_SOFT_KNEE_SCALE + over);
+  }
+
   // Computes OVR straight from the (manager-boosted) raw attribute sheet
-  // using the position's weight list above, then applies the same
-  // "lean toward peak" treatment as efootballBoostedOverall — a truly
-  // standout signature attribute for the role still pulls the whole
-  // rating up rather than just averaging away.
+  // using the position's nonlinear weight list above.
   function positionalRawOverall(attr, posGroup) {
     const weights = POSITION_ATTR_WEIGHTS[posGroup] || POSITION_ATTR_WEIGHTS.CMF;
-    let sum = 0, wsum = 0, peak = -Infinity;
-    Object.keys(weights).forEach((k) => {
+    const keys = Object.keys(weights);
+    const rawVals = [];
+    const curved = [];
+    let sum = 0, wsum = 0, floorVal = Infinity;
+    keys.forEach((k) => {
       const v = attr[k];
       if (typeof v !== 'number') return;
-      sum += v * weights[k];
+      rawVals.push(v);
+      if (v < floorVal) floorVal = v;
+      const cv = eliteValue(v);
+      curved.push(cv);
+      sum += cv * weights[k];
       wsum += weights[k];
-      if (v > peak) peak = v;
     });
-    const flat = wsum ? sum / wsum : 60;
-    if (peak === -Infinity) peak = flat;
-    return flat + (peak - flat) * OVERALL_BOOST_LEAN;
+    if (!wsum) return 60;
+    const base = sum / wsum;
+
+    const topN = curved.slice().sort((a, b) => b - a).slice(0, Math.min(OVR_TOPN_COUNT, curved.length));
+    const topNAvg = topN.reduce((a, b) => a + b, 0) / topN.length;
+    const leaned = base + (topNAvg - base) * OVR_TOPN_LEAN;
+
+    const comboKeys = keys.slice(0, Math.min(OVR_COMBO_TOPN, keys.length));
+    const eliteCount = comboKeys.filter((k) => typeof attr[k] === 'number' && attr[k] >= OVR_COMBO_ELITE_THRESHOLD).length;
+    const comboBonus = eliteCount >= 2 ? (eliteCount - 1) * OVR_COMBO_UNIT : 0;
+
+    const floorGap = (floorVal === Infinity) ? 0 : Math.max(0, floorVal - OVR_FLOOR_BONUS_THRESHOLD);
+    const floorBonus = Math.min(OVR_FLOOR_BONUS_CAP, OVR_FLOOR_BONUS_MULT * Math.pow(floorGap, OVR_FLOOR_BONUS_EXP));
+
+    return leaned + comboBonus + floorBonus;
   }
 
 
@@ -2375,7 +2442,8 @@ var App = (() => {
         // attribute sheet directly using this exact position's own
         // strongly-valued attribute list (see POSITION_ATTR_WEIGHTS).
         const posGroup = resolveAttrPositionGroup(posArr);
-        const base = positionalRawOverall(attr, posGroup) + signatureBonus;
+        const rawScore = positionalRawOverall(attr, posGroup) + signatureBonus;
+        const base = applySoftKnee(rawScore);
         const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base)));
         p.baseOvr = boostedBase;
         // Card overall is fixed to baseOvr — see the non-expanded branch
@@ -10274,22 +10342,28 @@ var App = (() => {
       .sort((a,b) => b.pts - a.pts || b.clean - a.clean || b.saves - a.saves);
   }
 
-  // Snapshots the current global leaderboard leaders (Golden Boot, Ballon
-  // d'Or, Golden Glove, Yashin Trophy, Top Assists, Most MOTM, Clean Sheet
-  // King, Puskás Award, Gerd Müller Award) into the trophy case
-  // as individual awards for the season that just ended, then wipes `stats`
-  // and `tournamentStats` so the new season's leaderboard & Awards tab start
-  // from zero. Team trophies (league/UCL winners) are left untouched — the
-  // trophy case is a permanent record, only the live leaderboard resets.
+  // Snapshots the current global leaderboard leaders (Ballon d'Or, Top
+  // Assists, Most MOTM, Clean Sheet King, Puskás Award, Gerd Müller Award,
+  // Yashin Trophy) into the trophy case as individual awards for the season
+  // that just ended, then wipes `stats` and `tournamentStats` so the new
+  // season's leaderboard & Awards tab start from zero. Team trophies
+  // (league/UCL winners) are left untouched — the trophy case is a
+  // permanent record, only the live leaderboard resets.
+  // Golden Boot/Golden Glove are deliberately NOT handed out here — Gerd
+  // Müller Award and Yashin Trophy already cover "best striker"/"best
+  // goalkeeper" for the global archive with a more holistic ranking than a
+  // raw goals/saves count, so a separate global Golden Boot/Golden Glove
+  // would just be a redundant duplicate. Golden Boot/Golden Glove still
+  // exist as their own thing at the per-competition level (Premier League,
+  // Champions League, a standalone Tournament, etc. — see
+  // recordIndividualAwardsFromAwardsObject() above), which is unaffected.
   function archiveAndResetGlobalAwards(year, category) {
     category = category || 'season-global';
     const extra = { category, year };
     const type = (category === 'standalone-global' ? 'Awards Round ' + year : 'Season Y' + year) + ' (Global)';
     const topOf = (key) => Object.values(stats[key] || {}).sort((a,b) => b.count - a.count)[0] || null;
-    pushIndividualTrophy('Golden Boot', topOf('goals'), type, extra);
     pushIndividualTrophy('Top Assists', topOf('assists'), type, extra);
     pushIndividualTrophy('Most MOTM', topOf('motm'), type, extra);
-    pushIndividualTrophy('Golden Glove', topOf('saves'), type, extra);
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
     pushIndividualTrophy('Puskás Award', topOf('puskas'), type, extra);
     pushIndividualTrophy('Gerd Müller Award', computeGerdMullerRanking(stats)[0] || null, type, extra);
@@ -10297,11 +10371,11 @@ var App = (() => {
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
     // Only the season-scoped `stats` leaderboard bucket resets here — it's
-    // what feeds each new season's Golden Boot/Golden Glove/Ballon d'Or race
-    // from zero. `careerStats` (a player's lifetime totals, shown on the
-    // Players tab / player profile) is a completely separate, never-reset
-    // bucket — see its declaration in js/state.js — so ending a season no
-    // longer wipes a player's career goals/assists/apps/etc.
+    // what feeds each new season's Ballon d'Or/Gerd Müller/Yashin race from
+    // zero. `careerStats` (a player's lifetime totals, shown on the Players
+    // tab / player profile) is a completely separate, never-reset bucket —
+    // see its declaration in js/state.js — so ending a season no longer
+    // wipes a player's career goals/assists/apps/etc.
     stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
@@ -15415,7 +15489,7 @@ var App = (() => {
   }
 
   // Manual "End Season" action (Extras tab) — a one-click way to hand out
-  // and archive awards (Golden Boot, Ballon d'Or, Puskás Award, etc.) right
+  // and archive awards (Ballon d'Or, Puskás Award, Gerd Müller Award, etc.) right
   // now instead of waiting for a season to run its course. This used to
   // require an active Season Calendar run (it would silently no-op
   // otherwise) — it no longer does: with no season running it still
@@ -15483,7 +15557,7 @@ var App = (() => {
     const hasSeason = !!season;
     const already = hasSeason && seasonIsComplete();
     const msg = !hasSeason
-      ? 'Hand out and archive this cycle\'s awards (Golden Boot, Ballon d\'Or, Puskás Award, etc.) now, and reset the leaderboard? No Season Calendar is running, so no league/cup champions will be crowned.'
+      ? 'Hand out and archive this cycle\'s awards (Ballon d\'Or, Puskás Award, Gerd Müller Award, etc.) now, and reset the leaderboard? No Season Calendar is running, so no league/cup champions will be crowned.'
       : already
         ? 'End Season Y' + season.year + ' now? This hands out the season\'s awards, resets the leaderboard, and kicks off Season Y' + (season.year + 1) + '.'
         : 'End Season Y' + season.year + ' now? Any fixtures still outstanding will be simulated to their conclusion, this season\'s champions crowned, awards handed out, and the leaderboard reset for Season Y' + (season.year + 1) + '.';
