@@ -1,565 +1,687 @@
 {
-  "national": [{
-  "id": "chile2015",
-  "name": "Chile 2015",
-  "short": "CHI15",
-  "flag": "🇨🇱",
-  "color": "#D52B1E",
-  "secondary": "#FFFFFF",
-  "logo": "chile.png",
-  "stadium": "Estadio Nacional Julio Martínez Prádanos",
-  "players": [
+  "national": [
     {
-      "id": "chi_15_1",
-      "name": "Claudio Bravo",
-      "pos": ["GK"],
-      "ovr": 84,
-      "att": 10,
-      "def": 85,
-      "phy": 76,
-      "pac": 48,
-      "tec": 82,
-      "num": 1
+      "id": "chile2015",
+      "name": "Chile 2015",
+      "short": "CHI15",
+      "flag": "🇨🇱",
+      "color": "#D52B1E",
+      "secondary": "#FFFFFF",
+      "logo": "chile.png",
+      "stadium": "Estadio Nacional Julio Martínez Prádanos",
+      "players": [
+        {
+          "id": "chi_15_1",
+          "name": "Claudio Bravo",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 84,
+          "att": 10,
+          "def": 85,
+          "phy": 76,
+          "pac": 48,
+          "tec": 82,
+          "num": 1
+        },
+        {
+          "id": "chi_15_12",
+          "name": "Paulo Garcés",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 70,
+          "att": 10,
+          "def": 71,
+          "phy": 68,
+          "pac": 40,
+          "tec": 60,
+          "num": 12
+        },
+        {
+          "id": "chi_15_23",
+          "name": "Johnny Herrera",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 75,
+          "att": 10,
+          "def": 76,
+          "phy": 72,
+          "pac": 42,
+          "tec": 65,
+          "num": 23
+        },
+        {
+          "id": "chi_15_17",
+          "name": "Gary Medel",
+          "pos": [
+            "CB",
+            "CDM"
+          ],
+          "ovr": 81,
+          "att": 60,
+          "def": 84,
+          "phy": 88,
+          "pac": 74,
+          "tec": 72,
+          "num": 17
+        },
+        {
+          "id": "chi_15_18",
+          "name": "Gonzalo Jara",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 76,
+          "att": 55,
+          "def": 77,
+          "phy": 78,
+          "pac": 72,
+          "tec": 68,
+          "num": 18
+        },
+        {
+          "id": "chi_15_4",
+          "name": "Mauricio Isla",
+          "pos": [
+            "RB",
+            "RWB",
+            "RM"
+          ],
+          "ovr": 78,
+          "att": 76,
+          "def": 74,
+          "phy": 77,
+          "pac": 82,
+          "tec": 76,
+          "num": 4
+        },
+        {
+          "id": "chi_15_2",
+          "name": "Eugenio Mena",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 76,
+          "att": 72,
+          "def": 73,
+          "phy": 75,
+          "pac": 84,
+          "tec": 71,
+          "num": 2
+        },
+        {
+          "id": "chi_15_3",
+          "name": "Miiko Albornoz",
+          "pos": [
+            "LB",
+            "CB"
+          ],
+          "ovr": 73,
+          "att": 68,
+          "def": 72,
+          "phy": 74,
+          "pac": 76,
+          "tec": 69,
+          "num": 3
+        },
+        {
+          "id": "chi_15_13",
+          "name": "José Rojas",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 72,
+          "att": 50,
+          "def": 74,
+          "phy": 73,
+          "pac": 62,
+          "tec": 64,
+          "num": 13
+        },
+        {
+          "id": "chi_15_21",
+          "name": "Miko Gutiérrez",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 71,
+          "att": 45,
+          "def": 72,
+          "phy": 75,
+          "pac": 60,
+          "tec": 62,
+          "num": 21
+        },
+        {
+          "id": "chi_15_20",
+          "name": "Charles Aránguiz",
+          "pos": [
+            "CM",
+            "CDM",
+            "RM"
+          ],
+          "ovr": 82,
+          "att": 78,
+          "def": 78,
+          "phy": 80,
+          "pac": 78,
+          "tec": 82,
+          "num": 20
+        },
+        {
+          "id": "chi_15_8",
+          "name": "Arturo Vidal",
+          "pos": [
+            "CM",
+            "CAM",
+            "CDM"
+          ],
+          "ovr": 86,
+          "att": 84,
+          "def": 83,
+          "phy": 88,
+          "pac": 77,
+          "tec": 84,
+          "num": 8
+        },
+        {
+          "id": "chi_15_21_m",
+          "name": "Marcelo Díaz",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 79,
+          "att": 70,
+          "def": 77,
+          "phy": 72,
+          "pac": 65,
+          "tec": 83,
+          "num": 21
+        },
+        {
+          "id": "chi_15_10",
+          "name": "Jorge Valdivia",
+          "pos": [
+            "CAM"
+          ],
+          "ovr": 81,
+          "att": 80,
+          "def": 38,
+          "phy": 64,
+          "pac": 70,
+          "tec": 90,
+          "num": 10
+        },
+        {
+          "id": "chi_15_6",
+          "name": "David Pizarro",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 76,
+          "att": 72,
+          "def": 68,
+          "phy": 66,
+          "pac": 55,
+          "tec": 84,
+          "num": 6
+        },
+        {
+          "id": "chi_15_14",
+          "name": "Matias Fernández",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 77,
+          "att": 76,
+          "def": 50,
+          "phy": 65,
+          "pac": 75,
+          "tec": 84,
+          "num": 14
+        },
+        {
+          "id": "chi_15_16",
+          "name": "Felipe Gutiérrez",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 74,
+          "att": 72,
+          "def": 65,
+          "phy": 70,
+          "pac": 72,
+          "tec": 77,
+          "num": 16
+        },
+        {
+          "id": "chi_15_7",
+          "name": "Alexis Sánchez",
+          "pos": [
+            "LW",
+            "ST",
+            "RW"
+          ],
+          "ovr": 87,
+          "att": 87,
+          "def": 45,
+          "phy": 78,
+          "pac": 88,
+          "tec": 89,
+          "num": 7
+        },
+        {
+          "id": "chi_15_11",
+          "name": "Eduardo Vargas",
+          "pos": [
+            "ST",
+            "RW"
+          ],
+          "ovr": 80,
+          "att": 82,
+          "def": 38,
+          "phy": 72,
+          "pac": 87,
+          "tec": 79,
+          "num": 11
+        },
+        {
+          "id": "chi_15_9",
+          "name": "Mauricio Pinilla",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 75,
+          "att": 77,
+          "def": 32,
+          "phy": 80,
+          "pac": 68,
+          "tec": 73,
+          "num": 9
+        },
+        {
+          "id": "chi_15_15",
+          "name": "Jean Beausejour",
+          "pos": [
+            "LWB",
+            "LM",
+            "LB"
+          ],
+          "ovr": 76,
+          "att": 73,
+          "def": 70,
+          "phy": 79,
+          "pac": 81,
+          "tec": 75,
+          "num": 15
+        },
+        {
+          "id": "chi_15_22",
+          "name": "Angelo Henríquez",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 73,
+          "att": 74,
+          "def": 28,
+          "phy": 68,
+          "pac": 78,
+          "tec": 72,
+          "num": 22
+        }
+      ],
+      "manager": {
+        "name": "Jorge Sampaoli",
+        "ovr": 86
+      }
     },
     {
-      "id": "chi_15_12",
-      "name": "Paulo Garcés",
-      "pos": ["GK"],
-      "ovr": 70,
-      "att": 10,
-      "def": 71,
-      "phy": 68,
-      "pac": 40,
-      "tec": 60,
-      "num": 12
+      "id": "brazil2006",
+      "name": "Brazil 2006",
+      "short": "BRA06",
+      "flag": "🇧🇷",
+      "color": "#FFDC02",
+      "secondary": "#002776",
+      "logo": "brazil.png",
+      "stadium": "Germany",
+      "players": [
+        {
+          "id": "bra_06_1",
+          "name": "Dida",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 88,
+          "att": 10,
+          "def": 89,
+          "phy": 82,
+          "pac": 50,
+          "tec": 72,
+          "num": 1
+        },
+        {
+          "id": "bra_06_12",
+          "name": "Rogério Ceni",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 81,
+          "att": 35,
+          "def": 82,
+          "phy": 75,
+          "pac": 42,
+          "tec": 78,
+          "num": 12
+        },
+        {
+          "id": "bra_06_22",
+          "name": "Júlio César",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 80,
+          "att": 10,
+          "def": 81,
+          "phy": 76,
+          "pac": 48,
+          "tec": 68,
+          "num": 22
+        },
+        {
+          "id": "bra_06_3",
+          "name": "Lúcio",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 88,
+          "att": 68,
+          "def": 89,
+          "phy": 87,
+          "pac": 80,
+          "tec": 76,
+          "num": 3
+        },
+        {
+          "id": "bra_06_4",
+          "name": "Juan",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 85,
+          "att": 55,
+          "def": 87,
+          "phy": 83,
+          "pac": 74,
+          "tec": 72,
+          "num": 4
+        },
+        {
+          "id": "bra_06_13",
+          "name": "Cicinho",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 81,
+          "att": 80,
+          "def": 70,
+          "phy": 74,
+          "pac": 88,
+          "tec": 82,
+          "num": 13
+        },
+        {
+          "id": "bra_06_2",
+          "name": "Cafu",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 86,
+          "att": 82,
+          "def": 83,
+          "phy": 84,
+          "pac": 82,
+          "tec": 83,
+          "num": 2
+        },
+        {
+          "id": "bra_06_6",
+          "name": "Roberto Carlos",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 88,
+          "att": 86,
+          "def": 82,
+          "phy": 86,
+          "pac": 90,
+          "tec": 85,
+          "num": 6
+        },
+        {
+          "id": "bra_06_16",
+          "name": "Gilberto",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 78,
+          "att": 74,
+          "def": 75,
+          "phy": 76,
+          "pac": 81,
+          "tec": 76,
+          "num": 16
+        },
+        {
+          "id": "bra_06_14",
+          "name": "Luisão",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 82,
+          "att": 45,
+          "def": 84,
+          "phy": 86,
+          "pac": 62,
+          "tec": 65,
+          "num": 14
+        },
+        {
+          "id": "bra_06_15",
+          "name": "Cris",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 83,
+          "att": 48,
+          "def": 84,
+          "phy": 84,
+          "pac": 68,
+          "tec": 67,
+          "num": 15
+        },
+        {
+          "id": "bra_06_5",
+          "name": "Emerson",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 85,
+          "att": 68,
+          "def": 87,
+          "phy": 85,
+          "pac": 70,
+          "tec": 78,
+          "num": 5
+        },
+        {
+          "id": "bra_06_17",
+          "name": "Gilberto Silva",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 86,
+          "att": 66,
+          "def": 88,
+          "phy": 84,
+          "pac": 72,
+          "tec": 79,
+          "num": 17
+        },
+        {
+          "id": "bra_06_8",
+          "name": "Kaká",
+          "pos": [
+            "CAM",
+            "CF"
+          ],
+          "ovr": 90,
+          "att": 88,
+          "def": 45,
+          "phy": 78,
+          "pac": 91,
+          "tec": 90,
+          "num": 8
+        },
+        {
+          "id": "bra_06_10",
+          "name": "Ronaldinho",
+          "pos": [
+            "CAM",
+            "LW",
+            "SS"
+          ],
+          "ovr": 93,
+          "att": 91,
+          "def": 38,
+          "phy": 76,
+          "pac": 89,
+          "tec": 97,
+          "num": 10
+        },
+        {
+          "id": "bra_06_19",
+          "name": "Juninho Pernambucano",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 85,
+          "att": 82,
+          "def": 65,
+          "phy": 72,
+          "pac": 72,
+          "tec": 92,
+          "num": 19
+        },
+        {
+          "id": "bra_06_18",
+          "name": "Mineiro",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 78,
+          "att": 64,
+          "def": 78,
+          "phy": 78,
+          "pac": 74,
+          "tec": 74,
+          "num": 18
+        },
+        {
+          "id": "bra_06_20",
+          "name": "Ricardinho",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 78,
+          "att": 76,
+          "def": 55,
+          "phy": 68,
+          "pac": 70,
+          "tec": 82,
+          "num": 20
+        },
+        {
+          "id": "bra_06_9",
+          "name": "Ronaldo Nazário",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 89,
+          "att": 92,
+          "def": 32,
+          "phy": 80,
+          "pac": 84,
+          "tec": 91,
+          "num": 9
+        },
+        {
+          "id": "bra_06_7",
+          "name": "Adriano",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 88,
+          "att": 90,
+          "def": 35,
+          "phy": 92,
+          "pac": 85,
+          "tec": 84,
+          "num": 7
+        },
+        {
+          "id": "bra_06_23",
+          "name": "Robinho",
+          "pos": [
+            "LW",
+            "RW",
+            "ST"
+          ],
+          "ovr": 84,
+          "att": 83,
+          "def": 30,
+          "phy": 60,
+          "pac": 90,
+          "tec": 91,
+          "num": 23
+        },
+        {
+          "id": "bra_06_21",
+          "name": "Fred",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 79,
+          "att": 81,
+          "def": 30,
+          "phy": 78,
+          "pac": 75,
+          "tec": 76,
+          "num": 21
+        }
+      ],
+      "manager": {
+        "name": "Carlos Alberto Parreira",
+        "ovr": 86
+      }
     },
-    {
-      "id": "chi_15_23",
-      "name": "Johnny Herrera",
-      "pos": ["GK"],
-      "ovr": 75,
-      "att": 10,
-      "def": 76,
-      "phy": 72,
-      "pac": 42,
-      "tec": 65,
-      "num": 23
-    },
-    {
-      "id": "chi_15_17",
-      "name": "Gary Medel",
-      "pos": ["CB", "CDM"],
-      "ovr": 81,
-      "att": 60,
-      "def": 84,
-      "phy": 88,
-      "pac": 74,
-      "tec": 72,
-      "num": 17
-    },
-    {
-      "id": "chi_15_18",
-      "name": "Gonzalo Jara",
-      "pos": ["CB", "RB"],
-      "ovr": 76,
-      "att": 55,
-      "def": 77,
-      "phy": 78,
-      "pac": 72,
-      "tec": 68,
-      "num": 18
-    },
-    {
-      "id": "chi_15_4",
-      "name": "Mauricio Isla",
-      "pos": ["RB", "RWB", "RM"],
-      "ovr": 78,
-      "att": 76,
-      "def": 74,
-      "phy": 77,
-      "pac": 82,
-      "tec": 76,
-      "num": 4
-    },
-    {
-      "id": "chi_15_2",
-      "name": "Eugenio Mena",
-      "pos": ["LB", "LWB"],
-      "ovr": 76,
-      "att": 72,
-      "def": 73,
-      "phy": 75,
-      "pac": 84,
-      "tec": 71,
-      "num": 2
-    },
-    {
-      "id": "chi_15_3",
-      "name": "Miiko Albornoz",
-      "pos": ["LB", "CB"],
-      "ovr": 73,
-      "att": 68,
-      "def": 72,
-      "phy": 74,
-      "pac": 76,
-      "tec": 69,
-      "num": 3
-    },
-    {
-      "id": "chi_15_13",
-      "name": "José Rojas",
-      "pos": ["CB", "LB"],
-      "ovr": 72,
-      "att": 50,
-      "def": 74,
-      "phy": 73,
-      "pac": 62,
-      "tec": 64,
-      "num": 13
-    },
-    {
-      "id": "chi_15_21",
-      "name": "Miko Gutiérrez",
-      "pos": ["CB"],
-      "ovr": 71,
-      "att": 45,
-      "def": 72,
-      "phy": 75,
-      "pac": 60,
-      "tec": 62,
-      "num": 21
-    },
-    {
-      "id": "chi_15_20",
-      "name": "Charles Aránguiz",
-      "pos": ["CM", "CDM", "RM"],
-      "ovr": 82,
-      "att": 78,
-      "def": 78,
-      "phy": 80,
-      "pac": 78,
-      "tec": 82,
-      "num": 20
-    },
-    {
-      "id": "chi_15_8",
-      "name": "Arturo Vidal",
-      "pos": ["CM", "CAM", "CDM"],
-      "ovr": 86,
-      "att": 84,
-      "def": 83,
-      "phy": 88,
-      "pac": 77,
-      "tec": 84,
-      "num": 8
-    },
-    {
-      "id": "chi_15_21_m",
-      "name": "Marcelo Díaz",
-      "pos": ["CDM", "CM"],
-      "ovr": 79,
-      "att": 70,
-      "def": 77,
-      "phy": 72,
-      "pac": 65,
-      "tec": 83,
-      "num": 21
-    },
-    {
-      "id": "chi_15_10",
-      "name": "Jorge Valdivia",
-      "pos": ["CAM"],
-      "ovr": 81,
-      "att": 80,
-      "def": 38,
-      "phy": 64,
-      "pac": 70,
-      "tec": 90,
-      "num": 10
-    },
-    {
-      "id": "chi_15_6",
-      "name": "David Pizarro",
-      "pos": ["CM", "CDM"],
-      "ovr": 76,
-      "att": 72,
-      "def": 68,
-      "phy": 66,
-      "pac": 55,
-      "tec": 84,
-      "num": 6
-    },
-    {
-      "id": "chi_15_14",
-      "name": "Matias Fernández",
-      "pos": ["CAM", "CM"],
-      "ovr": 77,
-      "att": 76,
-      "def": 50,
-      "phy": 65,
-      "pac": 75,
-      "tec": 84,
-      "num": 14
-    },
-    {
-      "id": "chi_15_16",
-      "name": "Felipe Gutiérrez",
-      "pos": ["CM", "CAM"],
-      "ovr": 74,
-      "att": 72,
-      "def": 65,
-      "phy": 70,
-      "pac": 72,
-      "tec": 77,
-      "num": 16
-    },
-    {
-      "id": "chi_15_7",
-      "name": "Alexis Sánchez",
-      "pos": ["LW", "ST", "RW"],
-      "ovr": 87,
-      "att": 87,
-      "def": 45,
-      "phy": 78,
-      "pac": 88,
-      "tec": 89,
-      "num": 7
-    },
-    {
-      "id": "chi_15_11",
-      "name": "Eduardo Vargas",
-      "pos": ["ST", "RW"],
-      "ovr": 80,
-      "att": 82,
-      "def": 38,
-      "phy": 72,
-      "pac": 87,
-      "tec": 79,
-      "num": 11
-    },
-    {
-      "id": "chi_15_9",
-      "name": "Mauricio Pinilla",
-      "pos": ["ST"],
-      "ovr": 75,
-      "att": 77,
-      "def": 32,
-      "phy": 80,
-      "pac": 68,
-      "tec": 73,
-      "num": 9
-    },
-    {
-      "id": "chi_15_15",
-      "name": "Jean Beausejour",
-      "pos": ["LWB", "LM", "LB"],
-      "ovr": 76,
-      "att": 73,
-      "def": 70,
-      "phy": 79,
-      "pac": 81,
-      "tec": 75,
-      "num": 15
-    },
-    {
-      "id": "chi_15_22",
-      "name": "Angelo Henríquez",
-      "pos": ["ST"],
-      "ovr": 73,
-      "att": 74,
-      "def": 28,
-      "phy": 68,
-      "pac": 78,
-      "tec": 72,
-      "num": 22
-    }
-  ],
-  "manager": {
-    "name": "Jorge Sampaoli",
-    "ovr": 86
-  }
-}
-,{
-  "id": "brazil2006",
-  "name": "Brazil 2006",
-  "short": "BRA06",
-  "flag": "🇧🇷",
-  "color": "#FFDC02",
-  "secondary": "#002776",
-  "logo": "brazil.png",
-  "stadium": "Germany",
-  "players": [
-    {
-      "id": "bra_06_1",
-      "name": "Dida",
-      "pos": ["GK"],
-      "ovr": 88,
-      "att": 10,
-      "def": 89,
-      "phy": 82,
-      "pac": 50,
-      "tec": 72,
-      "num": 1
-    },
-    {
-      "id": "bra_06_12",
-      "name": "Rogério Ceni",
-      "pos": ["GK"],
-      "ovr": 81,
-      "att": 35,
-      "def": 82,
-      "phy": 75,
-      "pac": 42,
-      "tec": 78,
-      "num": 12
-    },
-    {
-      "id": "bra_06_22",
-      "name": "Júlio César",
-      "pos": ["GK"],
-      "ovr": 80,
-      "att": 10,
-      "def": 81,
-      "phy": 76,
-      "pac": 48,
-      "tec": 68,
-      "num": 22
-    },
-    {
-      "id": "bra_06_3",
-      "name": "Lúcio",
-      "pos": ["CB"],
-      "ovr": 88,
-      "att": 68,
-      "def": 89,
-      "phy": 87,
-      "pac": 80,
-      "tec": 76,
-      "num": 3
-    },
-    {
-      "id": "bra_06_4",
-      "name": "Juan",
-      "pos": ["CB"],
-      "ovr": 85,
-      "att": 55,
-      "def": 87,
-      "phy": 83,
-      "pac": 74,
-      "tec": 72,
-      "num": 4
-    },
-    {
-      "id": "bra_06_13",
-      "name": "Cicinho",
-      "pos": ["RB", "RWB"],
-      "ovr": 81,
-      "att": 80,
-      "def": 70,
-      "phy": 74,
-      "pac": 88,
-      "tec": 82,
-      "num": 13
-    },
-    {
-      "id": "bra_06_2",
-      "name": "Cafu",
-      "pos": ["RB", "RWB"],
-      "ovr": 86,
-      "att": 82,
-      "def": 83,
-      "phy": 84,
-      "pac": 82,
-      "tec": 83,
-      "num": 2
-    },
-    {
-      "id": "bra_06_6",
-      "name": "Roberto Carlos",
-      "pos": ["LB", "LWB"],
-      "ovr": 88,
-      "att": 86,
-      "def": 82,
-      "phy": 86,
-      "pac": 90,
-      "tec": 85,
-      "num": 6
-    },
-    {
-      "id": "bra_06_16",
-      "name": "Gilberto",
-      "pos": ["LB", "LWB"],
-      "ovr": 78,
-      "att": 74,
-      "def": 75,
-      "phy": 76,
-      "pac": 81,
-      "tec": 76,
-      "num": 16
-    },
-    {
-      "id": "bra_06_14",
-      "name": "Luisão",
-      "pos": ["CB"],
-      "ovr": 82,
-      "att": 45,
-      "def": 84,
-      "phy": 86,
-      "pac": 62,
-      "tec": 65,
-      "num": 14
-    },
-    {
-      "id": "bra_06_15",
-      "name": "Cris",
-      "pos": ["CB"],
-      "ovr": 83,
-      "att": 48,
-      "def": 84,
-      "phy": 84,
-      "pac": 68,
-      "tec": 67,
-      "num": 15
-    },
-    {
-      "id": "bra_06_5",
-      "name": "Emerson",
-      "pos": ["CDM", "CM"],
-      "ovr": 85,
-      "att": 68,
-      "def": 87,
-      "phy": 85,
-      "pac": 70,
-      "tec": 78,
-      "num": 5
-    },
-    {
-      "id": "bra_06_17",
-      "name": "Gilberto Silva",
-      "pos": ["CDM", "CM"],
-      "ovr": 86,
-      "att": 66,
-      "def": 88,
-      "phy": 84,
-      "pac": 72,
-      "tec": 79,
-      "num": 17
-    },
-    {
-      "id": "bra_06_8",
-      "name": "Kaká",
-      "pos": ["CAM", "CF"],
-      "ovr": 90,
-      "att": 88,
-      "def": 45,
-      "phy": 78,
-      "pac": 91,
-      "tec": 90,
-      "num": 8
-    },
-    {
-      "id": "bra_06_10",
-      "name": "Ronaldinho",
-      "pos": ["CAM", "LW", "SS"],
-      "ovr": 93,
-      "att": 91,
-      "def": 38,
-      "phy": 76,
-      "pac": 89,
-      "tec": 97,
-      "num": 10
-    },
-    {
-      "id": "bra_06_19",
-      "name": "Juninho Pernambucano",
-      "pos": ["CM", "CAM"],
-      "ovr": 85,
-      "att": 82,
-      "def": 65,
-      "phy": 72,
-      "pac": 72,
-      "tec": 92,
-      "num": 19
-    },
-    {
-      "id": "bra_06_18",
-      "name": "Mineiro",
-      "pos": ["CDM", "CM"],
-      "ovr": 78,
-      "att": 64,
-      "def": 78,
-      "phy": 78,
-      "pac": 74,
-      "tec": 74,
-      "num": 18
-    },
-    {
-      "id": "bra_06_20",
-      "name": "Ricardinho",
-      "pos": ["CAM", "CM"],
-      "ovr": 78,
-      "att": 76,
-      "def": 55,
-      "phy": 68,
-      "pac": 70,
-      "tec": 82,
-      "num": 20
-    },
-    {
-      "id": "bra_06_9",
-      "name": "Ronaldo Nazário",
-      "pos": ["ST"],
-      "ovr": 89,
-      "att": 92,
-      "def": 32,
-      "phy": 80,
-      "pac": 84,
-      "tec": 91,
-      "num": 9
-    },
-    {
-      "id": "bra_06_7",
-      "name": "Adriano",
-      "pos": ["ST"],
-      "ovr": 88,
-      "att": 90,
-      "def": 35,
-      "phy": 92,
-      "pac": 85,
-      "tec": 84,
-      "num": 7
-    },
-    {
-      "id": "bra_06_23",
-      "name": "Robinho",
-      "pos": ["LW", "RW", "ST"],
-      "ovr": 84,
-      "att": 83,
-      "def": 30,
-      "phy": 60,
-      "pac": 90,
-      "tec": 91,
-      "num": 23
-    },
-    {
-      "id": "bra_06_21",
-      "name": "Fred",
-      "pos": ["ST"],
-      "ovr": 79,
-      "att": 81,
-      "def": 30,
-      "phy": 78,
-      "pac": 75,
-      "tec": 76,
-      "num": 21
-    }
-  ],
-  "manager": {
-    "name": "Carlos Alberto Parreira",
-    "ovr": 86
-  }
-}
-,
     {
       "id": "slovenia2026",
       "name": "Slovenia",
@@ -27023,7 +27145,7 @@
       "manager": {
         "name": "Joachim Löw",
         "ovr": 94,
-        "formation":"4-3-3"
+        "formation": "4-3-3"
       }
     },
     {
@@ -49332,7 +49454,7 @@
       "manager": {
         "name": "Enzo Maresca",
         "ovr": 89,
-        "formation":"4-2-3-1"
+        "formation": "4-2-3-1"
       }
     },
     {
@@ -54494,8 +54616,8 @@
       "manager": {
         "name": "Luis Enrique",
         "ovr": 96,
-        "formation":"4-3-3",
-        "playstyle":"Possession"
+        "formation": "4-3-3",
+        "playstyle": "Possession"
       }
     },
     {
@@ -58856,7 +58978,8 @@
           "pac": 76,
           "tec": 77,
           "num": 14
-        },{
+        },
+        {
           "id": "bet26_19",
           "name": "Troy Parrott",
           "pos": [
@@ -58870,7 +58993,8 @@
           "pac": 76,
           "tec": 71,
           "num": 19
-        },     {
+        },
+        {
           "id": "bet26_28",
           "name": "Dani Ceballos",
           "pos": [
@@ -58889,7 +59013,7 @@
       "manager": {
         "name": "Manuel Pellegrini",
         "ovr": 84,
-        "formation":"4-2-3-1"
+        "formation": "4-2-3-1"
       }
     },
     {
@@ -62614,22 +62738,6 @@
           "num": 28
         },
         {
-          "id": "wal17",
-          "name": "Brennan Johnson",
-          "pos": [
-            "RW",
-            "RM",
-            "ST"
-          ],
-          "ovr": 81,
-          "att": 81,
-          "def": 45,
-          "phy": 72,
-          "pac": 91,
-          "tec": 78,
-          "num": 22
-        },
-        {
           "id": "swe17",
           "name": "Dejan Kulusevski",
           "pos": [
@@ -63871,6 +63979,21 @@
           "pac": 85,
           "tec": 76,
           "num": 22
+        },
+        {
+          "id": "val27_20",
+          "name": "Enzo Barrenechea",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 81,
+          "att": 72,
+          "def": 83,
+          "phy": 84,
+          "pac": 74,
+          "tec": 78,
+          "num": 20
         }
       ],
       "manager": {
@@ -86173,20 +86296,6 @@
           "num": 1
         },
         {
-          "id": "rac27_13",
-          "name": "Julen Agirrezabala",
-          "pos": [
-            "GK"
-          ],
-          "ovr": 84,
-          "att": 10,
-          "def": 85,
-          "phy": 81,
-          "pac": 50,
-          "tec": 74,
-          "num": 13
-        },
-        {
           "id": "rac27_31",
           "name": "Álvaro Jiménez",
           "pos": [
@@ -86446,6 +86555,35 @@
           "pac": 87,
           "tec": 79,
           "num": 21
+        },
+        {
+          "id": "val27_18",
+          "name": "André Almeida",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 83,
+          "att": 82,
+          "def": 54,
+          "phy": 71,
+          "pac": 79,
+          "tec": 88,
+          "num": 18
+        },
+        {
+          "id": "val27_13",
+          "name": "Julen Agirrezabala",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 82,
+          "att": 10,
+          "def": 83,
+          "phy": 79,
+          "pac": 52,
+          "tec": 72,
+          "num": 13
         }
       ],
       "manager": {
@@ -88784,49 +88922,6 @@
           "num": 1
         },
         {
-          "id": "val27_13",
-          "name": "Julen Agirrezabala",
-          "pos": [
-            "GK"
-          ],
-          "ovr": 82,
-          "att": 10,
-          "def": 83,
-          "phy": 79,
-          "pac": 52,
-          "tec": 72,
-          "num": 13
-        },
-        {
-          "id": "val27_25",
-          "name": "Cristian Rivero",
-          "pos": [
-            "GK"
-          ],
-          "ovr": 76,
-          "att": 10,
-          "def": 77,
-          "phy": 74,
-          "pac": 44,
-          "tec": 63,
-          "num": 25
-        },
-        {
-          "id": "val27_2",
-          "name": "Thierry Correia",
-          "pos": [
-            "RB",
-            "RWB"
-          ],
-          "ovr": 83,
-          "att": 76,
-          "def": 81,
-          "phy": 80,
-          "pac": 88,
-          "tec": 78,
-          "num": 2
-        },
-        {
           "id": "val27_12",
           "name": "Dimitri Foulquier",
           "pos": [
@@ -88914,21 +89009,6 @@
           "num": 5
         },
         {
-          "id": "val27_24",
-          "name": "Yarek Gasiorowski",
-          "pos": [
-            "CB",
-            "LB"
-          ],
-          "ovr": 81,
-          "att": 46,
-          "def": 83,
-          "phy": 80,
-          "pac": 74,
-          "tec": 74,
-          "num": 24
-        },
-        {
           "id": "val27_6",
           "name": "Pepelu",
           "pos": [
@@ -88958,36 +89038,6 @@
           "pac": 78,
           "tec": 87,
           "num": 8
-        },
-        {
-          "id": "val27_18",
-          "name": "André Almeida",
-          "pos": [
-            "CAM",
-            "CM"
-          ],
-          "ovr": 83,
-          "att": 82,
-          "def": 54,
-          "phy": 71,
-          "pac": 79,
-          "tec": 88,
-          "num": 18
-        },
-        {
-          "id": "val27_20",
-          "name": "Enzo Barrenechea",
-          "pos": [
-            "CDM",
-            "CM"
-          ],
-          "ovr": 81,
-          "att": 72,
-          "def": 83,
-          "phy": 84,
-          "pac": 74,
-          "tec": 78,
-          "num": 20
         },
         {
           "id": "val27_15",
@@ -89037,35 +89087,6 @@
           "num": 11
         },
         {
-          "id": "val27_17",
-          "name": "Fran Pérez",
-          "pos": [
-            "RW",
-            "RM"
-          ],
-          "ovr": 79,
-          "att": 79,
-          "def": 43,
-          "phy": 74,
-          "pac": 88,
-          "tec": 77,
-          "num": 17
-        },
-        {
-          "id": "val27_10",
-          "name": "Rafa Mir",
-          "pos": [
-            "ST"
-          ],
-          "ovr": 82,
-          "att": 84,
-          "def": 35,
-          "phy": 81,
-          "pac": 82,
-          "tec": 78,
-          "num": 10
-        },
-        {
           "id": "val27_9",
           "name": "Hugo Duro",
           "pos": [
@@ -89078,20 +89099,6 @@
           "pac": 83,
           "tec": 80,
           "num": 9
-        },
-        {
-          "id": "val27_22",
-          "name": "Alberto Marí",
-          "pos": [
-            "ST"
-          ],
-          "ovr": 78,
-          "att": 80,
-          "def": 34,
-          "phy": 77,
-          "pac": 79,
-          "tec": 75,
-          "num": 22
         },
         {
           "id": "liv26_19",
@@ -89108,6 +89115,79 @@
           "pac": 78,
           "tec": 85,
           "num": 19
+        },
+        {
+          "id": "valencia2027_new1",
+          "name": "Pablo Maffeo",
+          "pos": [
+            "RB"
+          ],
+          "num": 24,
+          "ovr": 79,
+          "att": 57,
+          "def": 75,
+          "phy": 71,
+          "pac": 80,
+          "tec": 75
+        },
+        {
+          "id": "valencia2027_new2",
+          "name": "Arnau Martínez",
+          "pos": [
+            "CB"
+          ],
+          "num": 22,
+          "ovr": 80,
+          "att": 55,
+          "def": 76,
+          "phy": 72,
+          "pac": 78,
+          "tec": 73
+        },
+        {
+          "id": "valencia2027_new3",
+          "name": "David Otorbi",
+          "pos": [
+            "RM",
+            "RW"
+          ],
+          "num": 27,
+          "ovr": 63,
+          "att": 55,
+          "def": 31,
+          "phy": 50,
+          "pac": 72,
+          "tec": 62
+        },
+        {
+          "id": "valencia2027_new4",
+          "name": "Filip Ugrinić",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "num": 23,
+          "ovr": 75,
+          "att": 73,
+          "def": 70,
+          "phy": 85,
+          "pac": 77,
+          "tec": 75
+        },
+        {
+          "id": "valencia2027_new5",
+          "name": "Aliou Dieng",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "num": 15,
+          "ovr": 74,
+          "att": 65,
+          "def": 70,
+          "phy": 73,
+          "pac": 78,
+          "tec": 70
         }
       ],
       "manager": {
@@ -93606,6 +93686,126 @@
           "pac": 77,
           "tec": 89,
           "num": 10
+        },
+        {
+          "id": "wal17",
+          "name": "Brennan Johnson",
+          "pos": [
+            "RW",
+            "RM",
+            "ST"
+          ],
+          "ovr": 81,
+          "att": 81,
+          "def": 45,
+          "phy": 72,
+          "pac": 91,
+          "tec": 78,
+          "num": 22
+        },
+        {
+          "id": "everton2027_new2",
+          "name": "Kiernan Frank Dewsbury-Hall",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "num": 8,
+          "ovr": 80,
+          "att": 70,
+          "def": 70,
+          "phy": 71,
+          "pac": 77,
+          "tec": 81
+        },
+        {
+          "id": "everton2027_new3",
+          "name": "Tyrique George",
+          "pos": [
+            "LW",
+            "LM"
+          ],
+          "num": 19,
+          "ovr": 71,
+          "att": 66,
+          "def": 36,
+          "phy": 55,
+          "pac": 79,
+          "tec": 69
+        },
+        {
+          "id": "everton2027_new4",
+          "name": "Thierno Barry",
+          "pos": [
+            "ST"
+          ],
+          "num": 11,
+          "ovr": 77,
+          "att": 74,
+          "def": 25,
+          "phy": 73,
+          "pac": 80,
+          "tec": 70
+        },
+        {
+          "id": "ol_26_98",
+          "name": "Ainsley Maitland-Niles",
+          "pos": [
+            "RB",
+            "RM",
+            "CM"
+          ],
+          "ovr": 77,
+          "att": 72,
+          "def": 73,
+          "phy": 74,
+          "pac": 80,
+          "tec": 77,
+          "num": 2
+        },
+        {
+          "id": "everton2027_new5",
+          "name": "Hayden Hackney",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "num": 30,
+          "ovr": 75,
+          "att": 66,
+          "def": 70,
+          "phy": 74,
+          "pac": 67,
+          "tec": 74
+        },
+        {
+          "id": "everton2027_new6",
+          "name": "Braiden Graham",
+          "pos": [
+            "ST"
+          ],
+          "num": 58,
+          "ovr": 65,
+          "att": 68,
+          "def": 21,
+          "phy": 64,
+          "pac": 70,
+          "tec": 68
+        },
+        {
+          "id": "everton2027_new7",
+          "name": "Christian Nørgaard",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "num": 23,
+          "ovr": 80,
+          "att": 65,
+          "def": 79,
+          "phy": 79,
+          "pac": 49,
+          "tec": 73
         }
       ],
       "manager": {
@@ -101081,6 +101281,21 @@
           "pac": 76,
           "tec": 71,
           "num": 19
+        },
+        {
+          "id": "val27_2",
+          "name": "Thierry Correia",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 83,
+          "att": 76,
+          "def": 81,
+          "phy": 80,
+          "pac": 88,
+          "tec": 78,
+          "num": 2
         }
       ],
       "manager": {
@@ -103219,6 +103434,21 @@
           "pac": 78,
           "tec": 74,
           "num": 14
+        },
+        {
+          "id": "val27_24",
+          "name": "Yarek Gasiorowski",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 81,
+          "att": 46,
+          "def": 83,
+          "phy": 80,
+          "pac": 74,
+          "tec": 74,
+          "num": 24
         }
       ],
       "manager": {
@@ -109169,3299 +109399,4006 @@
         "name": "Gérard Houllier",
         "ovr": 83
       }
-    },{
-  "id": "aja2026",
-  "name": "AJ Auxerre 2026-27",
-  "short": "AJA",
-  "flag": "🇫🇷",
-  "color": "#0055A5",
-  "secondary": "#FFFFFF",
-  "logo": "auxerre.png",
-  "stadium": "Stade de l'Abbé-Deschamps",
-  "players": [
-    {
-      "id": "aja_26_1",
-      "name": "Paul Nardi",
-      "pos": ["GK"],
-      "ovr": 76,
-      "att": 10,
-      "def": 77,
-      "phy": 72,
-      "pac": 42,
-      "tec": 62,
-      "num": 1
-    },
-    {
-      "id": "aja_26_23",
-      "name": "Mamadou Diop",
-      "pos": ["GK"],
-      "ovr": 71,
-      "att": 10,
-      "def": 72,
-      "phy": 70,
-      "pac": 40,
-      "tec": 55,
-      "num": 23
-    },
-    {
-      "id": "aja_26_37",
-      "name": "Louis Mezerette",
-      "pos": ["GK"],
-      "ovr": 64,
-      "att": 10,
-      "def": 65,
-      "phy": 62,
-      "pac": 38,
-      "tec": 50,
-      "num": 37
-    },
-    {
-      "id": "aja_26_20",
-      "name": "Sinaly Diomandé",
-      "pos": ["CB"],
-      "ovr": 77,
-      "att": 45,
-      "def": 78,
-      "phy": 79,
-      "pac": 68,
-      "tec": 65,
-      "num": 20
-    },
-    {
-      "id": "aja_26_92",
-      "name": "Clément Akpa",
-      "pos": ["CB", "LB"],
-      "ovr": 76,
-      "att": 58,
-      "def": 76,
-      "phy": 77,
-      "pac": 74,
-      "tec": 67,
-      "num": 92
-    },
-    {
-      "id": "aja_26_4",
-      "name": "Francisco Sierralta",
-      "pos": ["CB"],
-      "ovr": 74,
-      "att": 42,
-      "def": 75,
-      "phy": 80,
-      "pac": 58,
-      "tec": 60,
-      "num": 4
-    },
-    {
-      "id": "aja_26_24",
-      "name": "Bryan Okoh",
-      "pos": ["CB"],
-      "ovr": 73,
-      "att": 40,
-      "def": 74,
-      "phy": 75,
-      "pac": 62,
-      "tec": 61,
-      "num": 24
-    },
-    {
-      "id": "aja_26_29",
-      "name": "Marvin Senaya",
-      "pos": ["RB"],
-      "ovr": 74,
-      "att": 68,
-      "def": 72,
-      "phy": 73,
-      "pac": 78,
-      "tec": 70,
-      "num": 29
-    },
-    {
-      "id": "aja_26_22",
-      "name": "Fredrik Oppegård",
-      "pos": ["LB", "LWB"],
-      "ovr": 72,
-      "att": 66,
-      "def": 69,
-      "phy": 70,
-      "pac": 79,
-      "tec": 68,
-      "num": 22
-    },
-    {
-      "id": "aja_26_15",
-      "name": "Christ Makosso",
-      "pos": ["CB"],
-      "ovr": 70,
-      "att": 38,
-      "def": 71,
-      "phy": 74,
-      "pac": 64,
-      "tec": 58,
-      "num": 15
-    },
-    {
-      "id": "aja_26_21",
-      "name": "Romain Faivre",
-      "pos": ["CAM", "RM", "RW"],
-      "ovr": 78,
-      "att": 76,
-      "def": 52,
-      "phy": 65,
-      "pac": 76,
-      "tec": 82,
-      "num": 21
-    },
-    {
-      "id": "aja_26_5",
-      "name": "Kévin Danois",
-      "pos": ["CM", "CAM"],
-      "ovr": 77,
-      "att": 74,
-      "def": 64,
-      "phy": 72,
-      "pac": 75,
-      "tec": 79,
-      "num": 5
-    },
-    {
-      "id": "aja_26_8",
-      "name": "Naouirou Ahamada",
-      "pos": ["CM", "CDM"],
-      "ovr": 75,
-      "att": 68,
-      "def": 71,
-      "phy": 75,
-      "pac": 74,
-      "tec": 76,
-      "num": 8
-    },
-    {
-      "id": "aja_26_17",
-      "name": "Pierre Ekwah",
-      "pos": ["CDM", "CM"],
-      "ovr": 75,
-      "att": 66,
-      "def": 75,
-      "phy": 78,
-      "pac": 68,
-      "tec": 73,
-      "num": 17
-    },
-    {
-      "id": "aja_26_18",
-      "name": "Assane Dioussé",
-      "pos": ["CDM", "CM"],
-      "ovr": 72,
-      "att": 60,
-      "def": 72,
-      "phy": 74,
-      "pac": 65,
-      "tec": 71,
-      "num": 18
-    },
-    {
-      "id": "aja_26_10",
-      "name": "Danny Namaso",
-      "pos": ["ST", "CAM"],
-      "ovr": 76,
-      "att": 77,
-      "def": 38,
-      "phy": 76,
-      "pac": 80,
-      "tec": 77,
-      "num": 10
-    },
-    {
-      "id": "aja_26_3",
-      "name": "Rémy Labeau Lascary",
-      "pos": ["ST", "RW"],
-      "ovr": 74,
-      "att": 75,
-      "def": 35,
-      "phy": 73,
-      "pac": 84,
-      "tec": 73,
-      "num": 3
-    },
-    {
-      "id": "aja_26_7",
-      "name": "Josué Casimir",
-      "pos": ["RW", "RM", "ST"],
-      "ovr": 73,
-      "att": 72,
-      "def": 42,
-      "phy": 69,
-      "pac": 83,
-      "tec": 74,
-      "num": 7
-    },
-    {
-      "id": "aja_26_14",
-      "name": "Theo Bair",
-      "pos": ["ST"],
-      "ovr": 72,
-      "att": 73,
-      "def": 32,
-      "phy": 81,
-      "pac": 76,
-      "tec": 68,
-      "num": 14
-    },
-    {
-      "id": "aja_26_11",
-      "name": "Eros Maddy",
-      "pos": ["RM", "RW"],
-      "ovr": 69,
-      "att": 67,
-      "def": 40,
-      "phy": 64,
-      "pac": 82,
-      "tec": 70,
-      "num": 11
-    }
-  ],
-  "manager": {
-    "name": "Will Still",
-    "ovr": 79
-  }
-}
-,{
-  "id": "sco2026",
-  "name": "Angers SCO 2026-27",
-  "short": "SCO",
-  "flag": "🇫🇷",
-  "color": "#000000",
-  "secondary": "#FFFFFF",
-  "logo": "angers.png",
-  "stadium": "Stade Raymond Kopa",
-  "players": [
-    {
-      "id": "sco_26_1",
-      "name": "Anthony Lopes",
-      "pos": ["GK"],
-      "ovr": 78,
-      "att": 10,
-      "def": 79,
-      "phy": 74,
-      "pac": 48,
-      "tec": 68,
-      "num": 1
-    },
-    {
-      "id": "sco_26_16",
-      "name": "Melvin Zinga",
-      "pos": ["GK"],
-      "ovr": 70,
-      "att": 10,
-      "def": 71,
-      "phy": 68,
-      "pac": 40,
-      "tec": 58,
-      "num": 16
-    },
-    {
-      "id": "sco_26_40",
-      "name": "Oumar Pona",
-      "pos": ["GK"],
-      "ovr": 63,
-      "att": 10,
-      "def": 64,
-      "phy": 61,
-      "pac": 38,
-      "tec": 50,
-      "num": 40
-    },
-    {
-      "id": "sco_26_4",
-      "name": "Ousmane Camara",
-      "pos": ["CB"],
-      "ovr": 76,
-      "att": 42,
-      "def": 77,
-      "phy": 78,
-      "pac": 66,
-      "tec": 64,
-      "num": 4
-    },
-    {
-      "id": "sco_26_21",
-      "name": "Jordan Lefort",
-      "pos": ["CB", "LB"],
-      "ovr": 74,
-      "att": 50,
-      "def": 75,
-      "phy": 76,
-      "pac": 62,
-      "tec": 65,
-      "num": 21
-    },
-    {
-      "id": "sco_26_24",
-      "name": "Emmanuel Biumla",
-      "pos": ["CB", "CDM"],
-      "ovr": 73,
-      "att": 48,
-      "def": 74,
-      "phy": 75,
-      "pac": 65,
-      "tec": 66,
-      "num": 24
-    },
-    {
-      "id": "sco_26_2",
-      "name": "Carlens Arcus",
-      "pos": ["RB"],
-      "ovr": 74,
-      "att": 66,
-      "def": 71,
-      "phy": 74,
-      "pac": 78,
-      "tec": 69,
-      "num": 2
-    },
-    {
-      "id": "sco_26_27",
-      "name": "Lilian Raolisoa",
-      "pos": ["RB", "RM"],
-      "ovr": 73,
-      "att": 68,
-      "def": 68,
-      "phy": 70,
-      "pac": 81,
-      "tec": 71,
-      "num": 27
-    },
-    {
-      "id": "sco_26_17",
-      "name": "Joseph Kalulu",
-      "pos": ["CB", "RB"],
-      "ovr": 71,
-      "att": 45,
-      "def": 72,
-      "phy": 73,
-      "pac": 68,
-      "tec": 61,
-      "num": 17
-    },
-    {
-      "id": "sco_26_20",
-      "name": "Marius Louër",
-      "pos": ["CB"],
-      "ovr": 70,
-      "att": 40,
-      "def": 71,
-      "phy": 72,
-      "pac": 64,
-      "tec": 60,
-      "num": 20
-    },
-    {
-      "id": "sco_26_8",
-      "name": "Branco van den Boomen",
-      "pos": ["CM", "CAM"],
-      "ovr": 77,
-      "att": 76,
-      "def": 65,
-      "phy": 71,
-      "pac": 62,
-      "tec": 82,
-      "num": 8
-    },
-    {
-      "id": "sco_26_14",
-      "name": "Yassin Belkhdim",
-      "pos": ["CM", "CAM"],
-      "ovr": 76,
-      "att": 73,
-      "def": 62,
-      "phy": 68,
-      "pac": 74,
-      "tec": 78,
-      "num": 14
-    },
-    {
-      "id": "sco_26_93",
-      "name": "Haris Belkebla",
-      "pos": ["CDM", "CM"],
-      "ovr": 75,
-      "att": 62,
-      "def": 76,
-      "phy": 77,
-      "pac": 68,
-      "tec": 73,
-      "num": 93
-    },
-    {
-      "id": "sco_26_6",
-      "name": "Louis Mouton",
-      "pos": ["CM", "CDM"],
-      "ovr": 74,
-      "att": 67,
-      "def": 71,
-      "phy": 72,
-      "pac": 70,
-      "tec": 74,
-      "num": 6
-    },
-    {
-      "id": "sco_26_18",
-      "name": "Jim Allevinah",
-      "pos": ["RM", "RW", "LM"],
-      "ovr": 74,
-      "att": 72,
-      "def": 55,
-      "phy": 69,
-      "pac": 83,
-      "tec": 75,
-      "num": 18
-    },
-    {
-      "id": "sco_26_10",
-      "name": "Amine Sbaï",
-      "pos": ["LM", "LW", "CAM"],
-      "ovr": 75,
-      "att": 75,
-      "def": 40,
-      "phy": 65,
-      "pac": 82,
-      "tec": 78,
-      "num": 10
-    },
-    {
-      "id": "sco_26_26",
-      "name": "Anthony Bermont",
-      "pos": ["LW", "LM"],
-      "ovr": 72,
-      "att": 71,
-      "def": 38,
-      "phy": 63,
-      "pac": 80,
-      "tec": 74,
-      "num": 26
-    },
-    {
-      "id": "sco_26_9",
-      "name": "Prosper Peter",
-      "pos": ["ST"],
-      "ovr": 76,
-      "att": 78,
-      "def": 32,
-      "phy": 76,
-      "pac": 82,
-      "tec": 73,
-      "num": 9
-    },
-    {
-      "id": "sco_26_19",
-      "name": "Amine El Ouazzani",
-      "pos": ["ST"],
-      "ovr": 75,
-      "att": 76,
-      "def": 35,
-      "phy": 77,
-      "pac": 78,
-      "tec": 72,
-      "num": 19
-    },
-    {
-      "id": "sco_26_7",
-      "name": "Usman Simbakoli",
-      "pos": ["ST"],
-      "ovr": 71,
-      "att": 72,
-      "def": 30,
-      "phy": 72,
-      "pac": 76,
-      "tec": 68,
-      "num": 7
-    }
-  ],
-  "manager": {
-    "name": "Alexandre Dujeux",
-    "ovr": 76
-  }
-}
-,{
-  "id": "estac2026",
-  "name": "ES Troyes AC 2026-27",
-  "short": "EST",
-  "flag": "🇫🇷",
-  "color": "#00529C",
-  "secondary": "#FFFFFF",
-  "logo": "troyes.png",
-  "stadium": "Stade de l'Aube",
-  "players": [
-    {
-      "id": "est_26_33",
-      "name": "Patrick Beach",
-      "pos": ["GK"],
-      "ovr": 72,
-      "att": 10,
-      "def": 73,
-      "phy": 70,
-      "pac": 42,
-      "tec": 58,
-      "num": 33
-    },
-    {
-      "id": "est_26_40",
-      "name": "Hillel Konaté",
-      "pos": ["GK"],
-      "ovr": 70,
-      "att": 10,
-      "def": 71,
-      "phy": 68,
-      "pac": 38,
-      "tec": 52,
-      "num": 40
-    },
-    {
-      "id": "est_26_1",
-      "name": "Zacharie Boucher",
-      "pos": ["GK"],
-      "ovr": 69,
-      "att": 10,
-      "def": 70,
-      "phy": 67,
-      "pac": 36,
-      "tec": 55,
-      "num": 1
-    },
-    {
-      "id": "est_26_4",
-      "name": "Junior Diaz",
-      "pos": ["CB", "CDM"],
-      "ovr": 76,
-      "att": 48,
-      "def": 77,
-      "phy": 79,
-      "pac": 68,
-      "tec": 65,
-      "num": 4
-    },
-    {
-      "id": "est_26_14",
-      "name": "Ismaël Boura",
-      "pos": ["LB", "LM"],
-      "ovr": 75,
-      "att": 68,
-      "def": 72,
-      "phy": 71,
-      "pac": 81,
-      "tec": 73,
-      "num": 14
-    },
-    {
-      "id": "est_26_44",
-      "name": "Yvann Titi",
-      "pos": ["RB", "CB"],
-      "ovr": 74,
-      "att": 62,
-      "def": 73,
-      "phy": 76,
-      "pac": 80,
-      "tec": 68,
-      "num": 44
-    },
-    {
-      "id": "est_26_5",
-      "name": "Paolo Gozzi",
-      "pos": ["CB", "LB"],
-      "ovr": 72,
-      "att": 44,
-      "def": 73,
-      "phy": 74,
-      "pac": 65,
-      "tec": 62,
-      "num": 5
-    },
-    {
-      "id": "est_26_2",
-      "name": "Lucas Maronnier",
-      "pos": ["RB", "LB"],
-      "ovr": 71,
-      "att": 64,
-      "def": 69,
-      "phy": 68,
-      "pac": 76,
-      "tec": 67,
-      "num": 2
-    },
-    {
-      "id": "est_26_6",
-      "name": "Adrien Monfray",
-      "pos": ["CB"],
-      "ovr": 70,
-      "att": 38,
-      "def": 72,
-      "phy": 73,
-      "pac": 50,
-      "tec": 60,
-      "num": 6
-    },
-    {
-      "id": "est_26_37",
-      "name": "Tom Akpakoun",
-      "pos": ["CB"],
-      "ovr": 66,
-      "att": 35,
-      "def": 67,
-      "phy": 69,
-      "pac": 62,
-      "tec": 55,
-      "num": 37
-    },
-    {
-      "id": "est_26_8",
-      "name": "Mouhamed Diop",
-      "pos": ["CM", "CAM", "RW"],
-      "ovr": 75,
-      "att": 73,
-      "def": 65,
-      "phy": 74,
-      "pac": 76,
-      "tec": 77,
-      "num": 8
-    },
-    {
-      "id": "est_26_22",
-      "name": "Hugo Picard",
-      "pos": ["LM", "CAM"],
-      "ovr": 74,
-      "att": 72,
-      "def": 48,
-      "phy": 62,
-      "pac": 79,
-      "tec": 78,
-      "num": 22
-    },
-    {
-      "id": "est_26_17",
-      "name": "Antoine Mille",
-      "pos": ["CM", "CDM"],
-      "ovr": 74,
-      "att": 69,
-      "def": 68,
-      "phy": 70,
-      "pac": 72,
-      "tec": 76,
-      "num": 17
-    },
-    {
-      "id": "est_26_29",
-      "name": "Dermane Karim",
-      "pos": ["CAM", "CM"],
-      "ovr": 74,
-      "att": 73,
-      "def": 55,
-      "phy": 66,
-      "pac": 78,
-      "tec": 77,
-      "num": 29
-    },
-    {
-      "id": "est_26_11",
-      "name": "Iron Gomis",
-      "pos": ["CM", "CDM", "CAM"],
-      "ovr": 72,
-      "att": 68,
-      "def": 66,
-      "phy": 73,
-      "pac": 71,
-      "tec": 73,
-      "num": 11
-    },
-    {
-      "id": "est_26_26",
-      "name": "Alexandre Phliponeau",
-      "pos": ["CDM", "CM"],
-      "ovr": 69,
-      "att": 58,
-      "def": 69,
-      "phy": 70,
-      "pac": 64,
-      "tec": 68,
-      "num": 26
-    },
-    {
-      "id": "est_26_10",
-      "name": "Merwan Ifnaoui",
-      "pos": ["RM", "CAM", "RW"],
-      "ovr": 74,
-      "att": 73,
-      "def": 45,
-      "phy": 62,
-      "pac": 80,
-      "tec": 76,
-      "num": 10
-    },
-    {
-      "id": "est_26_7",
-      "name": "Kandet Diawara",
-      "pos": ["LW", "RW", "ST"],
-      "ovr": 73,
-      "att": 72,
-      "def": 38,
-      "phy": 67,
-      "pac": 84,
-      "tec": 75,
-      "num": 7
-    },
-    {
-      "id": "est_26_20",
-      "name": "Renaud Ripart",
-      "pos": ["ST", "LW", "RW"],
-      "ovr": 71,
-      "att": 73,
-      "def": 42,
-      "phy": 72,
-      "pac": 68,
-      "tec": 71,
-      "num": 20
-    },
-    {
-      "id": "est_26_12",
-      "name": "Elijah Odede",
-      "pos": ["LW", "RW"],
-      "ovr": 68,
-      "att": 68,
-      "def": 32,
-      "phy": 62,
-      "pac": 82,
-      "tec": 70,
-      "num": 12
-    }
-  ],
-  "manager": {
-    "name": "Stéphane Dumont",
-    "ovr": 75
-  }
-}
-,{
-  "id": "fcl2026",
-  "name": "FC Lorient 2026-27",
-  "short": "FCL",
-  "flag": "🇫🇷",
-  "color": "#F26522",
-  "secondary": "#000000",
-  "logo": "lorient.png",
-  "stadium": "Stade du Moustoir",
-  "players": [
-    {
-      "id": "fcl_26_1",
-      "name": "Yvon Mvogo",
-      "pos": ["GK"],
-      "ovr": 77,
-      "att": 10,
-      "def": 78,
-      "phy": 75,
-      "pac": 45,
-      "tec": 65,
-      "num": 1
-    },
-    {
-      "id": "fcl_26_38",
-      "name": "Yvon Mvogo",
-      "pos": ["GK"],
-      "ovr": 72,
-      "att": 10,
-      "def": 73,
-      "phy": 71,
-      "pac": 40,
-      "tec": 58,
-      "num": 38
-    },
-    {
-      "id": "fcl_26_40",
-      "name": "Gaël Aynaoui",
-      "pos": ["GK"],
-      "ovr": 65,
-      "att": 10,
-      "def": 66,
-      "phy": 63,
-      "pac": 38,
-      "tec": 52,
-      "num": 40
-    },
-    {
-      "id": "fcl_26_3",
-      "name": "Montassar Talbi",
-      "pos": ["CB"],
-      "ovr": 78,
-      "att": 45,
-      "def": 80,
-      "phy": 79,
-      "pac": 66,
-      "tec": 68,
-      "num": 3
-    },
-    {
-      "id": "fcl_26_15",
-      "name": "Julien Laporte",
-      "pos": ["CB"],
-      "ovr": 75,
-      "att": 42,
-      "def": 76,
-      "phy": 77,
-      "pac": 60,
-      "tec": 63,
-      "num": 15
-    },
-    {
-      "id": "fcl_26_5",
-      "name": "Formose Mendy",
-      "pos": ["CB", "RB"],
-      "ovr": 75,
-      "att": 50,
-      "def": 75,
-      "phy": 78,
-      "pac": 74,
-      "tec": 64,
-      "num": 5
-    },
-    {
-      "id": "fcl_26_24",
-      "name": "Gédéon Kalulu",
-      "pos": ["RB", "RWB"],
-      "ovr": 74,
-      "att": 65,
-      "def": 72,
-      "phy": 72,
-      "pac": 80,
-      "tec": 70,
-      "num": 24
-    },
-    {
-      "id": "fcl_26_12",
-      "name": "Darlin Yongwa",
-      "pos": ["LB", "LWB", "LM"],
-      "ovr": 74,
-      "att": 69,
-      "def": 70,
-      "phy": 74,
-      "pac": 82,
-      "tec": 72,
-      "num": 12
-    },
-    {
-      "id": "fcl_26_32",
-      "name": "Nathaniel Adjei",
-      "pos": ["CB"],
-      "ovr": 73,
-      "att": 40,
-      "def": 74,
-      "phy": 77,
-      "pac": 67,
-      "tec": 60,
-      "num": 32
-    },
-    {
-      "id": "fcl_26_2",
-      "name": "Igor Silva",
-      "pos": ["RB", "RWB"],
-      "ovr": 72,
-      "att": 66,
-      "def": 69,
-      "phy": 70,
-      "pac": 78,
-      "tec": 71,
-      "num": 2
-    },
-    {
-      "id": "fcl_26_6",
-      "name": "Laurent Abergel",
-      "pos": ["CDM", "CM"],
-      "ovr": 78,
-      "att": 68,
-      "def": 79,
-      "phy": 77,
-      "pac": 71,
-      "tec": 76,
-      "num": 6
-    },
-    {
-      "id": "fcl_26_8",
-      "name": "Bonke Innocent",
-      "pos": ["CDM", "CM"],
-      "ovr": 74,
-      "att": 58,
-      "def": 75,
-      "phy": 81,
-      "pac": 65,
-      "tec": 68,
-      "num": 8
-    },
-    {
-      "id": "fcl_26_17",
-      "name": "Jean-Victor Makengo",
-      "pos": ["CM", "CDM"],
-      "ovr": 74,
-      "att": 70,
-      "def": 72,
-      "phy": 75,
-      "pac": 72,
-      "tec": 75,
-      "num": 17
-    },
-    {
-      "id": "fcl_26_10",
-      "name": "Badredine Bouanani",
-      "pos": ["RW", "RM", "CAM"],
-      "ovr": 76,
-      "att": 75,
-      "def": 42,
-      "phy": 64,
-      "pac": 79,
-      "tec": 81,
-      "num": 10
-    },
-    {
-      "id": "fcl_26_21",
-      "name": "Julien Ponceau",
-      "pos": ["CAM", "CM", "LM"],
-      "ovr": 75,
-      "att": 74,
-      "def": 58,
-      "phy": 66,
-      "pac": 75,
-      "tec": 79,
-      "num": 21
-    },
-    {
-      "id": "fcl_26_14",
-      "name": "Tiemoué Bakayoko",
-      "pos": ["CDM", "CM"],
-      "ovr": 73,
-      "att": 62,
-      "def": 73,
-      "phy": 79,
-      "pac": 58,
-      "tec": 72,
-      "num": 14
-    },
-    {
-      "id": "fcl_26_9",
-      "name": "Mohamed Bamba",
-      "pos": ["ST"],
-      "ovr": 77,
-      "att": 79,
-      "def": 36,
-      "phy": 78,
-      "pac": 84,
-      "tec": 75,
-      "num": 9
-    },
-    {
-      "id": "fcl_26_11",
-      "name": "Théo Le Bris",
-      "pos": ["LM", "LW", "RM"],
-      "ovr": 75,
-      "att": 73,
-      "def": 50,
-      "phy": 65,
-      "pac": 81,
-      "tec": 77,
-      "num": 11
-    },
-    {
-      "id": "fcl_26_27",
-      "name": "Aiyegun Tosin",
-      "pos": ["ST", "LW", "RW"],
-      "ovr": 74,
-      "att": 75,
-      "def": 38,
-      "phy": 73,
-      "pac": 85,
-      "tec": 73,
-      "num": 27
-    },
-    {
-      "id": "fcl_26_22",
-      "name": "Eli Junior Kroupi",
-      "pos": ["ST", "CAM", "LW"],
-      "ovr": 76,
-      "att": 77,
-      "def": 35,
-      "phy": 68,
-      "pac": 82,
-      "tec": 78,
-      "num": 22
-    }
-  ],
-  "manager": {
-    "name": "Olivier Pantaloni",
-    "ovr": 77
-  }
-}
-,{
-  "id": "ogcn2026",
-  "name": "OGC Nice 2026-27",
-  "short": "OGCN",
-  "flag": "🇫🇷",
-  "color": "#E2001A",
-  "secondary": "#000000",
-  "logo": "nice.png",
-  "stadium": "Allianz Riviera",
-  "players": [
-    {
-      "id": "ogc_26_1",
-      "name": "Marcin Bułka",
-      "pos": ["GK"],
-      "ovr": 82,
-      "att": 10,
-      "def": 83,
-      "phy": 80,
-      "pac": 45,
-      "tec": 68,
-      "num": 1
-    },
-    {
-      "id": "ogc_26_31",
-      "name": "Maxime Dupé",
-      "pos": ["GK"],
-      "ovr": 74,
-      "att": 10,
-      "def": 75,
-      "phy": 72,
-      "pac": 40,
-      "tec": 60,
-      "num": 31
-    },
-    {
-      "id": "ogc_26_50",
-      "name": "Barthélémy Boulhendi",
-      "pos": ["GK"],
-      "ovr": 65,
-      "att": 10,
-      "def": 66,
-      "phy": 64,
-      "pac": 38,
-      "tec": 52,
-      "num": 50
-    },
-    {
-      "id": "ogc_26_4",
-      "name": "Dante",
-      "pos": ["CB"],
-      "ovr": 77,
-      "att": 48,
-      "def": 80,
-      "phy": 74,
-      "pac": 42,
-      "tec": 75,
-      "num": 4
-    },
-    {
-      "id": "ogc_26_55",
-      "name": "Youssouf Ndayishimiye",
-      "pos": ["CB", "CDM"],
-      "ovr": 80,
-      "att": 58,
-      "def": 81,
-      "phy": 83,
-      "pac": 70,
-      "tec": 71,
-      "num": 55
-    },
-    {
-      "id": "ogc_26_64",
-      "name": "Moïse Bombito",
-      "pos": ["CB"],
-      "ovr": 78,
-      "att": 45,
-      "def": 79,
-      "phy": 82,
-      "pac": 83,
-      "tec": 64,
-      "num": 64
-    },
-    {
-      "id": "ogc_26_26",
-      "name": "Melvin Bard",
-      "pos": ["LB", "LWB"],
-      "ovr": 78,
-      "att": 72,
-      "def": 76,
-      "phy": 75,
-      "pac": 81,
-      "tec": 76,
-      "num": 26
-    },
-    {
-      "id": "ogc_26_92",
-      "name": "Jonathan Clauss",
-      "pos": ["RB", "RWB", "RM"],
-      "ovr": 80,
-      "att": 78,
-      "def": 72,
-      "phy": 71,
-      "pac": 83,
-      "tec": 81,
-      "num": 92
-    },
-    {
-      "id": "ogc_26_20",
-      "name": "Tom Louchet",
-      "pos": ["CM", "RB", "LB"],
-      "ovr": 74,
-      "att": 68,
-      "def": 72,
-      "phy": 70,
-      "pac": 76,
-      "tec": 74,
-      "num": 20
-    },
-    {
-      "id": "ogc_26_33",
-      "name": "Antoine Mendy",
-      "pos": ["CB", "RB"],
-      "ovr": 73,
-      "att": 50,
-      "def": 74,
-      "phy": 76,
-      "pac": 75,
-      "tec": 63,
-      "num": 33
-    },
-    {
-      "id": "ogc_26_6",
-      "name": "Hicham Boudaoui",
-      "pos": ["CM", "CDM"],
-      "ovr": 79,
-      "att": 72,
-      "def": 76,
-      "phy": 78,
-      "pac": 82,
-      "tec": 78,
-      "num": 6
-    },
-    {
-      "id": "ogc_26_11",
-      "name": "Morgan Sanson",
-      "pos": ["CM", "CAM"],
-      "ovr": 78,
-      "att": 76,
-      "def": 68,
-      "phy": 72,
-      "pac": 74,
-      "tec": 80,
-      "num": 11
-    },
-    {
-      "id": "ogc_26_8",
-      "name": "Pablo Rosario",
-      "pos": ["CDM", "CM", "CB"],
-      "ovr": 77,
-      "att": 62,
-      "def": 78,
-      "phy": 81,
-      "pac": 66,
-      "tec": 73,
-      "num": 8
-    },
-    {
-      "id": "ogc_26_22",
-      "name": "Tanguy Ndombele",
-      "pos": ["CM", "CAM"],
-      "ovr": 78,
-      "att": 75,
-      "def": 62,
-      "phy": 74,
-      "pac": 70,
-      "tec": 86,
-      "num": 22
-    },
-    {
-      "id": "ogc_26_10",
-      "name": "Sofiane Diop",
-      "pos": ["LW", "CAM", "LM"],
-      "ovr": 77,
-      "att": 76,
-      "def": 42,
-      "phy": 60,
-      "pac": 78,
-      "tec": 83,
-      "num": 10
-    },
-    {
-      "id": "ogc_26_25",
-      "name": "Mohamed-Ali Cho",
-      "pos": ["RW", "RM", "ST"],
-      "ovr": 77,
-      "att": 76,
-      "def": 40,
-      "phy": 71,
-      "pac": 87,
-      "tec": 78,
-      "num": 25
-    },
-    {
-      "id": "ogc_26_7",
-      "name": "Jérémie Boga",
-      "pos": ["LW", "LM"],
-      "ovr": 79,
-      "att": 78,
-      "def": 38,
-      "phy": 65,
-      "pac": 86,
-      "tec": 85,
-      "num": 7
-    },
-    {
-      "id": "ogc_26_9",
-      "name": "Terem Moffi",
-      "pos": ["ST"],
-      "ovr": 80,
-      "att": 81,
-      "def": 35,
-      "phy": 84,
-      "pac": 85,
-      "tec": 76,
-      "num": 9
-    },
-    {
-      "id": "ogc_26_24",
-      "name": "Gaëtan Laborde",
-      "pos": ["ST", "RW"],
-      "ovr": 79,
-      "att": 81,
-      "def": 48,
-      "phy": 78,
-      "pac": 73,
-      "tec": 78,
-      "num": 24
-    },
-    {
-      "id": "ogc_26_29",
-      "name": "Evann Guessand",
-      "pos": ["ST", "RW"],
-      "ovr": 78,
-      "att": 79,
-      "def": 38,
-      "phy": 82,
-      "pac": 84,
-      "tec": 75,
-      "num": 29
-    }
-  ],
-  "manager": {
-    "name": "Franck Haise",
-    "ovr": 82
-  }
-}
-,{
-  "id": "ol2026",
-  "name": "Olympique Lyonnais 2026-27",
-  "short": "OL",
-  "flag": "🇫🇷",
-  "color": "#002366",
-  "secondary": "#DA291C",
-  "logo": "lyon.png",
-  "stadium": "Groupama Stadium",
-  "players": [
-    {
-      "id": "ol_26_23",
-      "name": "Lucas Perri",
-      "pos": ["GK"],
-      "ovr": 81,
-      "att": 10,
-      "def": 82,
-      "phy": 81,
-      "pac": 42,
-      "tec": 68,
-      "num": 23
-    },
-    {
-      "id": "ol_26_1",
-      "name": "Anthony Lopes",
-      "pos": ["GK"],
-      "ovr": 78,
-      "att": 10,
-      "def": 79,
-      "phy": 74,
-      "pac": 48,
-      "tec": 68,
-      "num": 1
-    },
-    {
-      "id": "ol_26_40",
-      "name": "Lassine Diarra",
-      "pos": ["GK"],
-      "ovr": 66,
-      "att": 10,
-      "def": 67,
-      "phy": 65,
-      "pac": 40,
-      "tec": 52,
-      "num": 40
-    },
-    {
-      "id": "ol_26_19",
-      "name": "Moussa Niakhaté",
-      "pos": ["CB"],
-      "ovr": 79,
-      "att": 48,
-      "def": 80,
-      "phy": 82,
-      "pac": 72,
-      "tec": 65,
-      "num": 19
-    },
-    {
-      "id": "ol_26_55",
-      "name": "Duje Ćaleta-Car",
-      "pos": ["CB"],
-      "ovr": 78,
-      "att": 45,
-      "def": 79,
-      "phy": 80,
-      "pac": 58,
-      "tec": 68,
-      "num": 55
-    },
-    {
-      "id": "ol_26_16",
-      "name": "Abner Vinícius",
-      "pos": ["LB", "LWB"],
-      "ovr": 77,
-      "att": 72,
-      "def": 74,
-      "phy": 73,
-      "pac": 81,
-      "tec": 76,
-      "num": 16
-    },
-    {
-      "id": "ol_26_22",
-      "name": "Clinton Mata",
-      "pos": ["RB", "CB"],
-      "ovr": 77,
-      "att": 65,
-      "def": 78,
-      "phy": 77,
-      "pac": 75,
-      "tec": 70,
-      "num": 22
-    },
-    {
-      "id": "ol_26_98",
-      "name": "Ainsley Maitland-Niles",
-      "pos": ["RB", "RM", "CM"],
-      "ovr": 77,
-      "att": 72,
-      "def": 73,
-      "phy": 74,
-      "pac": 80,
-      "tec": 77,
-      "num": 98
-    },
-    {
-      "id": "ol_26_3",
-      "name": "Nicolas Tagliafico",
-      "pos": ["LB"],
-      "ovr": 78,
-      "att": 70,
-      "def": 79,
-      "phy": 76,
-      "pac": 72,
-      "tec": 74,
-      "num": 3
-    },
-    {
-      "id": "ol_26_20",
-      "name": "Saël Kumbedi",
-      "pos": ["RB", "RWB"],
-      "ovr": 75,
-      "att": 68,
-      "def": 73,
-      "phy": 71,
-      "pac": 82,
-      "tec": 72,
-      "num": 20
-    },
-    {
-      "id": "ol_26_6",
-      "name": "Maxence Caqueret",
-      "pos": ["CM", "CDM"],
-      "ovr": 80,
-      "att": 73,
-      "def": 77,
-      "phy": 73,
-      "pac": 76,
-      "tec": 82,
-      "num": 6
-    },
-    {
-      "id": "ol_26_31",
-      "name": "Nemanja Matić",
-      "pos": ["CDM", "CM"],
-      "ovr": 78,
-      "att": 68,
-      "def": 80,
-      "phy": 76,
-      "pac": 48,
-      "tec": 81,
-      "num": 31
-    },
-    {
-      "id": "ol_26_8",
-      "name": "Corentin Tolisso",
-      "pos": ["CM", "CDM"],
-      "ovr": 79,
-      "att": 76,
-      "def": 75,
-      "phy": 77,
-      "pac": 68,
-      "tec": 81,
-      "num": 8
-    },
-    {
-      "id": "ol_26_34",
-      "name": "Mahamadou Diawara",
-      "pos": ["CM", "CDM"],
-      "ovr": 72,
-      "att": 65,
-      "def": 70,
-      "phy": 74,
-      "pac": 70,
-      "tec": 72,
-      "num": 34
-    },
-    {
-      "id": "ol_26_11",
-      "name": "Malick Fofana",
-      "pos": ["LW", "RW", "LM"],
-      "ovr": 79,
-      "att": 78,
-      "def": 40,
-      "phy": 68,
-      "pac": 88,
-      "tec": 82,
-      "num": 11
-    },
-    {
-      "id": "ol_26_37",
-      "name": "Ernest Nuamah",
-      "pos": ["RW", "RM"],
-      "ovr": 78,
-      "att": 77,
-      "def": 42,
-      "phy": 74,
-      "pac": 87,
-      "tec": 80,
-      "num": 37
-    },
-    {
-      "id": "ol_26_10",
-      "name": "Alexandre Lacazette",
-      "pos": ["ST"],
-      "ovr": 82,
-      "att": 85,
-      "def": 42,
-      "phy": 76,
-      "pac": 73,
-      "tec": 83,
-      "num": 10
-  }
-  ],
-  "manager": {
-    "name": "Pierre Sage",
-    "ovr": 81
-  }
-}
-,{
-  "id": "pfc2026",
-  "name": "Paris FC 2026-27",
-  "short": "PFC",
-  "flag": "🇫🇷",
-  "color": "#001C46",
-  "secondary": "#E30613",
-  "logo": "paris_fc.png",
-  "stadium": "Stade Charléty",
-  "players": [
-    {
-      "id": "pfc_26_16",
-      "name": "Obed Nkambadio",
-      "pos": ["GK"],
-      "ovr": 75,
-      "att": 10,
-      "def": 76,
-      "phy": 72,
-      "pac": 42,
-      "tec": 60,
-      "num": 16
-    },
-    {
-      "id": "pfc_26_1",
-      "name": "Rémy Riou",
-      "pos": ["GK"],
-      "ovr": 70,
-      "att": 10,
-      "def": 71,
-      "phy": 68,
-      "pac": 35,
-      "tec": 58,
-      "num": 1
-    },
-    {
-      "id": "pfc_26_30",
-      "name": "Thomas Himeur",
-      "pos": ["GK"],
-      "ovr": 66,
-      "att": 10,
-      "def": 67,
-      "phy": 64,
-      "pac": 38,
-      "tec": 52,
-      "num": 30
-    },
-    {
-      "id": "pfc_26_15",
-      "name": "Timothée Kolodziejczak",
-      "pos": ["CB", "LB"],
-      "ovr": 75,
-      "att": 52,
-      "def": 76,
-      "phy": 75,
-      "pac": 62,
-      "tec": 68,
-      "num": 15
-    },
-    {
-      "id": "pfc_26_2",
-      "name": "Tuomas Ollila",
-      "pos": ["LB", "LWB"],
-      "ovr": 74,
-      "att": 68,
-      "def": 71,
-      "phy": 70,
-      "pac": 80,
-      "tec": 72,
-      "num": 2
-    },
-    {
-      "id": "pfc_26_31",
-      "name": "Samir Chergui",
-      "pos": ["CB", "RB"],
-      "ovr": 74,
-      "att": 48,
-      "def": 75,
-      "phy": 78,
-      "pac": 68,
-      "tec": 64,
-      "num": 31
-    },
-    {
-      "id": "pfc_26_22",
-      "name": "Sofiane Alakouch",
-      "pos": ["RB", "RWB"],
-      "ovr": 73,
-      "att": 65,
-      "def": 71,
-      "phy": 69,
-      "pac": 78,
-      "tec": 70,
-      "num": 22
-    },
-    {
-      "id": "pfc_26_5",
-      "name": "Moustapha Mbow",
-      "pos": ["CB"],
-      "ovr": 73,
-      "att": 40,
-      "def": 74,
-      "phy": 76,
-      "pac": 64,
-      "tec": 60,
-      "num": 5
-    },
-    {
-      "id": "pfc_26_25",
-      "name": "Yoan Koré",
-      "pos": ["CB", "RB"],
-      "ovr": 72,
-      "att": 45,
-      "def": 73,
-      "phy": 75,
-      "pac": 70,
-      "tec": 62,
-      "num": 25
-    },
-    {
-      "id": "pfc_26_6",
-      "name": "Vincent Marchetti",
-      "pos": ["CM", "CDM"],
-      "ovr": 76,
-      "att": 70,
-      "def": 74,
-      "phy": 73,
-      "pac": 72,
-      "tec": 77,
-      "num": 6
-    },
-    {
-      "id": "pfc_26_8",
-      "name": "Lohann Doucet",
-      "pos": ["CDM", "CM"],
-      "ovr": 75,
-      "att": 65,
-      "def": 75,
-      "phy": 77,
-      "pac": 71,
-      "tec": 73,
-      "num": 8
     },
     {
-      "id": "pfc_26_10",
-      "name": "Ilan Kebbal",
-      "pos": ["CAM", "RW", "RM"],
-      "ovr": 78,
-      "att": 77,
-      "def": 45,
-      "phy": 60,
-      "pac": 79,
-      "tec": 84,
-      "num": 10
+      "id": "aja2026",
+      "name": "AJ Auxerre 2026-27",
+      "short": "AJA",
+      "flag": "🇫🇷",
+      "color": "#0055A5",
+      "secondary": "#FFFFFF",
+      "logo": "auxerre.png",
+      "stadium": "Stade de l'Abbé-Deschamps",
+      "players": [
+        {
+          "id": "aja_26_1",
+          "name": "Paul Nardi",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 76,
+          "att": 10,
+          "def": 77,
+          "phy": 72,
+          "pac": 42,
+          "tec": 62,
+          "num": 1
+        },
+        {
+          "id": "aja_26_23",
+          "name": "Mamadou Diop",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 71,
+          "att": 10,
+          "def": 72,
+          "phy": 70,
+          "pac": 40,
+          "tec": 55,
+          "num": 23
+        },
+        {
+          "id": "aja_26_37",
+          "name": "Louis Mezerette",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 64,
+          "att": 10,
+          "def": 65,
+          "phy": 62,
+          "pac": 38,
+          "tec": 50,
+          "num": 37
+        },
+        {
+          "id": "aja_26_20",
+          "name": "Sinaly Diomandé",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 45,
+          "def": 78,
+          "phy": 79,
+          "pac": 68,
+          "tec": 65,
+          "num": 20
+        },
+        {
+          "id": "aja_26_92",
+          "name": "Clément Akpa",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 76,
+          "att": 58,
+          "def": 76,
+          "phy": 77,
+          "pac": 74,
+          "tec": 67,
+          "num": 92
+        },
+        {
+          "id": "aja_26_4",
+          "name": "Francisco Sierralta",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 74,
+          "att": 42,
+          "def": 75,
+          "phy": 80,
+          "pac": 58,
+          "tec": 60,
+          "num": 4
+        },
+        {
+          "id": "aja_26_24",
+          "name": "Bryan Okoh",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 73,
+          "att": 40,
+          "def": 74,
+          "phy": 75,
+          "pac": 62,
+          "tec": 61,
+          "num": 24
+        },
+        {
+          "id": "aja_26_29",
+          "name": "Marvin Senaya",
+          "pos": [
+            "RB"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 72,
+          "phy": 73,
+          "pac": 78,
+          "tec": 70,
+          "num": 29
+        },
+        {
+          "id": "aja_26_22",
+          "name": "Fredrik Oppegård",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 72,
+          "att": 66,
+          "def": 69,
+          "phy": 70,
+          "pac": 79,
+          "tec": 68,
+          "num": 22
+        },
+        {
+          "id": "aja_26_15",
+          "name": "Christ Makosso",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 70,
+          "att": 38,
+          "def": 71,
+          "phy": 74,
+          "pac": 64,
+          "tec": 58,
+          "num": 15
+        },
+        {
+          "id": "aja_26_21",
+          "name": "Romain Faivre",
+          "pos": [
+            "CAM",
+            "RM",
+            "RW"
+          ],
+          "ovr": 78,
+          "att": 76,
+          "def": 52,
+          "phy": 65,
+          "pac": 76,
+          "tec": 82,
+          "num": 21
+        },
+        {
+          "id": "aja_26_5",
+          "name": "Kévin Danois",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 77,
+          "att": 74,
+          "def": 64,
+          "phy": 72,
+          "pac": 75,
+          "tec": 79,
+          "num": 5
+        },
+        {
+          "id": "aja_26_8",
+          "name": "Naouirou Ahamada",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 75,
+          "att": 68,
+          "def": 71,
+          "phy": 75,
+          "pac": 74,
+          "tec": 76,
+          "num": 8
+        },
+        {
+          "id": "aja_26_17",
+          "name": "Pierre Ekwah",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 75,
+          "att": 66,
+          "def": 75,
+          "phy": 78,
+          "pac": 68,
+          "tec": 73,
+          "num": 17
+        },
+        {
+          "id": "aja_26_18",
+          "name": "Assane Dioussé",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 72,
+          "att": 60,
+          "def": 72,
+          "phy": 74,
+          "pac": 65,
+          "tec": 71,
+          "num": 18
+        },
+        {
+          "id": "aja_26_10",
+          "name": "Danny Namaso",
+          "pos": [
+            "ST",
+            "CAM"
+          ],
+          "ovr": 76,
+          "att": 77,
+          "def": 38,
+          "phy": 76,
+          "pac": 80,
+          "tec": 77,
+          "num": 10
+        },
+        {
+          "id": "aja_26_3",
+          "name": "Rémy Labeau Lascary",
+          "pos": [
+            "ST",
+            "RW"
+          ],
+          "ovr": 74,
+          "att": 75,
+          "def": 35,
+          "phy": 73,
+          "pac": 84,
+          "tec": 73,
+          "num": 3
+        },
+        {
+          "id": "aja_26_7",
+          "name": "Josué Casimir",
+          "pos": [
+            "RW",
+            "RM",
+            "ST"
+          ],
+          "ovr": 73,
+          "att": 72,
+          "def": 42,
+          "phy": 69,
+          "pac": 83,
+          "tec": 74,
+          "num": 7
+        },
+        {
+          "id": "aja_26_14",
+          "name": "Theo Bair",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 72,
+          "att": 73,
+          "def": 32,
+          "phy": 81,
+          "pac": 76,
+          "tec": 68,
+          "num": 14
+        },
+        {
+          "id": "aja_26_11",
+          "name": "Eros Maddy",
+          "pos": [
+            "RM",
+            "RW"
+          ],
+          "ovr": 69,
+          "att": 67,
+          "def": 40,
+          "phy": 64,
+          "pac": 82,
+          "tec": 70,
+          "num": 11
+        }
+      ],
+      "manager": {
+        "name": "Will Still",
+        "ovr": 79
+      }
+    },
+    {
+      "id": "sco2026",
+      "name": "Angers SCO 2026-27",
+      "short": "SCO",
+      "flag": "🇫🇷",
+      "color": "#000000",
+      "secondary": "#FFFFFF",
+      "logo": "angers.png",
+      "stadium": "Stade Raymond Kopa",
+      "players": [
+        {
+          "id": "sco_26_1",
+          "name": "Anthony Lopes",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 78,
+          "att": 10,
+          "def": 79,
+          "phy": 74,
+          "pac": 48,
+          "tec": 68,
+          "num": 1
+        },
+        {
+          "id": "sco_26_16",
+          "name": "Melvin Zinga",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 70,
+          "att": 10,
+          "def": 71,
+          "phy": 68,
+          "pac": 40,
+          "tec": 58,
+          "num": 16
+        },
+        {
+          "id": "sco_26_40",
+          "name": "Oumar Pona",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 63,
+          "att": 10,
+          "def": 64,
+          "phy": 61,
+          "pac": 38,
+          "tec": 50,
+          "num": 40
+        },
+        {
+          "id": "sco_26_4",
+          "name": "Ousmane Camara",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 76,
+          "att": 42,
+          "def": 77,
+          "phy": 78,
+          "pac": 66,
+          "tec": 64,
+          "num": 4
+        },
+        {
+          "id": "sco_26_21",
+          "name": "Jordan Lefort",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 74,
+          "att": 50,
+          "def": 75,
+          "phy": 76,
+          "pac": 62,
+          "tec": 65,
+          "num": 21
+        },
+        {
+          "id": "sco_26_24",
+          "name": "Emmanuel Biumla",
+          "pos": [
+            "CB",
+            "CDM"
+          ],
+          "ovr": 73,
+          "att": 48,
+          "def": 74,
+          "phy": 75,
+          "pac": 65,
+          "tec": 66,
+          "num": 24
+        },
+        {
+          "id": "sco_26_2",
+          "name": "Carlens Arcus",
+          "pos": [
+            "RB"
+          ],
+          "ovr": 74,
+          "att": 66,
+          "def": 71,
+          "phy": 74,
+          "pac": 78,
+          "tec": 69,
+          "num": 2
+        },
+        {
+          "id": "sco_26_27",
+          "name": "Lilian Raolisoa",
+          "pos": [
+            "RB",
+            "RM"
+          ],
+          "ovr": 73,
+          "att": 68,
+          "def": 68,
+          "phy": 70,
+          "pac": 81,
+          "tec": 71,
+          "num": 27
+        },
+        {
+          "id": "sco_26_17",
+          "name": "Joseph Kalulu",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 71,
+          "att": 45,
+          "def": 72,
+          "phy": 73,
+          "pac": 68,
+          "tec": 61,
+          "num": 17
+        },
+        {
+          "id": "sco_26_20",
+          "name": "Marius Louër",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 70,
+          "att": 40,
+          "def": 71,
+          "phy": 72,
+          "pac": 64,
+          "tec": 60,
+          "num": 20
+        },
+        {
+          "id": "sco_26_8",
+          "name": "Branco van den Boomen",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 77,
+          "att": 76,
+          "def": 65,
+          "phy": 71,
+          "pac": 62,
+          "tec": 82,
+          "num": 8
+        },
+        {
+          "id": "sco_26_14",
+          "name": "Yassin Belkhdim",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 76,
+          "att": 73,
+          "def": 62,
+          "phy": 68,
+          "pac": 74,
+          "tec": 78,
+          "num": 14
+        },
+        {
+          "id": "sco_26_93",
+          "name": "Haris Belkebla",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 75,
+          "att": 62,
+          "def": 76,
+          "phy": 77,
+          "pac": 68,
+          "tec": 73,
+          "num": 93
+        },
+        {
+          "id": "sco_26_6",
+          "name": "Louis Mouton",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 74,
+          "att": 67,
+          "def": 71,
+          "phy": 72,
+          "pac": 70,
+          "tec": 74,
+          "num": 6
+        },
+        {
+          "id": "sco_26_18",
+          "name": "Jim Allevinah",
+          "pos": [
+            "RM",
+            "RW",
+            "LM"
+          ],
+          "ovr": 74,
+          "att": 72,
+          "def": 55,
+          "phy": 69,
+          "pac": 83,
+          "tec": 75,
+          "num": 18
+        },
+        {
+          "id": "sco_26_10",
+          "name": "Amine Sbaï",
+          "pos": [
+            "LM",
+            "LW",
+            "CAM"
+          ],
+          "ovr": 75,
+          "att": 75,
+          "def": 40,
+          "phy": 65,
+          "pac": 82,
+          "tec": 78,
+          "num": 10
+        },
+        {
+          "id": "sco_26_26",
+          "name": "Anthony Bermont",
+          "pos": [
+            "LW",
+            "LM"
+          ],
+          "ovr": 72,
+          "att": 71,
+          "def": 38,
+          "phy": 63,
+          "pac": 80,
+          "tec": 74,
+          "num": 26
+        },
+        {
+          "id": "sco_26_9",
+          "name": "Prosper Peter",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 76,
+          "att": 78,
+          "def": 32,
+          "phy": 76,
+          "pac": 82,
+          "tec": 73,
+          "num": 9
+        },
+        {
+          "id": "sco_26_19",
+          "name": "Amine El Ouazzani",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 75,
+          "att": 76,
+          "def": 35,
+          "phy": 77,
+          "pac": 78,
+          "tec": 72,
+          "num": 19
+        },
+        {
+          "id": "sco_26_7",
+          "name": "Usman Simbakoli",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 71,
+          "att": 72,
+          "def": 30,
+          "phy": 72,
+          "pac": 76,
+          "tec": 68,
+          "num": 7
+        }
+      ],
+      "manager": {
+        "name": "Alexandre Dujeux",
+        "ovr": 76
+      }
+    },
+    {
+      "id": "estac2026",
+      "name": "ES Troyes AC 2026-27",
+      "short": "EST",
+      "flag": "🇫🇷",
+      "color": "#00529C",
+      "secondary": "#FFFFFF",
+      "logo": "troyes.png",
+      "stadium": "Stade de l'Aube",
+      "players": [
+        {
+          "id": "est_26_33",
+          "name": "Patrick Beach",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 72,
+          "att": 10,
+          "def": 73,
+          "phy": 70,
+          "pac": 42,
+          "tec": 58,
+          "num": 33
+        },
+        {
+          "id": "est_26_40",
+          "name": "Hillel Konaté",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 70,
+          "att": 10,
+          "def": 71,
+          "phy": 68,
+          "pac": 38,
+          "tec": 52,
+          "num": 40
+        },
+        {
+          "id": "est_26_1",
+          "name": "Zacharie Boucher",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 69,
+          "att": 10,
+          "def": 70,
+          "phy": 67,
+          "pac": 36,
+          "tec": 55,
+          "num": 1
+        },
+        {
+          "id": "est_26_4",
+          "name": "Junior Diaz",
+          "pos": [
+            "CB",
+            "CDM"
+          ],
+          "ovr": 76,
+          "att": 48,
+          "def": 77,
+          "phy": 79,
+          "pac": 68,
+          "tec": 65,
+          "num": 4
+        },
+        {
+          "id": "est_26_14",
+          "name": "Ismaël Boura",
+          "pos": [
+            "LB",
+            "LM"
+          ],
+          "ovr": 75,
+          "att": 68,
+          "def": 72,
+          "phy": 71,
+          "pac": 81,
+          "tec": 73,
+          "num": 14
+        },
+        {
+          "id": "est_26_44",
+          "name": "Yvann Titi",
+          "pos": [
+            "RB",
+            "CB"
+          ],
+          "ovr": 74,
+          "att": 62,
+          "def": 73,
+          "phy": 76,
+          "pac": 80,
+          "tec": 68,
+          "num": 44
+        },
+        {
+          "id": "est_26_5",
+          "name": "Paolo Gozzi",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 72,
+          "att": 44,
+          "def": 73,
+          "phy": 74,
+          "pac": 65,
+          "tec": 62,
+          "num": 5
+        },
+        {
+          "id": "est_26_2",
+          "name": "Lucas Maronnier",
+          "pos": [
+            "RB",
+            "LB"
+          ],
+          "ovr": 71,
+          "att": 64,
+          "def": 69,
+          "phy": 68,
+          "pac": 76,
+          "tec": 67,
+          "num": 2
+        },
+        {
+          "id": "est_26_6",
+          "name": "Adrien Monfray",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 70,
+          "att": 38,
+          "def": 72,
+          "phy": 73,
+          "pac": 50,
+          "tec": 60,
+          "num": 6
+        },
+        {
+          "id": "est_26_37",
+          "name": "Tom Akpakoun",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 66,
+          "att": 35,
+          "def": 67,
+          "phy": 69,
+          "pac": 62,
+          "tec": 55,
+          "num": 37
+        },
+        {
+          "id": "est_26_8",
+          "name": "Mouhamed Diop",
+          "pos": [
+            "CM",
+            "CAM",
+            "RW"
+          ],
+          "ovr": 75,
+          "att": 73,
+          "def": 65,
+          "phy": 74,
+          "pac": 76,
+          "tec": 77,
+          "num": 8
+        },
+        {
+          "id": "est_26_22",
+          "name": "Hugo Picard",
+          "pos": [
+            "LM",
+            "CAM"
+          ],
+          "ovr": 74,
+          "att": 72,
+          "def": 48,
+          "phy": 62,
+          "pac": 79,
+          "tec": 78,
+          "num": 22
+        },
+        {
+          "id": "est_26_17",
+          "name": "Antoine Mille",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 74,
+          "att": 69,
+          "def": 68,
+          "phy": 70,
+          "pac": 72,
+          "tec": 76,
+          "num": 17
+        },
+        {
+          "id": "est_26_29",
+          "name": "Dermane Karim",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 74,
+          "att": 73,
+          "def": 55,
+          "phy": 66,
+          "pac": 78,
+          "tec": 77,
+          "num": 29
+        },
+        {
+          "id": "est_26_11",
+          "name": "Iron Gomis",
+          "pos": [
+            "CM",
+            "CDM",
+            "CAM"
+          ],
+          "ovr": 72,
+          "att": 68,
+          "def": 66,
+          "phy": 73,
+          "pac": 71,
+          "tec": 73,
+          "num": 11
+        },
+        {
+          "id": "est_26_26",
+          "name": "Alexandre Phliponeau",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 69,
+          "att": 58,
+          "def": 69,
+          "phy": 70,
+          "pac": 64,
+          "tec": 68,
+          "num": 26
+        },
+        {
+          "id": "est_26_10",
+          "name": "Merwan Ifnaoui",
+          "pos": [
+            "RM",
+            "CAM",
+            "RW"
+          ],
+          "ovr": 74,
+          "att": 73,
+          "def": 45,
+          "phy": 62,
+          "pac": 80,
+          "tec": 76,
+          "num": 10
+        },
+        {
+          "id": "est_26_7",
+          "name": "Kandet Diawara",
+          "pos": [
+            "LW",
+            "RW",
+            "ST"
+          ],
+          "ovr": 73,
+          "att": 72,
+          "def": 38,
+          "phy": 67,
+          "pac": 84,
+          "tec": 75,
+          "num": 7
+        },
+        {
+          "id": "est_26_20",
+          "name": "Renaud Ripart",
+          "pos": [
+            "ST",
+            "LW",
+            "RW"
+          ],
+          "ovr": 71,
+          "att": 73,
+          "def": 42,
+          "phy": 72,
+          "pac": 68,
+          "tec": 71,
+          "num": 20
+        },
+        {
+          "id": "est_26_12",
+          "name": "Elijah Odede",
+          "pos": [
+            "LW",
+            "RW"
+          ],
+          "ovr": 68,
+          "att": 68,
+          "def": 32,
+          "phy": 62,
+          "pac": 82,
+          "tec": 70,
+          "num": 12
+        }
+      ],
+      "manager": {
+        "name": "Stéphane Dumont",
+        "ovr": 75
+      }
+    },
+    {
+      "id": "fcl2026",
+      "name": "FC Lorient 2026-27",
+      "short": "FCL",
+      "flag": "🇫🇷",
+      "color": "#F26522",
+      "secondary": "#000000",
+      "logo": "lorient.png",
+      "stadium": "Stade du Moustoir",
+      "players": [
+        {
+          "id": "fcl_26_1",
+          "name": "Yvon Mvogo",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 77,
+          "att": 10,
+          "def": 78,
+          "phy": 75,
+          "pac": 45,
+          "tec": 65,
+          "num": 1
+        },
+        {
+          "id": "fcl_26_38",
+          "name": "Yvon Mvogo",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 72,
+          "att": 10,
+          "def": 73,
+          "phy": 71,
+          "pac": 40,
+          "tec": 58,
+          "num": 38
+        },
+        {
+          "id": "fcl_26_40",
+          "name": "Gaël Aynaoui",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 65,
+          "att": 10,
+          "def": 66,
+          "phy": 63,
+          "pac": 38,
+          "tec": 52,
+          "num": 40
+        },
+        {
+          "id": "fcl_26_3",
+          "name": "Montassar Talbi",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 78,
+          "att": 45,
+          "def": 80,
+          "phy": 79,
+          "pac": 66,
+          "tec": 68,
+          "num": 3
+        },
+        {
+          "id": "fcl_26_15",
+          "name": "Julien Laporte",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 75,
+          "att": 42,
+          "def": 76,
+          "phy": 77,
+          "pac": 60,
+          "tec": 63,
+          "num": 15
+        },
+        {
+          "id": "fcl_26_5",
+          "name": "Formose Mendy",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 75,
+          "att": 50,
+          "def": 75,
+          "phy": 78,
+          "pac": 74,
+          "tec": 64,
+          "num": 5
+        },
+        {
+          "id": "fcl_26_24",
+          "name": "Gédéon Kalulu",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 74,
+          "att": 65,
+          "def": 72,
+          "phy": 72,
+          "pac": 80,
+          "tec": 70,
+          "num": 24
+        },
+        {
+          "id": "fcl_26_12",
+          "name": "Darlin Yongwa",
+          "pos": [
+            "LB",
+            "LWB",
+            "LM"
+          ],
+          "ovr": 74,
+          "att": 69,
+          "def": 70,
+          "phy": 74,
+          "pac": 82,
+          "tec": 72,
+          "num": 12
+        },
+        {
+          "id": "fcl_26_32",
+          "name": "Nathaniel Adjei",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 73,
+          "att": 40,
+          "def": 74,
+          "phy": 77,
+          "pac": 67,
+          "tec": 60,
+          "num": 32
+        },
+        {
+          "id": "fcl_26_2",
+          "name": "Igor Silva",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 72,
+          "att": 66,
+          "def": 69,
+          "phy": 70,
+          "pac": 78,
+          "tec": 71,
+          "num": 2
+        },
+        {
+          "id": "fcl_26_6",
+          "name": "Laurent Abergel",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 78,
+          "att": 68,
+          "def": 79,
+          "phy": 77,
+          "pac": 71,
+          "tec": 76,
+          "num": 6
+        },
+        {
+          "id": "fcl_26_8",
+          "name": "Bonke Innocent",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 74,
+          "att": 58,
+          "def": 75,
+          "phy": 81,
+          "pac": 65,
+          "tec": 68,
+          "num": 8
+        },
+        {
+          "id": "fcl_26_17",
+          "name": "Jean-Victor Makengo",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 74,
+          "att": 70,
+          "def": 72,
+          "phy": 75,
+          "pac": 72,
+          "tec": 75,
+          "num": 17
+        },
+        {
+          "id": "fcl_26_10",
+          "name": "Badredine Bouanani",
+          "pos": [
+            "RW",
+            "RM",
+            "CAM"
+          ],
+          "ovr": 76,
+          "att": 75,
+          "def": 42,
+          "phy": 64,
+          "pac": 79,
+          "tec": 81,
+          "num": 10
+        },
+        {
+          "id": "fcl_26_21",
+          "name": "Julien Ponceau",
+          "pos": [
+            "CAM",
+            "CM",
+            "LM"
+          ],
+          "ovr": 75,
+          "att": 74,
+          "def": 58,
+          "phy": 66,
+          "pac": 75,
+          "tec": 79,
+          "num": 21
+        },
+        {
+          "id": "fcl_26_14",
+          "name": "Tiemoué Bakayoko",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 73,
+          "att": 62,
+          "def": 73,
+          "phy": 79,
+          "pac": 58,
+          "tec": 72,
+          "num": 14
+        },
+        {
+          "id": "fcl_26_9",
+          "name": "Mohamed Bamba",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 77,
+          "att": 79,
+          "def": 36,
+          "phy": 78,
+          "pac": 84,
+          "tec": 75,
+          "num": 9
+        },
+        {
+          "id": "fcl_26_11",
+          "name": "Théo Le Bris",
+          "pos": [
+            "LM",
+            "LW",
+            "RM"
+          ],
+          "ovr": 75,
+          "att": 73,
+          "def": 50,
+          "phy": 65,
+          "pac": 81,
+          "tec": 77,
+          "num": 11
+        },
+        {
+          "id": "fcl_26_27",
+          "name": "Aiyegun Tosin",
+          "pos": [
+            "ST",
+            "LW",
+            "RW"
+          ],
+          "ovr": 74,
+          "att": 75,
+          "def": 38,
+          "phy": 73,
+          "pac": 85,
+          "tec": 73,
+          "num": 27
+        },
+        {
+          "id": "fcl_26_22",
+          "name": "Eli Junior Kroupi",
+          "pos": [
+            "ST",
+            "CAM",
+            "LW"
+          ],
+          "ovr": 76,
+          "att": 77,
+          "def": 35,
+          "phy": 68,
+          "pac": 82,
+          "tec": 78,
+          "num": 22
+        }
+      ],
+      "manager": {
+        "name": "Olivier Pantaloni",
+        "ovr": 77
+      }
+    },
+    {
+      "id": "ogcn2026",
+      "name": "OGC Nice 2026-27",
+      "short": "OGCN",
+      "flag": "🇫🇷",
+      "color": "#E2001A",
+      "secondary": "#000000",
+      "logo": "nice.png",
+      "stadium": "Allianz Riviera",
+      "players": [
+        {
+          "id": "ogc_26_1",
+          "name": "Marcin Bułka",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 82,
+          "att": 10,
+          "def": 83,
+          "phy": 80,
+          "pac": 45,
+          "tec": 68,
+          "num": 1
+        },
+        {
+          "id": "ogc_26_31",
+          "name": "Maxime Dupé",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 74,
+          "att": 10,
+          "def": 75,
+          "phy": 72,
+          "pac": 40,
+          "tec": 60,
+          "num": 31
+        },
+        {
+          "id": "ogc_26_50",
+          "name": "Barthélémy Boulhendi",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 65,
+          "att": 10,
+          "def": 66,
+          "phy": 64,
+          "pac": 38,
+          "tec": 52,
+          "num": 50
+        },
+        {
+          "id": "ogc_26_4",
+          "name": "Dante",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 48,
+          "def": 80,
+          "phy": 74,
+          "pac": 42,
+          "tec": 75,
+          "num": 4
+        },
+        {
+          "id": "ogc_26_55",
+          "name": "Youssouf Ndayishimiye",
+          "pos": [
+            "CB",
+            "CDM"
+          ],
+          "ovr": 80,
+          "att": 58,
+          "def": 81,
+          "phy": 83,
+          "pac": 70,
+          "tec": 71,
+          "num": 55
+        },
+        {
+          "id": "ogc_26_64",
+          "name": "Moïse Bombito",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 78,
+          "att": 45,
+          "def": 79,
+          "phy": 82,
+          "pac": 83,
+          "tec": 64,
+          "num": 64
+        },
+        {
+          "id": "ogc_26_26",
+          "name": "Melvin Bard",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 78,
+          "att": 72,
+          "def": 76,
+          "phy": 75,
+          "pac": 81,
+          "tec": 76,
+          "num": 26
+        },
+        {
+          "id": "ogc_26_92",
+          "name": "Jonathan Clauss",
+          "pos": [
+            "RB",
+            "RWB",
+            "RM"
+          ],
+          "ovr": 80,
+          "att": 78,
+          "def": 72,
+          "phy": 71,
+          "pac": 83,
+          "tec": 81,
+          "num": 92
+        },
+        {
+          "id": "ogc_26_20",
+          "name": "Tom Louchet",
+          "pos": [
+            "CM",
+            "RB",
+            "LB"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 72,
+          "phy": 70,
+          "pac": 76,
+          "tec": 74,
+          "num": 20
+        },
+        {
+          "id": "ogc_26_33",
+          "name": "Antoine Mendy",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 73,
+          "att": 50,
+          "def": 74,
+          "phy": 76,
+          "pac": 75,
+          "tec": 63,
+          "num": 33
+        },
+        {
+          "id": "ogc_26_6",
+          "name": "Hicham Boudaoui",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 79,
+          "att": 72,
+          "def": 76,
+          "phy": 78,
+          "pac": 82,
+          "tec": 78,
+          "num": 6
+        },
+        {
+          "id": "ogc_26_11",
+          "name": "Morgan Sanson",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 78,
+          "att": 76,
+          "def": 68,
+          "phy": 72,
+          "pac": 74,
+          "tec": 80,
+          "num": 11
+        },
+        {
+          "id": "ogc_26_8",
+          "name": "Pablo Rosario",
+          "pos": [
+            "CDM",
+            "CM",
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 62,
+          "def": 78,
+          "phy": 81,
+          "pac": 66,
+          "tec": 73,
+          "num": 8
+        },
+        {
+          "id": "ogc_26_22",
+          "name": "Tanguy Ndombele",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 78,
+          "att": 75,
+          "def": 62,
+          "phy": 74,
+          "pac": 70,
+          "tec": 86,
+          "num": 22
+        },
+        {
+          "id": "ogc_26_10",
+          "name": "Sofiane Diop",
+          "pos": [
+            "LW",
+            "CAM",
+            "LM"
+          ],
+          "ovr": 77,
+          "att": 76,
+          "def": 42,
+          "phy": 60,
+          "pac": 78,
+          "tec": 83,
+          "num": 10
+        },
+        {
+          "id": "ogc_26_25",
+          "name": "Mohamed-Ali Cho",
+          "pos": [
+            "RW",
+            "RM",
+            "ST"
+          ],
+          "ovr": 77,
+          "att": 76,
+          "def": 40,
+          "phy": 71,
+          "pac": 87,
+          "tec": 78,
+          "num": 25
+        },
+        {
+          "id": "ogc_26_7",
+          "name": "Jérémie Boga",
+          "pos": [
+            "LW",
+            "LM"
+          ],
+          "ovr": 79,
+          "att": 78,
+          "def": 38,
+          "phy": 65,
+          "pac": 86,
+          "tec": 85,
+          "num": 7
+        },
+        {
+          "id": "ogc_26_9",
+          "name": "Terem Moffi",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 80,
+          "att": 81,
+          "def": 35,
+          "phy": 84,
+          "pac": 85,
+          "tec": 76,
+          "num": 9
+        },
+        {
+          "id": "ogc_26_24",
+          "name": "Gaëtan Laborde",
+          "pos": [
+            "ST",
+            "RW"
+          ],
+          "ovr": 79,
+          "att": 81,
+          "def": 48,
+          "phy": 78,
+          "pac": 73,
+          "tec": 78,
+          "num": 24
+        },
+        {
+          "id": "ogc_26_29",
+          "name": "Evann Guessand",
+          "pos": [
+            "ST",
+            "RW"
+          ],
+          "ovr": 78,
+          "att": 79,
+          "def": 38,
+          "phy": 82,
+          "pac": 84,
+          "tec": 75,
+          "num": 29
+        }
+      ],
+      "manager": {
+        "name": "Franck Haise",
+        "ovr": 82
+      }
+    },
+    {
+      "id": "ol2026",
+      "name": "Olympique Lyonnais 2026-27",
+      "short": "OL",
+      "flag": "🇫🇷",
+      "color": "#002366",
+      "secondary": "#DA291C",
+      "logo": "lyon.png",
+      "stadium": "Groupama Stadium",
+      "players": [
+        {
+          "id": "ol_26_23",
+          "name": "Lucas Perri",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 81,
+          "att": 10,
+          "def": 82,
+          "phy": 81,
+          "pac": 42,
+          "tec": 68,
+          "num": 23
+        },
+        {
+          "id": "ol_26_1",
+          "name": "Anthony Lopes",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 78,
+          "att": 10,
+          "def": 79,
+          "phy": 74,
+          "pac": 48,
+          "tec": 68,
+          "num": 1
+        },
+        {
+          "id": "ol_26_40",
+          "name": "Lassine Diarra",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 66,
+          "att": 10,
+          "def": 67,
+          "phy": 65,
+          "pac": 40,
+          "tec": 52,
+          "num": 40
+        },
+        {
+          "id": "ol_26_19",
+          "name": "Moussa Niakhaté",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 79,
+          "att": 48,
+          "def": 80,
+          "phy": 82,
+          "pac": 72,
+          "tec": 65,
+          "num": 19
+        },
+        {
+          "id": "ol_26_55",
+          "name": "Duje Ćaleta-Car",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 78,
+          "att": 45,
+          "def": 79,
+          "phy": 80,
+          "pac": 58,
+          "tec": 68,
+          "num": 55
+        },
+        {
+          "id": "ol_26_16",
+          "name": "Abner Vinícius",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 77,
+          "att": 72,
+          "def": 74,
+          "phy": 73,
+          "pac": 81,
+          "tec": 76,
+          "num": 16
+        },
+        {
+          "id": "ol_26_22",
+          "name": "Clinton Mata",
+          "pos": [
+            "RB",
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 65,
+          "def": 78,
+          "phy": 77,
+          "pac": 75,
+          "tec": 70,
+          "num": 22
+        },
+        {
+          "id": "ol_26_3",
+          "name": "Nicolas Tagliafico",
+          "pos": [
+            "LB"
+          ],
+          "ovr": 78,
+          "att": 70,
+          "def": 79,
+          "phy": 76,
+          "pac": 72,
+          "tec": 74,
+          "num": 3
+        },
+        {
+          "id": "ol_26_20",
+          "name": "Saël Kumbedi",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 75,
+          "att": 68,
+          "def": 73,
+          "phy": 71,
+          "pac": 82,
+          "tec": 72,
+          "num": 20
+        },
+        {
+          "id": "ol_26_6",
+          "name": "Maxence Caqueret",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 80,
+          "att": 73,
+          "def": 77,
+          "phy": 73,
+          "pac": 76,
+          "tec": 82,
+          "num": 6
+        },
+        {
+          "id": "ol_26_31",
+          "name": "Nemanja Matić",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 78,
+          "att": 68,
+          "def": 80,
+          "phy": 76,
+          "pac": 48,
+          "tec": 81,
+          "num": 31
+        },
+        {
+          "id": "ol_26_8",
+          "name": "Corentin Tolisso",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 79,
+          "att": 76,
+          "def": 75,
+          "phy": 77,
+          "pac": 68,
+          "tec": 81,
+          "num": 8
+        },
+        {
+          "id": "ol_26_34",
+          "name": "Mahamadou Diawara",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 72,
+          "att": 65,
+          "def": 70,
+          "phy": 74,
+          "pac": 70,
+          "tec": 72,
+          "num": 34
+        },
+        {
+          "id": "ol_26_11",
+          "name": "Malick Fofana",
+          "pos": [
+            "LW",
+            "RW",
+            "LM"
+          ],
+          "ovr": 79,
+          "att": 78,
+          "def": 40,
+          "phy": 68,
+          "pac": 88,
+          "tec": 82,
+          "num": 11
+        },
+        {
+          "id": "ol_26_37",
+          "name": "Ernest Nuamah",
+          "pos": [
+            "RW",
+            "RM"
+          ],
+          "ovr": 78,
+          "att": 77,
+          "def": 42,
+          "phy": 74,
+          "pac": 87,
+          "tec": 80,
+          "num": 37
+        },
+        {
+          "id": "ol_26_10",
+          "name": "Alexandre Lacazette",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 82,
+          "att": 85,
+          "def": 42,
+          "phy": 76,
+          "pac": 73,
+          "tec": 83,
+          "num": 10
+        }
+      ],
+      "manager": {
+        "name": "Pierre Sage",
+        "ovr": 81
+      }
+    },
+    {
+      "id": "pfc2026",
+      "name": "Paris FC 2026-27",
+      "short": "PFC",
+      "flag": "🇫🇷",
+      "color": "#001C46",
+      "secondary": "#E30613",
+      "logo": "paris_fc.png",
+      "stadium": "Stade Charléty",
+      "players": [
+        {
+          "id": "pfc_26_16",
+          "name": "Obed Nkambadio",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 75,
+          "att": 10,
+          "def": 76,
+          "phy": 72,
+          "pac": 42,
+          "tec": 60,
+          "num": 16
+        },
+        {
+          "id": "pfc_26_1",
+          "name": "Rémy Riou",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 70,
+          "att": 10,
+          "def": 71,
+          "phy": 68,
+          "pac": 35,
+          "tec": 58,
+          "num": 1
+        },
+        {
+          "id": "pfc_26_30",
+          "name": "Thomas Himeur",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 66,
+          "att": 10,
+          "def": 67,
+          "phy": 64,
+          "pac": 38,
+          "tec": 52,
+          "num": 30
+        },
+        {
+          "id": "pfc_26_15",
+          "name": "Timothée Kolodziejczak",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 75,
+          "att": 52,
+          "def": 76,
+          "phy": 75,
+          "pac": 62,
+          "tec": 68,
+          "num": 15
+        },
+        {
+          "id": "pfc_26_2",
+          "name": "Tuomas Ollila",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 71,
+          "phy": 70,
+          "pac": 80,
+          "tec": 72,
+          "num": 2
+        },
+        {
+          "id": "pfc_26_31",
+          "name": "Samir Chergui",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 74,
+          "att": 48,
+          "def": 75,
+          "phy": 78,
+          "pac": 68,
+          "tec": 64,
+          "num": 31
+        },
+        {
+          "id": "pfc_26_22",
+          "name": "Sofiane Alakouch",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 73,
+          "att": 65,
+          "def": 71,
+          "phy": 69,
+          "pac": 78,
+          "tec": 70,
+          "num": 22
+        },
+        {
+          "id": "pfc_26_5",
+          "name": "Moustapha Mbow",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 73,
+          "att": 40,
+          "def": 74,
+          "phy": 76,
+          "pac": 64,
+          "tec": 60,
+          "num": 5
+        },
+        {
+          "id": "pfc_26_25",
+          "name": "Yoan Koré",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 72,
+          "att": 45,
+          "def": 73,
+          "phy": 75,
+          "pac": 70,
+          "tec": 62,
+          "num": 25
+        },
+        {
+          "id": "pfc_26_6",
+          "name": "Vincent Marchetti",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 76,
+          "att": 70,
+          "def": 74,
+          "phy": 73,
+          "pac": 72,
+          "tec": 77,
+          "num": 6
+        },
+        {
+          "id": "pfc_26_8",
+          "name": "Lohann Doucet",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 75,
+          "att": 65,
+          "def": 75,
+          "phy": 77,
+          "pac": 71,
+          "tec": 73,
+          "num": 8
+        },
+        {
+          "id": "pfc_26_10",
+          "name": "Ilan Kebbal",
+          "pos": [
+            "CAM",
+            "RW",
+            "RM"
+          ],
+          "ovr": 78,
+          "att": 77,
+          "def": 45,
+          "phy": 60,
+          "pac": 79,
+          "tec": 84,
+          "num": 10
+        },
+        {
+          "id": "pfc_26_17",
+          "name": "Adama Camara",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 72,
+          "phy": 76,
+          "pac": 73,
+          "tec": 72,
+          "num": 17
+        },
+        {
+          "id": "pfc_26_18",
+          "name": "Jean-Philippe Krasso",
+          "pos": [
+            "ST",
+            "CAM"
+          ],
+          "ovr": 77,
+          "att": 78,
+          "def": 38,
+          "phy": 81,
+          "pac": 74,
+          "tec": 78,
+          "num": 18
+        },
+        {
+          "id": "pfc_26_11",
+          "name": "Nouha Dicko",
+          "pos": [
+            "ST",
+            "LW"
+          ],
+          "ovr": 73,
+          "att": 74,
+          "def": 35,
+          "phy": 75,
+          "pac": 80,
+          "tec": 71,
+          "num": 11
+        },
+        {
+          "id": "pfc_26_29",
+          "name": "Pierre-Yves Hamel",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 72,
+          "att": 74,
+          "def": 32,
+          "phy": 73,
+          "pac": 70,
+          "tec": 71,
+          "num": 29
+        },
+        {
+          "id": "pfc_26_7",
+          "name": "Alimami Gory",
+          "pos": [
+            "LW",
+            "LM",
+            "ST"
+          ],
+          "ovr": 74,
+          "att": 73,
+          "def": 40,
+          "phy": 72,
+          "pac": 84,
+          "tec": 75,
+          "num": 7
+        },
+        {
+          "id": "pfc_26_26",
+          "name": "Lamine Diaby-Fadiga",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 71,
+          "att": 72,
+          "def": 30,
+          "phy": 74,
+          "pac": 76,
+          "tec": 69,
+          "num": 26
+        },
+        {
+          "id": "pfc_26_12",
+          "name": "Lamine Gueye",
+          "pos": [
+            "RW",
+            "RM"
+          ],
+          "ovr": 72,
+          "att": 71,
+          "def": 38,
+          "phy": 68,
+          "pac": 83,
+          "tec": 72,
+          "num": 12
+        },
+        {
+          "id": "pfc_26_20",
+          "name": "Julien López",
+          "pos": [
+            "LW",
+            "CAM",
+            "LM"
+          ],
+          "ovr": 72,
+          "att": 72,
+          "def": 42,
+          "phy": 65,
+          "pac": 75,
+          "tec": 75,
+          "num": 20
+        }
+      ],
+      "manager": {
+        "name": "Stéphane Gilli",
+        "ovr": 76
+      }
+    },
+    {
+      "id": "rcs2026",
+      "name": "RC Strasbourg Alsace 2026-27",
+      "short": "RCS",
+      "flag": "🇫🇷",
+      "color": "#0091D2",
+      "secondary": "#FFFFFF",
+      "logo": "strasbourg.png",
+      "stadium": "Stade de la Meinau",
+      "players": [
+        {
+          "id": "rcs_26_1",
+          "name": "Djordje Petrović",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 78,
+          "att": 10,
+          "def": 79,
+          "phy": 77,
+          "pac": 45,
+          "tec": 65,
+          "num": 1
+        },
+        {
+          "id": "rcs_26_30",
+          "name": "Karl-Johan Johnsson",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 73,
+          "att": 10,
+          "def": 74,
+          "phy": 72,
+          "pac": 40,
+          "tec": 58,
+          "num": 30
+        },
+        {
+          "id": "rcs_26_36",
+          "name": "Alaa Bellaarouch",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 71,
+          "att": 10,
+          "def": 72,
+          "phy": 70,
+          "pac": 42,
+          "tec": 56,
+          "num": 36
+        },
+        {
+          "id": "rcs_26_24",
+          "name": "Abakar Sylla",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 45,
+          "def": 78,
+          "phy": 81,
+          "pac": 73,
+          "tec": 64,
+          "num": 24
+        },
+        {
+          "id": "rcs_26_5",
+          "name": "Lucas Perrin",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 76,
+          "att": 42,
+          "def": 77,
+          "phy": 76,
+          "pac": 65,
+          "tec": 66,
+          "num": 5
+        },
+        {
+          "id": "rcs_26_22",
+          "name": "Guéla Doué",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 76,
+          "att": 68,
+          "def": 74,
+          "phy": 75,
+          "pac": 82,
+          "tec": 73,
+          "num": 22
+        },
+        {
+          "id": "rcs_26_3",
+          "name": "Thomas Delaine",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 72,
+          "phy": 70,
+          "pac": 81,
+          "tec": 72,
+          "num": 3
+        },
+        {
+          "id": "rcs_26_2",
+          "name": "Saïdou Sow",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 74,
+          "att": 40,
+          "def": 75,
+          "phy": 77,
+          "pac": 66,
+          "tec": 60,
+          "num": 2
+        },
+        {
+          "id": "rcs_26_14",
+          "name": "Ismaël Doukouré",
+          "pos": [
+            "CB",
+            "CDM"
+          ],
+          "ovr": 76,
+          "att": 55,
+          "def": 77,
+          "phy": 78,
+          "pac": 74,
+          "tec": 70,
+          "num": 14
+        },
+        {
+          "id": "rcs_26_77",
+          "name": "Eduard Sobol",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 73,
+          "att": 66,
+          "def": 71,
+          "phy": 72,
+          "pac": 77,
+          "tec": 70,
+          "num": 77
+        },
+        {
+          "id": "rcs_26_19",
+          "name": "Habib Diarra",
+          "pos": [
+            "CM",
+            "CAM",
+            "RM"
+          ],
+          "ovr": 79,
+          "att": 76,
+          "def": 70,
+          "phy": 79,
+          "pac": 84,
+          "tec": 80,
+          "num": 19
+        },
+        {
+          "id": "rcs_26_18",
+          "name": "Félix Lemaréchal",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 74,
+          "att": 71,
+          "def": 65,
+          "phy": 68,
+          "pac": 75,
+          "tec": 77,
+          "num": 18
+        },
+        {
+          "id": "rcs_26_8",
+          "name": "Andrey Santos",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 78,
+          "att": 73,
+          "def": 76,
+          "phy": 78,
+          "pac": 74,
+          "tec": 79,
+          "num": 8
+        },
+        {
+          "id": "rcs_26_6",
+          "name": "Felix Nzouango",
+          "pos": [
+            "CB",
+            "CDM"
+          ],
+          "ovr": 68,
+          "att": 40,
+          "def": 69,
+          "phy": 72,
+          "pac": 62,
+          "tec": 58,
+          "num": 6
+        },
+        {
+          "id": "rcs_26_10",
+          "name": "Emanuel Emegha",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 77,
+          "att": 78,
+          "def": 35,
+          "phy": 78,
+          "pac": 86,
+          "tec": 72,
+          "num": 10
+        },
+        {
+          "id": "rcs_26_11",
+          "name": "Moïse Sahi Dion",
+          "pos": [
+            "ST",
+            "LW"
+          ],
+          "ovr": 73,
+          "att": 74,
+          "def": 32,
+          "phy": 68,
+          "pac": 80,
+          "tec": 74,
+          "num": 11
+        },
+        {
+          "id": "rcs_26_26",
+          "name": "Dilane Bakwa",
+          "pos": [
+            "RW",
+            "RM",
+            "LW"
+          ],
+          "ovr": 77,
+          "att": 76,
+          "def": 42,
+          "phy": 70,
+          "pac": 85,
+          "tec": 81,
+          "num": 26
+        },
+        {
+          "id": "rcs_26_20",
+          "name": "Oscar Perea",
+          "pos": [
+            "LW",
+            "RW"
+          ],
+          "ovr": 72,
+          "att": 71,
+          "def": 38,
+          "phy": 66,
+          "pac": 82,
+          "tec": 74,
+          "num": 20
+        },
+        {
+          "id": "rcs_26_9",
+          "name": "Miloš Luković",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 74,
+          "att": 75,
+          "def": 30,
+          "phy": 74,
+          "pac": 76,
+          "tec": 72,
+          "num": 9
+        },
+        {
+          "id": "rcs_26_17",
+          "name": "Pape Daouda Diong",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 71,
+          "att": 62,
+          "def": 72,
+          "phy": 75,
+          "pac": 70,
+          "tec": 68,
+          "num": 17
+        }
+      ],
+      "manager": {
+        "name": "Liam Rosenior",
+        "ovr": 77
+      }
+    },
+    {
+      "id": "sb29_2026",
+      "name": "Stade Brestois 29 2026-27",
+      "short": "SB29",
+      "flag": "🇫🇷",
+      "color": "#E30613",
+      "secondary": "#FFFFFF",
+      "logo": "brest.png",
+      "stadium": "Stade Francis-Le Blé",
+      "players": [
+        {
+          "id": "sb29_26_40",
+          "name": "Marco Bizot",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 79,
+          "att": 10,
+          "def": 80,
+          "phy": 78,
+          "pac": 42,
+          "tec": 62,
+          "num": 40
+        },
+        {
+          "id": "sb29_26_30",
+          "name": "Grégoire Coudert",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 68,
+          "att": 10,
+          "def": 69,
+          "phy": 66,
+          "pac": 38,
+          "tec": 52,
+          "num": 30
+        },
+        {
+          "id": "sb29_26_50",
+          "name": "Noah Jauny",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 65,
+          "att": 10,
+          "def": 66,
+          "phy": 64,
+          "pac": 40,
+          "tec": 50,
+          "num": 50
+        },
+        {
+          "id": "sb29_26_5",
+          "name": "Brendan Chardonnet",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 78,
+          "att": 45,
+          "def": 79,
+          "phy": 80,
+          "pac": 62,
+          "tec": 66,
+          "num": 5
+        },
+        {
+          "id": "sb29_26_3",
+          "name": "Abdoulaye Ndiaye",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 75,
+          "att": 42,
+          "def": 76,
+          "phy": 78,
+          "pac": 68,
+          "tec": 62,
+          "num": 3
+        },
+        {
+          "id": "sb29_26_25",
+          "name": "Julien Le Cardinal",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 74,
+          "att": 48,
+          "def": 74,
+          "phy": 76,
+          "pac": 72,
+          "tec": 64,
+          "num": 25
+        },
+        {
+          "id": "sb29_26_27",
+          "name": "Kenny Lala",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 77,
+          "att": 70,
+          "def": 75,
+          "phy": 74,
+          "pac": 76,
+          "tec": 76,
+          "num": 27
+        },
+        {
+          "id": "sb29_26_22",
+          "name": "Massadio Haïdara",
+          "pos": [
+            "LB",
+            "CB"
+          ],
+          "ovr": 74,
+          "att": 62,
+          "def": 75,
+          "phy": 76,
+          "pac": 73,
+          "tec": 68,
+          "num": 22
+        },
+        {
+          "id": "sb29_26_2",
+          "name": "Bradley Locko",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 78,
+          "att": 72,
+          "def": 76,
+          "phy": 77,
+          "pac": 83,
+          "tec": 75,
+          "num": 2
+        },
+        {
+          "id": "sb29_26_12",
+          "name": "Luck Zogbé",
+          "pos": [
+            "RB",
+            "LB"
+          ],
+          "ovr": 70,
+          "att": 62,
+          "def": 69,
+          "phy": 71,
+          "pac": 78,
+          "tec": 66,
+          "num": 12
+        },
+        {
+          "id": "sb29_26_20",
+          "name": "Pierre Lees-Melou",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 81,
+          "att": 76,
+          "def": 80,
+          "phy": 80,
+          "pac": 68,
+          "tec": 82,
+          "num": 20
+        },
+        {
+          "id": "sb29_26_8",
+          "name": "Hugo Magnetti",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 77,
+          "att": 72,
+          "def": 75,
+          "phy": 76,
+          "pac": 72,
+          "tec": 77,
+          "num": 8
+        },
+        {
+          "id": "sb29_26_45",
+          "name": "Mahdi Camara",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 78,
+          "att": 75,
+          "def": 74,
+          "phy": 79,
+          "pac": 75,
+          "tec": 76,
+          "num": 45
+        },
+        {
+          "id": "sb29_26_21",
+          "name": "Romain Faivre",
+          "pos": [
+            "CAM",
+            "RM",
+            "RW"
+          ],
+          "ovr": 77,
+          "att": 76,
+          "def": 45,
+          "phy": 66,
+          "pac": 76,
+          "tec": 82,
+          "num": 21
+        },
+        {
+          "id": "sb29_26_28",
+          "name": "Jonas Martin",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 73,
+          "phy": 72,
+          "pac": 60,
+          "tec": 75,
+          "num": 28
+        },
+        {
+          "id": "sb29_26_10",
+          "name": "Romain Del Castillo",
+          "pos": [
+            "RW",
+            "RM",
+            "CAM"
+          ],
+          "ovr": 79,
+          "att": 78,
+          "def": 48,
+          "phy": 68,
+          "pac": 78,
+          "tec": 83,
+          "num": 10
+        },
+        {
+          "id": "sb29_26_17",
+          "name": "Abdallah Sima",
+          "pos": [
+            "LW",
+            "RW",
+            "ST"
+          ],
+          "ovr": 77,
+          "att": 77,
+          "def": 40,
+          "phy": 76,
+          "pac": 85,
+          "tec": 75,
+          "num": 17
+        },
+        {
+          "id": "sb29_26_19",
+          "name": "Ludovic Ajorque",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 77,
+          "att": 78,
+          "def": 42,
+          "phy": 86,
+          "pac": 64,
+          "tec": 73,
+          "num": 19
+        },
+        {
+          "id": "sb29_26_11",
+          "name": "Axel Camblan",
+          "pos": [
+            "RW",
+            "LW"
+          ],
+          "ovr": 71,
+          "att": 70,
+          "def": 38,
+          "phy": 65,
+          "pac": 80,
+          "tec": 72,
+          "num": 11
+        },
+        {
+          "id": "sb29_26_14",
+          "name": "Mama Baldé",
+          "pos": [
+            "ST",
+            "RW"
+          ],
+          "ovr": 75,
+          "att": 76,
+          "def": 38,
+          "phy": 77,
+          "pac": 84,
+          "tec": 74,
+          "num": 14
+        }
+      ],
+      "manager": {
+        "name": "Éric Roy",
+        "ovr": 79
+      }
+    },
+    {
+      "id": "srf2026",
+      "name": "Stade Rennais FC 2026-27",
+      "short": "REN",
+      "flag": "🇫🇷",
+      "color": "#E30613",
+      "secondary": "#000000",
+      "logo": "rennes.png",
+      "stadium": "Roazhon Park",
+      "players": [
+        {
+          "id": "srf_26_30",
+          "name": "Steve Mandanda",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 78,
+          "att": 10,
+          "def": 79,
+          "phy": 75,
+          "pac": 40,
+          "tec": 68,
+          "num": 30
+        },
+        {
+          "id": "srf_26_80",
+          "name": "Dogan Alemdar",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 74,
+          "att": 10,
+          "def": 75,
+          "phy": 72,
+          "pac": 44,
+          "tec": 60,
+          "num": 80
+        },
+        {
+          "id": "srf_26_40",
+          "name": "Geoffrey Lembet",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 66,
+          "att": 10,
+          "def": 67,
+          "phy": 65,
+          "pac": 38,
+          "tec": 50,
+          "num": 40
+        },
+        {
+          "id": "srf_26_15",
+          "name": "Christopher Wooh",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 42,
+          "def": 78,
+          "phy": 81,
+          "pac": 68,
+          "tec": 64,
+          "num": 15
+        },
+        {
+          "id": "srf_26_18",
+          "name": "Leo Østigård",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 76,
+          "att": 48,
+          "def": 77,
+          "phy": 82,
+          "pac": 66,
+          "tec": 62,
+          "num": 18
+        },
+        {
+          "id": "srf_26_4",
+          "name": "Mikayil Faye",
+          "pos": [
+            "CB",
+            "LB"
+          ],
+          "ovr": 76,
+          "att": 55,
+          "def": 76,
+          "phy": 78,
+          "pac": 75,
+          "tec": 68,
+          "num": 4
+        },
+        {
+          "id": "srf_26_3",
+          "name": "Adrien Truffert",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 79,
+          "att": 73,
+          "def": 76,
+          "phy": 75,
+          "pac": 82,
+          "tec": 77,
+          "num": 3
+        },
+        {
+          "id": "srf_26_22",
+          "name": "Lorenz Assignon",
+          "pos": [
+            "RB",
+            "RWB"
+          ],
+          "ovr": 77,
+          "att": 72,
+          "def": 73,
+          "phy": 74,
+          "pac": 85,
+          "tec": 75,
+          "num": 22
+        },
+        {
+          "id": "srf_26_36",
+          "name": "Alidu Seidu",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 76,
+          "att": 50,
+          "def": 77,
+          "phy": 79,
+          "pac": 76,
+          "tec": 65,
+          "num": 36
+        },
+        {
+          "id": "srf_26_33",
+          "name": "Hans Hateboer",
+          "pos": [
+            "RB",
+            "RWB",
+            "CB"
+          ],
+          "ovr": 76,
+          "att": 68,
+          "def": 75,
+          "phy": 78,
+          "pac": 77,
+          "tec": 72,
+          "num": 33
+        },
+        {
+          "id": "srf_26_6",
+          "name": "Azor Matusiwa",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 78,
+          "att": 65,
+          "def": 79,
+          "phy": 80,
+          "pac": 72,
+          "tec": 75,
+          "num": 6
+        },
+        {
+          "id": "srf_26_8",
+          "name": "Baptiste Santamaria",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 77,
+          "att": 68,
+          "def": 78,
+          "phy": 77,
+          "pac": 65,
+          "tec": 76,
+          "num": 8
+        },
+        {
+          "id": "srf_26_28",
+          "name": "Glen Kamara",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 77,
+          "att": 70,
+          "def": 74,
+          "phy": 75,
+          "pac": 73,
+          "tec": 79,
+          "num": 28
+        },
+        {
+          "id": "srf_26_11",
+          "name": "Ludovic Blas",
+          "pos": [
+            "CAM",
+            "RW",
+            "RM"
+          ],
+          "ovr": 79,
+          "att": 79,
+          "def": 48,
+          "phy": 70,
+          "pac": 77,
+          "tec": 84,
+          "num": 11
+        },
+        {
+          "id": "srf_26_38",
+          "name": "Djaoui Cissé",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 71,
+          "att": 64,
+          "def": 70,
+          "phy": 72,
+          "pac": 71,
+          "tec": 71,
+          "num": 38
+        },
+        {
+          "id": "srf_26_7",
+          "name": "Albert Grønbæk",
+          "pos": [
+            "CAM",
+            "CM",
+            "LW"
+          ],
+          "ovr": 78,
+          "att": 77,
+          "def": 55,
+          "phy": 72,
+          "pac": 79,
+          "tec": 81,
+          "num": 7
+        },
+        {
+          "id": "srf_26_9",
+          "name": "Arnaud Kalimuendo",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 79,
+          "att": 80,
+          "def": 38,
+          "phy": 74,
+          "pac": 83,
+          "tec": 78,
+          "num": 9
+        },
+        {
+          "id": "srf_26_19",
+          "name": "Henrik Meister",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 73,
+          "att": 74,
+          "def": 32,
+          "phy": 77,
+          "pac": 81,
+          "tec": 70,
+          "num": 19
+        },
+        {
+          "id": "srf_26_10",
+          "name": "Amine Gouiri",
+          "pos": [
+            "ST",
+            "LW",
+            "CAM"
+          ],
+          "ovr": 80,
+          "att": 81,
+          "def": 40,
+          "phy": 72,
+          "pac": 80,
+          "tec": 83,
+          "num": 10
+        },
+        {
+          "id": "srf_26_17",
+          "name": "Jota",
+          "pos": [
+            "LW",
+            "RW"
+          ],
+          "ovr": 78,
+          "att": 77,
+          "def": 38,
+          "phy": 66,
+          "pac": 84,
+          "tec": 82,
+          "num": 17
+        }
+      ],
+      "manager": {
+        "name": "Jorge Sampaoli",
+        "ovr": 80
+      }
+    },
+    {
+      "id": "tfc2026",
+      "name": "Toulouse FC 2026-27",
+      "short": "TFC",
+      "flag": "🇫🇷",
+      "color": "#472175",
+      "secondary": "#FFFFFF",
+      "logo": "toulouse.png",
+      "stadium": "Stadium de Toulouse",
+      "players": [
+        {
+          "id": "tfc_26_50",
+          "name": "Guillaume Restes",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 79,
+          "att": 10,
+          "def": 80,
+          "phy": 75,
+          "pac": 45,
+          "tec": 68,
+          "num": 50
+        },
+        {
+          "id": "tfc_26_30",
+          "name": "Álex Domínguez",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 71,
+          "att": 10,
+          "def": 72,
+          "phy": 68,
+          "pac": 40,
+          "tec": 58,
+          "num": 30
+        },
+        {
+          "id": "tfc_26_16",
+          "name": "Kjetil Haug",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 68,
+          "att": 10,
+          "def": 69,
+          "phy": 66,
+          "pac": 38,
+          "tec": 52,
+          "num": 16
+        },
+        {
+          "id": "tfc_26_2",
+          "name": "Rasmus Nicolaisen",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 77,
+          "att": 45,
+          "def": 78,
+          "phy": 82,
+          "pac": 60,
+          "tec": 65,
+          "num": 2
+        },
+        {
+          "id": "tfc_26_6",
+          "name": "Mark McKenzie",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 76,
+          "att": 42,
+          "def": 77,
+          "phy": 78,
+          "pac": 72,
+          "tec": 64,
+          "num": 6
+        },
+        {
+          "id": "tfc_26_4",
+          "name": "Charlie Cresswell",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 75,
+          "att": 40,
+          "def": 76,
+          "phy": 80,
+          "pac": 64,
+          "tec": 60,
+          "num": 4
+        },
+        {
+          "id": "tfc_26_12",
+          "name": "Warren Kamanzi",
+          "pos": [
+            "RB",
+            "RWB",
+            "LB"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 71,
+          "phy": 72,
+          "pac": 83,
+          "tec": 71,
+          "num": 12
+        },
+        {
+          "id": "tfc_26_19",
+          "name": "Djibril Sidibé",
+          "pos": [
+            "RB",
+            "CB"
+          ],
+          "ovr": 75,
+          "att": 68,
+          "def": 76,
+          "phy": 76,
+          "pac": 70,
+          "tec": 73,
+          "num": 19
+        },
+        {
+          "id": "tfc_26_17",
+          "name": "Gabriel Suazo",
+          "pos": [
+            "LB",
+            "LWB",
+            "LM"
+          ],
+          "ovr": 77,
+          "att": 73,
+          "def": 75,
+          "phy": 76,
+          "pac": 78,
+          "tec": 77,
+          "num": 17
+        },
+        {
+          "id": "tfc_26_26",
+          "name": "Ylies Aradj",
+          "pos": [
+            "LB"
+          ],
+          "ovr": 67,
+          "att": 60,
+          "def": 66,
+          "phy": 65,
+          "pac": 75,
+          "tec": 64,
+          "num": 26
+        },
+        {
+          "id": "tfc_26_8",
+          "name": "Vincent Sierro",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 78,
+          "att": 75,
+          "def": 76,
+          "phy": 77,
+          "pac": 68,
+          "tec": 80,
+          "num": 8
+        },
+        {
+          "id": "tfc_26_23",
+          "name": "Cristian Cásseres Jr.",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "ovr": 76,
+          "att": 72,
+          "def": 74,
+          "phy": 76,
+          "pac": 75,
+          "tec": 77,
+          "num": 23
+        },
+        {
+          "id": "tfc_26_5",
+          "name": "Denis Genreau",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 72,
+          "att": 70,
+          "def": 68,
+          "phy": 70,
+          "pac": 72,
+          "tec": 74,
+          "num": 5
+        },
+        {
+          "id": "tfc_26_34",
+          "name": "Noah Lahmadi",
+          "pos": [
+            "CM"
+          ],
+          "ovr": 67,
+          "att": 62,
+          "def": 65,
+          "phy": 66,
+          "pac": 68,
+          "tec": 70,
+          "num": 34
+        },
+        {
+          "id": "tfc_26_21",
+          "name": "Niklas Schmidt",
+          "pos": [
+            "CAM",
+            "CM"
+          ],
+          "ovr": 74,
+          "att": 73,
+          "def": 55,
+          "phy": 71,
+          "pac": 66,
+          "tec": 79,
+          "num": 21
+        },
+        {
+          "id": "tfc_26_80",
+          "name": "Shavy Babicka",
+          "pos": [
+            "RW",
+            "RM",
+            "ST"
+          ],
+          "ovr": 75,
+          "att": 74,
+          "def": 42,
+          "phy": 73,
+          "pac": 88,
+          "tec": 75,
+          "num": 80
+        },
+        {
+          "id": "tfc_26_15",
+          "name": "Aron Dønnum",
+          "pos": [
+            "RW",
+            "RM",
+            "LWB"
+          ],
+          "ovr": 75,
+          "att": 74,
+          "def": 58,
+          "phy": 75,
+          "pac": 79,
+          "tec": 77,
+          "num": 15
+        },
+        {
+          "id": "tfc_26_10",
+          "name": "Yann Gboho",
+          "pos": [
+            "LW",
+            "CAM",
+            "LM"
+          ],
+          "ovr": 77,
+          "att": 76,
+          "def": 40,
+          "phy": 68,
+          "pac": 83,
+          "tec": 82,
+          "num": 10
+        },
+        {
+          "id": "tfc_26_9",
+          "name": "Frank Magri",
+          "pos": [
+            "ST",
+            "LW"
+          ],
+          "ovr": 74,
+          "att": 75,
+          "def": 38,
+          "phy": 76,
+          "pac": 78,
+          "tec": 73,
+          "num": 9
+        },
+        {
+          "id": "tfc_26_13",
+          "name": "Joshua King",
+          "pos": [
+            "ST",
+            "LW"
+          ],
+          "ovr": 74,
+          "att": 75,
+          "def": 35,
+          "phy": 77,
+          "pac": 79,
+          "tec": 74,
+          "num": 13
+        }
+      ],
+      "manager": {
+        "name": "Carles Martínez Novell",
+        "ovr": 77
+      }
+    },
+    {
+      "id": "lmc2026",
+      "name": "Le Mans FC 2026-27",
+      "short": "LMF",
+      "flag": "🇫🇷",
+      "color": "#D31127",
+      "secondary": "#FFD700",
+      "logo": "lemans.png",
+      "stadium": "Stade Marie-Marvingt",
+      "players": [
+        {
+          "id": "lmc_26_16",
+          "name": "Ewan Hatfout",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 69,
+          "att": 10,
+          "def": 70,
+          "phy": 67,
+          "pac": 40,
+          "tec": 56,
+          "num": 16
+        },
+        {
+          "id": "lmc_26_1",
+          "name": "Nicolas Kocik",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 68,
+          "att": 10,
+          "def": 69,
+          "phy": 66,
+          "pac": 38,
+          "tec": 54,
+          "num": 1
+        },
+        {
+          "id": "lmc_26_40",
+          "name": "Augustin Delbecque",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 62,
+          "att": 10,
+          "def": 63,
+          "phy": 60,
+          "pac": 35,
+          "tec": 48,
+          "num": 40
+        },
+        {
+          "id": "lmc_26_5",
+          "name": "Harold Voyer",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 71,
+          "att": 40,
+          "def": 72,
+          "phy": 75,
+          "pac": 62,
+          "tec": 58,
+          "num": 5
+        },
+        {
+          "id": "lmc_26_21",
+          "name": "Samuel Yohou",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 70,
+          "att": 38,
+          "def": 71,
+          "phy": 77,
+          "pac": 58,
+          "tec": 56,
+          "num": 21
+        },
+        {
+          "id": "lmc_26_28",
+          "name": "Théo Eyoum",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 69,
+          "att": 42,
+          "def": 70,
+          "phy": 73,
+          "pac": 65,
+          "tec": 60,
+          "num": 28
+        },
+        {
+          "id": "lmc_26_2",
+          "name": "Alexandre Lauray",
+          "pos": [
+            "RB",
+            "CB"
+          ],
+          "ovr": 68,
+          "att": 55,
+          "def": 68,
+          "phy": 70,
+          "pac": 72,
+          "tec": 64,
+          "num": 2
+        },
+        {
+          "id": "lmc_26_23",
+          "name": "Mike Bettinger",
+          "pos": [
+            "LB"
+          ],
+          "ovr": 68,
+          "att": 60,
+          "def": 67,
+          "phy": 66,
+          "pac": 75,
+          "tec": 65,
+          "num": 23
+        },
+        {
+          "id": "lmc_26_12",
+          "name": "Anthony Ribelin",
+          "pos": [
+            "RB",
+            "RM"
+          ],
+          "ovr": 67,
+          "att": 62,
+          "def": 65,
+          "phy": 68,
+          "pac": 74,
+          "tec": 66,
+          "num": 12
+        },
+        {
+          "id": "lmc_26_6",
+          "name": "Maxence Derrien",
+          "pos": [
+            "CB",
+            "CDM"
+          ],
+          "ovr": 67,
+          "att": 45,
+          "def": 68,
+          "phy": 72,
+          "pac": 56,
+          "tec": 62,
+          "num": 6
+        },
+        {
+          "id": "lmc_26_8",
+          "name": "Alexandre Vincent",
+          "pos": [
+            "CM",
+            "CAM",
+            "LM"
+          ],
+          "ovr": 71,
+          "att": 70,
+          "def": 58,
+          "phy": 65,
+          "pac": 73,
+          "tec": 74,
+          "num": 8
+        },
+        {
+          "id": "lmc_26_14",
+          "name": "Edwin Quarshie",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 70,
+          "att": 60,
+          "def": 71,
+          "phy": 74,
+          "pac": 68,
+          "tec": 69,
+          "num": 14
+        },
+        {
+          "id": "lmc_26_10",
+          "name": "Maki Tall",
+          "pos": [
+            "CAM",
+            "ST"
+          ],
+          "ovr": 69,
+          "att": 70,
+          "def": 42,
+          "phy": 68,
+          "pac": 76,
+          "tec": 72,
+          "num": 10
+        },
+        {
+          "id": "lmc_26_18",
+          "name": "Martin Rossignol",
+          "pos": [
+            "CM"
+          ],
+          "ovr": 67,
+          "att": 64,
+          "def": 63,
+          "phy": 66,
+          "pac": 70,
+          "tec": 70,
+          "num": 18
+        },
+        {
+          "id": "lmc_26_22",
+          "name": "Ali Ouchen",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 66,
+          "att": 65,
+          "def": 52,
+          "phy": 60,
+          "pac": 72,
+          "tec": 71,
+          "num": 22
+        },
+        {
+          "id": "lmc_26_9",
+          "name": "Dame Gueye",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 71,
+          "att": 73,
+          "def": 30,
+          "phy": 76,
+          "pac": 78,
+          "tec": 68,
+          "num": 9
+        },
+        {
+          "id": "lmc_26_11",
+          "name": "Zaïd Amir",
+          "pos": [
+            "LW",
+            "LM",
+            "RW"
+          ],
+          "ovr": 70,
+          "att": 69,
+          "def": 38,
+          "phy": 62,
+          "pac": 82,
+          "tec": 73,
+          "num": 11
+        },
+        {
+          "id": "lmc_26_7",
+          "name": "Erwan Colas",
+          "pos": [
+            "RW",
+            "ST"
+          ],
+          "ovr": 69,
+          "att": 70,
+          "def": 35,
+          "phy": 66,
+          "pac": 79,
+          "tec": 70,
+          "num": 7
+        },
+        {
+          "id": "lmc_26_19",
+          "name": "Antoine Rabillard",
+          "pos": [
+            "ST",
+            "RW"
+          ],
+          "ovr": 68,
+          "att": 70,
+          "def": 32,
+          "phy": 71,
+          "pac": 74,
+          "tec": 67,
+          "num": 19
+        },
+        {
+          "id": "lmc_26_27",
+          "name": "Arnold Vula",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 67,
+          "att": 68,
+          "def": 28,
+          "phy": 74,
+          "pac": 75,
+          "tec": 65,
+          "num": 27
+        }
+      ],
+      "manager": {
+        "name": "Patrick Videira",
+        "ovr": 72
+      }
+    },
+    {
+      "id": "hac2026",
+      "name": "Le Havre AC 2026-27",
+      "short": "HAC",
+      "flag": "🇫🇷",
+      "color": "#002B49",
+      "secondary": "#87CEEB",
+      "logo": "le_havre.png",
+      "stadium": "Stade Océane",
+      "players": [
+        {
+          "id": "hac_26_1",
+          "name": "Arthur Desmas",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 76,
+          "att": 10,
+          "def": 77,
+          "phy": 73,
+          "pac": 42,
+          "tec": 64,
+          "num": 1
+        },
+        {
+          "id": "hac_26_30",
+          "name": "Mathieu Gorgelin",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 70,
+          "att": 10,
+          "def": 71,
+          "phy": 68,
+          "pac": 38,
+          "tec": 56,
+          "num": 30
+        },
+        {
+          "id": "hac_26_50",
+          "name": "Paul Argney",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 65,
+          "att": 10,
+          "def": 66,
+          "phy": 64,
+          "pac": 40,
+          "tec": 52,
+          "num": 50
+        },
+        {
+          "id": "hac_26_93",
+          "name": "Arouna Sangante",
+          "pos": [
+            "CB",
+            "RB"
+          ],
+          "ovr": 77,
+          "att": 52,
+          "def": 78,
+          "phy": 80,
+          "pac": 76,
+          "tec": 68,
+          "num": 93
+        },
+        {
+          "id": "hac_26_4",
+          "name": "Gautier Lloris",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 76,
+          "att": 48,
+          "def": 77,
+          "phy": 78,
+          "pac": 62,
+          "tec": 67,
+          "num": 4
+        },
+        {
+          "id": "hac_26_6",
+          "name": "Étienne Youté Kinkoué",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 75,
+          "att": 40,
+          "def": 76,
+          "phy": 81,
+          "pac": 64,
+          "tec": 62,
+          "num": 6
+        },
+        {
+          "id": "hac_26_7",
+          "name": "Loïc Négo",
+          "pos": [
+            "RB",
+            "RM",
+            "RWB"
+          ],
+          "ovr": 74,
+          "att": 68,
+          "def": 71,
+          "phy": 72,
+          "pac": 82,
+          "tec": 73,
+          "num": 7
+        },
+        {
+          "id": "hac_26_27",
+          "name": "Christopher Operi",
+          "pos": [
+            "LB",
+            "LWB"
+          ],
+          "ovr": 76,
+          "att": 72,
+          "def": 74,
+          "phy": 75,
+          "pac": 80,
+          "tec": 75,
+          "num": 27
+        },
+        {
+          "id": "hac_26_18",
+          "name": "Yaniz Zouaoui",
+          "pos": [
+            "LB"
+          ],
+          "ovr": 71,
+          "att": 65,
+          "def": 70,
+          "phy": 69,
+          "pac": 78,
+          "tec": 68,
+          "num": 18
+        },
+        {
+          "id": "hac_26_12",
+          "name": "Mathéo Bodmer",
+          "pos": [
+            "CB"
+          ],
+          "ovr": 67,
+          "att": 38,
+          "def": 68,
+          "phy": 70,
+          "pac": 60,
+          "tec": 58,
+          "num": 12
+        },
+        {
+          "id": "hac_26_25",
+          "name": "Alois Confais",
+          "pos": [
+            "CDM",
+            "CM",
+            "RB"
+          ],
+          "ovr": 72,
+          "att": 62,
+          "def": 72,
+          "phy": 74,
+          "pac": 68,
+          "tec": 70,
+          "num": 25
+        },
+        {
+          "id": "hac_26_8",
+          "name": "Yassine Kechta",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 76,
+          "att": 73,
+          "def": 60,
+          "phy": 62,
+          "pac": 78,
+          "tec": 81,
+          "num": 8
+        },
+        {
+          "id": "hac_26_14",
+          "name": "Rassoul Ndiaye",
+          "pos": [
+            "CM",
+            "CAM"
+          ],
+          "ovr": 74,
+          "att": 72,
+          "def": 64,
+          "phy": 73,
+          "pac": 74,
+          "tec": 76,
+          "num": 14
+        },
+        {
+          "id": "hac_26_94",
+          "name": "Abdoulaye Touré",
+          "pos": [
+            "CDM",
+            "CM"
+          ],
+          "ovr": 75,
+          "att": 65,
+          "def": 76,
+          "phy": 82,
+          "pac": 63,
+          "tec": 73,
+          "num": 94
+        },
+        {
+          "id": "hac_26_19",
+          "name": "Daler Kuzyaev",
+          "pos": [
+            "CM",
+            "RM",
+            "CAM"
+          ],
+          "ovr": 75,
+          "att": 74,
+          "def": 66,
+          "phy": 72,
+          "pac": 72,
+          "tec": 78,
+          "num": 19
+        },
+        {
+          "id": "hac_26_28",
+          "name": "Antoine Joujou",
+          "pos": [
+            "LW",
+            "LM",
+            "ST"
+          ],
+          "ovr": 73,
+          "att": 72,
+          "def": 38,
+          "phy": 68,
+          "pac": 83,
+          "tec": 75,
+          "num": 28
+        },
+        {
+          "id": "hac_26_11",
+          "name": "Emmanuel Sabbi",
+          "pos": [
+            "RW",
+            "RM",
+            "ST"
+          ],
+          "ovr": 74,
+          "att": 74,
+          "def": 42,
+          "phy": 74,
+          "pac": 84,
+          "tec": 74,
+          "num": 11
+        },
+        {
+          "id": "hac_26_29",
+          "name": "Samuel Grandsir",
+          "pos": [
+            "RW",
+            "LW",
+            "RM"
+          ],
+          "ovr": 72,
+          "att": 71,
+          "def": 45,
+          "phy": 65,
+          "pac": 80,
+          "tec": 74,
+          "num": 29
+        },
+        {
+          "id": "hac_26_9",
+          "name": "Yann Kitala",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 71,
+          "att": 72,
+          "def": 32,
+          "phy": 78,
+          "pac": 76,
+          "tec": 68,
+          "num": 9
+        },
+        {
+          "id": "hac_26_10",
+          "name": "Josué Casimir",
+          "pos": [
+            "ST",
+            "RW"
+          ],
+          "ovr": 73,
+          "att": 73,
+          "def": 36,
+          "phy": 70,
+          "pac": 82,
+          "tec": 72,
+          "num": 10
+        }
+      ],
+      "manager": {
+        "name": "Didier Digard",
+        "ovr": 76
+      }
     },
-    {
-      "id": "pfc_26_17",
-      "name": "Adama Camara",
-      "pos": ["CM", "CDM"],
-      "ovr": 74,
-      "att": 68,
-      "def": 72,
-      "phy": 76,
-      "pac": 73,
-      "tec": 72,
-      "num": 17
-    },
-    {
-      "id": "pfc_26_18",
-      "name": "Jean-Philippe Krasso",
-      "pos": ["ST", "CAM"],
-      "ovr": 77,
-      "att": 78,
-      "def": 38,
-      "phy": 81,
-      "pac": 74,
-      "tec": 78,
-      "num": 18
-    },
-    {
-      "id": "pfc_26_11",
-      "name": "Nouha Dicko",
-      "pos": ["ST", "LW"],
-      "ovr": 73,
-      "att": 74,
-      "def": 35,
-      "phy": 75,
-      "pac": 80,
-      "tec": 71,
-      "num": 11
-    },
-    {
-      "id": "pfc_26_29",
-      "name": "Pierre-Yves Hamel",
-      "pos": ["ST"],
-      "ovr": 72,
-      "att": 74,
-      "def": 32,
-      "phy": 73,
-      "pac": 70,
-      "tec": 71,
-      "num": 29
-    },
-    {
-      "id": "pfc_26_7",
-      "name": "Alimami Gory",
-      "pos": ["LW", "LM", "ST"],
-      "ovr": 74,
-      "att": 73,
-      "def": 40,
-      "phy": 72,
-      "pac": 84,
-      "tec": 75,
-      "num": 7
-    },
-    {
-      "id": "pfc_26_26",
-      "name": "Lamine Diaby-Fadiga",
-      "pos": ["ST"],
-      "ovr": 71,
-      "att": 72,
-      "def": 30,
-      "phy": 74,
-      "pac": 76,
-      "tec": 69,
-      "num": 26
-    },
-    {
-      "id": "pfc_26_12",
-      "name": "Lamine Gueye",
-      "pos": ["RW", "RM"],
-      "ovr": 72,
-      "att": 71,
-      "def": 38,
-      "phy": 68,
-      "pac": 83,
-      "tec": 72,
-      "num": 12
-    },
-    {
-      "id": "pfc_26_20",
-      "name": "Julien López",
-      "pos": ["LW", "CAM", "LM"],
-      "ovr": 72,
-      "att": 72,
-      "def": 42,
-      "phy": 65,
-      "pac": 75,
-      "tec": 75,
-      "num": 20
-    }
-  ],
-  "manager": {
-    "name": "Stéphane Gilli",
-    "ovr": 76
-  }
-}
-,{
-  "id": "rcs2026",
-  "name": "RC Strasbourg Alsace 2026-27",
-  "short": "RCS",
-  "flag": "🇫🇷",
-  "color": "#0091D2",
-  "secondary": "#FFFFFF",
-  "logo": "strasbourg.png",
-  "stadium": "Stade de la Meinau",
-  "players": [
-    {
-      "id": "rcs_26_1",
-      "name": "Djordje Petrović",
-      "pos": ["GK"],
-      "ovr": 78,
-      "att": 10,
-      "def": 79,
-      "phy": 77,
-      "pac": 45,
-      "tec": 65,
-      "num": 1
-    },
-    {
-      "id": "rcs_26_30",
-      "name": "Karl-Johan Johnsson",
-      "pos": ["GK"],
-      "ovr": 73,
-      "att": 10,
-      "def": 74,
-      "phy": 72,
-      "pac": 40,
-      "tec": 58,
-      "num": 30
-    },
-    {
-      "id": "rcs_26_36",
-      "name": "Alaa Bellaarouch",
-      "pos": ["GK"],
-      "ovr": 71,
-      "att": 10,
-      "def": 72,
-      "phy": 70,
-      "pac": 42,
-      "tec": 56,
-      "num": 36
-    },
-    {
-      "id": "rcs_26_24",
-      "name": "Abakar Sylla",
-      "pos": ["CB"],
-      "ovr": 77,
-      "att": 45,
-      "def": 78,
-      "phy": 81,
-      "pac": 73,
-      "tec": 64,
-      "num": 24
-    },
-    {
-      "id": "rcs_26_5",
-      "name": "Lucas Perrin",
-      "pos": ["CB"],
-      "ovr": 76,
-      "att": 42,
-      "def": 77,
-      "phy": 76,
-      "pac": 65,
-      "tec": 66,
-      "num": 5
-    },
-    {
-      "id": "rcs_26_22",
-      "name": "Guéla Doué",
-      "pos": ["RB", "RWB"],
-      "ovr": 76,
-      "att": 68,
-      "def": 74,
-      "phy": 75,
-      "pac": 82,
-      "tec": 73,
-      "num": 22
-    },
-    {
-      "id": "rcs_26_3",
-      "name": "Thomas Delaine",
-      "pos": ["LB", "LWB"],
-      "ovr": 74,
-      "att": 68,
-      "def": 72,
-      "phy": 70,
-      "pac": 81,
-      "tec": 72,
-      "num": 3
-    },
-    {
-      "id": "rcs_26_2",
-      "name": "Saïdou Sow",
-      "pos": ["CB"],
-      "ovr": 74,
-      "att": 40,
-      "def": 75,
-      "phy": 77,
-      "pac": 66,
-      "tec": 60,
-      "num": 2
-    },
-    {
-      "id": "rcs_26_14",
-      "name": "Ismaël Doukouré",
-      "pos": ["CB", "CDM"],
-      "ovr": 76,
-      "att": 55,
-      "def": 77,
-      "phy": 78,
-      "pac": 74,
-      "tec": 70,
-      "num": 14
-    },
-    {
-      "id": "rcs_26_77",
-      "name": "Eduard Sobol",
-      "pos": ["LB", "LWB"],
-      "ovr": 73,
-      "att": 66,
-      "def": 71,
-      "phy": 72,
-      "pac": 77,
-      "tec": 70,
-      "num": 77
-    },
-    {
-      "id": "rcs_26_19",
-      "name": "Habib Diarra",
-      "pos": ["CM", "CAM", "RM"],
-      "ovr": 79,
-      "att": 76,
-      "def": 70,
-      "phy": 79,
-      "pac": 84,
-      "tec": 80,
-      "num": 19
-    },
-    {
-      "id": "rcs_26_18",
-      "name": "Félix Lemaréchal",
-      "pos": ["CM", "CAM"],
-      "ovr": 74,
-      "att": 71,
-      "def": 65,
-      "phy": 68,
-      "pac": 75,
-      "tec": 77,
-      "num": 18
-    },
-    {
-      "id": "rcs_26_8",
-      "name": "Andrey Santos",
-      "pos": ["CM", "CDM"],
-      "ovr": 78,
-      "att": 73,
-      "def": 76,
-      "phy": 78,
-      "pac": 74,
-      "tec": 79,
-      "num": 8
-    },
-    {
-      "id": "rcs_26_6",
-      "name": "Felix Nzouango",
-      "pos": ["CB", "CDM"],
-      "ovr": 68,
-      "att": 40,
-      "def": 69,
-      "phy": 72,
-      "pac": 62,
-      "tec": 58,
-      "num": 6
-    },
-    {
-      "id": "rcs_26_10",
-      "name": "Emanuel Emegha",
-      "pos": ["ST"],
-      "ovr": 77,
-      "att": 78,
-      "def": 35,
-      "phy": 78,
-      "pac": 86,
-      "tec": 72,
-      "num": 10
-    },
-    {
-      "id": "rcs_26_11",
-      "name": "Moïse Sahi Dion",
-      "pos": ["ST", "LW"],
-      "ovr": 73,
-      "att": 74,
-      "def": 32,
-      "phy": 68,
-      "pac": 80,
-      "tec": 74,
-      "num": 11
-    },
-    {
-      "id": "rcs_26_26",
-      "name": "Dilane Bakwa",
-      "pos": ["RW", "RM", "LW"],
-      "ovr": 77,
-      "att": 76,
-      "def": 42,
-      "phy": 70,
-      "pac": 85,
-      "tec": 81,
-      "num": 26
-    },
-    {
-      "id": "rcs_26_20",
-      "name": "Oscar Perea",
-      "pos": ["LW", "RW"],
-      "ovr": 72,
-      "att": 71,
-      "def": 38,
-      "phy": 66,
-      "pac": 82,
-      "tec": 74,
-      "num": 20
-    },
-    {
-      "id": "rcs_26_9",
-      "name": "Miloš Luković",
-      "pos": ["ST"],
-      "ovr": 74,
-      "att": 75,
-      "def": 30,
-      "phy": 74,
-      "pac": 76,
-      "tec": 72,
-      "num": 9
-    },
-    {
-      "id": "rcs_26_17",
-      "name": "Pape Daouda Diong",
-      "pos": ["CDM", "CM"],
-      "ovr": 71,
-      "att": 62,
-      "def": 72,
-      "phy": 75,
-      "pac": 70,
-      "tec": 68,
-      "num": 17
-    }
-  ],
-  "manager": {
-    "name": "Liam Rosenior",
-    "ovr": 77
-  }
-}
-,{
-  "id": "sb29_2026",
-  "name": "Stade Brestois 29 2026-27",
-  "short": "SB29",
-  "flag": "🇫🇷",
-  "color": "#E30613",
-  "secondary": "#FFFFFF",
-  "logo": "brest.png",
-  "stadium": "Stade Francis-Le Blé",
-  "players": [
-    {
-      "id": "sb29_26_40",
-      "name": "Marco Bizot",
-      "pos": ["GK"],
-      "ovr": 79,
-      "att": 10,
-      "def": 80,
-      "phy": 78,
-      "pac": 42,
-      "tec": 62,
-      "num": 40
-    },
-    {
-      "id": "sb29_26_30",
-      "name": "Grégoire Coudert",
-      "pos": ["GK"],
-      "ovr": 68,
-      "att": 10,
-      "def": 69,
-      "phy": 66,
-      "pac": 38,
-      "tec": 52,
-      "num": 30
-    },
-    {
-      "id": "sb29_26_50",
-      "name": "Noah Jauny",
-      "pos": ["GK"],
-      "ovr": 65,
-      "att": 10,
-      "def": 66,
-      "phy": 64,
-      "pac": 40,
-      "tec": 50,
-      "num": 50
-    },
-    {
-      "id": "sb29_26_5",
-      "name": "Brendan Chardonnet",
-      "pos": ["CB"],
-      "ovr": 78,
-      "att": 45,
-      "def": 79,
-      "phy": 80,
-      "pac": 62,
-      "tec": 66,
-      "num": 5
-    },
-    {
-      "id": "sb29_26_3",
-      "name": "Abdoulaye Ndiaye",
-      "pos": ["CB"],
-      "ovr": 75,
-      "att": 42,
-      "def": 76,
-      "phy": 78,
-      "pac": 68,
-      "tec": 62,
-      "num": 3
-    },
-    {
-      "id": "sb29_26_25",
-      "name": "Julien Le Cardinal",
-      "pos": ["CB", "RB"],
-      "ovr": 74,
-      "att": 48,
-      "def": 74,
-      "phy": 76,
-      "pac": 72,
-      "tec": 64,
-      "num": 25
-    },
-    {
-      "id": "sb29_26_27",
-      "name": "Kenny Lala",
-      "pos": ["RB", "RWB"],
-      "ovr": 77,
-      "att": 70,
-      "def": 75,
-      "phy": 74,
-      "pac": 76,
-      "tec": 76,
-      "num": 27
-    },
-    {
-      "id": "sb29_26_22",
-      "name": "Massadio Haïdara",
-      "pos": ["LB", "CB"],
-      "ovr": 74,
-      "att": 62,
-      "def": 75,
-      "phy": 76,
-      "pac": 73,
-      "tec": 68,
-      "num": 22
-    },
-    {
-      "id": "sb29_26_2",
-      "name": "Bradley Locko",
-      "pos": ["LB", "LWB"],
-      "ovr": 78,
-      "att": 72,
-      "def": 76,
-      "phy": 77,
-      "pac": 83,
-      "tec": 75,
-      "num": 2
-    },
-    {
-      "id": "sb29_26_12",
-      "name": "Luck Zogbé",
-      "pos": ["RB", "LB"],
-      "ovr": 70,
-      "att": 62,
-      "def": 69,
-      "phy": 71,
-      "pac": 78,
-      "tec": 66,
-      "num": 12
-    },
-    {
-      "id": "sb29_26_20",
-      "name": "Pierre Lees-Melou",
-      "pos": ["CDM", "CM"],
-      "ovr": 81,
-      "att": 76,
-      "def": 80,
-      "phy": 80,
-      "pac": 68,
-      "tec": 82,
-      "num": 20
-    },
-    {
-      "id": "sb29_26_8",
-      "name": "Hugo Magnetti",
-      "pos": ["CM", "CDM"],
-      "ovr": 77,
-      "att": 72,
-      "def": 75,
-      "phy": 76,
-      "pac": 72,
-      "tec": 77,
-      "num": 8
-    },
-    {
-      "id": "sb29_26_45",
-      "name": "Mahdi Camara",
-      "pos": ["CM", "CAM"],
-      "ovr": 78,
-      "att": 75,
-      "def": 74,
-      "phy": 79,
-      "pac": 75,
-      "tec": 76,
-      "num": 45
-    },
-    {
-      "id": "sb29_26_21",
-      "name": "Romain Faivre",
-      "pos": ["CAM", "RM", "RW"],
-      "ovr": 77,
-      "att": 76,
-      "def": 45,
-      "phy": 66,
-      "pac": 76,
-      "tec": 82,
-      "num": 21
-    },
-    {
-      "id": "sb29_26_28",
-      "name": "Jonas Martin",
-      "pos": ["CM", "CDM"],
-      "ovr": 74,
-      "att": 68,
-      "def": 73,
-      "phy": 72,
-      "pac": 60,
-      "tec": 75,
-      "num": 28
-    },
-    {
-      "id": "sb29_26_10",
-      "name": "Romain Del Castillo",
-      "pos": ["RW", "RM", "CAM"],
-      "ovr": 79,
-      "att": 78,
-      "def": 48,
-      "phy": 68,
-      "pac": 78,
-      "tec": 83,
-      "num": 10
-    },
-    {
-      "id": "sb29_26_17",
-      "name": "Abdallah Sima",
-      "pos": ["LW", "RW", "ST"],
-      "ovr": 77,
-      "att": 77,
-      "def": 40,
-      "phy": 76,
-      "pac": 85,
-      "tec": 75,
-      "num": 17
-    },
-    {
-      "id": "sb29_26_19",
-      "name": "Ludovic Ajorque",
-      "pos": ["ST"],
-      "ovr": 77,
-      "att": 78,
-      "def": 42,
-      "phy": 86,
-      "pac": 64,
-      "tec": 73,
-      "num": 19
-    },
-    {
-      "id": "sb29_26_11",
-      "name": "Axel Camblan",
-      "pos": ["RW", "LW"],
-      "ovr": 71,
-      "att": 70,
-      "def": 38,
-      "phy": 65,
-      "pac": 80,
-      "tec": 72,
-      "num": 11
-    },
-    {
-      "id": "sb29_26_14",
-      "name": "Mama Baldé",
-      "pos": ["ST", "RW"],
-      "ovr": 75,
-      "att": 76,
-      "def": 38,
-      "phy": 77,
-      "pac": 84,
-      "tec": 74,
-      "num": 14
-    }
-  ],
-  "manager": {
-    "name": "Éric Roy",
-    "ovr": 79
-  }
-}
-,{
-  "id": "srf2026",
-  "name": "Stade Rennais FC 2026-27",
-  "short": "REN",
-  "flag": "🇫🇷",
-  "color": "#E30613",
-  "secondary": "#000000",
-  "logo": "rennes.png",
-  "stadium": "Roazhon Park",
-  "players": [
-    {
-      "id": "srf_26_30",
-      "name": "Steve Mandanda",
-      "pos": ["GK"],
-      "ovr": 78,
-      "att": 10,
-      "def": 79,
-      "phy": 75,
-      "pac": 40,
-      "tec": 68,
-      "num": 30
-    },
-    {
-      "id": "srf_26_80",
-      "name": "Dogan Alemdar",
-      "pos": ["GK"],
-      "ovr": 74,
-      "att": 10,
-      "def": 75,
-      "phy": 72,
-      "pac": 44,
-      "tec": 60,
-      "num": 80
-    },
-    {
-      "id": "srf_26_40",
-      "name": "Geoffrey Lembet",
-      "pos": ["GK"],
-      "ovr": 66,
-      "att": 10,
-      "def": 67,
-      "phy": 65,
-      "pac": 38,
-      "tec": 50,
-      "num": 40
-    },
-    {
-      "id": "srf_26_15",
-      "name": "Christopher Wooh",
-      "pos": ["CB"],
-      "ovr": 77,
-      "att": 42,
-      "def": 78,
-      "phy": 81,
-      "pac": 68,
-      "tec": 64,
-      "num": 15
-    },
-    {
-      "id": "srf_26_18",
-      "name": "Leo Østigård",
-      "pos": ["CB"],
-      "ovr": 76,
-      "att": 48,
-      "def": 77,
-      "phy": 82,
-      "pac": 66,
-      "tec": 62,
-      "num": 18
-    },
-    {
-      "id": "srf_26_4",
-      "name": "Mikayil Faye",
-      "pos": ["CB", "LB"],
-      "ovr": 76,
-      "att": 55,
-      "def": 76,
-      "phy": 78,
-      "pac": 75,
-      "tec": 68,
-      "num": 4
-    },
-    {
-      "id": "srf_26_3",
-      "name": "Adrien Truffert",
-      "pos": ["LB", "LWB"],
-      "ovr": 79,
-      "att": 73,
-      "def": 76,
-      "phy": 75,
-      "pac": 82,
-      "tec": 77,
-      "num": 3
-    },
-    {
-      "id": "srf_26_22",
-      "name": "Lorenz Assignon",
-      "pos": ["RB", "RWB"],
-      "ovr": 77,
-      "att": 72,
-      "def": 73,
-      "phy": 74,
-      "pac": 85,
-      "tec": 75,
-      "num": 22
-    },
-    {
-      "id": "srf_26_36",
-      "name": "Alidu Seidu",
-      "pos": ["CB", "RB"],
-      "ovr": 76,
-      "att": 50,
-      "def": 77,
-      "phy": 79,
-      "pac": 76,
-      "tec": 65,
-      "num": 36
-    },
-    {
-      "id": "srf_26_33",
-      "name": "Hans Hateboer",
-      "pos": ["RB", "RWB", "CB"],
-      "ovr": 76,
-      "att": 68,
-      "def": 75,
-      "phy": 78,
-      "pac": 77,
-      "tec": 72,
-      "num": 33
-    },
-    {
-      "id": "srf_26_6",
-      "name": "Azor Matusiwa",
-      "pos": ["CDM", "CM"],
-      "ovr": 78,
-      "att": 65,
-      "def": 79,
-      "phy": 80,
-      "pac": 72,
-      "tec": 75,
-      "num": 6
-    },
-    {
-      "id": "srf_26_8",
-      "name": "Baptiste Santamaria",
-      "pos": ["CDM", "CM"],
-      "ovr": 77,
-      "att": 68,
-      "def": 78,
-      "phy": 77,
-      "pac": 65,
-      "tec": 76,
-      "num": 8
-    },
-    {
-      "id": "srf_26_28",
-      "name": "Glen Kamara",
-      "pos": ["CM", "CDM"],
-      "ovr": 77,
-      "att": 70,
-      "def": 74,
-      "phy": 75,
-      "pac": 73,
-      "tec": 79,
-      "num": 28
-    },
-    {
-      "id": "srf_26_11",
-      "name": "Ludovic Blas",
-      "pos": ["CAM", "RW", "RM"],
-      "ovr": 79,
-      "att": 79,
-      "def": 48,
-      "phy": 70,
-      "pac": 77,
-      "tec": 84,
-      "num": 11
-    },
-    {
-      "id": "srf_26_38",
-      "name": "Djaoui Cissé",
-      "pos": ["CM", "CDM"],
-      "ovr": 71,
-      "att": 64,
-      "def": 70,
-      "phy": 72,
-      "pac": 71,
-      "tec": 71,
-      "num": 38
-    },
-    {
-      "id": "srf_26_7",
-      "name": "Albert Grønbæk",
-      "pos": ["CAM", "CM", "LW"],
-      "ovr": 78,
-      "att": 77,
-      "def": 55,
-      "phy": 72,
-      "pac": 79,
-      "tec": 81,
-      "num": 7
-    },
-    {
-      "id": "srf_26_9",
-      "name": "Arnaud Kalimuendo",
-      "pos": ["ST"],
-      "ovr": 79,
-      "att": 80,
-      "def": 38,
-      "phy": 74,
-      "pac": 83,
-      "tec": 78,
-      "num": 9
-    },
-    {
-      "id": "srf_26_19",
-      "name": "Henrik Meister",
-      "pos": ["ST"],
-      "ovr": 73,
-      "att": 74,
-      "def": 32,
-      "phy": 77,
-      "pac": 81,
-      "tec": 70,
-      "num": 19
-    },
-    {
-      "id": "srf_26_10",
-      "name": "Amine Gouiri",
-      "pos": ["ST", "LW", "CAM"],
-      "ovr": 80,
-      "att": 81,
-      "def": 40,
-      "phy": 72,
-      "pac": 80,
-      "tec": 83,
-      "num": 10
-    },
-    {
-      "id": "srf_26_17",
-      "name": "Jota",
-      "pos": ["LW", "RW"],
-      "ovr": 78,
-      "att": 77,
-      "def": 38,
-      "phy": 66,
-      "pac": 84,
-      "tec": 82,
-      "num": 17
-    }
-  ],
-  "manager": {
-    "name": "Jorge Sampaoli",
-    "ovr": 80
-  }
-}
-,{
-  "id": "tfc2026",
-  "name": "Toulouse FC 2026-27",
-  "short": "TFC",
-  "flag": "🇫🇷",
-  "color": "#472175",
-  "secondary": "#FFFFFF",
-  "logo": "toulouse.png",
-  "stadium": "Stadium de Toulouse",
-  "players": [
-    {
-      "id": "tfc_26_50",
-      "name": "Guillaume Restes",
-      "pos": ["GK"],
-      "ovr": 79,
-      "att": 10,
-      "def": 80,
-      "phy": 75,
-      "pac": 45,
-      "tec": 68,
-      "num": 50
-    },
-    {
-      "id": "tfc_26_30",
-      "name": "Álex Domínguez",
-      "pos": ["GK"],
-      "ovr": 71,
-      "att": 10,
-      "def": 72,
-      "phy": 68,
-      "pac": 40,
-      "tec": 58,
-      "num": 30
-    },
-    {
-      "id": "tfc_26_16",
-      "name": "Kjetil Haug",
-      "pos": ["GK"],
-      "ovr": 68,
-      "att": 10,
-      "def": 69,
-      "phy": 66,
-      "pac": 38,
-      "tec": 52,
-      "num": 16
-    },
-    {
-      "id": "tfc_26_2",
-      "name": "Rasmus Nicolaisen",
-      "pos": ["CB"],
-      "ovr": 77,
-      "att": 45,
-      "def": 78,
-      "phy": 82,
-      "pac": 60,
-      "tec": 65,
-      "num": 2
-    },
-    {
-      "id": "tfc_26_6",
-      "name": "Mark McKenzie",
-      "pos": ["CB"],
-      "ovr": 76,
-      "att": 42,
-      "def": 77,
-      "phy": 78,
-      "pac": 72,
-      "tec": 64,
-      "num": 6
-    },
-    {
-      "id": "tfc_26_4",
-      "name": "Charlie Cresswell",
-      "pos": ["CB"],
-      "ovr": 75,
-      "att": 40,
-      "def": 76,
-      "phy": 80,
-      "pac": 64,
-      "tec": 60,
-      "num": 4
-    },
-    {
-      "id": "tfc_26_12",
-      "name": "Warren Kamanzi",
-      "pos": ["RB", "RWB", "LB"],
-      "ovr": 74,
-      "att": 68,
-      "def": 71,
-      "phy": 72,
-      "pac": 83,
-      "tec": 71,
-      "num": 12
-    },
-    {
-      "id": "tfc_26_19",
-      "name": "Djibril Sidibé",
-      "pos": ["RB", "CB"],
-      "ovr": 75,
-      "att": 68,
-      "def": 76,
-      "phy": 76,
-      "pac": 70,
-      "tec": 73,
-      "num": 19
-    },
-    {
-      "id": "tfc_26_17",
-      "name": "Gabriel Suazo",
-      "pos": ["LB", "LWB", "LM"],
-      "ovr": 77,
-      "att": 73,
-      "def": 75,
-      "phy": 76,
-      "pac": 78,
-      "tec": 77,
-      "num": 17
-    },
-    {
-      "id": "tfc_26_26",
-      "name": "Ylies Aradj",
-      "pos": ["LB"],
-      "ovr": 67,
-      "att": 60,
-      "def": 66,
-      "phy": 65,
-      "pac": 75,
-      "tec": 64,
-      "num": 26
-    },
-    {
-      "id": "tfc_26_8",
-      "name": "Vincent Sierro",
-      "pos": ["CM", "CDM"],
-      "ovr": 78,
-      "att": 75,
-      "def": 76,
-      "phy": 77,
-      "pac": 68,
-      "tec": 80,
-      "num": 8
-    },
-    {
-      "id": "tfc_26_23",
-      "name": "Cristian Cásseres Jr.",
-      "pos": ["CM", "CDM"],
-      "ovr": 76,
-      "att": 72,
-      "def": 74,
-      "phy": 76,
-      "pac": 75,
-      "tec": 77,
-      "num": 23
-    },
-    {
-      "id": "tfc_26_5",
-      "name": "Denis Genreau",
-      "pos": ["CM", "CAM"],
-      "ovr": 72,
-      "att": 70,
-      "def": 68,
-      "phy": 70,
-      "pac": 72,
-      "tec": 74,
-      "num": 5
-    },
-    {
-      "id": "tfc_26_34",
-      "name": "Noah Lahmadi",
-      "pos": ["CM"],
-      "ovr": 67,
-      "att": 62,
-      "def": 65,
-      "phy": 66,
-      "pac": 68,
-      "tec": 70,
-      "num": 34
-    },
-    {
-      "id": "tfc_26_21",
-      "name": "Niklas Schmidt",
-      "pos": ["CAM", "CM"],
-      "ovr": 74,
-      "att": 73,
-      "def": 55,
-      "phy": 71,
-      "pac": 66,
-      "tec": 79,
-      "num": 21
-    },
-    {
-      "id": "tfc_26_80",
-      "name": "Shavy Babicka",
-      "pos": ["RW", "RM", "ST"],
-      "ovr": 75,
-      "att": 74,
-      "def": 42,
-      "phy": 73,
-      "pac": 88,
-      "tec": 75,
-      "num": 80
-    },
-    {
-      "id": "tfc_26_15",
-      "name": "Aron Dønnum",
-      "pos": ["RW", "RM", "LWB"],
-      "ovr": 75,
-      "att": 74,
-      "def": 58,
-      "phy": 75,
-      "pac": 79,
-      "tec": 77,
-      "num": 15
-    },
-    {
-      "id": "tfc_26_10",
-      "name": "Yann Gboho",
-      "pos": ["LW", "CAM", "LM"],
-      "ovr": 77,
-      "att": 76,
-      "def": 40,
-      "phy": 68,
-      "pac": 83,
-      "tec": 82,
-      "num": 10
-    },
-    {
-      "id": "tfc_26_9",
-      "name": "Frank Magri",
-      "pos": ["ST", "LW"],
-      "ovr": 74,
-      "att": 75,
-      "def": 38,
-      "phy": 76,
-      "pac": 78,
-      "tec": 73,
-      "num": 9
-    },
-    {
-      "id": "tfc_26_13",
-      "name": "Joshua King",
-      "pos": ["ST", "LW"],
-      "ovr": 74,
-      "att": 75,
-      "def": 35,
-      "phy": 77,
-      "pac": 79,
-      "tec": 74,
-      "num": 13
-    }
-  ],
-  "manager": {
-    "name": "Carles Martínez Novell",
-    "ovr": 77
-  }
-}
-,{
-  "id": "lmc2026",
-  "name": "Le Mans FC 2026-27",
-  "short": "LMF",
-  "flag": "🇫🇷",
-  "color": "#D31127",
-  "secondary": "#FFD700",
-  "logo": "lemans.png",
-  "stadium": "Stade Marie-Marvingt",
-  "players": [
-    {
-      "id": "lmc_26_16",
-      "name": "Ewan Hatfout",
-      "pos": ["GK"],
-      "ovr": 69,
-      "att": 10,
-      "def": 70,
-      "phy": 67,
-      "pac": 40,
-      "tec": 56,
-      "num": 16
-    },
-    {
-      "id": "lmc_26_1",
-      "name": "Nicolas Kocik",
-      "pos": ["GK"],
-      "ovr": 68,
-      "att": 10,
-      "def": 69,
-      "phy": 66,
-      "pac": 38,
-      "tec": 54,
-      "num": 1
-    },
-    {
-      "id": "lmc_26_40",
-      "name": "Augustin Delbecque",
-      "pos": ["GK"],
-      "ovr": 62,
-      "att": 10,
-      "def": 63,
-      "phy": 60,
-      "pac": 35,
-      "tec": 48,
-      "num": 40
-    },
-    {
-      "id": "lmc_26_5",
-      "name": "Harold Voyer",
-      "pos": ["CB"],
-      "ovr": 71,
-      "att": 40,
-      "def": 72,
-      "phy": 75,
-      "pac": 62,
-      "tec": 58,
-      "num": 5
-    },
-    {
-      "id": "lmc_26_21",
-      "name": "Samuel Yohou",
-      "pos": ["CB"],
-      "ovr": 70,
-      "att": 38,
-      "def": 71,
-      "phy": 77,
-      "pac": 58,
-      "tec": 56,
-      "num": 21
-    },
-    {
-      "id": "lmc_26_28",
-      "name": "Théo Eyoum",
-      "pos": ["CB", "RB"],
-      "ovr": 69,
-      "att": 42,
-      "def": 70,
-      "phy": 73,
-      "pac": 65,
-      "tec": 60,
-      "num": 28
-    },
-    {
-      "id": "lmc_26_2",
-      "name": "Alexandre Lauray",
-      "pos": ["RB", "CB"],
-      "ovr": 68,
-      "att": 55,
-      "def": 68,
-      "phy": 70,
-      "pac": 72,
-      "tec": 64,
-      "num": 2
-    },
-    {
-      "id": "lmc_26_23",
-      "name": "Mike Bettinger",
-      "pos": ["LB"],
-      "ovr": 68,
-      "att": 60,
-      "def": 67,
-      "phy": 66,
-      "pac": 75,
-      "tec": 65,
-      "num": 23
-    },
-    {
-      "id": "lmc_26_12",
-      "name": "Anthony Ribelin",
-      "pos": ["RB", "RM"],
-      "ovr": 67,
-      "att": 62,
-      "def": 65,
-      "phy": 68,
-      "pac": 74,
-      "tec": 66,
-      "num": 12
-    },
-    {
-      "id": "lmc_26_6",
-      "name": "Maxence Derrien",
-      "pos": ["CB", "CDM"],
-      "ovr": 67,
-      "att": 45,
-      "def": 68,
-      "phy": 72,
-      "pac": 56,
-      "tec": 62,
-      "num": 6
-    },
-    {
-      "id": "lmc_26_8",
-      "name": "Alexandre Vincent",
-      "pos": ["CM", "CAM", "LM"],
-      "ovr": 71,
-      "att": 70,
-      "def": 58,
-      "phy": 65,
-      "pac": 73,
-      "tec": 74,
-      "num": 8
-    },
-    {
-      "id": "lmc_26_14",
-      "name": "Edwin Quarshie",
-      "pos": ["CDM", "CM"],
-      "ovr": 70,
-      "att": 60,
-      "def": 71,
-      "phy": 74,
-      "pac": 68,
-      "tec": 69,
-      "num": 14
-    },
-    {
-      "id": "lmc_26_10",
-      "name": "Maki Tall",
-      "pos": ["CAM", "ST"],
-      "ovr": 69,
-      "att": 70,
-      "def": 42,
-      "phy": 68,
-      "pac": 76,
-      "tec": 72,
-      "num": 10
-    },
-    {
-      "id": "lmc_26_18",
-      "name": "Martin Rossignol",
-      "pos": ["CM"],
-      "ovr": 67,
-      "att": 64,
-      "def": 63,
-      "phy": 66,
-      "pac": 70,
-      "tec": 70,
-      "num": 18
-    },
-    {
-      "id": "lmc_26_22",
-      "name": "Ali Ouchen",
-      "pos": ["CM", "CAM"],
-      "ovr": 66,
-      "att": 65,
-      "def": 52,
-      "phy": 60,
-      "pac": 72,
-      "tec": 71,
-      "num": 22
-    },
-    {
-      "id": "lmc_26_9",
-      "name": "Dame Gueye",
-      "pos": ["ST"],
-      "ovr": 71,
-      "att": 73,
-      "def": 30,
-      "phy": 76,
-      "pac": 78,
-      "tec": 68,
-      "num": 9
-    },
-    {
-      "id": "lmc_26_11",
-      "name": "Zaïd Amir",
-      "pos": ["LW", "LM", "RW"],
-      "ovr": 70,
-      "att": 69,
-      "def": 38,
-      "phy": 62,
-      "pac": 82,
-      "tec": 73,
-      "num": 11
-    },
-    {
-      "id": "lmc_26_7",
-      "name": "Erwan Colas",
-      "pos": ["RW", "ST"],
-      "ovr": 69,
-      "att": 70,
-      "def": 35,
-      "phy": 66,
-      "pac": 79,
-      "tec": 70,
-      "num": 7
-    },
-    {
-      "id": "lmc_26_19",
-      "name": "Antoine Rabillard",
-      "pos": ["ST", "RW"],
-      "ovr": 68,
-      "att": 70,
-      "def": 32,
-      "phy": 71,
-      "pac": 74,
-      "tec": 67,
-      "num": 19
-    },
-    {
-      "id": "lmc_26_27",
-      "name": "Arnold Vula",
-      "pos": ["ST"],
-      "ovr": 67,
-      "att": 68,
-      "def": 28,
-      "phy": 74,
-      "pac": 75,
-      "tec": 65,
-      "num": 27
-    }
-  ],
-  "manager": {
-    "name": "Patrick Videira",
-    "ovr": 72
-  }
-}
-,{
-  "id": "hac2026",
-  "name": "Le Havre AC 2026-27",
-  "short": "HAC",
-  "flag": "🇫🇷",
-  "color": "#002B49",
-  "secondary": "#87CEEB",
-  "logo": "le_havre.png",
-  "stadium": "Stade Océane",
-  "players": [
-    {
-      "id": "hac_26_1",
-      "name": "Arthur Desmas",
-      "pos": ["GK"],
-      "ovr": 76,
-      "att": 10,
-      "def": 77,
-      "phy": 73,
-      "pac": 42,
-      "tec": 64,
-      "num": 1
-    },
-    {
-      "id": "hac_26_30",
-      "name": "Mathieu Gorgelin",
-      "pos": ["GK"],
-      "ovr": 70,
-      "att": 10,
-      "def": 71,
-      "phy": 68,
-      "pac": 38,
-      "tec": 56,
-      "num": 30
-    },
-    {
-      "id": "hac_26_50",
-      "name": "Paul Argney",
-      "pos": ["GK"],
-      "ovr": 65,
-      "att": 10,
-      "def": 66,
-      "phy": 64,
-      "pac": 40,
-      "tec": 52,
-      "num": 50
-    },
-    {
-      "id": "hac_26_93",
-      "name": "Arouna Sangante",
-      "pos": ["CB", "RB"],
-      "ovr": 77,
-      "att": 52,
-      "def": 78,
-      "phy": 80,
-      "pac": 76,
-      "tec": 68,
-      "num": 93
-    },
-    {
-      "id": "hac_26_4",
-      "name": "Gautier Lloris",
-      "pos": ["CB"],
-      "ovr": 76,
-      "att": 48,
-      "def": 77,
-      "phy": 78,
-      "pac": 62,
-      "tec": 67,
-      "num": 4
-    },
-    {
-      "id": "hac_26_6",
-      "name": "Étienne Youté Kinkoué",
-      "pos": ["CB"],
-      "ovr": 75,
-      "att": 40,
-      "def": 76,
-      "phy": 81,
-      "pac": 64,
-      "tec": 62,
-      "num": 6
-    },
-    {
-      "id": "hac_26_7",
-      "name": "Loïc Négo",
-      "pos": ["RB", "RM", "RWB"],
-      "ovr": 74,
-      "att": 68,
-      "def": 71,
-      "phy": 72,
-      "pac": 82,
-      "tec": 73,
-      "num": 7
-    },
-    {
-      "id": "hac_26_27",
-      "name": "Christopher Operi",
-      "pos": ["LB", "LWB"],
-      "ovr": 76,
-      "att": 72,
-      "def": 74,
-      "phy": 75,
-      "pac": 80,
-      "tec": 75,
-      "num": 27
-    },
-    {
-      "id": "hac_26_18",
-      "name": "Yaniz Zouaoui",
-      "pos": ["LB"],
-      "ovr": 71,
-      "att": 65,
-      "def": 70,
-      "phy": 69,
-      "pac": 78,
-      "tec": 68,
-      "num": 18
-    },
-    {
-      "id": "hac_26_12",
-      "name": "Mathéo Bodmer",
-      "pos": ["CB"],
-      "ovr": 67,
-      "att": 38,
-      "def": 68,
-      "phy": 70,
-      "pac": 60,
-      "tec": 58,
-      "num": 12
-    },
-    {
-      "id": "hac_26_25",
-      "name": "Alois Confais",
-      "pos": ["CDM", "CM", "RB"],
-      "ovr": 72,
-      "att": 62,
-      "def": 72,
-      "phy": 74,
-      "pac": 68,
-      "tec": 70,
-      "num": 25
-    },
-    {
-      "id": "hac_26_8",
-      "name": "Yassine Kechta",
-      "pos": ["CM", "CAM"],
-      "ovr": 76,
-      "att": 73,
-      "def": 60,
-      "phy": 62,
-      "pac": 78,
-      "tec": 81,
-      "num": 8
-    },
-    {
-      "id": "hac_26_14",
-      "name": "Rassoul Ndiaye",
-      "pos": ["CM", "CAM"],
-      "ovr": 74,
-      "att": 72,
-      "def": 64,
-      "phy": 73,
-      "pac": 74,
-      "tec": 76,
-      "num": 14
-    },
-    {
-      "id": "hac_26_94",
-      "name": "Abdoulaye Touré",
-      "pos": ["CDM", "CM"],
-      "ovr": 75,
-      "att": 65,
-      "def": 76,
-      "phy": 82,
-      "pac": 63,
-      "tec": 73,
-      "num": 94
-    },
-    {
-      "id": "hac_26_19",
-      "name": "Daler Kuzyaev",
-      "pos": ["CM", "RM", "CAM"],
-      "ovr": 75,
-      "att": 74,
-      "def": 66,
-      "phy": 72,
-      "pac": 72,
-      "tec": 78,
-      "num": 19
-    },
-    {
-      "id": "hac_26_28",
-      "name": "Antoine Joujou",
-      "pos": ["LW", "LM", "ST"],
-      "ovr": 73,
-      "att": 72,
-      "def": 38,
-      "phy": 68,
-      "pac": 83,
-      "tec": 75,
-      "num": 28
-    },
-    {
-      "id": "hac_26_11",
-      "name": "Emmanuel Sabbi",
-      "pos": ["RW", "RM", "ST"],
-      "ovr": 74,
-      "att": 74,
-      "def": 42,
-      "phy": 74,
-      "pac": 84,
-      "tec": 74,
-      "num": 11
-    },
-    {
-      "id": "hac_26_29",
-      "name": "Samuel Grandsir",
-      "pos": ["RW", "LW", "RM"],
-      "ovr": 72,
-      "att": 71,
-      "def": 45,
-      "phy": 65,
-      "pac": 80,
-      "tec": 74,
-      "num": 29
-    },
-    {
-      "id": "hac_26_9",
-      "name": "Yann Kitala",
-      "pos": ["ST"],
-      "ovr": 71,
-      "att": 72,
-      "def": 32,
-      "phy": 78,
-      "pac": 76,
-      "tec": 68,
-      "num": 9
-    },
-    {
-      "id": "hac_26_10",
-      "name": "Josué Casimir",
-      "pos": ["ST", "RW"],
-      "ovr": 73,
-      "att": 73,
-      "def": 36,
-      "phy": 70,
-      "pac": 82,
-      "tec": 72,
-      "num": 10
-    }
-  ],
-  "manager": {
-    "name": "Didier Digard",
-    "ovr": 76
-  }
-}
-,
     {
       "id": "free_agents",
       "name": "Free Agents",
@@ -112721,6 +113658,48 @@
           "pac": 82,
           "tec": 82,
           "num": 18
+        },
+        {
+          "id": "val27_10",
+          "name": "Rafa Mir",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 82,
+          "att": 84,
+          "def": 35,
+          "phy": 81,
+          "pac": 82,
+          "tec": 78,
+          "num": 10
+        },
+        {
+          "id": "val27_22",
+          "name": "Alberto Marí",
+          "pos": [
+            "ST"
+          ],
+          "ovr": 78,
+          "att": 80,
+          "def": 34,
+          "phy": 77,
+          "pac": 79,
+          "tec": 75,
+          "num": 22
+        },
+        {
+          "id": "val27_25",
+          "name": "Cristian Rivero",
+          "pos": [
+            "GK"
+          ],
+          "ovr": 76,
+          "att": 10,
+          "def": 77,
+          "phy": 74,
+          "pac": 44,
+          "tec": 63,
+          "num": 25
         }
       ]
     }
