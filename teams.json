@@ -96068,6 +96068,51 @@
           "pac": 87,
           "tec": 83,
           "num": 20
+        },
+        {
+          "id": "acmilan2027_new1",
+          "name": "Alphadjo Cissé",
+          "pos": [
+            "CAM",
+            "LM",
+            "RM"
+          ],
+          "num": 70,
+          "ovr": 65,
+          "att": 60,
+          "def": 46,
+          "phy": 50,
+          "pac": 77,
+          "tec": 61
+        },
+        {
+          "id": "acmilan2027_new2",
+          "name": "Sankhoun Diawara",
+          "pos": [
+            "CB"
+          ],
+          "num": 13,
+          "ovr": 60,
+          "att": 34,
+          "def": 58,
+          "phy": 66,
+          "pac": 60,
+          "tec": 41
+        },
+        {
+          "id": "acmilan2027_new3",
+          "name": "Christian Comotto",
+          "pos": [
+            "CM",
+            "CDM"
+          ],
+          "num": 28,
+          "ovr": 64,
+          "att": 53,
+          "def": 56,
+          "phy": 54,
+          "pac": 69,
+          "tec": 65
         }
       ],
       "manager": {
