@@ -343,6 +343,8 @@ var App = (() => {
     coords: [[50,92],[88.6,73],[64,75.5],[38,75],[12.8,72.1],[66.9,53],[35.2,53.2],[49.9,31.8],[78,30],[22,30],[49.1,15.4]] },
     '3-5-2': { name: '3-5-2', slots: ['GK','CB','CB','CB','RB','CM','CM','CM','LB','ST','ST'],
       coords: [[50,92],[68,75],[50,78],[32,75],[88,55],[62,48],[50,50],[38,48],[12,55],[58,20],[42,20]] },
+      '3-5-2-cm': { name: '3-5-2 (Mid)', slots: ['GK', 'CB', 'CB', 'CB', 'RM', 'CM', 'CM', 'CM', 'LM', 'ST', 'ST'],
+    coords: [[50,92],[80.5,72.5],[53.2,74.2],[23.7,73.3],[93,43.6],[71.5,45],[50.6,44.9],[32.3,44.5],[11.7,43.2],[66.9,16.2],[34.7,16]] },
     '4-5-1': { name: '4-5-1', slots: ['GK','RB','CB','CB','LB','RM','CM','CDM','CM','LM','ST'],
       coords: [[50,92],[82,72],[62,75],[38,75],[18,72],[82,45],[62,48],[50,55],[38,48],[18,45],[50,18]] },
     '3-4-3': { name: '3-4-3', slots: ['GK','CB','CB','CB','RM','CM','CM','LM','RW','ST','LW'],
@@ -1549,7 +1551,14 @@ var App = (() => {
     // falls through to the same auto-pick logic as before. Corner-box
     // attackers are always auto-picked — there's no manual override for
     // those.
-    const manual = (squad && squad.manualRoles) || {};
+    // Team-level default roles — set from the Transfer Tool (team.roles,
+    // e.g. { captain: playerId, shortFreeKick: playerId, ... }) and
+    // persisted straight into teams.json. These act as a base default;
+    // a per-squad manual override (squad.manualRoles, set from the Squad
+    // Builder's Match Roles panel for this specific lineup) always wins
+    // when both are set for the same role.
+    const teamDefaults = (side && side.team && side.team.roles) || {};
+    const manual = Object.assign({}, teamDefaults, (squad && squad.manualRoles) || {});
     const manualPick = (key) => {
       const id = manual[key];
       if (!id) return null;
@@ -4035,14 +4044,18 @@ var App = (() => {
 
       let slots = {};
       let bench = new Set();
-      let roles = {};
+      // Seed the Match Roles panel with this team's persisted default
+      // roles (team.roles, set from the Transfer Tool and saved into
+      // teams.json) — a saved lineup's own manualRoles (below) still wins
+      // for any role it explicitly sets.
+      let roles = Object.assign({}, team.roles || {});
       let coords = formation.coords.map(c => c.slice());
       let slotRoles = {};
       const saved = customLineups[side];
       if (saved && saved.formation === formKey && saved._teamId === team.id) {
         saved.starting.forEach((p, i) => { slots[i] = p.id; });
         (saved.subs || []).forEach(p => bench.add(p.id));
-        roles = Object.assign({}, saved.manualRoles || {});
+        roles = Object.assign({}, roles, saved.manualRoles || {});
         if (saved.customCoords) coords = saved.customCoords.map(c => c.slice());
         if (saved.customSlotRoles) slotRoles = Object.assign({}, saved.customSlotRoles);
       } else {
