@@ -670,6 +670,10 @@ var App = (() => {
     // genuinely slower stamina drain rather than just a late-game stat bump.
     if (hasSkill(p, 'Fighting Spirit')) rate *= 0.85;
     if (hasSkill(p, 'Track Back')) rate *= 0.94;
+    // Iron Man: genuinely slower fatigue regardless of the stam rating
+    // already baked into stamFactor above — a personality-level read, not
+    // a stat substitute.
+    if (((p.expandedAttrs && p.expandedAttrs.personality) || []).includes('Iron Man')) rate *= 0.88;
     return rate;
   }
   // Runs once per simulated minute for both sides — drains everyone
@@ -688,6 +692,15 @@ var App = (() => {
       // team's fatigue, not just his own — real captains manage tempo and
       // keep the squad's intensity honest through a long match.
       const captainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy'));
+      // Leader: deepens the existing Captaincy aura above rather than being
+      // a new standalone check — requires the actual Captaincy skill too,
+      // same captain-on-pitch lookup, just also carrying the Leader tag.
+      const leaderCaptainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy')
+        && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Leader'));
+      // Talisman: same aura pattern as Captaincy above, but on its own —
+      // no skill prerequisite, just the personality tag and being on the
+      // pitch. See engine/shooting.js for the matching shot-quality aura.
+      const talismanOnPitch = all.some(x => onIds.includes(x.id) && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Talisman'));
       // Personality tags (player-attributes.json "personality", optional —
       // undefined for anyone without a hand-authored entry, so this is a
       // no-op for the vast majority of players).
@@ -699,6 +712,8 @@ var App = (() => {
         const rec = fat[side][id];
         let drain = fatigueDrainRate(p, tac);
         if (captainOnPitch) drain *= 0.93;
+        if (leaderCaptainOnPitch) drain *= 0.95;
+        if (talismanOnPitch) drain *= 0.97;
         // A Determined player digs in and keeps his work rate up when his
         // side is chasing the game late on — modeled the same way as
         // Fighting Spirit/Track Back above, as a genuinely slower drain
@@ -851,6 +866,16 @@ var App = (() => {
     // fatigue.js lookup) dampens teammates' Inconsistent swings; a steady
     // Unwavering/Standard player's spread is untouched.
     if (captainOnPitch && p.form === 'Inconsistent') spread *= 0.9;
+    // Streaky: amplifies (rather than dampens, like the Captaincy aura
+    // above) an Inconsistent player's spread — a genuinely streaky player
+    // runs hot and cold even harder than the baseline Inconsistent type
+    // already predicts. Prodigy (simulation/developmentEngine.js) shares
+    // this same amplification, gated on age instead of the tag itself —
+    // "more volatile form while young" IS a bigger spread multiplier, not
+    // a separate system.
+    const personality = (p.expandedAttrs && p.expandedAttrs.personality) || [];
+    if (personality.includes('Streaky') && p.form === 'Inconsistent') spread *= 1.35;
+    if (isYoungProdigy(p) && p.form === 'Inconsistent') spread *= 1.2;
     const peakIdx = base.reduce((best, w, i) => (w > base[best] ? i : best), 0);
     // Stretch/compress each tier's weight by how far it sits from the
     // liveRating's own peak tier — see FORM_TYPE_SPREAD comment above.
@@ -899,7 +924,11 @@ var App = (() => {
   // shooting.js, passing.js, defending.js and goalkeeper.js).
   function conditionMultiplier(p) {
     const cond = getPlayerCondition(p);
-    return CONDITION_MULTIPLIER[cond] != null ? CONDITION_MULTIPLIER[cond] : 1;
+    const base = CONDITION_MULTIPLIER[cond] != null ? CONDITION_MULTIPLIER[cond] : 1;
+    // Slow Starter folds in here too (see slowStarterMultiplier in
+    // engine/matchEngine.js) — same choke point as the condition roll
+    // above, so every existing call site picks up both automatically.
+    return base * slowStarterMultiplier(p);
   }
   // Post-match progression: a player's liveRating is set directly from
   // their rating in the match that just finished — not drifted/eased
@@ -1197,8 +1226,11 @@ var App = (() => {
         ? `<span class="player">${taker.name}</span> takes it quickly — the defence isn't set!`
         : `<span class="player">${taker.name}</span> stands over the free-kick...`, attackingSide);
       // A quick restart catches an unorganised wall — a genuinely better
-      // sight of goal than a fully set-up direct effort.
-      const fk = pickFkOutcome(taker, fkGk, quick ? 0.08 : 0);
+      // sight of goal than a fully set-up direct effort. Set-Piece
+      // Specialist stacks its own composure boost on top, always on (no
+      // stakes gate, unlike Ice-Cold/Bottler in pickFkOutcome itself).
+      const spBoost = ((taker.expandedAttrs && taker.expandedAttrs.personality) || []).includes('Set-Piece Specialist') ? 0.05 : 0;
+      const fk = pickFkOutcome(taker, fkGk, (quick ? 0.08 : 0) + spBoost);
       if (fk.scored) {
         attTeam.stats.shotsOn++;
         attTeam.score++;
@@ -2419,6 +2451,22 @@ var App = (() => {
   }
 
 
+  // Baseline willingness multiplier (1.0 = neutral, uncapped on purpose so
+  // callers can clamp/scale to their own model) to actively engineer a
+  // move away from the player's current club, before any club-specific
+  // factors (contract length, playing time, ambition mismatch, etc.) a
+  // real transfer sim would layer on top. Personality is the only input
+  // here — Loyal pulls it down, Journeyman pushes it up — everyone else
+  // reads as a neutral 1.0, a no-op for the vast majority of players
+  // without a hand-authored personality entry.
+  function transferWillingnessMult(p) {
+    if (!p || !p.expandedAttrs) return 1;
+    const personality = p.expandedAttrs.personality || [];
+    let mult = 1;
+    if (personality.includes('Loyal')) mult *= 0.55;
+    if (personality.includes('Journeyman')) mult *= 1.6;
+    return mult;
+  }
 
   // Applies player-attributes.json to every matching player on every team.
   // Runs once at startup, after restorePlayerForms() so it can safely
@@ -2931,6 +2979,13 @@ var App = (() => {
       const stamina = getStamina(currentMatch, side, p.id);
       if (stamina < 50) mult *= 1 + (50 - stamina) / 140;
     }
+    // Brittle/Iron Man: personality-level injury-risk multiplier, layered
+    // on top of (not instead of) the injury_res stat above — a player can
+    // be rated High injury_res on paper and still carry the Brittle tag
+    // (or vice versa), same as any other stat/personality combo elsewhere.
+    const personality = p.expandedAttrs.personality || [];
+    if (personality.includes('Brittle')) mult *= 1.35;
+    if (personality.includes('Iron Man')) mult *= 0.7;
     return mult;
   }
   // Like pickPlayer, but the caller supplies the weighting function directly
@@ -5860,7 +5915,19 @@ var App = (() => {
     // shot-stopper with "GK Penalty Saver" genuinely saves more.
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
-    const scoreProb = Math.max(0.35, Math.min(0.95, 0.72 + penTakerEdge(taker) - penGkEdge(gk)));
+    // Ice-Cold/Bottler: composure under pressure at the spot, only when the
+    // moment actually carries stakes (same computeStakes gate as Big-Game/
+    // Fragile in resolveShot above) — a genuinely ice-cold penalty taker in
+    // a dead rubber reads no differently from anyone else.
+    const m0 = currentMatch;
+    const penStakes = m0 ? computeStakes(m0.home.team, m0.away.team, currentSeasonComp || tournament, m0.minute, m0.home.score - m0.away.score) : false;
+    let personalityEdge = 0;
+    if (penStakes) {
+      const personality = (taker.expandedAttrs && taker.expandedAttrs.personality) || [];
+      if (personality.includes('Ice-Cold')) personalityEdge += 0.09;
+      if (personality.includes('Bottler')) personalityEdge -= 0.12;
+    }
+    const scoreProb = Math.max(0.35, Math.min(0.95, 0.72 + penTakerEdge(taker) - penGkEdge(gk) + personalityEdge));
     if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
     return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
   }
@@ -5879,10 +5946,21 @@ var App = (() => {
     ];
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
+    // Ice-Cold/Bottler: same stakes-gated composure edge as the penalty
+    // version above, scaled down for the lower baseline conversion rate
+    // a direct free-kick carries.
+    const m0 = currentMatch;
+    const fkStakes = m0 ? computeStakes(m0.home.team, m0.away.team, currentSeasonComp || tournament, m0.minute, m0.home.score - m0.away.score) : false;
+    let personalityEdge = 0;
+    if (fkStakes) {
+      const personality = (taker.expandedAttrs && taker.expandedAttrs.personality) || [];
+      if (personality.includes('Ice-Cold')) personalityEdge += 0.05;
+      if (personality.includes('Bottler')) personalityEdge -= 0.07;
+    }
     // `boost` — a small edge for a quick restart caught the defence
     // unorganised (see resolveFreeKickRoutine in engine/setpieces.js);
     // defaults to 0 so every existing call site is unaffected.
-    const scoreProb = Math.max(0.06, Math.min(0.6, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4 + (boost || 0)));
+    const scoreProb = Math.max(0.06, Math.min(0.6, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4 + (boost || 0) + personalityEdge));
     if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
     return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
   }
@@ -6013,7 +6091,17 @@ var App = (() => {
       : isDef
         ? ((goals >= 1 && ps.cleanSheet) || (goals + assists >= 3) || (goals >= 2 && assists >= 1)) && !ps.red
         : (goals >= 3 || (goals >= 2 && assists >= 1) || assists >= 3 || goals + assists >= 4) && !ps.red;
-    const cap = isBreakout ? 10.0 : 8.7 + seededRandom() * 0.9; // ~8.7-9.6, varies match to match
+    let cap = isBreakout ? 10.0 : 8.7 + seededRandom() * 0.9; // ~8.7-9.6, varies match to match
+    // Big Occasion Riser: rating ceiling raised specifically in cup/
+    // knockout matches — distinct from Big-Game's shot-quality focus in
+    // shooting.js, this touches the rating formula itself so a big-
+    // occasion riser's whole game reads a notch higher on the day it
+    // matters most, not just his shooting. ps.isBigGame/ps.personality are
+    // set on the ratingInput copy by the caller below, right before this
+    // function is invoked.
+    if (!isBreakout && ps.isBigGame && (ps.personality || []).includes('Big Occasion Riser')) {
+      cap = Math.min(10.0, cap + 0.5);
+    }
     return Math.max(2.5, Math.min(cap, Math.round(r * 10) / 10));
   }
 
@@ -6519,7 +6607,14 @@ var App = (() => {
         // Man Marking, Blocker) add on top of the generic def-based chance,
         // and interceptBias skews *which* kind of action a specialist gets.
         const actionEdge = defActionEdge(p);
-        const chance = Math.min(0.24, base * skillMult * engagementMult * pressureMult + actionEdge.chance);
+        // Grinder: tackle/interception success specifically rises when his
+        // team is behind — a genuine game-state gate, not a flat bonus.
+        let grinderMult = 1;
+        if (((p.expandedAttrs && p.expandedAttrs.personality) || []).includes('Grinder')) {
+          const losing = side === 'home' ? m.home.score < m.away.score : m.away.score < m.home.score;
+          if (losing) grinderMult = 1.18;
+        }
+        const chance = Math.min(0.24, (base * skillMult * engagementMult * pressureMult + actionEdge.chance) * grinderMult);
         if (seededRandom() >= chance) return;
         // Aggression carries a real cost: the more aggressively a player
         // throws himself into challenges, the more of those attempts turn
@@ -6817,6 +6912,16 @@ var App = (() => {
     return (curvedAttr(p.tec || 70, 70) * 0.6 + curvedAttr(p.ovr || 75, 75) * 0.4) * staminaMultiplier(p) * conditionMultiplier(p);
   }
   function passingAbility(p) {
+    // Big Occasion Flop: passing accuracy (not just shooting, which is
+    // Fragile's domain in shooting.js) drops under stakes — same
+    // computeStakes gate as Big-Game/Fragile/Ice-Cold/Bottler.
+    let bigOccasionMult = 1;
+    if (p && p.expandedAttrs && ((p.expandedAttrs.personality) || []).includes('Big Occasion Flop')) {
+      const m = currentMatch;
+      if (m && computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score)) {
+        bigOccasionMult = 0.88;
+      }
+    }
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.low_pass, p.expandedAttrs.lofted_pass, p.expandedAttrs.ball_con, p.expandedAttrs.tight_pos].filter(v => typeof v === 'number');
       const base = vals.length
@@ -6839,9 +6944,9 @@ var App = (() => {
       // second half.
       if (hasSkill(p, 'Game-Changing Pass') && playerTeamTrailingOrDrawingSecondHalf(p)) bonus += 3;
       if (isActingSuperSub(p)) bonus += 2;
-      return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p);
+      return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p) * bigOccasionMult;
     }
-    return (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35) * conditionMultiplier(p);
+    return (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35) * conditionMultiplier(p) * bigOccasionMult;
   }
   function defensivePressure(p) {
     if (p && p.expandedAttrs) {
@@ -6963,15 +7068,41 @@ var App = (() => {
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
     // Personality tags (player-attributes.json "personality", optional —
     // undefined for anyone without a hand-authored entry, so this is a
-    // no-op for the vast majority of players). Only kicks in when the
-    // moment actually carries stakes (derby / final / close-and-late).
+    // no-op for the vast majority of players).
+    const personality = (shooter.expandedAttrs && shooter.expandedAttrs.personality) || [];
+    // Big-Game/Fragile only kick in when the moment actually carries
+    // stakes (derby / final / close-and-late).
     const stakes = computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score);
     if (stakes) {
-      const personality = (shooter.expandedAttrs && shooter.expandedAttrs.personality) || [];
       if (personality.includes('Big-Game')) shotQuality *= 1.15;
       if (personality.includes('Fragile')) shotQuality *= 0.85;
-      shotQuality = Math.max(0.05, Math.min(0.98, shotQuality));
     }
+    // Confidence Player: composure builds while he's on a live scoring run
+    // this match and evaporates the moment an effort doesn't end in a goal
+    // (see the reset/bump at the miss/save/goal points below) — a genuine
+    // per-match momentum read, distinct from the season-long liveRating/
+    // condition system in form.js. Capped at 3 stacks so a hot streak is a
+    // meaningful edge without becoming a lock.
+    if (personality.includes('Confidence Player')) {
+      const momentum = Math.min(3, (m.personalityMomentum && m.personalityMomentum[shooter.id]) || 0);
+      if (momentum > 0) shotQuality *= (1 + momentum * 0.03);
+    }
+    // Finisher's Instinct: extra late-game shot-quality bump distinct from
+    // Big-Game's stakes gate above — fires purely off the clock, any
+    // scoreline, including a dead rubber Big-Game's derby/final/close-
+    // and-late gate would never trigger for.
+    if (personality.includes("Finisher's Instinct") && m.minute > 80) shotQuality *= 1.12;
+    // Talisman aura: teammates play with a touch more composure while
+    // he's out there with them — same aura pattern as the existing
+    // Captaincy fatigue/form hooks, just read locally here since it only
+    // touches shot quality.
+    const onIdsTalisman = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    if ((attTeam.squad.all || []).some(x => onIdsTalisman.includes(x.id) && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Talisman'))) {
+      shotQuality *= 1.03;
+    }
+    // Homebody: genuinely worse away from home, nothing to do with stakes.
+    if (personality.includes('Homebody') && attackingSide === 'away') shotQuality *= 0.93;
+    shotQuality = Math.max(0.05, Math.min(0.98, shotQuality));
     // Kicking Power feeds the shot's raw power independently of placement —
     // used below in the GK phase so a fiercely struck effort is genuinely
     // harder to keep out/hold onto than a technically similar but softer one.
@@ -7016,6 +7147,10 @@ var App = (() => {
     const onTargetChance = Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
+      if (personality.includes('Confidence Player')) {
+        if (!m.personalityMomentum) m.personalityMomentum = {};
+        m.personalityMomentum[shooter.id] = 0;
+      }
       addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
       // Note: through-ball offside is now judged spatially, up front, in
       // resolveChanceCreation() before the shot is ever attempted — see
@@ -7036,6 +7171,10 @@ var App = (() => {
     const closeRangeShot = !isHeader && (chanceType === 'dribble' || chanceType === 'openplay' || chanceType === 'counter');
     const saveResult = resolveGkSave(gk, shooter, shotQuality, { isHeader, chanceType, shotPower, closeRange: closeRangeShot });
     if (saveResult.saved) {
+      if (personality.includes('Confidence Player')) {
+        if (!m.personalityMomentum) m.personalityMomentum = {};
+        m.personalityMomentum[shooter.id] = 0;
+      }
       if (gk) {
         defTeam.stats.saves++;
         recordStat('saves', gk, defTeam.team);
@@ -7060,6 +7199,10 @@ var App = (() => {
 
     // GOAL
     attTeam.score++;
+    if (personality.includes('Confidence Player')) {
+      if (!m.personalityMomentum) m.personalityMomentum = {};
+      m.personalityMomentum[shooter.id] = (m.personalityMomentum[shooter.id] || 0) + 1;
+    }
     const method = isHeader ? { desc: 'towering header', xg: 0.3, puskas: false } : pickGoalMethod(shooter);
     recordStat('goals', shooter, attTeam.team);
     if (method.puskas) recordStat('puskas', shooter, attTeam.team);
@@ -7130,6 +7273,12 @@ var App = (() => {
     if (!zonal && (routine === 'nearpost' || routine === 'crowd')) chance *= 0.82;
     const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p, true) * 2);
     if (blocker && aerialSkill(blocker, true) > 0.68) chance *= 0.85;
+    // Set-Piece Specialist: a genuine composure edge on corners, same trait
+    // that boosts free-kick conversion in resolveFreeKickRoutine (engine/
+    // setpieces.js) — always on, no stakes gate.
+    if (((attTeam.roles && attTeam.roles.cornerAttackers) || []).some(p => ((p.expandedAttrs && p.expandedAttrs.personality) || []).includes('Set-Piece Specialist'))) {
+      chance *= 1.08;
+    }
 
     // The most realistic own-goal source in the whole engine — a crowded
     // box, bodies flying at a cross under pressure, someone gets the
@@ -7275,7 +7424,7 @@ var App = (() => {
   // Returns an outcome tag ('penalty' | 'red' | 'yellow' | 'foul') so callers
   // can decide what, if anything, can still follow (e.g. a direct free-kick
   // shouldn't be taken if the fouler just saw red on the same passage of play).
-  function resolveFoul(defendingSide, attackingSide, fouler, victim, nearBox, forcePenalty) {
+  function resolveFoul(defendingSide, attackingSide, fouler, victim, nearBox, forcePenalty, context) {
     const m = currentMatch;
     if (!m || !fouler) return { outcome: 'none' };
     const defTeam = m[defendingSide], attTeam = m[attackingSide];
@@ -7291,6 +7440,13 @@ var App = (() => {
     const personality = (fouler.expandedAttrs && fouler.expandedAttrs.personality) || [];
     if (personality.includes('Volatile')) aggression *= 1.3;
     if (personality.includes('Calm')) aggression *= 0.8;
+    // Provocateur: reads off the VICTIM's tag, not the fouler's — a player
+    // who knows how to draw contact raises the marker's foul probability
+    // just by being the one they're up against.
+    if (victim) {
+      const victimPersonality = (victim.expandedAttrs && victim.expandedAttrs.personality) || [];
+      if (victimPersonality.includes('Provocateur')) aggression *= 1.2;
+    }
     const foulText = victim
       ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
       : `Foul by <span class="player">${fouler.name}</span>`;
@@ -7353,6 +7509,14 @@ var App = (() => {
     // clearly raises the odds of a card without turning into a near-certain
     // yellow (or a cheap second yellow) by a player's third or fourth foul.
     let yellowChance = Math.min(0.45, 0.04 * aggression + (foulCount - 1) * 0.06 + (alreadyYellow ? 0.07 : 0) + (foulCount >= 4 ? 0.05 : 0));
+    // Hot-Head: once already booked, a second yellow becomes a genuinely
+    // live risk on top of the flat alreadyYellow bump above.
+    if (alreadyYellow && personality.includes('Hot-Head')) yellowChance = Math.min(0.6, yellowChance + 0.08);
+    // Cynical: the flip side of the extra tactical-foul willingness applied
+    // in resolveTurnover (engine/transitions.js) — a professional foul in
+    // that same breakaway context draws fewer cards than a genuine mistimed
+    // challenge would.
+    if (context === 'breakaway' && personality.includes('Cynical')) yellowChance *= 0.6;
     const straightRedChance = 0.0013 * aggression;
     const roll = seededRandom();
     if (roll < straightRedChance && !alreadyYellow) {
@@ -7456,8 +7620,17 @@ var App = (() => {
     // contest a busy defensive position wins most often — drives the risk.
     let foulChance = 0.05 * aggression * (kind === 'duel' ? 1.0 : 0.6);
     if (contestedPlayer && hasSkill(contestedPlayer, 'Gamesmanship')) foulChance *= 1.2;
+    // Cynical: a genuine "take one for the team" tactical foul specifically
+    // to stop a break before it's sprung — gated to the same toThird ===
+    // 'ATT' breakaway context that already unlocks a penalty shout below
+    // (see nearBox in resolveFoul), not just any old duel. The card-side
+    // discount for this same context lives in resolveFoul (engine/
+    // referee.js), keyed off the 'breakaway' context tag passed below.
+    const breakawayContext = toThird === 'ATT';
+    const defenderPersonality = (defenderPlayer.expandedAttrs && defenderPlayer.expandedAttrs.personality) || [];
+    if (breakawayContext && defenderPersonality.includes('Cynical')) foulChance *= 1.6;
     if (seededRandom() < foulChance) {
-      resolveFoul(defendingSide, attackingSide, defenderPlayer, contestedPlayer, toThird === 'ATT');
+      resolveFoul(defendingSide, attackingSide, defenderPlayer, contestedPlayer, breakawayContext, false, breakawayContext ? 'breakaway' : null);
       return;
     }
 
@@ -7737,9 +7910,30 @@ var App = (() => {
 
       // Personality tags (player-attributes.json "personality", optional —
       // undefined on any player without a hand-authored entry, in which case
-      // this is a no-op). Reserved here alongside the weak-foot check below
-      // for any future personality-driven action weighting.
+      // this is a no-op).
       const personality = (player.expandedAttrs && player.expandedAttrs.personality) || [];
+      // Selfish/Team Player: nudges the shoot-or-dribble vs. pass-or-
+      // through-ball balance directly, independent of position/playstyle.
+      if (personality.includes('Selfish')) {
+        if (action === 'shoot' || action === 'dribble') w *= 1.2;
+        if (action === 'pass' || action === 'throughball' || action === 'cross') w *= 0.88;
+      }
+      if (personality.includes('Team Player')) {
+        if (action === 'pass' || action === 'throughball') w *= 1.2;
+        if (action === 'shoot' || action === 'dribble') w *= 0.85;
+      }
+      // Showboat: attempts more dribbles than the raw ability read alone
+      // would justify — the higher turnover risk that comes with it lives
+      // in the carryChance calc in engine/possession.js, not here.
+      if (personality.includes('Showboat') && action === 'dribble') w *= 1.25;
+      // Homebody: a genuine dip in incisive/risky ball actions away from
+      // home, nothing to do with pressure or tactics.
+      if (personality.includes('Homebody')) {
+        const homeCtx = playerSideData(player);
+        if (homeCtx && homeCtx.sideKey === 'away' && (action === 'dribble' || action === 'shoot' || action === 'throughball' || action === 'cross')) {
+          w *= 0.92;
+        }
+      }
       // Weak-foot suppression on top of the numeric weak-foot stat itself —
       // a genuinely one-footed player is less willing to shoot or whip in a
       // cross when it would come off his weaker side. This engine doesn't
@@ -7845,8 +8039,12 @@ var App = (() => {
         // die out long before reaching the final third far more often than
         // real buildup play does, starving both ends of the pitch of shots
         // and, in turn, keepers of saves.
+        // Showboat: the higher dribble attempt rate itself lives in
+        // decisionModel.js's evaluateBallActions; the flip side — slightly
+        // higher turnover risk once he actually goes for it — lives here.
+        const showboatPenalty = ((carrier.expandedAttrs && carrier.expandedAttrs.personality) || []).includes('Showboat') ? 0.04 : 0;
         const carryChance = Math.max(0.30, Math.min(0.93,
-          0.86 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus));
+          0.86 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus - showboatPenalty));
         if (seededRandom() >= carryChance) {
           resolveTurnover(attackingSide, defendingSide, carrier, runMarker, fromThird, toThird, 'carry', channel);
           return;
@@ -9154,6 +9352,12 @@ var App = (() => {
           : { passes: ps.passes > 0 ? ps.passes : 8, passesCompleted: ps.passes > 0 ? ps.passesCompleted : 6 };
         ratingInput = Object.assign({}, ps, floors);
       }
+      // Big Occasion Riser reads these two off the ratingInput copy inside
+      // calcPlayerRating — never mutates the real ps object.
+      ratingInput = Object.assign({}, ratingInput, {
+        isBigGame: m.isBigGame,
+        personality: (p.expandedAttrs && p.expandedAttrs.personality) || []
+      });
       ps.rating = calcPlayerRating(ratingInput);
       const teamObj = (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team;
       recordRating(p, teamObj, ps.rating);
@@ -15666,6 +15870,40 @@ var App = (() => {
     if (dash) dash.style.display = 'none';
     toast('Season reset');
     persistAll();
+  }
+  // Prodigy: faster own development curve. Neutral 1.0 for everyone else
+  // (including a Prodigy-tagged player past the young-age cutoff below —
+  // the accelerated curve is specifically a youth trait, not a permanent
+  // one).
+  function developmentRateMult(p) {
+    if (!isYoungProdigy(p)) return 1;
+    return 1.4;
+  }
+
+  // Mentor: a senior teammate in the same position group speeds up a
+  // younger player's development. Reads the *team's* on-book squad (not
+  // just who's currently in the match-day squad) for a Mentor sharing the
+  // young player's primary position group, since mentoring is a training-
+  // ground/dressing-room relationship, not a matchday one.
+  function mentorDevelopmentBonus(youngPlayer, teammates) {
+    if (!youngPlayer || !teammates) return 1;
+    const posGroup = (youngPlayer.pos || [])[0];
+    const hasMentor = teammates.some(t => t.id !== youngPlayer.id
+      && ((t.expandedAttrs && t.expandedAttrs.personality) || []).includes('Mentor')
+      && (t.pos || []).includes(posGroup));
+    return hasMentor ? 1.2 : 1;
+  }
+
+  // Prodigy: faster own development curve (see developmentRateMult above),
+  // but genuinely more volatile form while young — folds into the same
+  // Inconsistent-spread amplification Streaky uses (engine/form.js:
+  // rollPlayerCondition), not a separate system, since "more volatile form
+  // while young" IS exactly what a bigger FORM_TYPE_SPREAD multiplier
+  // already models. ~21 is used as a generic "still a youth prospect"
+  // cutoff, matching how the rest of the sheet talks about young players.
+  function isYoungProdigy(p) {
+    return !!(p && p.expandedAttrs && (p.expandedAttrs.personality || []).includes('Prodigy')
+      && typeof p.expandedAttrs.age === 'number' && p.expandedAttrs.age < 21);
   }
 
   function showSeasonComp(key) {
