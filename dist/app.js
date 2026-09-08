@@ -688,6 +688,10 @@ var App = (() => {
       // team's fatigue, not just his own — real captains manage tempo and
       // keep the squad's intensity honest through a long match.
       const captainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy'));
+      // Personality tags (player-attributes.json "personality", optional —
+      // undefined for anyone without a hand-authored entry, so this is a
+      // no-op for the vast majority of players).
+      const isLosing = side === 'home' ? m.home.score < m.away.score : m.away.score < m.home.score;
       onIds.forEach(id => {
         const p = all.find(x => x.id === id);
         if (!p) return;
@@ -695,6 +699,12 @@ var App = (() => {
         const rec = fat[side][id];
         let drain = fatigueDrainRate(p, tac);
         if (captainOnPitch) drain *= 0.93;
+        // A Determined player digs in and keeps his work rate up when his
+        // side is chasing the game late on — modeled the same way as
+        // Fighting Spirit/Track Back above, as a genuinely slower drain
+        // rather than a late-game stat bump.
+        const personality = (p.expandedAttrs && p.expandedAttrs.personality) || [];
+        if (personality.includes('Determined') && isLosing && m.minute > 75) drain *= 0.91;
         rec.stamina = Math.max(8, rec.stamina - drain);
       });
     });
@@ -833,10 +843,14 @@ var App = (() => {
     allTeams.forEach(t => (t.players || []).forEach(ensurePlayerConditionProfile));
   }
   // Weighted random condition roll for one player ahead of kickoff.
-  function rollPlayerCondition(p) {
+  function rollPlayerCondition(p, captainOnPitch) {
     ensurePlayerConditionProfile(p);
     const base = LIVE_RATING_CONDITION_WEIGHTS[p.liveRating] || LIVE_RATING_CONDITION_WEIGHTS.B;
-    const spread = FORM_TYPE_SPREAD[p.form] != null ? FORM_TYPE_SPREAD[p.form] : 1.0;
+    let spread = FORM_TYPE_SPREAD[p.form] != null ? FORM_TYPE_SPREAD[p.form] : 1.0;
+    // A captain on the pitch (existing Captaincy check — see the identical
+    // fatigue.js lookup) dampens teammates' Inconsistent swings; a steady
+    // Unwavering/Standard player's spread is untouched.
+    if (captainOnPitch && p.form === 'Inconsistent') spread *= 0.9;
     const peakIdx = base.reduce((best, w, i) => (w > base[best] ? i : best), 0);
     // Stretch/compress each tier's weight by how far it sits from the
     // liveRating's own peak tier — see FORM_TYPE_SPREAD comment above.
@@ -4708,6 +4722,18 @@ var App = (() => {
     return Object.assign({}, sq, { starting: starting, subs: subs, all: starting.concat(subs) });
   }
 
+  // Whether the current moment carries extra pressure — a derby (teams.json
+  // "rivals", optional), a cup/season final, or a close scoreline deep in
+  // the second half. Cheap to call per-shot/per-foul rather than cached
+  // once at kickoff, since the close-and-late leg of it genuinely changes
+  // minute to minute. Feeds the Big-Game/Fragile composure read in
+  // shooting.js.
+  function computeStakes(homeTeam, awayTeam, competition, minute, scoreDiff) {
+    const isDerby = Array.isArray(homeTeam.rivals) && homeTeam.rivals.includes(awayTeam.id);
+    const isFinal = competition && competition.stage === 'final';
+    const isCloseLate = minute > 75 && Math.abs(scoreDiff) <= 1;
+    return isDerby || isFinal || isCloseLate;
+  }
   function startMatch() {
     const homeSel = document.getElementById('home-team');
     const awaySel = document.getElementById('away-team');
@@ -6935,6 +6961,17 @@ var App = (() => {
           + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)
           + (chanceType === 'longshot' ? fkTakerEdge(shooter) * 0.6 : 0)));
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
+    // Personality tags (player-attributes.json "personality", optional —
+    // undefined for anyone without a hand-authored entry, so this is a
+    // no-op for the vast majority of players). Only kicks in when the
+    // moment actually carries stakes (derby / final / close-and-late).
+    const stakes = computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score);
+    if (stakes) {
+      const personality = (shooter.expandedAttrs && shooter.expandedAttrs.personality) || [];
+      if (personality.includes('Big-Game')) shotQuality *= 1.15;
+      if (personality.includes('Fragile')) shotQuality *= 0.85;
+      shotQuality = Math.max(0.05, Math.min(0.98, shotQuality));
+    }
     // Kicking Power feeds the shot's raw power independently of placement —
     // used below in the GK phase so a fiercely struck effort is genuinely
     // harder to keep out/hold onto than a technically similar but softer one.
@@ -7247,7 +7284,13 @@ var App = (() => {
     m.foulCounts[defendingSide][fouler.id] = (m.foulCounts[defendingSide][fouler.id] || 0) + 1;
     const foulCount = m.foulCounts[defendingSide][fouler.id];
     const alreadyYellow = (m.cards[defendingSide][fouler.id] || 0) >= 1;
-    const aggression = foulProneness(fouler);
+    let aggression = foulProneness(fouler);
+    // Personality tags (player-attributes.json "personality", optional —
+    // undefined for anyone without a hand-authored entry, so this is a
+    // no-op for the vast majority of players).
+    const personality = (fouler.expandedAttrs && fouler.expandedAttrs.personality) || [];
+    if (personality.includes('Volatile')) aggression *= 1.3;
+    if (personality.includes('Calm')) aggression *= 0.8;
     const foulText = victim
       ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
       : `Foul by <span class="player">${fouler.name}</span>`;
@@ -7690,6 +7733,21 @@ var App = (() => {
       // width and get a cross in more than a standard full-back would.
       if (styles.includes('Extra Frontman') || styles.includes('Offensive Full-back') || styles.includes('Full-back Finisher')) {
         if (action === 'carry' || action === 'cross') w *= 1.2;
+      }
+
+      // Personality tags (player-attributes.json "personality", optional —
+      // undefined on any player without a hand-authored entry, in which case
+      // this is a no-op). Reserved here alongside the weak-foot check below
+      // for any future personality-driven action weighting.
+      const personality = (player.expandedAttrs && player.expandedAttrs.personality) || [];
+      // Weak-foot suppression on top of the numeric weak-foot stat itself —
+      // a genuinely one-footed player is less willing to shoot or whip in a
+      // cross when it would come off his weaker side. This engine doesn't
+      // currently track which physical side of the body an action favors,
+      // so the suppression applies to both actions outright; gate it with
+      // that side-context once/if this model tracks it.
+      if (xattr(player, 'weak foot', 70) < 45) {
+        if (action === 'cross' || action === 'shoot') w *= 0.9;
       }
 
       scores[action] = Math.max(0.05, w);
