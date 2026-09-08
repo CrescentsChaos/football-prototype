@@ -480,14 +480,35 @@
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  // Optimization (Bolt): Cache canonical skill keys and lazy Set per player to avoid
+  // repeated regex string normalizations and O(N) array scans during match simulation.
+  const canonSkillCache = new Map();
   function canonSkillKey(s) {
+    if (!s) return '';
+    let cached = canonSkillCache.get(s);
+    if (cached !== undefined) return cached;
     const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    cached = SKILL_NAME_ALIASES[k] || k;
+    canonSkillCache.set(s, cached);
+    return cached;
+  }
+  function getCanonSkillSet(p) {
+    if (!p || !p.expandedAttrs) return null;
+    let set = p.expandedAttrs._canonSkillsSet;
+    if (!set) {
+      const skills = p.expandedAttrs.skills || [];
+      set = new Set();
+      for (let i = 0; i < skills.length; i++) {
+        set.add(canonSkillKey(skills[i]));
+      }
+      p.expandedAttrs._canonSkillsSet = set;
+    }
+    return set;
   }
   function hasSkill(p, skillName) {
-    if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    const set = getCanonSkillSet(p);
+    if (!set) return false;
+    return set.has(canonSkillKey(skillName));
   }
 /*@CHUNK:c0031:END*/
 
