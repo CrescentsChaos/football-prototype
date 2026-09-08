@@ -4802,6 +4802,24 @@ var App = (() => {
     const isCloseLate = minute > 75 && Math.abs(scoreDiff) <= 1;
     return isDerby || isFinal || isCloseLate;
   }
+  // Slow Starter personality: reduced effectiveness in the first ~15
+  // minutes of a match, partially offset as the half wears on. This is a
+  // genuine per-minute (m.minute) read, so it lives here in matchEngine.js
+  // alongside the match clock rather than being baked into the per-match,
+  // kickoff-rolled condition system in form.js — but it's applied through
+  // that same conditionMultiplier() choke point (see the call in form.js)
+  // so every existing shooting/passing/defending/goalkeeping read site
+  // picks it up automatically instead of needing its own wiring.
+  function slowStarterMultiplier(p) {
+    const m = currentMatch;
+    if (!m || !p || !p.expandedAttrs) return 1;
+    if (!(p.expandedAttrs.personality || []).includes('Slow Starter')) return 1;
+    const minute = m.minute || 0;
+    if (minute >= 15) return 1;
+    // Starts ~15% down at kickoff, linearly recovers back to neutral by
+    // minute 15.
+    return 1 - 0.15 * (1 - minute / 15);
+  }
   function startMatch() {
     const homeSel = document.getElementById('home-team');
     const awaySel = document.getElementById('away-team');
