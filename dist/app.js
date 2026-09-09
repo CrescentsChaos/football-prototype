@@ -1633,6 +1633,31 @@ var App = (() => {
 
     return { captain, shortFreeKick, longFreeKick, penalty, leftCorner, rightCorner, cornerAttackers: cornerAttackersFinal };
   }
+  // Shared badge builder — given an already-resolved roles object (the
+  // shape assignMatchRoles() returns: captain/penalty/shortFreeKick/
+  // longFreeKick/leftCorner/rightCorner/cornerAttackers) and a player id,
+  // returns the same captain-armband + set-piece-duty icon markup
+  // regardless of where those roles came from. iconClass lets callers
+  // pick the badge's positioning style: '.li-icon' (inline, for list
+  // rows) or '.sb-role-ic' (absolute-positioned corner badge, for pitch
+  // dots — see .sb-role-ic in styles.css).
+  function roleBadgesForIds(roles, playerId, iconClass) {
+    if (!roles || !playerId) return '';
+    const cls = iconClass || 'li-icon';
+    let out = '';
+    if (roles.captain && roles.captain.id === playerId) out += `<span class="captain-armband" title="Captain">${emojiImg('captain', 'Captain')}</span>`;
+    if (roles.penalty && roles.penalty.id === playerId) out += `<span class="${cls}" title="Penalty taker">${emojiImg('penalty_goal', 'Penalty taker')}</span>`;
+    const isFk = (roles.shortFreeKick && roles.shortFreeKick.id === playerId) || (roles.longFreeKick && roles.longFreeKick.id === playerId);
+    if (isFk) out += `<span class="${cls}" title="Free-kick taker">${emojiImg('freekick', 'Free-kick taker')}</span>`;
+    const isLeftCk = roles.leftCorner && roles.leftCorner.id === playerId;
+    const isRightCk = roles.rightCorner && roles.rightCorner.id === playerId;
+    if (isLeftCk) out += `<span class="${cls}" title="Left corner taker">${emojiImg('left_corner', 'Left corner taker')}</span>`;
+    if (isRightCk) out += `<span class="${cls}" title="Right corner taker">${emojiImg('right_corner', 'Right corner taker')}</span>`;
+    const isCa = (roles.cornerAttackers || []).some((cp) => cp && cp.id === playerId);
+    if (isCa) out += `<span class="${cls}" title="Corner-box attacker">${emojiImg('corner_attacker', 'Corner-box attacker')}</span>`;
+    return out;
+  }
+
   // Small HTML badges for the lineup list — captain armband plus icons for
   // whichever set-piece duties this player has been assigned for their
   // side. Purely cosmetic/read-only; safe to call for any player on the
@@ -1641,18 +1666,18 @@ var App = (() => {
     const m = currentMatch;
     const roles = m && m[side] && m[side].roles;
     if (!roles || !p) return '';
-    let out = '';
-    if (roles.captain && roles.captain.id === p.id) out += `<span class="captain-armband" title="Captain">${emojiImg('captain', 'Captain')}</span>`;
-    if (roles.penalty && roles.penalty.id === p.id) out += `<span class="li-icon" title="Penalty taker">${emojiImg('penalty_goal', 'Penalty taker')}</span>`;
-    const isFk = (roles.shortFreeKick && roles.shortFreeKick.id === p.id) || (roles.longFreeKick && roles.longFreeKick.id === p.id);
-    if (isFk) out += `<span class="li-icon" title="Free-kick taker">${emojiImg('freekick', 'Free-kick taker')}</span>`;
-    const isLeftCk = roles.leftCorner && roles.leftCorner.id === p.id;
-    const isRightCk = roles.rightCorner && roles.rightCorner.id === p.id;
-    if (isLeftCk) out += `<span class="li-icon" title="Left corner taker">${emojiImg('left_corner', 'Left corner taker')}</span>`;
-    if (isRightCk) out += `<span class="li-icon" title="Right corner taker">${emojiImg('right_corner', 'Right corner taker')}</span>`;
-    const isCa = (roles.cornerAttackers || []).some((cp) => cp && cp.id === p.id);
-    if (isCa) out += `<span class="li-icon" title="Corner-box attacker">${emojiImg('corner_attacker', 'Corner-box attacker')}</span>`;
-    return out;
+    return roleBadgesForIds(roles, p.id, 'li-icon');
+  }
+
+  // Same badges, but for a squad that isn't part of an in-progress match —
+  // takes a roles object computed on demand (assignMatchRoles() fed a
+  // lightweight fake "side", same pattern as sbEffectiveRoles() in
+  // ui/teamUI.js) instead of reading currentMatch. Used by the Teams tab
+  // lineup viewer (renderTeamLineupPitchHTML()) so its pitch dots carry
+  // the same role icons as the Squad Builder's formation editor and an
+  // actual kickoff, without needing a live match to source them from.
+  function roleBadgesForPreview(roles, playerId) {
+    return roleBadgesForIds(roles, playerId, 'sb-role-ic');
   }
   function formationShape(formationKey) {
     const key = formationKey || '4-3-3';
@@ -14235,30 +14260,49 @@ var App = (() => {
     const primary = team.color || '#1a237e';
     const secondary = team.secondary || '#ffffff';
 
-    // Line players up against their own slot (buildSquad already assigns
-    // squad.starting[i].slot === form.slots[i] in the common case), falling
-    // back to array order if a slot's own player is somehow missing.
-    const usedIds = new Set();
-    const slotPlayers = slots.map((slot, i) => {
-      // Prefer the player buildSquad() already lined up for this exact
-      // slot index (the common case). Only fall back to searching by slot
-      // *code* when that's missing, and always skip anyone already placed
-      // in an earlier slot — otherwise two players sharing a slot code
-      // (e.g. two "CB"s) both resolve to the same first match, so that
-      // player gets drawn twice while the other one never appears.
-      let p = null;
-      if (squad.starting[i] && squad.starting[i].slot === slot && !usedIds.has(squad.starting[i].id)) {
-        p = squad.starting[i];
-      }
-      if (!p) {
-        p = squad.starting.find(pl => pl.slot === slot && !usedIds.has(pl.id)) || null;
-      }
-      if (!p) {
-        p = squad.starting.find(pl => !usedIds.has(pl.id)) || null;
-      }
-      if (p) usedIds.add(p.id);
-      return p;
+    // Same 3-pass slot-assignment algorithm as drawTeam() in
+    // ui/matchUI.js (the kickoff/live-match pitch), rather than the
+    // single-pass index lookup this used to do. buildSquad() compacts its
+    // `starting` array — a formation slot nobody on the roster is even
+    // loosely eligible for (no natural fit AND no canPlay() alternate; see
+    // buildSquad() above) is dropped entirely rather than left as a gap,
+    // then padded back to 11 by appending whichever players were left
+    // over, tagged with THEIR OWN position rather than the slot that's
+    // actually still empty. Once that happens, `starting[i]` no longer
+    // lines up with `slots[i]`, and looking players up by array index
+    // (falling back to "just grab the next unused starter" the moment the
+    // index/slot-code lookup both miss) was pulling in whichever leftover
+    // happened to be unused yet — a reserve full-back or keeper — and
+    // drawing them at a completely unrelated pitch spot (e.g. up front at
+    // ST) instead of near the gap they were actually filling in for. This
+    // instead only ever falls back to "next remaining player" once every
+    // slot's had a fair shot at an exact/loose positional match, exactly
+    // like the live-match pitch does, so the two views agree.
+    const pool = squad.starting || [];
+    const assigned = new Set();
+    const slotPlayers = [];
+    slots.forEach((slot, idx) => {
+      const pick = pool.find(p => !assigned.has(p.id) && p.slot === slot);
+      if (pick) { assigned.add(pick.id); slotPlayers[idx] = pick; }
     });
+    slots.forEach((slot, idx) => {
+      if (slotPlayers[idx]) return;
+      let pick = pool.find(p => !assigned.has(p.id) && (p.pos || []).includes(slot));
+      if (!pick) pick = pool.find(p => !assigned.has(p.id) && canPlay(p, slot));
+      if (!pick) pick = pool.find(p => !assigned.has(p.id));
+      if (pick) { assigned.add(pick.id); slotPlayers[idx] = pick; }
+    });
+    pool.forEach(p => {
+      if (assigned.has(p.id)) return;
+      const empty = slots.findIndex((_, i) => !slotPlayers[i]);
+      if (empty >= 0) { slotPlayers[empty] = p; assigned.add(p.id); }
+    });
+
+    // Captain armband + set-piece duty badges — same roles a kickoff would
+    // assign, computed fresh from this preview XI (see roleBadgesForPreview()
+    // / assignMatchRoles() in engine/matchRoles.js) since there's no live
+    // match here to read them off of.
+    const previewRoles = pool.length ? assignMatchRoles({ squad: { starting: pool } }) : null;
 
     const used = [];
     let dots = '';
@@ -14276,9 +14320,10 @@ var App = (() => {
         }
         used.push({ x, y });
       }
+      const roleBadges = roleBadgesForPreview(previewRoles, p.id);
       dots += `<div class="player-dot" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
         <span class="dot-pos">${slots[idx] || ''}</span>
-        <span class="dot-avatar">${playerAvatarMark(p)}</span>
+        <span class="dot-avatar">${playerAvatarMark(p)}</span>${roleBadges}
         <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
       </div>`;
     });
