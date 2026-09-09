@@ -3656,6 +3656,38 @@ var App = (() => {
     }
     return `<span class="trophy-mark trophy-mark-fallback" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px">🏆</span>`;
   }
+  // Shared "champion presentation" banner — the competition's own trophy
+  // (trophyMark, keyed off the competition/trophy name in trophies.json)
+  // next to the winning team's own crest (teamMark) and name, in one
+  // consistent hero card. Used anywhere a competition announces its
+  // winner — the Tournament tab's Final Standings and a Season domestic
+  // cup/World Cup summary — instead of each screen inventing its own
+  // plain-text "Champion: <name>" line or a bare numbered "1" podium slot.
+  function championBannerHTML(compName, champion, opts) {
+    opts = opts || {};
+    const trophySize = opts.trophySize || 52;
+    const teamSize = opts.teamSize || 32;
+    const label = opts.label || 'Champions';
+    if (!champion) {
+      return `<div class="champion-banner champion-banner-empty">
+        <div class="champion-banner-trophy">${trophyMark(compName, trophySize)}</div>
+        <div class="champion-banner-body">
+          <div class="champion-banner-label">🏆 ${label}</div>
+          <div class="champion-banner-tbd">TBD</div>
+        </div>
+      </div>`;
+    }
+    return `<div class="champion-banner">
+      <div class="champion-banner-trophy">${trophyMark(compName, trophySize)}</div>
+      <div class="champion-banner-body">
+        <div class="champion-banner-label">🏆 ${label}</div>
+        <div class="champion-banner-team">
+          ${teamMark(champion, teamSize)}
+          <span class="champion-banner-name">${champion.name}</span>
+        </div>
+      </div>
+    </div>`;
+  }
 
   // Looks up a manager's portrait filename in managers.json. Tries an exact
   // name match first, then falls back to a trimmed/case-insensitive match so
@@ -9268,6 +9300,16 @@ var App = (() => {
         markLeftPitch(m, side, injured.id);
         resetFatigueFor(m, side, inPlayer.id);
         if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
+        // Same subLog bookkeeping as a normal/tactical substitution (see
+        // trySubstitution() above) — without this, renderLineups() in
+        // ui/matchUI.js has nothing to read for this pair, so the injured
+        // player and their replacement never get the in/out sub icons for
+        // this interaction even though the swap happened on the pitch.
+        if (!m.subLog) m.subLog = { home: {}, away: {} };
+        if (!m.subLog[side]) m.subLog[side] = {};
+        const subDispMin = m.dispMin != null ? m.dispMin : m.minute;
+        m.subLog[side][injured.id] = Object.assign({}, m.subLog[side][injured.id] || {}, { outMin: subDispMin, replacedBy: inPlayer.name });
+        m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: subDispMin, replaced: injured.name });
         addEvent(m.minute, 'sub', `Forced sub: <span class="player">${inPlayer.name}</span> replaces injured <span class="player">${injured.name}</span>`, side);
       } else {
         removeFromPitch(side, injured.id);
@@ -10152,9 +10194,13 @@ var App = (() => {
         if (idx !== 0) used.push({ x, y });
 
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
+        // Captain armband + set-piece duty badges — same roles shown in the
+        // lineup list (roleBadgesHTML()) and in the Teams tab preview
+        // (roleBadgesForPreview()), just missing from this pitch view.
+        const roleBadges = roleBadgesForIds(s.roles, p.id, 'sb-role-ic');
         dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
           <span class="dot-pos">${slots[idx] || ''}</span>
-          <span class="dot-avatar">${playerAvatarMark(p)}</span>
+          <span class="dot-avatar">${playerAvatarMark(p)}</span>${roleBadges}
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
       });
@@ -13622,21 +13668,21 @@ var App = (() => {
     const second = tournament.runnersUp;
     const third = tournament.thirdPlace;
     const tName = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
+    // Champion gets the full trophy + crest presentation (championBannerHTML,
+    // ui/playerUI.js) instead of just being the "1" slot in a bare numbered
+    // podium — runners-up/third still show below it, now with medals instead
+    // of plain digits.
     el.innerHTML = `
       <div class="card-title">${trophyMark(tName, 28)} Final Standings</div>
-      <div class="podium">
+      ${championBannerHTML(tName, first, { trophySize: 56, teamSize: 34 })}
+      <div class="podium podium-runnersup">
         <div class="podium-place">
-          <div class="place-num">2</div>
+          <div class="place-medal">🥈</div>
           <div class="place-team">${second ? teamMark(second, 20) + ' ' + second.name : '—'}</div>
           <div class="place-label">Runners-up</div>
         </div>
-        <div class="podium-place first">
-          <div class="place-num">1</div>
-          <div class="place-team">${teamMark(first, 20)} ${first.name}</div>
-          <div class="place-label">Champions</div>
-        </div>
         <div class="podium-place">
-          <div class="place-num">3</div>
+          <div class="place-medal">🥉</div>
           <div class="place-team">${third ? teamMark(third, 20) + ' ' + third.name : '—'}</div>
           <div class="place-label">Third place</div>
         </div>
@@ -14301,8 +14347,14 @@ var App = (() => {
     // Captain armband + set-piece duty badges — same roles a kickoff would
     // assign, computed fresh from this preview XI (see roleBadgesForPreview()
     // / assignMatchRoles() in engine/matchRoles.js) since there's no live
-    // match here to read them off of.
-    const previewRoles = pool.length ? assignMatchRoles({ squad: { starting: pool } }) : null;
+    // match here to read them off of. Must pass `team` here (same as
+    // matchEngine.js does for a real kickoff) so this team's persisted
+    // default roles (team.roles, set from the Transfer Tool) are honored —
+    // without it, assignMatchRoles() had no side.team to read those
+    // defaults from and silently fell back to a pure auto-pick, which
+    // could name a completely different captain/kicker than an actual
+    // match with this team would.
+    const previewRoles = pool.length ? assignMatchRoles({ team: team, squad: { starting: pool } }) : null;
 
     const used = [];
     let dots = '';
@@ -16568,7 +16620,7 @@ var App = (() => {
     let h = '<div class="group-card league-table-wrap">';
     h += '<h4>' + comp.name + '</h4>';
     if (comp.finished && comp.champion) {
-      h += '<p style="font-size:0.85rem">🏆 Champion: <strong>' + comp.champion.name + '</strong></p>';
+      h += championBannerHTML(comp.name, comp.champion, { label: 'Champion', trophySize: 46, teamSize: 28 });
     } else {
       h += '<p style="font-size:0.75rem;color:var(--text-muted)">' + comp.teams.length +
         '-team knockout — currently ' + (comp.roundName || 'in progress') +
@@ -16613,7 +16665,7 @@ var App = (() => {
     if (worldCup) {
       h += '<div class="group-card league-table-wrap"><h4>🌍 World Cup — Year ' + worldCup.year + '</h4>';
       if (worldCup.finished && worldCup.champion) {
-        h += '<p style="font-size:0.9rem">🏆 Champions: <strong>' + worldCup.champion.name + '</strong></p>';
+        h += championBannerHTML('World Cup', worldCup.champion, { label: 'Champions', trophySize: 46, teamSize: 28 });
       } else if (worldCup.stage === 'groups') {
         h += '<p style="font-size:0.8rem;color:var(--text-muted)">Group stage — ' + worldCup.groups.length + ' groups of 4. Top 2 advance automatically; best third-placed sides fill out the knockout bracket.</p>';
       } else {
