@@ -328,6 +328,15 @@ var App = (() => {
     selections: { epl: new Set(), laliga: new Set(), seriea: new Set(), bundesliga: new Set(), ligue1: new Set() },
     search: { epl: '', laliga: '', seriea: '', bundesliga: '', ligue1: '' }
   };
+  // ========== CAREER MODE ==========
+  // The single club (or none) the person is manually managing, shared across
+  // both Season Calendar and Tournament mode — like FIFA/eFootball Career
+  // Mode. When set: that club's own fixtures must be played live (with
+  // manual tactics/formation/subs — see engine/tactics.js) instead of being
+  // auto-simmed by "Simulate Matchday"/"Simulate Round", and every OTHER
+  // club's "Play Live" option is hidden in favour of "Instant" only, so the
+  // person only ever steps onto the pitch for their own team's matches.
+  let careerTeamId = null;
   let seasonActiveTab = 'epl';
   let seasonActiveSubTab = 'table'; // 'table' | 'stats' | 'awards' — sub-view within a league/UCL tab
   let seasonReportRegistry = []; // flat list of match reports referenced by index from season fixture cards
@@ -4860,6 +4869,13 @@ var App = (() => {
     };
     currentMatch.home.roles = assignMatchRoles(currentMatch.home);
     currentMatch.away.roles = assignMatchRoles(currentMatch.away);
+    // Career Mode: which side (if either) the person is manually managing —
+    // set once here from the shared careerTeamId (js/state.js), and read
+    // everywhere a live match needs to know whether to let the AI drive a
+    // side (runTacticalAI/trySubstitution in engine/tactics.js) or leave it
+    // to the person's own tactics/formation/substitution calls instead.
+    currentMatch.userSide = careerTeamId && homeTeam.id === careerTeamId ? 'home'
+      : careerTeamId && awayTeam.id === careerTeamId ? 'away' : null;
     // Form & Condition system (engine/form.js) — roll every squad member's
     // match condition once, right here at kickoff, before anything reads it.
     rollMatchConditions(currentMatch);
@@ -4909,6 +4925,13 @@ var App = (() => {
     isPlaying = false;
     const btn = document.getElementById('btn-play');
     if (btn) btn.textContent = '▶ Play';
+    // Career Mode: reveal the manage panel toggle only when the person is
+    // actually controlling one of the two sides in this match.
+    const mgBtn = document.getElementById('btn-career-manage');
+    if (mgBtn) mgBtn.style.display = currentMatch.userSide ? 'inline-flex' : 'none';
+    const mgPanel = document.getElementById('career-manage-panel');
+    if (mgPanel) mgPanel.style.display = 'none';
+    if (currentMatch.userSide) renderCareerPanel();
   }
 
   function blankStats() {
@@ -6230,6 +6253,10 @@ var App = (() => {
     const live = document.getElementById('match-live');
     if (setup) setup.style.display = 'block';
     if (live) live.style.display = 'none';
+    const mgBtn = document.getElementById('btn-career-manage');
+    if (mgBtn) mgBtn.style.display = 'none';
+    const mgPanel = document.getElementById('career-manage-panel');
+    if (mgPanel) mgPanel.style.display = 'none';
   }
 
 
@@ -6516,13 +6543,16 @@ var App = (() => {
       // earlier than the scoreline-only read above would suggest.
       if (teamAvgStamina('home') < 55) pHome *= 1.25;
       if (teamAvgStamina('away') < 55) pAway *= 1.25;
-      if (seededRandom() < pHome) trySubstitution('home');
-      if (seededRandom() < pAway) trySubstitution('away');
+      // Career Mode: the AI never auto-substitutes for the side the person
+      // is manually managing — subs for that side only ever come from
+      // manualSubstitute() via the Manage panel (see ui/matchUI.js).
+      if (m.userSide !== 'home' && seededRandom() < pHome) trySubstitution('home');
+      if (m.userSide !== 'away' && seededRandom() < pAway) trySubstitution('away');
     }
     // Late forced catch-up so each side reaches 3 if possible
     if (m.dispMin === 80 || m.dispMin === 84 || m.dispMin === 87) {
-      if ((m.homeSubsUsed || 0) < 3) trySubstitution('home');
-      if ((m.awaySubsUsed || 0) < 3) trySubstitution('away');
+      if (m.userSide !== 'home' && (m.homeSubsUsed || 0) < 3) trySubstitution('home');
+      if (m.userSide !== 'away' && (m.awaySubsUsed || 0) < 3) trySubstitution('away');
     }
     if (seededRandom() < 0.0015) tryInjury(seededRandom() < 0.5 ? 'home' : 'away');
     updateScoreboard();
@@ -8797,6 +8827,51 @@ var App = (() => {
     if (!m.quietSim) { renderLineups(); renderPitch(); }
   }
 
+  // Career Mode's player-driven substitution — same bookkeeping as the tail
+  // end of trySubstitution() above (pitch slot handoff, subLog, leftPitch,
+  // fatigue reset, event feed) but with BOTH the outgoing and incoming
+  // player chosen by the person instead of the automatic weighted pick, so
+  // it works for any manager identity, situation, or plain personal
+  // preference rather than only the AI's own reasoning. Called from the
+  // Manage panel in ui/matchUI.js — never from the AI's own tick() loop.
+  function manualSubstitute(side, outPlayerId, inPlayerId) {
+    const m = currentMatch;
+    if (!m || m.finished) { toast('No match in progress'); return false; }
+    const sideData = m[side];
+    if (!sideData) return false;
+    const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+    if (used >= (m.maxSubs || 5)) { toast('No substitutions remaining'); return false; }
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
+    if (!m.subLog) m.subLog = { home: {}, away: {} };
+    const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const outPlayer = allPlayers.find(p => p.id === outPlayerId);
+    const inPlayer = allPlayers.find(p => p.id === inPlayerId);
+    if (!outPlayer || !onPitchIds.includes(outPlayer.id)) { toast('That player is not on the pitch'); return false; }
+    if (!inPlayer || onPitchIds.includes(inPlayer.id) || leftIds.includes(inPlayer.id) || (m.injuries || []).includes(inPlayer.id)) {
+      toast('That substitute is not available'); return false;
+    }
+    const outSlot = outPlayer.slot || (outPlayer.pos || [])[0] || 'CM';
+    const restOfPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && p.id !== outPlayer.id);
+    const slot = pickSlotForIncomingSub(inPlayer, sideData.squad.formation, outSlot, restOfPitch) || outSlot;
+    const idx = onPitchIds.indexOf(outPlayer.id);
+    if (idx >= 0) onPitchIds[idx] = inPlayer.id;
+    markLeftPitch(m, side, outPlayer.id);
+    resetFatigueFor(m, side, inPlayer.id);
+    if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
+    const subDispMin = m.dispMin != null ? m.dispMin : m.minute;
+    m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: subDispMin, replacedBy: inPlayer.name });
+    m.subLog[side][inPlayer.id] = Object.assign({}, m.subLog[side][inPlayer.id] || {}, { inMin: subDispMin, replaced: outPlayer.name });
+    inPlayer.slot = slot;
+    addEvent(m.minute, 'sub',
+      `Substitution · ${sideData.team.short}<br><span style="color:#4ade80">▲ In</span> <span class="player">${inPlayer.name}</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${used + 1}/${m.maxSubs})</span>`,
+      side);
+    if (!m.quietSim) { renderLineups(); renderPitch(); updateScoreboard(); }
+    toast(inPlayer.name + ' on for ' + outPlayer.name);
+    return true;
+  }
+
   // A manager who's just gone down to 10 men often reshapes rather than just
   // absorbing the loss — most commonly sacrificing an attacker to bring on a
   // recognised defender when the sent-off player was part of the back line,
@@ -8947,8 +9022,11 @@ var App = (() => {
   function runTacticalAI() {
     const m = currentMatch;
     if (!m || m.finished || m.inET || m.inPens || m._awaitingET) return;
-    evaluateTacticalAI('home', 'away');
-    evaluateTacticalAI('away', 'home');
+    // Career Mode: the AI manager never overrides the person's own tactics/
+    // formation on the side they're controlling — see setTacticsLive/
+    // changeFormationLive calls from the Manage panel in ui/matchUI.js.
+    if (m.userSide !== 'home') evaluateTacticalAI('home', 'away');
+    if (m.userSide !== 'away') evaluateTacticalAI('away', 'home');
   }
 
   function evaluateTacticalAI(side, otherSide) {
@@ -9694,6 +9772,103 @@ var App = (() => {
     set('live-status', m.status);
     set('live-venue', '🏟️ ' + getStadium(m.home.team));
     renderGoalTimeline();
+    if (m.userSide) renderCareerPanel();
+  }
+
+  // ========== CAREER MODE — MANAGE PANEL ==========
+  // Renders (and keeps in sync every tick, via the updateScoreboard() call
+  // above) the manual tactics/formation/substitution controls for whichever
+  // side the person is controlling (currentMatch.userSide — set once in
+  // startMatch(), see engine/matchEngine.js). The AI side never gets this
+  // panel and keeps making its own decisions via runTacticalAI/
+  // trySubstitution as normal.
+  function renderCareerPanel() {
+    const m = currentMatch;
+    const panel = document.getElementById('career-manage-panel');
+    if (!panel) return;
+    if (!m || !m.userSide) { panel.style.display = 'none'; return; }
+    const side = m.userSide;
+    const sideData = m[side];
+    if (!sideData) { panel.style.display = 'none'; return; }
+
+    const label = document.getElementById('career-team-label');
+    if (label) label.textContent = sideData.team.short || sideData.team.name || '';
+
+    const curTactic = (m.tactics && m.tactics[side]) || 'balanced';
+    ['attack', 'press', 'balanced', 'defend'].forEach(t => {
+      const btn = document.getElementById('career-tac-' + t);
+      if (btn) btn.classList.toggle('active', t === curTactic);
+    });
+
+    const formSel = document.getElementById('career-formation-select');
+    if (formSel) {
+      if (!formSel.options.length) {
+        formSel.innerHTML = Object.keys(FORMATIONS).map(k => `<option value="${k}">${k}</option>`).join('');
+      }
+      if (document.activeElement !== formSel) formSel.value = sideData.squad.formation || '4-3-3';
+    }
+
+    const used = side === 'home' ? (m.homeSubsUsed || 0) : (m.awaySubsUsed || 0);
+    const max = m.maxSubs || 5;
+    const subsLabel = document.getElementById('career-subs-label');
+    if (subsLabel) subsLabel.textContent = `Substitutions: ${used}/${max}`;
+
+    const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitch = allPlayers.filter(p => onIds.includes(p.id) && !(m.injuries || []).includes(p.id));
+    const leftIds = (m.leftPitch && m.leftPitch[side]) || [];
+    const bench = (sideData.squad.subs || []).filter(p =>
+      !onIds.includes(p.id) && !(m.injuries || []).includes(p.id) && !leftIds.includes(p.id));
+
+    const outSel = document.getElementById('career-sub-out');
+    const inSel = document.getElementById('career-sub-in');
+    const canSub = used < max && onPitch.length > 0 && bench.length > 0 && !m.finished;
+    if (outSel && document.activeElement !== outSel) {
+      outSel.innerHTML = onPitch.map(p => `<option value="${p.id}">${p.slot || ''} · ${p.name}</option>`).join('') || '<option value="">—</option>';
+    }
+    if (inSel && document.activeElement !== inSel) {
+      inSel.innerHTML = bench.map(p => `<option value="${p.id}">${p.slot || (p.pos || [])[0] || ''} · ${p.name}</option>`).join('') || '<option value="">—</option>';
+    }
+    const subBtn = document.getElementById('career-sub-confirm');
+    if (subBtn) subBtn.disabled = !canSub;
+  }
+
+  // Shows/hides the manage panel (the 🎮 Manage button in match-controls).
+  function toggleCareerPanel() {
+    const panel = document.getElementById('career-manage-panel');
+    if (!panel) return;
+    const show = panel.style.display === 'none' || !panel.style.display;
+    panel.style.display = show ? 'block' : 'none';
+    if (show) renderCareerPanel();
+  }
+
+  // Wired to the four tactic buttons in the Manage panel.
+  function applyUserTactic(tactic) {
+    const m = currentMatch;
+    if (!m || !m.userSide) return;
+    setTacticsLive(m.userSide, tactic);
+    renderCareerPanel();
+  }
+
+  // Wired to the formation <select> in the Manage panel.
+  function applyUserFormation(formKey) {
+    const m = currentMatch;
+    if (!m || !m.userSide) return;
+    changeFormationLive(m.userSide, formKey);
+    renderCareerPanel();
+  }
+
+  // Wired to the "Make Substitution" button in the Manage panel.
+  function confirmUserSub() {
+    const m = currentMatch;
+    if (!m || !m.userSide) return;
+    const outSel = document.getElementById('career-sub-out');
+    const inSel = document.getElementById('career-sub-in');
+    const outId = outSel && outSel.value;
+    const inId = inSel && inSel.value;
+    if (!outId || !inId) { toast('Pick a player to bring off and a player to bring on'); return; }
+    manualSubstitute(m.userSide, outId, inId);
+    renderCareerPanel();
   }
 
   function updateStatsPanel() {
@@ -10954,6 +11129,8 @@ var App = (() => {
       ok = safeSetItem('apexTournamentStats', JSON.stringify(compactStatsBook(tournamentStats))) && ok;
       ok = safeSetItem('apexSeasonActiveTab', seasonActiveTab) && ok;
       ok = safeSetItem('apexSeasonActiveSubTab', seasonActiveSubTab) && ok;
+      if (careerTeamId) ok = safeSetItem('apexCareerTeamId', careerTeamId) && ok;
+      else localStorage.removeItem('apexCareerTeamId');
       ok = persistPlayerForms() && ok;
       const activeTab = document.querySelector('.nav-tab.active');
       if (activeTab && activeTab.dataset.view) safeSetItem('apexActiveView', activeTab.dataset.view);
@@ -10991,6 +11168,10 @@ var App = (() => {
       if (sat) seasonActiveTab = sat;
       const sst = localStorage.getItem('apexSeasonActiveSubTab');
       if (sst) seasonActiveSubTab = sst;
+    } catch (e) {}
+    try {
+      const ct = localStorage.getItem('apexCareerTeamId');
+      if (ct) careerTeamId = ct;
     } catch (e) {}
     try {
       // Restore the in-progress Tournament setup team selection (e.g. 36 of
@@ -11935,9 +12116,15 @@ var App = (() => {
     if (!tournament || tournament.format !== 'table') return;
     const round = tournament.rounds[tournament.currentRound];
     if (!round) { finishLeagueTournament(); renderLeagueTableTournament(); refreshTournamentStatsUI(); return; }
-    simulateRoundFixtures(round, { allowET: false, allowPens: false }, (fx) => {
+    simulateRoundFixtures(round, { allowET: false, allowPens: false, skipCareer: true }, (fx) => {
       applyResultToTable(tournament.table, fx.home, fx.away, fx.homeScore, fx.awayScore);
     });
+    // Career Mode: hold this matchday here if the person's own fixture is
+    // still pending (same skipCareer pattern as simulateLeagueRound in
+    // simulation/seasonEngine.js) — playLeagueTournamentFixture()/
+    // simLeagueTournamentFixture() advance currentRound for real once
+    // they've actually played it.
+    if (!round.every(f => f.played)) { renderLeagueTableTournament(); refreshTournamentStatsUI(); return; }
     tournament.currentRound++;
     if (tournament.currentRound >= tournament.rounds.length) {
       finishLeagueTournament();
@@ -11962,6 +12149,10 @@ var App = (() => {
   // in that function already uses, so a full-season sim doesn't freeze the tab.
   async function simAllLeagueTournament(updateLoading, updateLoadingProgress, startTime) {
     if (!tournament || tournament.format !== 'table') return;
+    // Career Mode: see simulateSeasonToEnd's identical guard in
+    // simulation/seasonEngine.js — fast-forwarding the whole competition
+    // isn't compatible with playing your own club's matches by hand.
+    if (careerTeamId) { toast('Career Mode: play your own matches first — simulating the whole competition is disabled while managing a club.'); return; }
     const remainingRounds = tournament.rounds.slice(tournament.currentRound);
     const total = remainingRounds.reduce((sum, r) => sum + r.length, 0);
     let done = 0;
@@ -12040,18 +12231,23 @@ var App = (() => {
     const awaySel = document.getElementById('away-team');
     if (homeSel) homeSel.value = home.id;
     if (awaySel) awaySel.value = away.id;
+    // Career Mode: keep the person's own club at its real formation/custom
+    // XI instead of randomizing it — same treatment as playSeasonFixture in
+    // simulation/seasonEngine.js. Only the AI opponent still gets randomized.
+    const isCareerHome = careerTeamId && home.id === careerTeamId;
+    const isCareerAway = careerTeamId && away.id === careerTeamId;
     const formKeys = Object.keys(FORMATIONS);
-    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
-    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hf = isCareerHome ? pickTeamFormation(home) : formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = isCareerAway ? pickTeamFormation(away) : formKeys[Math.floor(seededRandom() * formKeys.length)];
     const hForm = document.getElementById('home-formation');
     const aForm = document.getElementById('away-formation');
     if (hForm) hForm.value = hf;
     if (aForm) aForm.value = af;
-    customLineups.home = null;
-    customLineups.away = null;
+    if (!isCareerHome) customLineups.home = null;
+    if (!isCareerAway) customLineups.away = null;
     updateTeamPreview('home'); updateTeamPreview('away');
     startMatch();
-    toast((tournament.competitionName || 'League') + ' — live · formations randomized');
+    toast((isCareerHome || isCareerAway) ? 'Your match — take control!' : ((tournament.competitionName || 'League') + ' — live · formations randomized'));
   }
   function renderLeagueTableTournament() {
     const groupsEl = document.getElementById('groups-container');
@@ -12125,8 +12321,9 @@ var App = (() => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
         const idx = currentRound.indexOf(f);
+        const isCareerFixture = careerTeamId && (f.home === careerTeamId || f.away === careerTeamId);
         h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span>
-          <button class="btn btn-primary btn-sm" onclick="App.playLeagueTournamentFixture(${idx})">▶ Play Live</button>
+          ${(!careerTeamId || isCareerFixture) ? `<button class="btn btn-primary btn-sm" onclick="App.playLeagueTournamentFixture(${idx})">▶ Play Live</button>` : ''}
           <button class="btn btn-secondary btn-sm" onclick="App.simLeagueTournamentFixture(${idx})">⚡ Instant</button></div>`;
       });
     } else if (tournament.stage !== 'complete') {
@@ -12257,8 +12454,9 @@ var App = (() => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
         const idx = tournament.fixtures.indexOf(f);
+        const isCareerFixture = careerTeamId && (f.home === careerTeamId || f.away === careerTeamId);
         h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
-          <button class="btn btn-primary btn-sm" onclick="App.playUCLFixture(${idx})">▶ Live</button>
+          ${(!careerTeamId || isCareerFixture) ? `<button class="btn btn-primary btn-sm" onclick="App.playUCLFixture(${idx})">▶ Live</button>` : ''}
           <button class="btn btn-secondary btn-sm" onclick="App.simUCLFixture(${idx})">⚡ Instant</button></div>`;
       });
       if (played.length) {
@@ -12344,8 +12542,9 @@ var App = (() => {
         unplayed.forEach((f, i) => {
           const home = getTeam(f.home), away = getTeam(f.away);
           if (!home || !away) return;
+          const isCareerFixture = careerTeamId && (f.home === careerTeamId || f.away === careerTeamId);
           h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home,18)} ${home.short} vs ${teamMark(away,18)} ${away.short}</span>
-            <button class="btn btn-primary btn-sm" onclick="App.playTournamentMatch(${tournament.fixtures.indexOf(f)})">▶ Play Live</button>
+            ${(!careerTeamId || isCareerFixture) ? `<button class="btn btn-primary btn-sm" onclick="App.playTournamentMatch(${tournament.fixtures.indexOf(f)})">▶ Play Live</button>` : ''}
             <button class="btn btn-secondary btn-sm" onclick="App.simSingleFixture(${tournament.fixtures.indexOf(f)})">⚡ Instant</button></div>`;
         });
       }
@@ -13733,7 +13932,7 @@ var App = (() => {
           ${m.penalties ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + pensText + '</div>' : ''}
           ${m.played && m.twoLeg !== false && m.aggHome != null ? '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + score + '</div>' : ''}
           ${(!m.played && m.home && m.away && !tournament.champion) ? `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Live</button>
+            ${(!careerTeamId || m.home.id === careerTeamId || m.away.id === careerTeamId) ? `<button class="btn btn-primary btn-sm" onclick="App.playKnockoutMatch(${ri},${mi})">▶ Live</button>` : ''}
             <button class="btn btn-secondary btn-sm" onclick="App.simKnockoutMatch(${ri},${mi})">⚡ Instant</button>
           </div>` : ''}
           ${m.played ? `<button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%" onclick="App.viewKnockoutReport(${ri},${mi})">Match Report</button>` : ''}
@@ -14927,7 +15126,23 @@ var App = (() => {
     const el = document.getElementById('season-setup-comps');
     if (!el) return;
     const fullPool = seasonClubPool();
-    el.innerHTML = SEASON_LEAGUE_DEFS.map(def => {
+    // Career Mode picker — "play as" one club, like a FIFA/eFootball Career
+    // Mode. Options are every club currently selected into any league below
+    // (the actual pool of clubs that will exist in the season), so this
+    // naturally stays in sync as the person ticks/unticks boxes.
+    const careerPoolIds = new Set();
+    SEASON_LEAGUE_DEFS.forEach(def => seasonSetup.selections[def.key].forEach(id => careerPoolIds.add(id)));
+    const careerPool = [...careerPoolIds].map(id => getTeam(id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+    if (careerTeamId && !careerPoolIds.has(careerTeamId)) careerTeamId = null;
+    const careerCard = `<div class="card" style="margin-bottom:14px;border-color:var(--gold)">
+        <div class="card-title">🎮 Career Mode</div>
+        <div style="color:var(--text-muted);font-size:0.8rem;margin-bottom:8px">Optional — take manual control of one club. You'll play that club's own matches live (with your own tactics, formation changes, and substitutions); every other match in the season is simulated automatically.</div>
+        <select onchange="App.setCareerTeam(this.value)" style="width:100%;padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)" ${careerPool.length ? '' : 'disabled'}>
+          <option value="">— Full AI season (no career club) —</option>
+          ${careerPool.map(t => `<option value="${t.id}" ${careerTeamId === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}
+        </select>
+      </div>`;
+    el.innerHTML = careerCard + SEASON_LEAGUE_DEFS.map(def => {
       const sel = seasonSetup.selections[def.key];
       const q = (seasonSetup.search[def.key] || '').toLowerCase();
       // Prefer the roster leagues.json defines for this league; only fall
@@ -15129,6 +15344,13 @@ var App = (() => {
   function simulateRoundFixtures(round, opts, onResult) {
     (round || []).forEach(fx => {
       if (fx.played) return;
+      // Career Mode: the person's own club never gets auto-simmed by a bulk
+      // "Simulate Matchday"/"Simulate Round" pass — its fixture is left
+      // unplayed here so it can only be resolved by actually playing it
+      // live (see playSeasonFixture/playLeagueTournamentFixture). Callers
+      // that shouldn't hold a fixture back this way (the UCL/cup knockout
+      // bracket calls) simply don't pass skipCareer.
+      if (opts && opts.skipCareer && careerTeamId && (fx.home === careerTeamId || fx.away === careerTeamId)) return;
       const homeTeam = getTeam(fx.home), awayTeam = getTeam(fx.away);
       if (!homeTeam || !awayTeam) { fx.played = true; return; }
       const result = simQuickMatch(homeTeam, awayTeam, { countForLeaderboard: true, allowET: !!opts.allowET, allowPens: !!opts.allowPens });
@@ -15267,10 +15489,15 @@ var App = (() => {
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); return; }
     if (!comp.stats) comp.stats = blankCompStats();
     currentSeasonComp = comp;
-    simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+    const round = comp.rounds[comp.currentRound];
+    simulateRoundFixtures(round, { allowET: false, allowPens: false, skipCareer: true }, (fx, h, a, result) => {
       applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
     });
     currentSeasonComp = null;
+    // Career Mode: hold this round here if the person's own fixture is still
+    // pending — advanceSeasonRoundIfComplete() takes over and moves the
+    // round forward for real once they've actually played it.
+    if (!round.every(f => f.played)) return;
     comp.currentRound++;
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); }
   }
@@ -15284,7 +15511,7 @@ var App = (() => {
     if (!round || !round.length || round.every(f => f.played)) return;
     if (!comp.stats) comp.stats = blankCompStats();
     currentSeasonComp = comp;
-    simulateRoundFixtures(round, { allowET: true, allowPens: true }, (fx, h, a, result) => {
+    simulateRoundFixtures(round, { allowET: true, allowPens: true, skipCareer: true }, (fx, h, a, result) => {
       fx.winnerId = winnerOfResult(h, a, result).id;
     });
     currentSeasonComp = null;
@@ -15351,10 +15578,13 @@ var App = (() => {
     if (comp.stage === 'league') {
       if (comp.currentRound >= comp.rounds.length) { comp.stage = 'transition'; }
       else {
-        simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+        const round = comp.rounds[comp.currentRound];
+        simulateRoundFixtures(round, { allowET: false, allowPens: false, skipCareer: true }, (fx, h, a, result) => {
           applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
         });
-        comp.currentRound++;
+        // Career Mode: hold here if the person's own UCL league-phase
+        // fixture is still pending (same pattern as simulateLeagueRound).
+        if (round.every(f => f.played)) comp.currentRound++;
       }
       if (comp.currentRound >= comp.rounds.length) buildUCLBracketFromLeagueTable(comp);
     } else if (comp.stage === 'qf') {
@@ -15523,6 +15753,56 @@ var App = (() => {
     return due;
   }
 
+  // ========== CAREER MODE HELPERS ==========
+  // Finds the career club's own fixture for the CURRENT matchday, if any —
+  // i.e. exactly the fixture that a bulk "Simulate Matchday" pass just held
+  // back (see the skipCareer guard in simulateRoundFixtures above). Checked
+  // across the domestic leagues, the UCL league phase, and — on a Cup day —
+  // the domestic cups, mirroring the same eligibility rules
+  // seasonCompCanPlayNow/simulateSeasonWeek use so the person is only ever
+  // offered the fixture that's actually due right now.
+  function findCareerFixtureDue() {
+    if (!season || !careerTeamId) return null;
+    const targetIdx = computeSeasonWeek(season);
+    const slot = currentCongestionSlot();
+    const eligibleKeys = new Set(seasonKeysForCongestionComp(slot.comp));
+    let found = null;
+    seasonCompEntries().forEach(({ key, comp }) => {
+      if (found || !comp || comp.finished) return;
+      const isUclKnockout = key === 'ucl' && comp.stage !== 'league';
+      if (isUclKnockout) return; // knockout ties aren't covered by career-mode live play yet
+      if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+      if (!eligibleKeys.has(key)) return;
+      const round = comp.rounds && comp.rounds[comp.currentRound];
+      if (!round) return;
+      const idx = round.findIndex(f => !f.played && (f.home === careerTeamId || f.away === careerTeamId));
+      if (idx !== -1) found = { compKey: key, idx, comp };
+    });
+    if (!found && slot.comp === 'Cup' && season.cups) {
+      Object.keys(season.cups).forEach(k => {
+        if (found) return;
+        const comp = season.cups[k];
+        if (!comp || comp.finished) return;
+        const round = comp.rounds && comp.rounds[comp.currentRound];
+        if (!round) return;
+        const idx = round.findIndex(f => !f.played && (f.home === careerTeamId || f.away === careerTeamId));
+        if (idx !== -1) found = { compKey: 'cup_' + k, idx, comp };
+      });
+    }
+    return found;
+  }
+
+  // Sets/clears the person's Career Mode club. Exposed on the App object so
+  // both the Season Setup screen and Tournament setup can drive the same
+  // single shared "which club am I managing" concept.
+  function setCareerTeam(teamId) {
+    careerTeamId = teamId || null;
+    persistAll();
+    try { renderSeasonSetup(); } catch (e) {}
+    try { if (season) renderSeasonDashboard(); } catch (e) {}
+  }
+  function clearCareerTeam() { setCareerTeam(null); }
+
   // Advances a competition's matchday once every fixture in the current
   // round has been played (whether via live play, instant sim, or batch
   // simulation). Mirrors the round-increment logic that used to live only
@@ -15639,21 +15919,28 @@ var App = (() => {
     const awaySel = document.getElementById('away-team');
     if (homeSel) homeSel.value = home.id;
     if (awaySel) awaySel.value = away.id;
+    // Career Mode: the person's own club keeps its real formation/custom XI
+    // (whatever they set up in the squad builder) instead of getting a
+    // random one like every AI-vs-AI fixture — only the OPPONENT still gets
+    // randomized, same as before.
+    const isCareerHome = careerTeamId && home.id === careerTeamId;
+    const isCareerAway = careerTeamId && away.id === careerTeamId;
     const formKeys = Object.keys(FORMATIONS);
-    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
-    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hf = isCareerHome ? pickTeamFormation(home) : formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = isCareerAway ? pickTeamFormation(away) : formKeys[Math.floor(seededRandom() * formKeys.length)];
     const hForm = document.getElementById('home-formation');
     const aForm = document.getElementById('away-formation');
     if (hForm) hForm.value = hf;
     if (aForm) aForm.value = af;
-    // Clear custom lineups so random formation applies
-    customLineups.home = null;
-    customLineups.away = null;
+    // Clear custom lineups so random formation applies — but never for the
+    // career club's own side, so their squad-builder XI survives into kickoff.
+    if (!isCareerHome) customLineups.home = null;
+    if (!isCareerAway) customLineups.away = null;
     updateTeamPreview('home'); updateTeamPreview('away');
     if (!comp.stats) comp.stats = blankCompStats();
     currentSeasonComp = comp;
     startMatch();
-    toast((comp.name || 'Season') + ' — live · formations randomized');
+    toast((isCareerHome || isCareerAway) ? 'Your match — take control!' : ((comp.name || 'Season') + ' — live · formations randomized'));
   }
 
   function seasonIsComplete() {
@@ -15694,6 +15981,12 @@ var App = (() => {
 
   function simulateSeasonToEnd() {
     if (!season) return;
+    // Career Mode: a full skip-to-the-end doesn't make sense once the person
+    // is manually playing their own club's matches — it would either have to
+    // silently auto-sim every one of "their" games too, or stall forever
+    // waiting on a match nobody's there to play. Simplest and most honest
+    // is to just block it and point them at their own fixture instead.
+    if (careerTeamId) { toast('Career Mode: play your own matches first — "Simulate to End" is disabled while managing a club.'); return; }
     // Rough denominator for the progress bar: the most matchdays any single
     // still-active competition has left. Not exact (competitions advance at
     // different rates and some weeks skip a competition entirely), but a
@@ -16124,6 +16417,19 @@ var App = (() => {
     if (title) title.textContent = 'Year ' + season.year + ' · ' + computeSeasonMonth(season) + ' · Matchday ' + season.week;
     const congestionEl = document.getElementById('season-congestion');
     if (congestionEl) congestionEl.innerHTML = renderFixtureCongestionHTML();
+    const careerBannerEl = document.getElementById('season-career-banner');
+    if (careerBannerEl) {
+      if (careerTeamId) {
+        const club = getTeam(careerTeamId);
+        const dueFixture = findCareerFixtureDue();
+        careerBannerEl.innerHTML = club ? `<div class="career-banner">
+          <div>🎮 Playing as <strong>${club.name}</strong>${dueFixture ? ' — your match is ready!' : ' — sit tight, no match of yours is due this matchday.'}</div>
+          ${dueFixture ? `<button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${dueFixture.compKey}',${dueFixture.idx})">🎮 Play Your Match</button>` : ''}
+        </div>` : '';
+      } else {
+        careerBannerEl.innerHTML = '';
+      }
+    }
     const dueEl = document.getElementById('season-due-banner');
     if (dueEl) {
       const slotComp = currentCongestionSlot().comp;
@@ -16471,11 +16777,22 @@ var App = (() => {
         const home = getTeam(f.home), away = getTeam(f.away);
         if (!home || !away) return;
         const idx = currentRound.indexOf(f);
-        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span>
-          ${canPlay
-            ? `<button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">▶ Play Live</button>
-          <button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button>`
-            : `<button class="btn btn-secondary btn-sm" disabled>⏳ Not due yet</button>`}</div>`;
+        const isCareerFixture = careerTeamId && (f.home === careerTeamId || f.away === careerTeamId);
+        let actions;
+        if (!canPlay) {
+          actions = `<button class="btn btn-secondary btn-sm" disabled>⏳ Not due yet</button>`;
+        } else if (careerTeamId) {
+          // Career Mode: only the person's own fixture can be watched/played
+          // live — every other match on the card is Instant-only, so the
+          // person only ever steps onto the pitch for their own team.
+          actions = isCareerFixture
+            ? `<button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">🎮 Play Your Match</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button>`;
+        } else {
+          actions = `<button class="btn btn-primary btn-sm" onclick="App.playSeasonFixture('${compKey}',${idx})">▶ Play Live</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.simSeasonFixture('${compKey}',${idx})">⚡ Instant</button>`;
+        }
+        h += `<div class="fixture-item"><span class="fixture-teams">${teamMark(home, 18)} ${home.short} vs ${teamMark(away, 18)} ${away.short}</span>${actions}</div>`;
       });
     }
     if (laterUnplayed.length) {
@@ -17593,7 +17910,9 @@ var App = (() => {
     simulateWorldCupStep, simulateQualifyingRound, renderSeasonDashboard, advanceCongestionSlotIfComplete,
     searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, filterPlayersRating, loadMorePlayers,
     togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare,
-    renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital
+    renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital,
+    setCareerTeam, clearCareerTeam, findCareerFixtureDue,
+    manualSubstitute, toggleCareerPanel, applyUserTactic, applyUserFormation, confirmUserSub
   };
 })();
 
