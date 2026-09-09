@@ -1472,6 +1472,64 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   text-transform: uppercase;
   letter-spacing: 1px;
 }
+/* Runners-up/third row once the champion has its own banner above (see
+   .champion-banner) — same card look as .podium-place, just a 2-up grid
+   and a medal emoji standing in for .place-num. */
+.podium-runnersup {
+  grid-template-columns: 1fr 1fr;
+}
+.podium-place .place-medal {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+/* Champion presentation banner — competition trophy + winning team's crest
+   and name in one hero card. Used by championBannerHTML() (ui/playerUI.js)
+   anywhere a competition announces its winner: the Tournament tab's Final
+   Standings and a Season domestic cup/World Cup summary. */
+.champion-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, var(--bg-3), var(--bg-2));
+  border: 1px solid var(--gold);
+  box-shadow: 0 0 24px var(--gold-glow);
+}
+.champion-banner-empty {
+  border-color: var(--border);
+  box-shadow: none;
+  opacity: 0.75;
+}
+.champion-banner-trophy {
+  flex: 0 0 auto;
+}
+.champion-banner-body {
+  min-width: 0;
+}
+.champion-banner-label {
+  font-size: 0.7rem;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+}
+.champion-banner-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.champion-banner-name {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+.champion-banner-tbd {
+  font-size: 0.9rem;
+  color: var(--text-3);
+}
 /* League table scroll */
 .league-table-wrap {
   max-height: none;
