@@ -1600,6 +1600,16 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   height: 72%;
   vertical-align: middle;
 }
+/* Positions the captain armband as a corner badge on a pitch dot outside
+   the Squad Builder too — currently the Teams tab lineup viewer (see
+   renderTeamLineupPitchHTML() in ui/teamUI.js), whose dots use
+   .player-dot rather than .sb-dot. Mirrors .sb-dot .captain-armband. */
+.player-dot .captain-armband {
+  position: absolute; top: -6px; left: -6px;
+  background: none; color: #1a1400; font-weight: 800;
+  font-size: 0.6rem; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center; z-index: 5;
+}
 .li-sub {
   font-size: 0.68rem;
   font-weight: 700;
