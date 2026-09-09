@@ -3672,7 +3672,7 @@ var App = (() => {
       return `<div class="champion-banner champion-banner-empty">
         <div class="champion-banner-trophy">${trophyMark(compName, trophySize)}</div>
         <div class="champion-banner-body">
-          <div class="champion-banner-label">🏆 ${label}</div>
+          <div class="champion-banner-label">${label}</div>
           <div class="champion-banner-tbd">TBD</div>
         </div>
       </div>`;
@@ -3680,7 +3680,7 @@ var App = (() => {
     return `<div class="champion-banner">
       <div class="champion-banner-trophy">${trophyMark(compName, trophySize)}</div>
       <div class="champion-banner-body">
-        <div class="champion-banner-label">🏆 ${label}</div>
+        <div class="champion-banner-label">${label}</div>
         <div class="champion-banner-team">
           ${teamMark(champion, teamSize)}
           <span class="champion-banner-name">${champion.name}</span>
@@ -13673,7 +13673,7 @@ var App = (() => {
     // podium — runners-up/third still show below it, now with medals instead
     // of plain digits.
     el.innerHTML = `
-      <div class="card-title">${trophyMark(tName, 28)} Final Standings</div>
+      <div class="card-title">Final Standings</div>
       ${championBannerHTML(tName, first, { trophySize: 56, teamSize: 34 })}
       <div class="podium podium-runnersup">
         <div class="podium-place">
