@@ -156,6 +156,7 @@
             <button class="btn btn-primary btn-sm" id="btn-play" onclick="App.toggleSim()">▶ Play</button>
             <button class="btn btn-secondary btn-sm" onclick="App.finishMatch()">⏩ Finish Match</button>
             <button class="btn btn-secondary btn-sm" onclick="App.resetMatch()">↺ New Match</button>
+            <button class="btn btn-secondary btn-sm" id="btn-career-manage" style="display:none" onclick="App.toggleCareerPanel()">🎮 Manage</button>
             <span style="margin-left:auto;color:var(--text-muted);font-size:0.85rem" id="sim-speed-label">Speed: Normal</span>
             <select id="sim-speed" onchange="App.setSpeed(this.value)" style="padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)">
               <option value="800">Slow</option>
@@ -163,6 +164,32 @@
               <option value="150">Fast</option>
               <option value="40">Turbo</option>
             </select>
+          </div>
+          <div class="card career-manage-panel" id="career-manage-panel" style="display:none;margin-top:10px">
+            <div class="card-title">🎮 Managing <span id="career-team-label"></span></div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">You're in control — the AI won't change tactics or make substitutions for your side. Set these whenever you like, including mid-match.</div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px">Team Instructions</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-attack" onclick="App.applyUserTactic('attack')">⚔️ Attack</button>
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-press" onclick="App.applyUserTactic('press')">🔥 Press</button>
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-balanced" onclick="App.applyUserTactic('balanced')">⚖️ Balanced</button>
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-defend" onclick="App.applyUserTactic('defend')">🛡️ Defend</button>
+              </div>
+            </div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px">Formation</div>
+              <select id="career-formation-select" onchange="App.applyUserFormation(this.value)" style="padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)"></select>
+            </div>
+            <div>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px" id="career-subs-label">Substitutions: 0/5</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="career-sub-out" style="flex:1;min-width:160px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)"></select>
+                <span style="color:var(--text-muted)">→</span>
+                <select id="career-sub-in" style="flex:1;min-width:160px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)"></select>
+                <button class="btn btn-primary btn-sm" id="career-sub-confirm" onclick="App.confirmUserSub()">Make Substitution</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="pitch-wrap" id="pitch-display"></div>
@@ -348,6 +375,7 @@
             <button class="btn btn-danger btn-sm" onclick="App.resetSeason()" style="margin-left:auto">↺ Reset Season</button>
           </div>
           <div id="season-congestion"></div>
+          <div id="season-career-banner"></div>
           <div id="season-due-banner"></div>
         </div>
         <div class="card">

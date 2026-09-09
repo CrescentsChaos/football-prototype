@@ -450,6 +450,15 @@ body::before {
   border: 1px solid var(--border);
 }
 .btn-secondary:hover { border-color: var(--gold); color: var(--gold); transform: translateY(-2px); }
+/* Career Mode — Manage panel (in-match manual tactics/formation/subs) */
+.career-manage-panel { border-color: var(--gold); }
+.career-tac-btn.active { border-color: var(--gold); color: var(--gold); background: var(--gold-glow); }
+.career-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; padding: 12px 16px; margin-bottom: 14px;
+  border: 1px solid var(--gold); border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255,215,0,0.08), transparent);
+}
 .btn-danger {
   background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff;
 }
