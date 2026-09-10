@@ -1942,7 +1942,13 @@ var App = (() => {
     'Offensive Full-back':   'A full-back who aggressively pushes forward to support attacks and provide width.',
     'Full-back Finisher':    'A full-back who makes attacking runs into dangerous areas and can arrive in scoring positions.',
     'Offensive Goalkeeper':  'Proactively comes off his line to sweep up through balls and support a high defensive line.',
-    'Defensive Goalkeeper':  'Stays closer to his goal and prioritizes traditional shot-stopping and positioning.'
+    'Defensive Goalkeeper':  'Stays closer to his goal and prioritizes traditional shot-stopping and positioning.',
+    'Pass Disruptor':        'A defensive midfielder who blocks passing lanes and reads the game to intercept before a tackle is needed.',
+    'Front Line Pressure':   'Leads the press from the front, hunting the ball high up the pitch to force turnovers.',
+    'Attack Outlet':         'Stays high up the pitch as an out-ball, ready to break in behind on the counter-attack.',
+    'High Line Master':      'Steps up in unison with the defensive line to catch attackers offside and keep the team compact.',
+    'Covering Role':     'Drops off to cover space behind the back line and sweep up danger before it reaches goal.',
+    'Shadow Marker':         'Tracks a single opponent tightly across the pitch, man-marking rather than holding a zone.'
   };
 
   // Individual eFootball-style playstyle tag -> which team manager
@@ -1975,6 +1981,12 @@ var App = (() => {
     'Full-back Finisher':    ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
     'Offensive Goalkeeper':  ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
     'Defensive Goalkeeper':  ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
+    'Pass Disruptor':        ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
+    'Front Line Pressure':   ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
+    'Attack Outlet':         ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
+    'High Line Master':      ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
+    'Covering Role':     ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
+    'Shadow Marker':         ['Quick Counter', 'Long Ball Counter','Long Ball','Possession','Out Wide','Overload'],
   };
 
   // Flat nudges applied to a player's derived att/def/pac/phy/tec once
@@ -2006,7 +2018,13 @@ var App = (() => {
     'Defensive Full-back':  { pac: 2,  att: -1,  def: 1 },
     'Full-back Finisher':    { att: 3,  pac: 1,  def: -1 },
     'Offensive Goalkeeper':  { pac: 2,  tec: 2,  def: -1 },
-    'Defensive Goalkeeper':  { def: 3,  phy: 1 }
+    'Defensive Goalkeeper':  { def: 3,  phy: 1 },
+    'Pass Disruptor':        { def: 2,  tec: 2,  phy: -1 },
+    'Front Line Pressure':   { phy: 2,  def: 2,  tec: -1 },
+    'Attack Outlet':         { pac: 3,  att: 1,  def: -2 },
+    'High Line Master':      { def: 2,  pac: 2,  tec: -1 },
+    'Covering Role':     { def: 3,  pac: 1,  att: -1 },
+    'Shadow Marker':         { def: 3,  pac: 1,  tec: -1 }
   };
 
   // Which raw expanded-attribute ratings define each individual playstyle's
@@ -2037,7 +2055,13 @@ var App = (() => {
     'Defensive Full-back':   ['def_awr', 'spd', 'accel', 'stam', 'def_eng', 'phy_con'],
     'Full-back Finisher':    ['off_awr', 'fin', 'spd', 'accel', 'dribb', 'ball_con', 'stam'],
     'Offensive Goalkeeper':  ['gk_awr', 'gk_reflex', 'gk_reach', 'gk_parry', 'spd', 'accel', 'ball_con'],
-    'Defensive Goalkeeper':  ['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach', 'jmp', 'phy_con']
+    'Defensive Goalkeeper':  ['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach', 'jmp', 'phy_con'],
+    'Pass Disruptor':        ['def_awr', 'def_eng', 'aggr', 'tack', 'ball_con', 'stam', 'spd'],
+    'Front Line Pressure':   ['def_awr', 'def_eng', 'aggr', 'tack', 'stam', 'spd', 'accel'],
+    'Attack Outlet':         ['off_awr', 'spd', 'accel', 'stam', 'ball_con', 'bal', 'fin'],
+    'High Line Master':      ['def_awr', 'def_eng', 'spd', 'accel', 'aggr', 'phy_con', 'bal'],
+    'Covering Role':     ['def_awr', 'def_eng', 'spd', 'accel', 'phy_con', 'bal', 'stam'],
+    'Shadow Marker':         ['def_awr', 'def_eng', 'tack', 'aggr', 'spd', 'stam', 'phy_con']
   };
   // Every raw numeric rating that can appear on an expanded attribute
   // sheet, in display order, grouped for the player-profile UI. GK ratings
@@ -2494,6 +2518,214 @@ var App = (() => {
   }
 
 
+
+  // ===== Playstyle behavior profiles ============================================
+  // Internal behavioral parameters for each individual (eFootball-style)
+  // playstyle tag — see PLAYSTYLE_DESCRIPTIONS in data/playerDatabase.js for
+  // the canonical list of tag names this keys off of.
+  //
+  // These are NOT raw attribute values (that's what PLAYSTYLE_STAT_MODS /
+  // PLAYSTYLE_KEY_ATTRS in data/playerDatabase.js already do — they nudge a
+  // player's derived att/def/pac/phy/tec numbers). This table instead shapes
+  // *decision-making and in-match behavior*: which actions a player reaches
+  // for on the ball, how much of an edge specific styles give in shooting/
+  // defending/goalkeeping situations, independent of the attribute sheet.
+  // Two players with an identical attribute sheet but different playstyle
+  // tags should play noticeably differently — that's what this file is for.
+  //
+  // Shape per style (every field optional — omit anything that shouldn't
+  // move for that style):
+  //   actions:  { <BALL_ACTIONS entry>: multiplier, ... }
+  //             Read by playstyleActionMult() and applied in
+  //             evaluateBallActions() (engine/decisionModel.js) — shapes the
+  //             pass/dribble/carry/shoot/cross/throughball/backpass/switch/
+  //             hold decision every time this player has the ball.
+  //   finishingEdge, aerialEdge, penEdge, fkEdge, dribbleEdge:
+  //             Flat additive edges read by playstyleEdgeSum() from the
+  //             matching functions in engine/shooting.js.
+  //   defChance, interceptBias:
+  //             Flat additive edges read by playstyleEdgeSum() from
+  //             defActionEdge() in engine/defending.js.
+  //   gkReflexEdge, gkPositioningEdge:
+  //             Flat additive edges read by playstyleEdgeSum() from
+  //             gkReflexEdge()/gkPositioningEdge() in engine/goalkeeper.js —
+  //             only meaningful for the two goalkeeper styles.
+  //
+  // A player can carry more than one tag; every field stacks (action
+  // multipliers multiply together, edges sum), then playstyleActionMult()
+  // clamps the compound multiplier to a sane [0.25, 2.5] range so a player
+  // with several overlapping tags doesn't spiral into an absurd weight.
+  const PLAYSTYLE_BEHAVIOR = {
+    'Goal Poacher': {
+      actions: { shoot: 1.35, hold: 1.25, dribble: 0.7, carry: 0.7 },
+      finishingEdge: 0.03
+    },
+    'Fox in the Box': {
+      actions: { shoot: 1.4, hold: 1.3, dribble: 0.6, carry: 0.6, cross: 0.8 },
+      finishingEdge: 0.04,
+      aerialEdge: 0.02
+    },
+    'Target Man': {
+      actions: { hold: 1.4, dribble: 0.6, pass: 1.1 },
+      aerialEdge: 0.1,
+      finishingEdge: 0.01
+    },
+    'Deep-Lying Forward': {
+      actions: { pass: 1.3, throughball: 1.6, hold: 1.1, shoot: 0.9 }
+    },
+    'Dummy Runner': {
+      actions: { carry: 0.85, dribble: 1.05, hold: 0.8, shoot: 1.1 },
+      dribbleEdge: 0.03,
+      finishingEdge: 0.015
+    },
+    'Creative Playmaker': {
+      actions: { throughball: 1.6, dribble: 1.15, pass: 1.1 },
+      dribbleEdge: 0.02
+    },
+    'Hole Player': {
+      actions: { pass: 1.1, throughball: 1.15, hold: 1.0, shoot: 1.15 },
+      finishingEdge: 0.02
+    },
+    'Classic No. 10': {
+      actions: { pass: 1.2, throughball: 1.6, cross: 0.9 },
+      penEdge: 0.03,
+      fkEdge: 0.03
+    },
+    'Prolific Winger': {
+      actions: { cross: 1.5, dribble: 1.2 },
+      dribbleEdge: 0.04
+    },
+    'Cross Specialist': {
+      actions: { cross: 1.6, dribble: 0.9 },
+      fkEdge: 0.02
+    },
+    'Roaming Flank': {
+      actions: { carry: 1.15, throughball: 1.1, cross: 1.1 },
+      dribbleEdge: 0.03
+    },
+    'Inside Forward': {
+      actions: { dribble: 1.6, shoot: 1.2, cross: 0.7 },
+      finishingEdge: 0.025,
+      dribbleEdge: 0.04
+    },
+    'Box-to-Box': {
+      actions: { carry: 1.3, dribble: 1.15, backpass: 0.85, hold: 0.85 },
+      defChance: 0.005
+    },
+    'Destroyer': {
+      actions: { backpass: 1.2, pass: 1.2, dribble: 0.6, throughball: 0.6, shoot: 0.6 },
+      defChance: 0.012,
+      interceptBias: 0.05,
+      aerialEdge: 0.05
+    },
+    'Anchor Man': {
+      actions: { backpass: 1.2, pass: 1.2, dribble: 0.6, throughball: 0.6, shoot: 0.6 },
+      defChance: 0.008,
+      interceptBias: 0.1,
+      aerialEdge: 0.05
+    },
+    'Orchestrator': {
+      actions: { pass: 1.25, switch: 1.25, dribble: 0.8, throughball: 1.3 },
+      fkEdge: 0.02
+    },
+    'Build Up': {
+      actions: { pass: 1.25, switch: 1.25, dribble: 0.8 },
+      defChance: 0.005
+    },
+    'Extra Frontman': {
+      actions: { carry: 1.2, cross: 1.2 },
+      finishingEdge: 0.015
+    },
+    'Offensive Full-back': {
+      actions: { carry: 1.2, cross: 1.2 }
+    },
+    'Defensive Full-back': {
+      actions: { backpass: 1.15, pass: 1.1, cross: 0.8, carry: 0.85, dribble: 0.8 },
+      defChance: 0.006,
+      interceptBias: 0.04
+    },
+    'Full-back Finisher': {
+      actions: { carry: 1.2, cross: 1.2, shoot: 1.1 },
+      finishingEdge: 0.015
+    },
+    'Offensive Goalkeeper': {
+      gkPositioningEdge: 0.02,
+      gkReflexEdge: -0.01
+    },
+    'Defensive Goalkeeper': {
+      gkReflexEdge: 0.02,
+      gkPositioningEdge: -0.01
+    },
+    'Pass Disruptor': {
+      actions: { backpass: 1.15, pass: 1.15, dribble: 0.65, throughball: 0.55, shoot: 0.6 },
+      defChance: 0.006,
+      interceptBias: 0.12
+    },
+    'Front Line Pressure': {
+      actions: { shoot: 1.05, hold: 0.85, carry: 0.95, pass: 1.0 },
+      defChance: 0.018,
+      interceptBias: 0.02
+    },
+    'Attack Outlet': {
+      actions: { shoot: 1.15, hold: 0.75, carry: 0.8, dribble: 0.8 },
+      finishingEdge: 0.02
+    },
+    'High Line Master': {
+      actions: { backpass: 1.1, pass: 1.15, dribble: 0.7, throughball: 0.6, shoot: 0.6 },
+      defChance: 0.01,
+      interceptBias: 0.07,
+      aerialEdge: 0.04
+    },
+    'Covering Role': {
+      actions: { backpass: 1.15, pass: 1.15, dribble: 0.65, throughball: 0.6, shoot: 0.6 },
+      defChance: 0.009,
+      interceptBias: 0.09
+    },
+    'Shadow Marker': {
+      actions: { backpass: 1.15, pass: 1.1, dribble: 0.65, throughball: 0.55, shoot: 0.6 },
+      defChance: 0.011,
+      interceptBias: 0.1
+    }
+  };
+  // Every individual playstyle tag a player currently carries (see
+  // player-attributes.json's "playstyle" array), or [] if this player
+  // has no expanded attribute sheet / no tags at all.
+  function playstyleTagsOf(p) {
+    return (p && p.expandedAttrs && p.expandedAttrs.playstyle) || [];
+  }
+
+  // Compound action-weight multiplier for one BALL_ACTIONS entry, folding
+  // in every playstyle tag the player carries (multiplicative — two
+  // overlapping tags that both boost, say, "cross" compound). Clamped to
+  // keep a heavily-tagged player's weights from spiralling out of the
+  // range the rest of evaluateBallActions() expects. Returns 1 (no-op)
+  // for a player with no relevant tags.
+  function playstyleActionMult(p, action) {
+    const tags = playstyleTagsOf(p);
+    if (!tags.length) return 1;
+    let mult = 1;
+    for (let i = 0; i < tags.length; i++) {
+      const entry = PLAYSTYLE_BEHAVIOR[tags[i]];
+      const m = entry && entry.actions && entry.actions[action];
+      if (typeof m === 'number') mult *= m;
+    }
+    return Math.max(0.25, Math.min(2.5, mult));
+  }
+
+  // Flat additive edge for a named field (finishingEdge/aerialEdge/penEdge/
+  // fkEdge/dribbleEdge/defChance/interceptBias/gkReflexEdge/
+  // gkPositioningEdge), summed across every playstyle tag the player
+  // carries. Returns 0 for a player with no relevant tags.
+  function playstyleEdgeSum(p, field) {
+    const tags = playstyleTagsOf(p);
+    if (!tags.length) return 0;
+    let sum = 0;
+    for (let i = 0; i < tags.length; i++) {
+      const entry = PLAYSTYLE_BEHAVIOR[tags[i]];
+      if (entry && typeof entry[field] === 'number') sum += entry[field];
+    }
+    return sum;
+  }
   // Baseline willingness multiplier (1.0 = neutral, uncapped on purpose so
   // callers can clamp/scale to their own model) to actively engineer a
   // move away from the player's current club, before any club-specific
@@ -2696,13 +2928,10 @@ var App = (() => {
     if (hasSkill(p, 'Willpower') && m && m.playerMatchStats && m.playerMatchStats[p.id]) {
       edge += Math.min(0.08, (m.playerMatchStats[p.id].shots || 0) * 0.012);
     }
-    // Box-focused playstyles get a distinct finishing edge on top of raw
-    // finishing rating, so their identity shows up beyond the stat sheet.
-    if (hasStyle(p, 'Fox in the Box')) edge += 0.04;
-    if (hasStyle(p, 'Goal Poacher')) edge += 0.03;
-    if (hasStyle(p, 'Inside Forward')) edge += 0.025;
-    if (hasStyle(p, 'Hole Player')) edge += 0.02;
-    if (hasStyle(p, 'Full-back Finisher') || hasStyle(p, 'Extra Frontman')) edge += 0.015;
+    // Playstyle-driven finishing edge — data-driven via PLAYSTYLE_BEHAVIOR
+    // (engine/playstyleBehavior.js) so every tagged style contributes its
+    // own distinct edge here, not just a hand-picked subset.
+    edge += playstyleEdgeSum(p, 'finishingEdge');
     // A tired finisher's touch/composure in front of goal is a little less
     // reliable than when he's fresh.
     edge *= staminaMultiplier(p);
@@ -2770,10 +2999,11 @@ var App = (() => {
     if (hasSkill(p, 'Aerial Superiority') || hasSkill(p, 'Heading')) v += 0.12;
     if (hasSkill(p, 'Bullet Header')) v += 0.06;
     if (isDefensiveContext && hasSkill(p, 'Aerial Fort')) v += 0.08;
-    // A Target Man's whole game is built around winning the aerial duel;
-    // defensively-anchored styles also read the flight of a long ball well.
-    if (hasStyle(p, 'Target Man')) v += 0.1;
-    if (hasStyle(p, 'Anchor Man') || hasStyle(p, 'Destroyer')) v += 0.05;
+    // Playstyle-driven aerial edge — see PLAYSTYLE_BEHAVIOR
+    // (engine/playstyleBehavior.js): a Target Man's whole game is built
+    // around winning the aerial duel; defensively-anchored styles also
+    // read the flight of a long ball well.
+    v += playstyleEdgeSum(p, 'aerialEdge');
     // A tired jumper gets up a little less sharply late in the match.
     v *= staminaMultiplier(p) * conditionMultiplier(p);
     return Math.max(0.05, Math.min(0.98, v));
@@ -2790,6 +3020,10 @@ var App = (() => {
     // stat no longer buys nearly as much of it.
     let edge = curvedStat(xattr(gk, 'gk_reflex', 75), 75, 24, 1.6) * 0.12;
     if (hasSkill(gk, 'Acrobatic Clearance')) edge += 0.05;
+    // A shot-stopping-first Defensive Goalkeeper reacts a touch sharper;
+    // an Offensive Goalkeeper, whose game is built around sweeping and
+    // distribution rather than pure reflexes, gives a little back here.
+    edge += playstyleEdgeSum(gk, 'gkReflexEdge');
     return edge;
   }
   // Penalty-kick edges: taker's placement + specialist skill; keeper's
@@ -2799,7 +3033,7 @@ var App = (() => {
     let edge = curvedStat(xattr(p, 'place_kick', 70), 70, 29, 1.6) * 0.1015;
     if (hasSkill(p, 'Penalty Specialist')) edge += 0.08;
     if (hasSkill(p, 'Chip Shot Control')) edge += 0.02;
-    if (hasStyle(p, 'Fox in the Box') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
+    edge += playstyleEdgeSum(p, 'penEdge');
     return edge;
   }
   function penGkEdge(gk) {
@@ -2815,6 +3049,10 @@ var App = (() => {
     if (!gk || !gk.expandedAttrs) return 0;
     let edge = curvedStat(xattr(gk, 'gk_awr', 75), 75, 24, 1.6) * 0.096;
     if (hasSkill(gk, 'GK Directing Defense')) edge += 0.015;
+    // An Offensive Goalkeeper's proactive sweeping/positioning is exactly
+    // what this edge represents; a Defensive Goalkeeper trades a little of
+    // it away to stay closer to the line.
+    edge += playstyleEdgeSum(gk, 'gkPositioningEdge');
     return edge;
   }
   // Reach specifically covers shots placed toward the corners/edges of the
@@ -2901,8 +3139,7 @@ var App = (() => {
     if (hasSkill(p, 'Dipping Shot')) edge += 0.03;
     if (hasSkill(p, 'Blitz Curler')) edge += 0.03;
     if (hasSkill(p, 'Outside Curler')) edge += 0.02;
-    if (hasStyle(p, 'Creative Playmaker') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
-    if (hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Orchestrator')) edge += 0.02;
+    edge += playstyleEdgeSum(p, 'fkEdge');
     return edge;
   }
   // Dribble/skill-move success edge — dribbling ability plus specific moves.
@@ -2914,9 +3151,7 @@ var App = (() => {
     if (hasSkill(p, 'Momentum Dribbling')) edge += 0.03;
     if (hasSkill(p, 'Magnetic Feet')) edge += 0.03;
     if (hasSkill(p, 'Acceleration Burst')) edge += 0.02;
-    if (hasStyle(p, 'Prolific Winger') || hasStyle(p, 'Inside Forward')) edge += 0.04;
-    if (hasStyle(p, 'Roaming Flank') || hasStyle(p, 'Dummy Runner')) edge += 0.03;
-    if (hasStyle(p, 'Creative Playmaker')) edge += 0.02;
+    edge += playstyleEdgeSum(p, 'dribbleEdge');
     edge *= staminaMultiplier(p) * conditionMultiplier(p);
     return edge;
   }
@@ -2941,11 +3176,13 @@ var App = (() => {
     // them and reacts before it becomes a real chance — biases toward a
     // clean interception rather than a late/rash tackle.
     if (hasSkill(p, 'Shadow Hunt')) { chance += 0.005; interceptBias += 0.08; }
-    // Destroyer/Anchor Man actively hunt the ball; Build Up and Box-to-Box
-    // read the game well enough to time a challenge, but less aggressively.
-    if (hasStyle(p, 'Destroyer')) { chance += 0.012; interceptBias += 0.05; }
-    if (hasStyle(p, 'Anchor Man')) { chance += 0.008; interceptBias += 0.1; }
-    if (hasStyle(p, 'Box-to-Box') || hasStyle(p, 'Build Up')) chance += 0.005;
+    // Playstyle-driven defensive edge — data-driven via PLAYSTYLE_BEHAVIOR
+    // (engine/playstyleBehavior.js): Destroyer/Anchor Man actively hunt the
+    // ball, Build Up/Box-to-Box/Defensive Full-back read the game well
+    // enough to time a challenge but less aggressively, and every other
+    // tagged style contributes its own distinct edge here too.
+    chance += playstyleEdgeSum(p, 'defChance');
+    interceptBias += playstyleEdgeSum(p, 'interceptBias');
     return { chance: chance * staminaMultiplier(p), interceptBias };
   }
   // Shared foul-proneness read used by both the possession-sequence duel
@@ -7927,7 +8164,6 @@ var App = (() => {
     const base = baseActionWeights(third, posGroup);
     const attr = attributeActionScores(player);
     const pressure = ctx.marker ? defensivePressure(ctx.marker) : 55;
-    const styles = (player.expandedAttrs && player.expandedAttrs.playstyle) || [];
     const allowed = ctx.allowed || BALL_ACTIONS;
     // How much heavier pressure discourages (positive) or encourages
     // (negative, i.e. safety-first actions become relatively more attractive)
@@ -7969,62 +8205,16 @@ var App = (() => {
         if (action === 'backpass') w *= 1 / Math.max(0.6, ctx.mods.passVolMult || 1);
       }
 
-      // Individual playstyle tags — the same trait tags resolveChanceCreation
-      // already recognised for crossers/cutting-in wingers/creative playmakers
-      // now shape the decision itself instead of just the fixed cascade.
-      if (action === 'dribble' && styles.includes('Inside Forward')) w *= 1.6;
-      if (action === 'cross' && styles.some((s) => ['Cross Specialist', 'Prolific Winger', 'Roaming Flank', 'Offensive Full-back', 'Full-back Finisher'].includes(s))) w *= 1.6;
-      if (action === 'throughball' && styles.some((s) => ['Creative Playmaker', 'Classic No. 10', 'Orchestrator', 'Deep-Lying Forward'].includes(s))) w *= 1.6;
+      // Individual playstyle tags — data-driven via PLAYSTYLE_BEHAVIOR
+      // (engine/playstyleBehavior.js) so every tagged style nudges these
+      // weights in its own distinct direction, not just a hand-picked
+      // subset behind a fixed if-chain. See that file for the full
+      // per-style breakdown; these are internal behavior parameters, not
+      // raw attribute values, so two players with identical stat sheets
+      // but different tags still play noticeably differently here.
+      const styleMult = playstyleActionMult(player, action);
+      if (styleMult !== 1) w *= styleMult;
       if (hasSkill(player, 'Attack Trigger') && (action === 'dribble' || action === 'carry' || action === 'throughball')) w *= 1.08;
-
-      // A pure box player wants the ball played into the box for him to
-      // finish, not to drop deep and carry/dribble it up himself — a
-      // Goal Poacher/Fox in the Box receiving it outside the area looks to
-      // get a shot away or get it back into a dangerous area fast rather
-      // than dictate the move.
-      if (styles.includes('Goal Poacher') || styles.includes('Fox in the Box')) {
-        if (action === 'shoot') w *= 1.35;
-        if (action === 'hold') w *= 1.25;
-        if (action === 'dribble' || action === 'carry') w *= 0.7;
-      }
-      // Box-to-box is defined by covering the full length of the pitch —
-      // more willing to carry/drive forward with it himself than a
-      // stay-at-home teammate in the same shirt number.
-      if (styles.includes('Box-to-Box')) {
-        if (action === 'carry') w *= 1.3;
-        if (action === 'dribble') w *= 1.15;
-        if (action === 'backpass' || action === 'hold') w *= 0.85;
-      }
-      // A deep-lying forward/hole player is a false-nine type who drops to
-      // link play — looks to find the pass rather than force a shot.
-      if (styles.includes('Deep-Lying Forward') || styles.includes('Hole Player')) {
-        if (action === 'pass' || action === 'throughball') w *= 1.3;
-        if (action === 'hold') w *= 1.1;
-        if (action === 'shoot') w *= 0.9;
-      }
-      // A target man's whole game is holding the ball up for support to
-      // arrive, not beating a man himself.
-      if (styles.includes('Target Man')) {
-        if (action === 'hold') w *= 1.4;
-        if (action === 'dribble') w *= 0.6;
-      }
-      // Anchor Man/Destroyer sit and screen — they recycle the ball safely
-      // rather than gambling on a risky forward action.
-      if (styles.includes('Anchor Man') || styles.includes('Destroyer')) {
-        if (action === 'backpass' || action === 'pass') w *= 1.2;
-        if (action === 'dribble' || action === 'throughball' || action === 'shoot') w *= 0.6;
-      }
-      // An Orchestrator/Build Up player dictates tempo from deep — favors
-      // the considered pass/switch over trying to run past someone.
-      if (styles.includes('Orchestrator') || styles.includes('Build Up')) {
-        if (action === 'pass' || action === 'switch') w *= 1.25;
-        if (action === 'dribble') w *= 0.8;
-      }
-      // Attacking full-backs/wing-backs bombing forward look to carry the
-      // width and get a cross in more than a standard full-back would.
-      if (styles.includes('Extra Frontman') || styles.includes('Offensive Full-back') || styles.includes('Full-back Finisher')) {
-        if (action === 'carry' || action === 'cross') w *= 1.2;
-      }
 
       // Personality tags (player-attributes.json "personality", optional —
       // undefined on any player without a hand-authored entry, in which case
