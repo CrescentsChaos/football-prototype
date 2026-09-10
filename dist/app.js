@@ -10817,7 +10817,7 @@ var App = (() => {
         const ps = m.playerMatchStats && m.playerMatchStats[p.id];
         const statBadges = dotStatBadges(ps);
         const ratingBadge = dotRatingBadge(ps);
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}" onclick="App.showPlayerProfile('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.showPlayerProfile('${p.id}')}" role="button" tabindex="0" title="${(p.name || '').replace(/"/g, '&quot;')}">
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}${ratingBadge ? ' has-rating' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}" onclick="App.showPlayerProfile('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.showPlayerProfile('${p.id}')}" role="button" tabindex="0" title="${(p.name || '').replace(/"/g, '&quot;')}">
           <span class="dot-pos">${slots[idx] || ''}</span>
           <span class="dot-avatar">${playerAvatarMark(p)}</span>${roleBadges}${statBadges}${ratingBadge}
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
@@ -10879,7 +10879,11 @@ var App = (() => {
     if (!ps) return '';
     const r = calcPlayerRating(ps);
     ps.rating = r;
-    const cls = r >= 7.5 ? 'rating-high' : r >= 6.5 ? 'rating-mid' : 'rating-low';
+    // Man of the Match always renders blue on the pitch dot too, same
+    // override renderRatingRow() already applies in the post-match ratings
+    // list — takes priority over the usual high/mid/low performance color.
+    const isMotm = currentMatch && currentMatch.motmId != null && currentMatch.motmId === ps.id;
+    const cls = isMotm ? 'rating-motm' : r >= 7.5 ? 'rating-high' : r >= 6.5 ? 'rating-mid' : 'rating-low';
     return `<span class="dot-rating ${cls}">${r.toFixed(1)}</span>`;
   }
 
