@@ -919,6 +919,15 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
    rating chip's own performance color (high/mid/low) instead of letting
    that green bleed into it. */
 .player-dot.sub-on .dot-rating { filter: none; }
+/* The jersey number/name label sits right below the dot (top:100% + a
+   4px margin) — fine for a plain dot, but the rating chip overlaps that
+   same lower edge (by design, so it reads like it's docked to the photo)
+   and sits at a higher z-index than the label, so without more clearance
+   here the chip was rendering on top of — and hiding — the jersey number.
+   Only dots that actually carry a rating chip (.has-rating, set in
+   ui/matchUI.js::renderPitch()) need the extra gap; a plain dot with no
+   rating (e.g. the Teams tab lineup viewer) keeps its tighter default. */
+.player-dot.has-rating .dot-label { margin-top: 14px; }
 
 /* Lineup lists */
 .lineup-grid {
