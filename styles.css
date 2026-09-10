@@ -493,18 +493,23 @@ select:focus, input:focus {
 }
 label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: block; margin-bottom: 6px; letter-spacing: 0.2px; }
 
-/* Scoreboard - game broadcast style */
+/* ============================================================
+   LIVE MATCH SCOREBOARD — Sofascore-style broadcast header
+   (single source of truth: all scoreboard rules live here so
+   mobile/desktop never fight duplicate/conflicting overrides)
+   ============================================================ */
 .scoreboard {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 12px; align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px 14px; align-items: start;
   background: linear-gradient(180deg, #0c1524, #081018);
   border: 1px solid var(--border-strong);
   border-radius: 16px;
-  padding: 20px 16px;
-  margin-bottom: 16px;
+  padding: 18px 16px;
+  margin: 8px 0 20px;
   box-shadow: 0 0 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
   position: relative;
+  overflow: visible;
 }
 .scoreboard::before {
   content: '';
@@ -524,22 +529,57 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   0% { background-position: 140% 0; }
   100% { background-position: -140% 0; }
 }
-.score-team { text-align: center; min-width: 0; }
-.score-team.home { text-align: left; }
-.score-team.away { text-align: right; }
-.score-team .flag { font-size: 2rem; display: block; margin-bottom: 4px; }
-.score-team .name {
-  font-family: var(--display); font-weight: 700; font-size: 0.95rem;
-  letter-spacing: 0.5px; word-break: break-word;
+
+.score-team {
+  display: flex; flex-direction: column;
+  min-width: 0; max-width: 100%;
+  overflow: hidden;
 }
-.score-team .formation { font-size: 0.75rem; color: var(--text-3); margin-top: 2px; }
-.score-center { text-align: center; padding: 0 8px; }
+.score-team.home { text-align: left; align-items: flex-start; }
+.score-team.away { text-align: right; align-items: flex-end; }
+
+.score-team .flag { line-height: 1; margin-bottom: 6px; }
+/* Crest tile — gives the flag/logo a consistent circular badge instead of
+   a bare emoji/image floating on the scoreboard background. */
+.score-team .flag .team-mark {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  padding: 4px;
+  box-sizing: content-box;
+}
+.score-team .name {
+  display: block; max-width: 100%;
+  font-family: var(--font); font-weight: 700; font-size: 0.92rem;
+  letter-spacing: 0.2px; line-height: 1.25;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.score-team .formation {
+  display: block; max-width: 100%;
+  font-size: 0.7rem; color: var(--text-3); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Manager line can run long ("Name (Playstyle)") — keep it on one row and
+   clip with an ellipsis instead of wrapping into the goal-scorer list
+   below it or spilling past the scoreboard column. */
+.score-team .mgr {
+  max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.score-team .mgr span { overflow: hidden; text-overflow: ellipsis; }
+
+.score-center {
+  text-align: center; padding: 0 6px;
+  flex-shrink: 0; min-width: 84px;
+}
 .score-numbers {
-  font-family: var(--numeral), var(--display); font-size: clamp(2rem, 5.6vw, 3.1rem);
-  font-weight: 700; letter-spacing: 2px;
+  font-family: var(--numeral), var(--display);
+  font-size: clamp(1.9rem, 5.2vw, 2.9rem);
+  font-weight: 800; letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
   color: var(--gold);
   text-shadow: 0 0 30px var(--gold-glow);
-  display: inline-block;
+  display: inline-block; white-space: nowrap;
   transition: transform 0.25s var(--ease-snap);
 }
 .score-numbers.score-pop { animation: scorePop 0.55s var(--ease-snap); }
@@ -550,16 +590,39 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   100% { transform: scale(1); text-shadow: 0 0 30px var(--gold-glow); }
 }
 .score-time {
-  font-family: var(--display); font-size: 1rem; color: var(--cyan);
-  margin-top: 4px; font-weight: 700;
+  font-family: var(--font), system-ui, sans-serif;
+  font-size: 0.95rem; color: var(--cyan);
+  margin-top: 6px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .match-status {
-  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px;
-  color: var(--text-3); margin-top: 4px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--text-3); margin-top: 4px; font-weight: 700;
+  white-space: nowrap;
 }
+/* Sofascore-style pulsing red dot next to the status label while the ball
+   is actually rolling — toggled via .is-live/.is-break on #score-center
+   from updateScoreboard() (JS decides the state, CSS just renders it). */
+.live-dot {
+  display: none; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--red, #ef4444);
+  animation: liveDotPulse 1.6s infinite;
+}
+.score-center.is-live .live-dot { display: inline-block; }
+.score-center.is-live .match-status { color: var(--red, #ef4444); }
+.score-center.is-break .match-status { color: var(--gold); }
+@keyframes liveDotPulse {
+  0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.55); }
+  70% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+.match-venue { margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
 .goal-scorers {
-  margin-top: 10px; font-size: 0.72rem; line-height: 1.4;
-  color: var(--text-2); font-weight: 600; max-width: 150px;
+  margin-top: 8px; font-size: 0.7rem; line-height: 1.45;
+  color: var(--text-2); font-weight: 600; max-width: 100%;
+  word-break: break-word;
 }
 .score-team.home .goal-scorers { text-align: left; }
 .score-team.away .goal-scorers, .away-scorers { text-align: right; margin-left: auto; }
@@ -569,31 +632,54 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .playstyle-tag { color: var(--text-muted); font-weight: 500; }
 .gt-method { font-weight: 400; color: var(--text-3); font-size: 0.65rem; }
 
+@media (max-width: 640px) {
+  .scoreboard { padding: 14px 10px; gap: 6px 8px; }
+  .score-team .name { font-size: 0.78rem; }
+  .score-team .flag .team-mark { padding: 3px; }
+  .score-center { min-width: 66px; }
+  .score-numbers { font-size: clamp(1.5rem, 8.5vw, 2rem); }
+  .score-time { font-size: 0.82rem; }
+  .match-status { font-size: 0.6rem; letter-spacing: 0.8px; }
+}
+
 /* Match controls */
 .match-controls {
   display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
   margin-bottom: 16px;
 }
 
-/* Events feed - ticker style */
+/* ============================================================
+   LIVE MATCH BODY — commentary feed + stats panel
+   ============================================================ */
+.events-container {
+  display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start;
+}
+@media (min-width: 860px) {
+  /* Feed + stat bars side by side once there's room, same as Sofascore's
+     match-centre layout — narrower screens keep them stacked (see the
+     single-column default above) so nothing gets squeezed. */
+  .events-container { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+}
+
 .events-feed, #events-feed {
-  max-height: 320px; overflow-y: auto;
+  max-height: 420px; overflow-y: auto;
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px;
+  padding: 8px;
 }
 .event-item {
   font-size: 0.84rem; line-height: 1.45;
   border-left: 3px solid var(--border);
-  padding: 8px 10px; margin-bottom: 4px;
-  border-radius: 0 8px 8px 0;
-  background: rgba(255,255,255,0.02);
-  display: flex; gap: 8px; align-items: flex-start;
+  padding: 9px 10px; margin-bottom: 6px;
+  border-radius: 0 10px 10px 0;
+  background: rgba(255,255,255,0.03);
+  display: flex; gap: 10px; align-items: flex-start;
   animation: eventIn var(--dur-base) var(--ease-out);
   transition: background var(--dur-fast) ease;
 }
-.event-item:hover { background: rgba(255,255,255,0.045); }
+.event-item:last-child { margin-bottom: 0; }
+.event-item:hover { background: rgba(255,255,255,0.06); }
 @keyframes eventIn {
   from { opacity: 0; transform: translateX(-10px); }
   to { opacity: 1; transform: none; }
@@ -610,12 +696,79 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .event-item.event-card-red { border-left-color: var(--red); background: rgba(239,68,68,0.08); }
 .event-item.event-injury { border-left-color: var(--orange); }
-.event-icon {
-  font-size: 0.85rem; min-width: 24px; flex-shrink: 0;
+.event-item.event-sub { border-left-color: #22d3ee; background: rgba(34,211,238,0.06); }
+/* Which side the event belongs to — subtle team-colour accent, matching
+   the blue/red used in the stat bars below, so the feed reads at a glance
+   the way Sofascore's commentary does. Goals/reds/subs keep their own
+   accent colour above this (later rule) rather than being overridden. */
+.event-item.event-home { border-left-color: #60a5fa; }
+.event-item.event-away { border-left-color: #f87171; }
+.event-item.event-goal.event-home, .event-item.event-goal.event-away { border-left-color: var(--gold); }
+.event-item.event-card-red.event-home, .event-item.event-card-red.event-away { border-left-color: var(--red); }
+.event-item.event-sub.event-home, .event-item.event-sub.event-away { border-left-color: #22d3ee; }
+
+/* Minute badge — was previously unstyled (markup used .event-time while
+   only .event-min had rules), so it inherited body text size with no
+   fixed width and could wrap into/overlap the icon and commentary text
+   next to it, especially on narrow screens. Fixed width + tabular nums
+   keeps every row's icon/text starting at the same x position. */
+.event-time {
+  font-family: var(--display); font-size: 0.72rem; color: var(--gold);
+  font-weight: 700; min-width: 30px; flex-shrink: 0;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding-top: 1px;
 }
-.event-min {
-  font-family: var(--display); font-size: 0.7rem; color: var(--gold);
-  font-weight: 700; min-width: 28px;
+.event-icon {
+  font-size: 0.9rem; min-width: 20px; flex-shrink: 0;
+  line-height: 1.3; text-align: center;
+}
+.event-text { flex: 1; min-width: 0; line-height: 1.45; word-break: break-word; }
+
+/* Match stats panel — previously had no rules at all (bare text sitting
+   next to the feed with no card, padding or heading style). */
+.match-stats-panel {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  align-self: start;
+}
+.stat-label {
+  font-family: var(--display); font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.5px; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.stat-block { margin-bottom: 14px; }
+.stat-block:last-child { margin-bottom: 0; }
+.stat-block .stat-name {
+  text-align: center; font-size: 0.72rem; color: var(--text-muted);
+  margin-bottom: 6px; letter-spacing: 0.2px;
+}
+.stat-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.85rem; font-weight: 700;
+}
+.stat-val { min-width: 28px; font-variant-numeric: tabular-nums; text-align: center; }
+.stat-bar-wrap {
+  flex: 1; height: 7px; background: rgba(255,255,255,0.06);
+  border-radius: 4px; overflow: hidden; position: relative;
+}
+.stat-bar-home {
+  position: absolute; left: 0; top: 0; height: 100%;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  border-radius: 4px 0 0 4px;
+  transition: width var(--dur-slow) var(--ease-smooth);
+}
+.stat-bar-away {
+  position: absolute; right: 0; top: 0; height: 100%;
+  background: linear-gradient(90deg, #f87171, #ef4444);
+  border-radius: 0 4px 4px 0;
+  transition: width var(--dur-slow) var(--ease-smooth);
+}
+@media (max-width: 640px) {
+  .events-feed, #events-feed { max-height: 320px; }
+  .match-stats-panel { padding: 12px; }
 }
 
 /* Pitch */
@@ -760,29 +913,6 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   margin-left: auto; font-weight: 800; font-size: 0.8rem;
   color: var(--green); background: rgba(34,197,94,0.12);
   padding: 2px 7px; border-radius: 6px;
-}
-
-/* Stats bars */
-.stat-row {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 2px;
-  font-size: 0.85rem; font-weight: 700;
-}
-.stat-val { min-width: 32px; font-variant-numeric: tabular-nums; }
-.stat-bar-wrap {
-  flex: 1; height: 7px; background: rgba(255,255,255,0.06);
-  border-radius: 4px; overflow: hidden; position: relative;
-}
-.stat-bar-home {
-  position: absolute; left: 0; top: 0; height: 100%;
-  background: linear-gradient(90deg, #2563eb, #60a5fa);
-  border-radius: 4px 0 0 4px;
-  transition: width var(--dur-slow) var(--ease-smooth);
-}
-.stat-bar-away {
-  position: absolute; right: 0; top: 0; height: 100%;
-  background: linear-gradient(90deg, #f87171, #ef4444);
-  border-radius: 0 4px 4px 0;
-  transition: width var(--dur-slow) var(--ease-smooth);
 }
 
 /* Teams search toolbar */
@@ -1367,7 +1497,6 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   .header-inner { flex-direction: column; height: auto; padding: 10px 12px; gap: 8px; }
   .nav-tabs { width: 100%; justify-content: flex-start; }
   .nav-tab { padding: 7px 12px; font-size: 0.75rem; }
-  .scoreboard { padding: 14px 10px; }
   .main-content { padding: 14px 12px 32px; }
 }
 
@@ -1392,48 +1521,6 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
   position: sticky;
   top: 0;
   z-index: 200;
-}
-/* Prevent scoreboard text collision */
-.scoreboard {
-  overflow: hidden;
-}
-.score-team .name {
-  font-size: 0.85rem;
-  line-height: 1.2;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font);
-  -webkit-text-fill-color: var(--text);
-  background: none;
-  color: var(--text);
-}
-.score-numbers {
-  font-family: var(--font), system-ui, sans-serif;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.05em;
-  -webkit-text-fill-color: var(--gold);
-  background: none;
-  color: var(--gold);
-}
-.score-time {
-  font-family: var(--font), system-ui, sans-serif;
-  -webkit-text-fill-color: var(--cyan);
-  background: none;
-  color: var(--cyan);
-}
-.score-team .formation {
-  display: block;
-  font-size: 0.68rem;
-  color: var(--text-3);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.score-team .flag {
-  line-height: 1.2;
 }
 /* Podium */
 .podium {
@@ -1743,83 +1830,10 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 #match-live {
   padding-top: 8px;
 }
-.scoreboard {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
-  gap: 8px 12px !important;
-  align-items: start !important;
-  margin-top: 8px;
-  margin-bottom: 20px !important;
-  padding: 16px 12px !important;
-  overflow: visible !important;
-}
-.score-team {
-  min-width: 0 !important;
-  max-width: 100%;
-  overflow: hidden;
-}
-.score-team .name {
-  display: block !important;
-  font-size: 0.9rem !important;
-  font-weight: 700 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  line-height: 1.25 !important;
-  color: var(--text) !important;
-  background: none !important;
-  -webkit-text-fill-color: var(--text) !important;
-  font-family: var(--font) !important;
-  max-width: 100%;
-}
-.score-team .formation {
-  display: block !important;
-  font-size: 0.7rem !important;
-  color: var(--text-3) !important;
-  margin-top: 2px !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  line-height: 1.2 !important;
-}
-.score-team .flag {
-  display: block;
-  font-size: 1.6rem;
-  margin-bottom: 4px;
-  line-height: 1;
-}
-.score-center {
-  flex-shrink: 0;
-  padding: 0 4px;
-}
-.score-numbers {
-  font-size: clamp(1.6rem, 4.5vw, 2.4rem) !important;
-  white-space: nowrap;
-  font-family: system-ui, -apple-system, sans-serif !important;
-  font-weight: 800 !important;
-  color: var(--gold) !important;
-  -webkit-text-fill-color: var(--gold) !important;
-  background: none !important;
-}
-.goal-scorers {
-  margin-top: 8px !important;
-  max-width: 100%;
-  font-size: 0.7rem !important;
-  line-height: 1.35 !important;
-  word-break: break-word;
-}
-.score-team.home { text-align: left !important; }
-.score-team.away { text-align: right !important; }
-.score-team.away .goal-scorers { text-align: right; margin-left: auto; }
 
 /* Section spacing */
 .card { margin-bottom: 20px !important; }
 .match-controls { margin: 16px 0 !important; gap: 10px !important; }
-#events-feed, .events-feed {
-  margin-top: 8px;
-  margin-bottom: 20px;
-  max-height: 360px;
-}
 /* Extra bottom margin (vs the base 16px 0 rule above) reserves clear space
    after the pitch box for the goalkeeper's name label, which sits below
    the GK dot right at the pitch's bottom edge and can spill past the box
@@ -1874,19 +1888,6 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .et-prompt.show { display: flex; }
 .et-prompt p { width: 100%; color: var(--text-2); font-size: 0.9rem; margin-bottom: 4px; }
-
-/* Sofascore-ish commentary */
-.event-item {
-  padding: 10px 12px !important;
-  margin-bottom: 6px !important;
-  border-radius: 10px !important;
-  background: rgba(255,255,255,0.03) !important;
-}
-.event-item.event-sub {
-  border-left-color: #22d3ee !important;
-  background: rgba(34,211,238,0.06) !important;
-}
-.event-text { flex: 1; line-height: 1.4; }
 
 /* Squad builder custom UI */
 .sb-pick-btn {
