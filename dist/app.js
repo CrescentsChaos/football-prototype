@@ -10342,7 +10342,7 @@ var App = (() => {
     if (!feed) return;
     const icons = { goal: emojiImg(isPenalty ? 'penalty_goal' : 'goal', isPenalty ? 'Penalty goal' : 'Goal'), save: '🧤', yellow: emojiImg('yellow_card', 'Yellow card'), red: emojiImg('red_card', 'Red card'), sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', tackle: '🦵', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: emojiImg('whistle', 'Whistle'), pressure: '🔥', motm: '⭐', var: '📺', pen: emojiImg('penalty_goal', 'Penalty'), skill: '✨', handball: '✋', et: '⏱️' };
     const div = document.createElement('div');
-    div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
+    div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '') + (type === 'sub' ? ' event-sub' : '') + (side === 'home' ? ' event-home' : side === 'away' ? ' event-away' : '');
     div.innerHTML = `<span class="event-time">${dispLabel}</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
     feed.insertBefore(div, feed.firstChild);
     if (['goal','sub','yellow','red','injury','pen'].includes(type)) {
@@ -10390,6 +10390,16 @@ var App = (() => {
     popIfChanged('live-away-score', as_);
     set('live-minute', m.inPens ? 'Pens' : (m.dispLabel || (m.minute + "'")));
     set('live-status', m.status);
+    // Sofascore-style pulsing dot next to the status label — on while the
+    // clock is actually running, off during Half Time/shootouts/Full Time.
+    const scoreCenter = document.getElementById('score-center');
+    if (scoreCenter) {
+      const status = m.status || '';
+      const finished = /Full Time/.test(status);
+      const onBreak = !finished && (m.inPens || /Half Time/.test(status));
+      scoreCenter.classList.toggle('is-live', !finished && !onBreak);
+      scoreCenter.classList.toggle('is-break', onBreak);
+    }
     set('live-venue', '🏟️ ' + getStadium(m.home.team));
     renderGoalTimeline();
     if (m.userSide) renderCareerPanel();
@@ -10500,21 +10510,23 @@ var App = (() => {
     const el = document.getElementById('live-stats');
     if (!el) return;
     const hp = (v, t) => t ? Math.round((v/t)*100) : 50;
-    el.innerHTML = `
-      <div class="stat-row"><span class="stat-val">${h.shots}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shots,ts)}%"></div><div class="stat-bar-away" style="width:${hp(a.shots,ts)}%"></div></div><span class="stat-val">${a.shots}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Shots</div>
-      <div class="stat-row"><span class="stat-val">${h.shotsOn}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shotsOn,ton)}%"></div><div class="stat-bar-away" style="width:${hp(a.shotsOn,ton)}%"></div></div><span class="stat-val">${a.shotsOn}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">On Target</div>
-      <div class="stat-row"><span class="stat-val">${h.possession}%</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${h.possession}%"></div><div class="stat-bar-away" style="width:${a.possession}%"></div></div><span class="stat-val">${a.possession}%</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Possession</div>
-      <div class="stat-row"><span class="stat-val">${h.corners}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.corners,tc)}%"></div><div class="stat-bar-away" style="width:${hp(a.corners,tc)}%"></div></div><span class="stat-val">${a.corners}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Corners</div>
-      <div class="stat-row"><span class="stat-val">${h.fouls}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.fouls,tf)}%"></div><div class="stat-bar-away" style="width:${hp(a.fouls,tf)}%"></div></div><span class="stat-val">${a.fouls}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Fouls</div>
-      <div class="stat-row"><span class="stat-val">${h.saves}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.saves,tsv)}%"></div><div class="stat-bar-away" style="width:${hp(a.saves,tsv)}%"></div></div><span class="stat-val">${a.saves}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Saves</div>
-      <div class="stat-row"><span class="stat-val">${h.yellows}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.yellows,h.yellows+a.yellows||1)}%"></div><div class="stat-bar-away" style="width:${hp(a.yellows,h.yellows+a.yellows||1)}%"></div></div><span class="stat-val">${a.yellows}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted)">Yellow Cards</div>`;
+    // Sofascore-style stat rows: label centered above, home value / bar /
+    // away value below — each pair wrapped in its own .stat-block so
+    // spacing between rows is consistent instead of relying on stray
+    // inline margins between two independently-ordered divs.
+    const block = (label, hv, av, pctH, pctA) => `
+      <div class="stat-block">
+        <div class="stat-name">${label}</div>
+        <div class="stat-row"><span class="stat-val">${hv}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${pctH}%"></div><div class="stat-bar-away" style="width:${pctA}%"></div></div><span class="stat-val">${av}</span></div>
+      </div>`;
+    el.innerHTML =
+      block('Shots', h.shots, a.shots, hp(h.shots, ts), hp(a.shots, ts)) +
+      block('On Target', h.shotsOn, a.shotsOn, hp(h.shotsOn, ton), hp(a.shotsOn, ton)) +
+      block('Possession', h.possession + '%', a.possession + '%', h.possession, a.possession) +
+      block('Corners', h.corners, a.corners, hp(h.corners, tc), hp(a.corners, tc)) +
+      block('Fouls', h.fouls, a.fouls, hp(h.fouls, tf), hp(a.fouls, tf)) +
+      block('Saves', h.saves, a.saves, hp(h.saves, tsv), hp(a.saves, tsv)) +
+      block('Yellow Cards', h.yellows, a.yellows, hp(h.yellows, (h.yellows + a.yellows) || 1), hp(a.yellows, (h.yellows + a.yellows) || 1));
   }
 
 
