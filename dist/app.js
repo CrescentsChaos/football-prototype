@@ -156,8 +156,8 @@ var App = (() => {
   // pac/phy/tec/ovr as read from teams.json for that player are ignored —
   // see applyExpandedPlayerAttributes()).
   let playerAttributesData = {};
-  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
-  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
   // Permanent, never-reset per-player totals (goals, assists, apps, etc.)
   // across every season the save has ever played — this is what the
   // Players tab / player profile's "Career (competitive)" panel reads from.
@@ -166,7 +166,7 @@ var App = (() => {
   // wiped by archiveAndResetGlobalAwards() at every season end; careerStats
   // uses the exact same shape but is only ever added to, never reset, so
   // ending a season doesn't erase a player's lifetime totals.
-  let careerStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
+  let careerStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
   // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
   // can also tally into that competition's own stat bucket (comp.stats), giving each
@@ -10022,14 +10022,39 @@ var App = (() => {
     try { renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI(); } catch(e) {}
     if (tournament) { try { refreshTournamentStatsUI(); } catch(e) {} }
     addEvent(m.minute || 90, 'whistle', `Full Time! ${m.home.team.short} ${m.home.score} - ${m.away.score} ${m.away.team.short}`, null);
-    if (m.away.score === 0) {
-      const gk = (m.home.squad.starting || []).find(p => (p.pos || []).includes('GK'));
-      if (gk) recordStat('cleanSheets', gk, m.home.team);
+    // Clean sheet credit: the goalkeeper always qualified for this (as
+    // before), but a clean sheet is a back-line achievement, not just a
+    // keeper one — the back four/five (CB/RB/LB/RWB/LWB) who were actually
+    // on the pitch at full time share the credit too. This used to be
+    // GK-only, which meant a defender's own stat line — and the
+    // Defenders' Award, which scores clean sheets alongside interceptions
+    // and tackles (see the 'defenders' branch in ui/statisticsUI.js) —
+    // could never actually reflect the clean sheets they helped keep.
+    // The eligible-id sets computed here are reused below (see
+    // homeCleanSheetIds/awayCleanSheetIds) to also set the per-match
+    // ps.cleanSheet flag that calcPlayerRating reads for its GK/defender
+    // breakout-rating check.
+    function cleanSheetEligibleIds(side) {
+      const onPitchIds = side === 'home' ? (m.homeOnPitch || []) : (m.awayOnPitch || []);
+      const allSquad = (m[side].squad && m[side].squad.all) || [];
+      const ids = new Set();
+      const gk = (m[side].squad.starting || []).find(p => (p.pos || []).includes('GK'));
+      if (gk) ids.add(gk.id);
+      allSquad.forEach(p => {
+        if (onPitchIds.includes(p.id) && (p.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) ids.add(p.id);
+      });
+      return ids;
     }
-    if (m.home.score === 0) {
-      const gk = (m.away.squad.starting || []).find(p => (p.pos || []).includes('GK'));
-      if (gk) recordStat('cleanSheets', gk, m.away.team);
-    }
+    const homeCleanSheetIds = m.away.score === 0 ? cleanSheetEligibleIds('home') : new Set();
+    const awayCleanSheetIds = m.home.score === 0 ? cleanSheetEligibleIds('away') : new Set();
+    homeCleanSheetIds.forEach(id => {
+      const p = (m.home.squad.all || []).find(x => x.id === id);
+      if (p) recordStat('cleanSheets', p, m.home.team);
+    });
+    awayCleanSheetIds.forEach(id => {
+      const p = (m.away.squad.all || []).find(x => x.id === id);
+      if (p) recordStat('cleanSheets', p, m.away.team);
+    });
     // Compute ratings for everyone who played, then MOTM = highest rating
     if (!m.playerMatchStats) m.playerMatchStats = {};
     // Flag this match as a "big game" (knockout-stage/final, or two top-tier
@@ -10057,10 +10082,11 @@ var App = (() => {
       // final scoreline, keyed off which side this player was on.
       const concededSide = (m.home.squad.all||[]).find(x => x.id === p.id) ? 'home' : 'away';
       ps.goalsConceded = concededSide === 'home' ? m.away.score : m.home.score;
-      if ((ps.pos === 'GK' || (ps.posArr||[]).includes('GK'))) {
-        const side = concededSide;
-        if ((side === 'home' && m.away.score === 0) || (side === 'away' && m.home.score === 0)) ps.cleanSheet = true;
-      }
+      // Same eligibility (GK + on-pitch back line) as the season clean-sheet
+      // stat recorded above, so the per-match rating flag and the
+      // season/career leaderboard count never disagree about who kept it.
+      const csIds = concededSide === 'home' ? homeCleanSheetIds : awayCleanSheetIds;
+      if (csIds.has(p.id)) ps.cleanSheet = true;
       // Rating uses a small activity floor for players who genuinely played
       // but happened to see very little of the ball (e.g. a sub on for the
       // last few minutes) so they don't get an unfairly harsh 0-stat rating.
@@ -10101,6 +10127,15 @@ var App = (() => {
       // with this match's accumulated defensive totals.
       if (ps.interceptions > 0) recordStatCount('interceptions', p, teamObj, ps.interceptions);
       if (ps.tackles > 0) recordStatCount('tackles', p, teamObj, ps.tackles);
+      // Blocks and xG/xA are also real, live-simulated per-match totals by
+      // this point (set in engine/defending.js, engine/shooting.js, and
+      // engine/setpieces.js as the match runs) — feed them into the same
+      // season/career leaderboard buckets as everything else above so a
+      // player's profile and the Statistics tab can show season/career
+      // totals for them, not just this-match numbers.
+      if (ps.blocks > 0) recordStatCount('blocks', p, teamObj, ps.blocks);
+      if (ps.xg > 0) recordStatCount('xg', p, teamObj, ps.xg);
+      if (ps.xa > 0) recordStatCount('xa', p, teamObj, ps.xa);
       // Feed the "minutes" bucket so the Avg Rating leaderboard can require
       // a minimum share of available playing time (see showLeaderboard).
       const minutesPlayed = computeMinutesPlayed(m, p.id, p.name, concededSide);
@@ -10124,6 +10159,18 @@ var App = (() => {
     // for every player who took part, then roll those up into each side's
     // team totals — see deriveExtendedMatchStats() below.
     deriveExtendedMatchStats(m);
+    // Chance creation ("Chances Created" on a player's profile/leaderboard)
+    // is the season/career total of key passes — passes that led directly
+    // to a shot. keyPasses only exists on ps once deriveExtendedMatchStats()
+    // above has run, so this has to be its own pass over `pool` rather than
+    // folding into the interceptions/tackles/blocks/xG/xA loop earlier,
+    // which runs before that derivation.
+    pool.forEach(p => {
+      const ps = m.playerMatchStats[p.id];
+      if (!ps || !(ps.keyPasses > 0)) return;
+      const teamObj = (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team;
+      recordStatCount('chancesCreated', p, teamObj, ps.keyPasses);
+    });
     let best = null, bestR = -1;
     Object.values(m.playerMatchStats).forEach(ps => {
       if (ps.rating > bestR) { bestR = ps.rating; best = ps; }
@@ -10954,7 +11001,7 @@ var App = (() => {
   // Shape used for every per-competition stat bucket: season leagues, the season's
   // UCL, and (already existing) the global `stats` / `tournamentStats` buckets.
   function blankCompStats() {
-    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
   }
 
   function bumpStatBucket(bucket, type, player, team) {
@@ -11539,12 +11586,12 @@ var App = (() => {
     // tab / player profile) is a completely separate, never-reset bucket —
     // see its declaration in js/state.js — so ending a season no longer
     // wipes a player's career goals/assists/apps/etc.
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
     // otherwise this would wipe that tournament's own live leaderboard mid-run.
     if (!tournament || tournament.champion) {
-      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     }
     saveStats();
   }
@@ -12183,8 +12230,14 @@ var App = (() => {
       el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No ${type} recorded yet. Simulate matches!</p></div>`;
       return;
     }
-    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating', interceptions: 'Interceptions' };
+    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating', interceptions: 'Interceptions', tackles: 'Tackles', blocks: 'Blocks', chancesCreated: 'Chances Created', xg: 'xG', xa: 'xA' };
     const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
+    // xG/xA accumulate in fractional increments (a fraction of a goal/assist
+    // "expected" per chance, not a whole-number event like a tackle or an
+    // interception) — round those two to 2dp for display instead of
+    // printing a long raw float.
+    const isDecimalStat = type === 'xg' || type === 'xa';
+    const fmtCount = (v) => isDecimalStat ? (v || 0).toFixed(2) : v;
     const top3 = data.slice(0, 3);
     const podium = top3.length ? `<div class="lb-podium">
       ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1} player-clickable" onclick="App.showPlayerProfile('${p.id}')">
@@ -12192,7 +12245,7 @@ var App = (() => {
           ${lbAvatar(p, 56)}
           <div class="lb-podium-name">${playerNameHTML(p)}</div>
           <div class="lb-podium-team">${[p.national, p.club].filter(Boolean).join(' · ') || p.team || ''}</div>
-          <div class="lb-podium-value">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—') : p.count}</div>
+          <div class="lb-podium-value">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—') : fmtCount(p.count)}</div>
         </div>`).join('')}
     </div>` : '';
     el.innerHTML = `${podium}<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th>${appsCol}<th>${labels[type]||type}</th></tr></thead><tbody>
@@ -12200,7 +12253,7 @@ var App = (() => {
         const aff = [p.national, p.club].filter(Boolean).join(' · ') || p.team;
         const apps = (stats.ratings && stats.ratings[p.id]) ? stats.ratings[p.id].count : 0;
         const appsCell = type === 'ratings' ? '' : `<td>${apps}</td>`;
-        return `<tr class="${i<3?'lb-row-top rank-'+(i+1):''}"><td class="lb-rank">${rankBadge(i)}</td><td class="lb-player">${lbPlayerCell(p)}</td><td class="lb-team">${aff}</td>${appsCell}<td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : p.count}</td></tr>`;
+        return `<tr class="${i<3?'lb-row-top rank-'+(i+1):''}"><td class="lb-rank">${rankBadge(i)}</td><td class="lb-player">${lbPlayerCell(p)}</td><td class="lb-team">${aff}</td>${appsCell}<td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : fmtCount(p.count)}</td></tr>`;
       }).join('')}
     </tbody></table></div>`;
   }
@@ -12340,7 +12393,7 @@ var App = (() => {
     if (selected.length < minTeams) { toast('Select at least ' + minTeams + ' teams'); return; }
 
     applyTournamentBranding(tournamentType);
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {}, minutes: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     // Wipe the player/team match logs for the new tournament. These logs
     // exist to show recent form (last 10, capped at 30) for whatever's
     // currently being played — carrying entries over from a finished
@@ -15342,6 +15395,25 @@ var App = (() => {
     const y = playerCareerCount('yellows', playerId);
     const rd = playerCareerCount('reds', playerId);
     const apps = playerCareerCount('ratings', playerId);
+    // Newer career totals — interceptions/blocks/chances created (key
+    // passes) and xA all accumulate the same way goals/assists do (see
+    // recordStatCount() calls in engine/matchEngine.js::endMatch), so they
+    // read off careerStats via the same playerCareerCount() helper as
+    // everything else above. Avg rating is the one exception: it's a mean,
+    // not a running total, so it's read straight off the ratings bucket's
+    // own `.avg` field instead.
+    const ints = playerCareerCount('interceptions', playerId);
+    const blk = playerCareerCount('blocks', playerId);
+    const cc = playerCareerCount('chancesCreated', playerId);
+    const xaTotal = playerCareerCount('xa', playerId);
+    const avgRatingEntry = (careerStats.ratings || {})[playerId];
+    const avgRating = avgRatingEntry && avgRatingEntry.count ? avgRatingEntry.avg : null;
+    // Goal+assist involvement per 90 minutes — needs a real minutes total
+    // (careerStats.minutes, fed by the same computeMinutesPlayed() figure
+    // used everywhere else) rather than just apps, since a bench-heavy
+    // career shouldn't read the same as a nailed-on starter's.
+    const careerMinutes = ((careerStats.minutes || {})[playerId] || {}).count || 0;
+    const gaPer90 = careerMinutes > 0 ? ((g + a) * 90 / careerMinutes) : null;
     const primary = (team && team.color) || '#d4af37';
     const secondary = (team && team.secondary) || '#fff';
     const ms = (currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) || null;
@@ -15424,6 +15496,12 @@ var App = (() => {
         <div class="profile-stat"><div class="val">${s}</div><div class="lbl">Saves</div></div>
         <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
         <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
+        <div class="profile-stat"><div class="val">${avgRating != null ? avgRating.toFixed(2) : '—'}</div><div class="lbl">Avg Rating</div></div>
+        <div class="profile-stat"><div class="val">${cc}</div><div class="lbl">Chances Created</div></div>
+        <div class="profile-stat"><div class="val">${xaTotal.toFixed(2)}</div><div class="lbl">xA</div></div>
+        <div class="profile-stat"><div class="val">${ints}</div><div class="lbl">Interceptions</div></div>
+        <div class="profile-stat"><div class="val">${blk}</div><div class="lbl">Blocks</div></div>
+        <div class="profile-stat"><div class="val">${gaPer90 != null ? gaPer90.toFixed(2) : '—'}</div><div class="lbl">G+A / 90</div></div>
       </div>
       ${renderPlayerRatingFormChartHTML(player.id)}
       ${renderPlayerMatchLogHTML(player.id)}
