@@ -10763,9 +10763,16 @@ var App = (() => {
         // lineup list (roleBadgesHTML()) and in the Teams tab preview
         // (roleBadgesForPreview()), just missing from this pitch view.
         const roleBadges = roleBadgesForIds(s.roles, p.id, 'sb-role-ic');
+        // Goal/assist/rating badges only make sense once the player has
+        // actually appeared and picked up match stats — an unused sub or
+        // a brand-new kickoff view (no playerMatchStats entry yet) just
+        // gets the plain dot, same as before this feature existed.
+        const ps = m.playerMatchStats && m.playerMatchStats[p.id];
+        const statBadges = dotStatBadges(ps);
+        const ratingBadge = dotRatingBadge(ps);
         dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}" onclick="App.showPlayerProfile('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.showPlayerProfile('${p.id}')}" role="button" tabindex="0" title="${(p.name || '').replace(/"/g, '&quot;')}">
           <span class="dot-pos">${slots[idx] || ''}</span>
-          <span class="dot-avatar">${playerAvatarMark(p)}</span>${roleBadges}
+          <span class="dot-avatar">${playerAvatarMark(p)}</span>${roleBadges}${statBadges}${ratingBadge}
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
       });
@@ -10813,6 +10820,36 @@ var App = (() => {
     ps.rating = r;
     const cls = r >= 7.5 ? 'rating-high' : r >= 6.5 ? 'rating-mid' : 'rating-low';
     return `<span class="rating-badge ${cls}">${r.toFixed(1)}</span>`;
+  }
+  // Sofascore-style rating chip anchored to the BOTTOM edge of a formation
+  // pitch dot (see renderPitch()), overlapping the avatar circle the same
+  // way Sofascore's lineup pitch overlaps its player photos. Reuses the
+  // same .rating-badge color thresholds/classes as the lineup-list rating
+  // (liveRatingBadge) so a player reads the same score in both places —
+  // just re-shelled with a dot-specific wrapper class for pitch styling
+  // (rounder corners, border, drop shadow) instead of the list's pill.
+  function dotRatingBadge(ps) {
+    if (!ps) return '';
+    const r = calcPlayerRating(ps);
+    ps.rating = r;
+    const cls = r >= 7.5 ? 'rating-high' : r >= 6.5 ? 'rating-mid' : 'rating-low';
+    return `<span class="dot-rating ${cls}">${r.toFixed(1)}</span>`;
+  }
+
+  // Sofascore-style goal/assist corner badges for a formation pitch dot:
+  // one small ball icon if the player scored, one small boot/assist icon
+  // if they set one up, each carrying its own count (e.g. "2", "3") when
+  // the player has more than one — rather than repeating the icon per
+  // goal the way the lineup-list icon strip does (playerLineIcons()),
+  // since stacking that many tiny icons on a dot this size would just
+  // blur into a smudge.
+  function dotStatBadges(ps) {
+    if (!ps) return '';
+    let out = '';
+    if (ps.goals) out += `<span class="dot-stat-badge dot-stat-goal" title="${ps.goals} goal${ps.goals > 1 ? 's' : ''}">${emojiImg('goal', 'Goal')}${ps.goals > 1 ? `<span class="dot-stat-count">${ps.goals}</span>` : ''}</span>`;
+    if (ps.assists) out += `<span class="dot-stat-badge dot-stat-assist" title="${ps.assists} assist${ps.assists > 1 ? 's' : ''}">${emojiImg('assist', 'Assist')}${ps.assists > 1 ? `<span class="dot-stat-count">${ps.assists}</span>` : ''}</span>`;
+    if (!out) return '';
+    return `<span class="dot-stat-badges">${out}</span>`;
   }
 
   function renderLineups() {
