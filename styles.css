@@ -878,6 +878,48 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 }
 .manager-dot .dot-name { max-width: 96px; }
 
+/* Sofascore-style goal/assist/rating badges overlaid on a formation pitch
+   dot (see dotStatBadges()/dotRatingBadge() in ui/matchUI.js). The rating
+   chip overlaps the bottom edge of the avatar circle the same way
+   Sofascore's does; the goal/assist icons stack in the top-right corner,
+   each picking up its own small count badge once a player has more than
+   one of that stat, instead of repeating the icon per goal (that repeat
+   style is still used in the lineup LIST — see .li-icon — where there's
+   room for it; a 46px pitch dot doesn't have that room). */
+.player-dot .dot-rating {
+  position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
+  min-width: 24px; height: 16px; padding: 0 4px;
+  border-radius: 4px; font-size: 0.62rem; font-weight: 800; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  border: 1.5px solid rgba(10,14,23,0.85);
+  z-index: 5; pointer-events: none;
+}
+.player-dot .dot-stat-badges {
+  position: absolute; top: -6px; right: -7px;
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-end;
+  z-index: 5; pointer-events: none;
+}
+.dot-stat-badge {
+  position: relative; width: 15px; height: 15px; border-radius: 50%;
+  background: rgba(10,14,23,0.92); border: 1px solid rgba(255,255,255,0.55);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.dot-stat-badge .emoji-icon-img { width: 68%; height: 68%; }
+.dot-stat-count {
+  position: absolute; bottom: -4px; right: -4px;
+  min-width: 12px; height: 12px; padding: 0 2px; border-radius: 50%;
+  background: var(--accent-gold); color: #1a1400;
+  font-size: 0.5rem; font-weight: 800; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(10,14,23,0.9);
+}
+/* Sub-on markers already tint green (.player-dot.sub-on) — keep the
+   rating chip's own performance color (high/mid/low) instead of letting
+   that green bleed into it. */
+.player-dot.sub-on .dot-rating { filter: none; }
+
 /* Lineup lists */
 .lineup-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
