@@ -1076,10 +1076,13 @@ var App = (() => {
     // reference line under the law.
     const deepestOutfield = advs[0];
     const tac = (m.tactics && m.tactics[defSide]) || 'balanced';
-    const style = getManagerPlaystyle(defTeam.team);
-    const highLineStyle = ['Possession', 'Overload'].includes(style);
+    // Defensive line height now comes from the manager's own DNA (a
+    // continuous trait) instead of a flat "these two styles play a high
+    // line" list, so two managers of the same nominal style can genuinely
+    // hold different lines.
+    const dna = getManagerDNA(defTeam.team);
     let pushUp = tac === 'press' ? 0.09 : tac === 'attack' ? 0.05 : tac === 'defend' ? -0.07 : 0;
-    if (highLineStyle) pushUp += 0.02;
+    pushUp += (dna.defensiveLine - 0.5) * 0.12;
     const lineAdv = Math.max(0.03, Math.min(0.55, deepestOutfield + pushUp));
     const gkAdv = gk ? playerAdvancement(gk, formationKey) : 0.04;
     // A rare sweeper-keeper case: the keeper is sat ahead of the deepest
@@ -1829,7 +1832,11 @@ var App = (() => {
 
   // Gameplay effect of each playstyle. These are deliberately modest nudges —
   // enough to give each style a distinct identity over 90 minutes/a season
-  // without letting any one style dominate results outright.
+  // without letting any one style dominate results outright. Note: these are
+  // now the *archetype baseline* only — getPlaystyleMods() below layers each
+  // individual manager's own DNA (see MANAGER DNA section) and style
+  // proficiency/tactical fit on top, so two managers sharing the same
+  // playstyle no longer produce identical numbers.
   //   attBonus/defBonus   — flat nudge to calcTeamStrength() att/def
   //   passVolMult         — multiplies a team's per-minute pass volume
   //   passAccDelta        — flat nudge to individual pass success rate
@@ -1877,8 +1884,69 @@ var App = (() => {
     return team.manager.playstyle;
   }
 
-  function getPlaystyleMods(team) {
-    return PLAYSTYLE_MODS[getManagerPlaystyle(team)] || PLAYSTYLE_MODS['Possession'];
+  // ========== MANAGER DNA ==========
+  // A manager's "playstyle" (above) is *what* system he nominally runs —
+  // one of six broad archetypes shared by many managers. His DNA is *how*
+  // he actually executes it: an 18-dimension fingerprint (tempo,
+  // directness, width, pressing, defensive line, compactness, risk,
+  // verticality, positional freedom, crossing, cutbacks, through balls,
+  // switches, overlaps, counterpressing, block depth, transition speed,
+  // match-management) that's rolled once per manager — deterministically,
+  // from a hash of his name, so it's stable across sessions/rebuilds
+  // without needing to be hand-authored for hundreds of managers — and
+  // cached on team.manager._dna. Two "Possession" managers both nominally
+  // want the ball, but one presses like a maniac with a high line while
+  // the other sits deeper and just recycles it patiently; DNA is what
+  // encodes that difference. Values are 0..1, read as "how strongly this
+  // manager leans that way", with 0.5 as roughly neutral/average.
+  const DNA_TRAITS = [
+    'tempo', 'directness', 'width', 'pressing', 'defensiveLine', 'compactness',
+    'risk', 'verticality', 'positionalFreedom', 'crossing', 'cutbacks',
+    'throughBalls', 'switches', 'overlaps', 'counterpressing', 'blockDepth',
+    'transitionSpeed', 'matchManagement'
+  ];
+
+  // A manager's nominal playstyle still pulls a handful of the most
+  // style-relevant traits toward a plausible center of gravity (a Long
+  // Ball manager trends toward high directness/verticality, low tempo) —
+  // but every manager still rolls their own value around that center, and
+  // every trait NOT listed here for a given style is free to land anywhere,
+  // which is what keeps two same-style managers genuinely distinct rather
+  // than reskins of one archetype.
+  const STYLE_DNA_CENTER = {
+    'Possession':        { tempo: 0.68, directness: 0.28, width: 0.45, pressing: 0.62, defensiveLine: 0.64, verticality: 0.32, risk: 0.42 },
+    'Quick Counter':      { tempo: 0.52, directness: 0.62, width: 0.50, pressing: 0.46, defensiveLine: 0.40, verticality: 0.66, risk: 0.55 },
+    'Long Ball Counter':  { tempo: 0.38, directness: 0.76, width: 0.42, pressing: 0.40, defensiveLine: 0.32, verticality: 0.78, risk: 0.48 },
+    'Out Wide':           { tempo: 0.55, directness: 0.48, width: 0.82, pressing: 0.50, defensiveLine: 0.50, verticality: 0.50, risk: 0.50 },
+    'Long Ball':          { tempo: 0.32, directness: 0.86, width: 0.40, pressing: 0.40, defensiveLine: 0.28, verticality: 0.82, risk: 0.44 },
+    'Overload':           { tempo: 0.58, directness: 0.50, width: 0.76, pressing: 0.54, defensiveLine: 0.54, verticality: 0.54, risk: 0.60 }
+  };
+  // FNV-1a style string hash -> a stable 32-bit seed, so the same manager
+  // name always produces the same DNA/proficiency roll regardless of when
+  // or in what order teams happen to load this session.
+  function hashStringToSeed(s) {
+    let h = 2166136261 >>> 0;
+    const str = String(s || '');
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  // Small, fast, deterministic PRNG (mulberry32) seeded from the hash above.
+  // Used only for one-time DNA/proficiency generation — never for anything
+  // that needs to stay in lockstep with the match engine's own seededRandom()
+  // sequence, so authoring/regenerating a manager's DNA can never shift any
+  // other random draw in a replay.
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
 
   // ========== EXPANDED PLAYER ATTRIBUTES (player-attributes.json) ==========
@@ -2132,14 +2200,59 @@ var App = (() => {
     const nums = keys.map(k => attr[k]).filter(v => typeof v === 'number');
     return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 65;
   }
-  // Playstyle synergy modifier — deliberately small. The card's overall
-  // now comes almost entirely from the raw attribute sheet itself (see
-  // positionalRawOverall in data/playerDatabase.js: the elite-value curve,
-  // top-N lean, elite-combo bonus, and no-weak-link floor bonus). Playstyle
-  // no longer drives the rating; it only adds a light nudge when a
-  // player's own signature attributes for their tagged style(s) run above
-  // their sheet average, reflecting a well-fitted identity rather than
-  // being a second source of major inflation.
+  // Rolls (and caches) a manager's 18-trait DNA fingerprint. Style-relevant
+  // traits are rolled around STYLE_DNA_CENTER for the manager's playstyle
+  // (still with real per-manager spread); every other trait rolls freely
+  // around a neutral 0.5. Cached on team.manager._dna keyed by the manager's
+  // name, so it survives a formation change/playstyle re-read within the
+  // same session and stays stable across rebuilds (deterministic from the
+  // name hash), the same guarantee getManagerPlaystyle() already gives.
+  // Rolls (and caches) a manager's 18-trait DNA fingerprint. Style-relevant
+  // traits are rolled around STYLE_DNA_CENTER for the manager's playstyle
+  // (still with real per-manager spread); every other trait rolls freely
+  // around a neutral 0.5. Cached on team.manager._dna keyed by the manager's
+  // name, so it survives a formation change/playstyle re-read within the
+  // same session and stays stable across rebuilds (deterministic from the
+  // name hash), the same guarantee getManagerPlaystyle() already gives.
+  //
+  // Hand-authored override: if teams.json sets manager.dna = { trait: val,
+  // ... }, any trait listed there is used exactly as given (clamped to the
+  // normal 0.06..0.96 range) instead of the hash-generated value — every
+  // trait NOT listed still falls back to the generated one. This lets a
+  // handful of well-known managers be hand-tuned without having to author
+  // all 18 traits, or touch the other ~300 managers that rely on the
+  // automatic generation.
+  function getManagerDNA(team) {
+    if (!team) team = {};
+    if (!team.manager) team.manager = {};
+    const mgr = team.manager;
+    const name = mgr.name || (team.id || team.name || 'unknown-manager');
+    if (mgr._dna && mgr._dnaFor === name) return mgr._dna;
+    const style = getManagerPlaystyle(team);
+    const center = STYLE_DNA_CENTER[style] || {};
+    const rng = mulberry32(hashStringToSeed(name + '::dna'));
+    const dna = {};
+    DNA_TRAITS.forEach((trait) => {
+      const c = center[trait] != null ? center[trait] : 0.5;
+      // Style-anchored traits still spread +/-0.32 around their center so
+      // two managers of the same style clearly differ; free traits spread
+      // the full +/-0.4 around neutral for genuine individuality.
+      const spread = center[trait] != null ? 0.32 : 0.4;
+      dna[trait] = Math.max(0.06, Math.min(0.96, c + (rng() - 0.5) * spread * 2));
+    });
+    const overrides = mgr.dna;
+    if (overrides && typeof overrides === 'object') {
+      DNA_TRAITS.forEach((trait) => {
+        const v = overrides[trait];
+        if (typeof v === 'number' && !Number.isNaN(v)) {
+          dna[trait] = Math.max(0.06, Math.min(0.96, v));
+        }
+      });
+    }
+    mgr._dna = dna;
+    mgr._dnaFor = name;
+    return dna;
+  }
   function styleSignatureBonus(attr, styles, isGK) {
     if (!styles || !styles.length) return 0;
     const sheetAvg = attrSheetAverage(attr, isGK);
@@ -2155,8 +2268,97 @@ var App = (() => {
     });
     return Math.max(0, Math.min(4, Math.round(bonus)));
   }
+  // A manager's STYLE PROFICIENCY — separate from his DNA — is how well he
+  // actually executes his nominal system, independent of *how* he executes
+  // it. Rolled once per manager off its own hash stream (so it doesn't
+  // correlate with any single DNA trait), nudged slightly by the manager's
+  // own overall rating where teams.json sets one. Cached on
+  // team.manager._proficiency the same way DNA is cached above.
+  function getManagerStyleProficiency(team) {
+    if (!team) team = {};
+    if (!team.manager) team.manager = {};
+    const mgr = team.manager;
+    const name = mgr.name || (team.id || team.name || 'unknown-manager');
+    if (mgr._proficiency != null && mgr._proficiencyFor === name) return mgr._proficiency;
+    const rng = mulberry32(hashStringToSeed(name + '::proficiency'));
+    const ovrNudge = mgr.ovr != null ? (mgr.ovr - 78) / 220 : 0;
+    const prof = Math.max(0.55, Math.min(1.08, 0.68 + (rng() - 0.5) * 0.5 + ovrNudge));
+    mgr._proficiency = prof;
+    mgr._proficiencyFor = name;
+    return prof;
+  }
+  // Finds the live sideData wrapper (currentMatch.home/.away) for a raw
+  // team object, so DNA-consuming code that's only ever handed the raw
+  // team (as getPlaystyleMods()'s callers do) can still reach the on-pitch
+  // squad/formation when a match is actually in progress. Returns null
+  // outside of a live match (e.g. squad-planning screens) — callers treat
+  // that as "no compatibility data available yet", not a penalty.
+  function teamSideData(team) {
+    const m = currentMatch;
+    if (!m || !team) return null;
+    if (m.home && m.home.team === team) return m.home;
+    if (m.away && m.away.team === team) return m.away;
+    return null;
+  }
 
+  // TACTICAL COMPATIBILITY — how well this manager's DNA actually fits the
+  // squad/formation he's got out there right now. A high-pressing DNA with
+  // a gassed, low-work-rate midfield doesn't press as effectively in
+  // practice as the same DNA behind a tireless engine room; a high
+  // defensive line with slow centre-backs is a live liability, not a free
+  // upgrade. Returns a multiplier centered on 1 (0.8..1.2) that
+  // getPlaystyleMods() folds in alongside raw proficiency — so the
+  // *system* a manager wants to play interacts with the attributes,
+  // stamina, roles and formation actually on the pitch instead of playing
+  // out identically regardless of personnel.
+  function computeTacticalCompatibility(team) {
+    const sd = teamSideData(team);
+    if (!sd || !sd.squad) return 1;
+    const m = currentMatch;
+    const dna = getManagerDNA(team);
+    const all = sd.squad.all || [];
+    const onIds = sd === m.home ? m.homeOnPitch : m.awayOnPitch;
+    let onPitch = (onIds || []).map(id => all.find(p => p.id === id)).filter(Boolean);
+    if (!onPitch.length) onPitch = sd.squad.starting || all;
+    if (!onPitch.length) return 1;
+    const avg = (fn) => onPitch.reduce((s, p) => s + fn(p), 0) / onPitch.length;
+    const slotOf = (p) => p.slot || (p.pos || [])[0] || 'CM';
+    const wide = onPitch.filter(p => WIDE_SLOTS.has(slotOf(p)));
+    const backline = onPitch.filter(p => slotOf(p) === 'CB');
+    const strikers = onPitch.filter(p => slotOf(p) === 'ST');
+    const midfield = onPitch.filter(p => ['CM', 'CDM', 'CAM'].includes(slotOf(p)));
 
+    let score = 1;
+    // High-pressing DNA needs legs (work-rate + pace) all over the pitch —
+    // a slow, low-engagement group can't actually sustain it.
+    const workrate = avg(p => (xattr(p, 'def_eng', p.def || 70) + (p.pac || 70)) / 2);
+    score += (dna.pressing - 0.5) * ((workrate - 72) / 90);
+    // A genuinely high defensive line is a gamble without recovery pace at
+    // the back to cover it.
+    const backPace = backline.length ? backline.reduce((s, p) => s + (p.pac || 70), 0) / backline.length : 70;
+    score += (dna.defensiveLine - 0.5) * ((backPace - 68) / 70);
+    // Width wants capable wide outlets to actually deliver it; without
+    // them a "wide" system is just an instruction nobody can carry out.
+    const wideQuality = wide.length ? wide.reduce((s, p) => s + ((p.pac || 70) + (p.tec || 70)) / 2, 0) / wide.length : 58;
+    score += (dna.width - 0.5) * (wide.length ? (wideQuality - 68) / 90 : -0.35);
+    // A directness/verticality-heavy approach wants genuine physical
+    // presence up front to actually win/hold the longer ball.
+    const targetQuality = strikers.length ? strikers.reduce((s, p) => s + (p.phy || p.ovr || 70), 0) / strikers.length : 68;
+    score += (dna.verticality - 0.5) * ((targetQuality - 70) / 90);
+    // Patient, high-tempo possession football wants technical midfielders
+    // to actually retain it under pressure.
+    const midTec = midfield.length ? midfield.reduce((s, p) => s + (p.tec || 70), 0) / midfield.length : 70;
+    score += (dna.tempo - 0.5) * ((midTec - 70) / 80);
+    return Math.max(0.8, Math.min(1.2, score));
+  }
+
+  // The single number the rest of the engine actually cares about: how
+  // purely this manager's *authored* archetype numbers (PLAYSTYLE_MODS)
+  // come through, blending his separately-rolled proficiency with how well
+  // his DNA currently fits the group on the pitch.
+  function getEffectiveProficiency(team) {
+    return Math.max(0.55, Math.min(1.25, getManagerStyleProficiency(team) * computeTacticalCompatibility(team)));
+  }
 
   // True if a player's expanded sheet carries the given individual
   // playstyle tag. Used throughout the match-engine "edge" functions below
@@ -2516,8 +2718,78 @@ var App = (() => {
 
     return leaned + massBonus + supportBonus;
   }
-
-
+  // Gets a team's fully blended tactical mods: the archetype baseline
+  // (PLAYSTYLE_MODS), regressed toward neutral in proportion to how
+  // purely this specific manager executes it (proficiency x tactical
+  // fit — see getEffectiveProficiency), with his own 18-trait DNA layered
+  // on top as continuous fields the rest of the engine reads directly.
+  // This is the one function nearly every possession/passing/defending/
+  // transitions call site already calls (getPlaystyleMods(team)) — so
+  // enriching its output here is what lets a manager's individual DNA
+  // reach positioning, buildup, chance creation, pressing, defending and
+  // transitions everywhere else without having to touch every call site.
+  function getPlaystyleMods(team) {
+    const style = getManagerPlaystyle(team);
+    const base = PLAYSTYLE_MODS[style] || PLAYSTYLE_MODS['Possession'];
+    const dna = getManagerDNA(team);
+    const eff = getEffectiveProficiency(team);
+    // Regresses an authored delta toward its neutral value by (1 - eff) —
+    // a lower-proficiency/poorer-fit manager is nominally "Possession" but
+    // doesn't actually get the full benefit of it.
+    const blend = (neutral, val) => neutral + (val - neutral) * eff;
+    return {
+      // ---- Archetype baseline, scaled by proficiency x tactical fit ----
+      attBonus: blend(0, base.attBonus),
+      defBonus: blend(0, base.defBonus),
+      passVolMult: blend(1, base.passVolMult),
+      passAccDelta: blend(0, base.passAccDelta),
+      possBias: blend(0, base.possBias),
+      wingBiasMult: blend(1, base.wingBiasMult) * (0.75 + dna.width * 0.5),
+      counterBonus: blend(1, base.counterBonus) * (0.7 + dna.transitionSpeed * 0.6),
+      // ---- Individual manager DNA, layered independently of proficiency —
+      // ---- this is HOW he plays, not how well he pulls off his system.
+      tempoMult: 0.75 + dna.tempo * 0.5,
+      directness: dna.directness,
+      pressingIntensity: dna.pressing,
+      defensiveLine: dna.defensiveLine,
+      compactness: dna.compactness,
+      riskAppetite: dna.risk,
+      verticality: dna.verticality,
+      positionalFreedom: dna.positionalFreedom,
+      crossingBias: 0.7 + dna.crossing * 0.6,
+      cutbackBias: 0.7 + dna.cutbacks * 0.6,
+      throughBallBias: 0.7 + dna.throughBalls * 0.6,
+      switchBias: 0.7 + dna.switches * 0.6,
+      overlapBias: dna.overlaps,
+      counterpressIntensity: dna.counterpressing,
+      blockDepth: dna.blockDepth,
+      transitionSpeedMult: 0.75 + dna.transitionSpeed * 0.5,
+      matchManagement: dna.matchManagement,
+      styleProficiency: eff
+    };
+  }
+  // How this manager reacts to the live match state right now — scoreline,
+  // minute, his own team's fatigue, and the gap in quality to the
+  // opponent — used by the in-match tactical AI (engine/tactics.js::
+  // evaluateTacticalAI) instead of a flat "this style is aggressive"
+  // lookup and a single hardcoded gamble chance for every manager. High
+  // risk + low match-management managers panic/chase earlier and gamble
+  // harder; a composed, high match-management manager stays patient and
+  // times changes better — and a gassed team or a clearly stronger
+  // opponent tempers the gamble regardless of the manager's instincts.
+  function getManagerMatchReaction(team, ctx) {
+    const dna = getManagerDNA(team);
+    ctx = ctx || {};
+    const fatigue = ctx.fatigue != null ? ctx.fatigue : 1; // ~0.7 (gassed) .. 1.05 (fresh)
+    const oppGap = ctx.oppGap || 0; // positive = opponent rated stronger
+    let urgency = 0.5 + dna.risk * 0.4 - dna.matchManagement * 0.3;
+    urgency += Math.max(-0.15, Math.min(0.15, -oppGap / 60));
+    urgency *= 0.6 + 0.4 * Math.min(1.1, fatigue);
+    urgency = Math.max(0.1, Math.min(0.95, urgency));
+    const gambleChance = Math.max(0.08, Math.min(0.75, 0.15 + dna.risk * 0.5 - Math.max(0, oppGap) / 120));
+    const cooldown = Math.max(6, Math.round(16 - dna.matchManagement * 8));
+    return { urgency, gambleChance, cooldown };
+  }
 
   // ===== Playstyle behavior profiles ============================================
   // Internal behavioral parameters for each individual (eFootball-style)
@@ -4001,7 +4273,19 @@ var App = (() => {
     // only picks among the handful of formations that actually fit the
     // manager's style, not all twenty regardless of identity.
     const style = getManagerPlaystyle(team);
-    const pref = PLAYSTYLE_FORM_PREF[style] || { fwd: 0.6, def: 0.6, wide: 0.6, mid: 0.6 };
+    const basePref = PLAYSTYLE_FORM_PREF[style] || { fwd: 0.6, def: 0.6, wide: 0.6, mid: 0.6 };
+    // Layer this specific manager's DNA on top of the style archetype so
+    // two managers running the same nominal system don't converge on the
+    // same formation-scoring vector — a high-risk/verticality manager
+    // within a style leans further forward than a cautious one running
+    // the identical playstyle label, etc.
+    const dna = getManagerDNA(team);
+    const pref = {
+      fwd: basePref.fwd * (0.75 + dna.risk * 0.5) * (0.85 + dna.verticality * 0.3),
+      def: basePref.def * (0.7 + (1 - dna.risk) * 0.5) * (0.85 + dna.compactness * 0.3),
+      wide: basePref.wide * (0.6 + dna.width * 0.8),
+      mid: (basePref.mid || 0.6) * (0.7 + dna.positionalFreedom * 0.6)
+    };
     const keys = Object.keys(FORMATIONS);
     const idKey = (team && (team.id || team.name)) || '';
     let hash = 0;
@@ -5181,8 +5465,8 @@ var App = (() => {
     // actually playing before a single ball is kicked.
     const openStrHome = calcTeamStrength(currentMatch.home);
     const openStrAway = calcTeamStrength(currentMatch.away);
-    currentMatch.tactics.home = decideOpeningTactic(openStrHome, openStrAway, getManagerPlaystyle(homeTeam));
-    currentMatch.tactics.away = decideOpeningTactic(openStrAway, openStrHome, getManagerPlaystyle(awayTeam));
+    currentMatch.tactics.home = decideOpeningTactic(openStrHome, openStrAway, getManagerPlaystyle(homeTeam), homeTeam);
+    currentMatch.tactics.away = decideOpeningTactic(openStrAway, openStrHome, getManagerPlaystyle(awayTeam), awayTeam);
 
     const setup = document.getElementById('match-setup');
     const live = document.getElementById('match-live');
@@ -7096,6 +7380,11 @@ var App = (() => {
         const slot = p.slot || (p.pos || [])[0] || 'CM';
         let w = PASS_POS_WEIGHT[slot] != null ? PASS_POS_WEIGHT[slot] : 1.2;
         if (WIDE_SLOTS.has(slot)) w *= pmods.wingBiasMult; // Out Wide / Overload lean on wide play
+        // Overlap-minded managers specifically push their full-backs
+        // higher up the passing picture, on top of the general wide bias.
+        if ((slot === 'RB' || slot === 'LB' || slot === 'RWB' || slot === 'LWB') && pmods.overlapBias != null) {
+          w *= 0.8 + pmods.overlapBias * 0.5;
+        }
         return { p, w };
       });
       const totalW = weighted.reduce((s, x) => s + x.w, 0) || 1;
@@ -7328,6 +7617,16 @@ var App = (() => {
       // front of him, not just his own shot-stopping.
       if (teamGkHasSkill(p, 'GK Directing Defense')) bonus += 1.5;
       if (teamGkHasSkill(p, 'GK Spirit Roar') && playerTeamLeadingSecondHalf(p)) bonus += 2;
+      // The manager's own pressing/compactness DNA lifts (or blunts) every
+      // defender's ability to close a man down, on top of that player's
+      // raw attributes — a genuinely high-pressing, compact manager's
+      // side closes space quicker as a unit than the same eleven bodies
+      // playing for a passive one.
+      const sd = playerSideData(p);
+      if (sd) {
+        const dna = getManagerDNA(sd.side.team);
+        bonus += (dna.pressing - 0.5) * 3 + (dna.compactness - 0.5) * 2;
+      }
       // A tired defender presses/closes down a yard slower than a fresh one.
       return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p);
     }
@@ -7370,6 +7669,10 @@ var App = (() => {
     // team's chances. 0.45 still makes headers the more likely outcome of a
     // cross (realistic), just not an near-total lock.
     cross:       { baseOnTarget: 0.37, baseXg: 0.11, headerWeight: 0.45 },
+    // A cutback is a low pull-back across the face of goal to an arriving
+    // midfielder — never a header, and a cleaner strike than a generic
+    // open-play look since the defence is still turned/side-on.
+    cutback:     { baseOnTarget: 0.40, baseXg: 0.135, headerWeight: 0 },
     dribble:     { baseOnTarget: 0.40, baseXg: 0.13, headerWeight: 0 },
     longshot:    { baseOnTarget: 0.24, baseXg: 0.045, headerWeight: 0 },
     counter:     { baseOnTarget: 0.42, baseXg: 0.16, headerWeight: 0 }
@@ -7523,7 +7826,7 @@ var App = (() => {
     // that context, so the two attributes actually mean different things
     // in different situations instead of being interchangeable.
     const gk = pickPlayer(defTeam, ['GK']);
-    const closeRangeShot = !isHeader && (chanceType === 'dribble' || chanceType === 'openplay' || chanceType === 'counter');
+    const closeRangeShot = !isHeader && (chanceType === 'dribble' || chanceType === 'openplay' || chanceType === 'counter' || chanceType === 'cutback');
     const saveResult = resolveGkSave(gk, shooter, shotQuality, { isHeader, chanceType, shotPower, closeRange: closeRangeShot });
     if (saveResult.saved) {
       if (personality.includes('Confidence Player')) {
@@ -7710,18 +8013,30 @@ var App = (() => {
       case 'dribble':
         chanceType = 'dribble'; shooter = carrier;
         break;
-      case 'cross':
-        chanceType = 'cross';
-        // aerialSkill(p) * 2 used to decide the cross target almost purely on
-        // heading ability, regularly passing over a team's actual first-choice
-        // striker in the box for a better header elsewhere on the pitch. A
-        // GOAL_ROLE_WEIGHT term (favors ST/CAM/wide — see possession.js) is
-        // blended in alongside it so a striker's natural spot to attack a
-        // cross from still counts for something, not just who jumps best.
-        shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'],
-          (p) => aerialSkill(p) * 1.3 + (GOAL_ROLE_WEIGHT[p.slot || (p.pos || [])[0]] || 0.5) * 0.5, carrier.id)
-          || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
+      case 'cross': {
+        // A manager whose DNA leans toward cutbacks trades some of his
+        // wide deliveries for a low pull-back to an arriving midfielder
+        // instead of a ball into the box for an aerial target — a
+        // genuinely distinct chance type (no header, sharper look at
+        // goal) rather than just a reskinned cross.
+        const cutbackChance = wide ? Math.max(0.06, Math.min(0.55, 0.16 * (mods.cutbackBias || 1))) : 0;
+        if (seededRandom() < cutbackChance) {
+          chanceType = 'cutback';
+          shooter = pickPlayerWeighted(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
+        } else {
+          chanceType = 'cross';
+          // aerialSkill(p) * 2 used to decide the cross target almost purely on
+          // heading ability, regularly passing over a team's actual first-choice
+          // striker in the box for a better header elsewhere on the pitch. A
+          // GOAL_ROLE_WEIGHT term (favors ST/CAM/wide — see possession.js) is
+          // blended in alongside it so a striker's natural spot to attack a
+          // cross from still counts for something, not just who jumps best.
+          shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'],
+            (p) => aerialSkill(p) * 1.3 + (GOAL_ROLE_WEIGHT[p.slot || (p.pos || [])[0]] || 0.5) * 0.5, carrier.id)
+            || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
+        }
         break;
+      }
       case 'throughball':
         chanceType = 'throughball';
         shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
@@ -8025,7 +8340,15 @@ var App = (() => {
     // specific attribute for that first burst, so it (not the generic pac
     // blend) decides how likely the counter actually gets going.
     const burst = xattr(defenderPlayer, 'accel', defenderPlayer.pac || 70) * staminaMultiplier(defenderPlayer);
-    const counterProb = Math.max(0.03, Math.min(0.55, 0.08 * defMods.counterBonus * spaceFactor + (burst - 70) / 300 + counterSkillBonus));
+    // transitionSpeedMult (how quickly this manager's team turns a
+    // regain into a break) and counterpressIntensity (how sharply they
+    // react to winning the ball back at all) are individual DNA traits on
+    // top of the broad counterBonus archetype nudge already folded into
+    // defMods.counterBonus.
+    const counterProb = Math.max(0.03, Math.min(0.6,
+      0.08 * defMods.counterBonus * spaceFactor * (defMods.transitionSpeedMult || 1)
+      + (burst - 70) / 300 + counterSkillBonus
+      + ((defMods.counterpressIntensity != null ? defMods.counterpressIntensity : 0.5) - 0.5) * 0.06));
     if (seededRandom() < counterProb) runFastBreak(defendingSide, attackingSide);
   }
 
@@ -8203,6 +8526,18 @@ var App = (() => {
       if (ctx.mods) {
         if (action === 'cross' || action === 'switch') w *= ctx.mods.wingBiasMult || 1;
         if (action === 'backpass') w *= 1 / Math.max(0.6, ctx.mods.passVolMult || 1);
+        // ---- Individual manager DNA on top of the broad style multiplier
+        // ---- above — this is what makes two managers running the same
+        // ---- nominal playstyle still make visibly different decisions
+        // ---- on the ball.
+        if (action === 'cross') w *= ctx.mods.crossingBias || 1;
+        if (action === 'switch') w *= ctx.mods.switchBias || 1;
+        if (action === 'throughball') w *= (ctx.mods.throughBallBias || 1) * (0.8 + (ctx.mods.verticality != null ? ctx.mods.verticality : 0.5) * 0.4);
+        if (action === 'dribble' || action === 'carry') w *= 0.8 + (ctx.mods.positionalFreedom != null ? ctx.mods.positionalFreedom : 0.5) * 0.4;
+        if (action === 'shoot' || action === 'throughball' || action === 'dribble') {
+          w *= 0.85 + (ctx.mods.riskAppetite != null ? ctx.mods.riskAppetite : 0.5) * 0.3;
+        }
+        if (action === 'pass') w *= 0.85 + (ctx.mods.tempoMult != null ? Math.min(1, ctx.mods.tempoMult / 1.25) : 0.8) * 0.3;
       }
 
       // Individual playstyle tags — data-driven via PLAYSTYLE_BEHAVIOR
@@ -8672,14 +9007,21 @@ var App = (() => {
   // ---- Opening-instructions AI: what a manager sets up with at kickoff,
   // driven by the actual quality gap between the two sides plus identity —
   // not a flat "balanced" default that made every kickoff feel the same.
-  function decideOpeningTactic(selfStr, oppStr, style) {
+  function decideOpeningTactic(selfStr, oppStr, style, team) {
     const gap = (selfStr.ovr || 75) - (oppStr.ovr || 75);
-    const counterMinded = ['Quick Counter', 'Long Ball Counter', 'Long Ball'].includes(style);
-    const possessionMinded = style === 'Possession';
-    if (gap <= -4) return seededRandom() < 0.6 ? 'defend' : 'balanced';
-    if (gap >= 5) return seededRandom() < (possessionMinded ? 0.65 : 0.5) ? (possessionMinded ? 'press' : 'attack') : 'balanced';
-    if (counterMinded && gap < 2) return seededRandom() < 0.35 ? 'defend' : 'balanced';
-    if (possessionMinded) return seededRandom() < 0.4 ? 'press' : 'balanced';
+    // With a team reference we read the manager's own DNA (risk/directness)
+    // on top of the style label, so opening instructions vary manager to
+    // manager instead of just archetype to archetype.
+    const dna = team ? getManagerDNA(team) : null;
+    const risk = dna ? dna.risk : 0.5;
+    const directness = dna ? dna.directness : 0.5;
+    const counterMinded = ['Quick Counter', 'Long Ball Counter', 'Long Ball'].includes(style) || directness > 0.62;
+    const possessionMinded = style === 'Possession' || (dna && dna.tempo > 0.62 && directness < 0.4);
+    const pressChance = Math.max(0.25, Math.min(0.85, 0.5 + (risk - 0.5) * 0.4));
+    if (gap <= -4) return seededRandom() < Math.max(0.35, 0.6 - (risk - 0.5) * 0.3) ? 'defend' : 'balanced';
+    if (gap >= 5) return seededRandom() < (possessionMinded ? Math.min(0.85, pressChance + 0.15) : pressChance) ? (possessionMinded ? 'press' : 'attack') : 'balanced';
+    if (counterMinded && gap < 2) return seededRandom() < Math.max(0.15, 0.35 - (risk - 0.5) * 0.2) ? 'defend' : 'balanced';
+    if (possessionMinded) return seededRandom() < Math.min(0.65, 0.4 + (risk - 0.5) * 0.2) ? 'press' : 'balanced';
     return 'balanced';
   }
 
@@ -9285,29 +9627,50 @@ var App = (() => {
     const ai = m.tacticalAI[side];
     const minute = m.dispMin != null ? m.dispMin : m.minute;
     const diff = (sideData.score || 0) - (oppData.score || 0);
-    const style = getManagerPlaystyle(sideData.team);
-    const aggressive = ['Overload', 'Quick Counter', 'Long Ball Counter'].includes(style);
+    const dna = getManagerDNA(sideData.team);
+    // Fatigue and opponent-strength context feed the manager's reaction —
+    // a gassed team or a clearly stronger opponent tempers even a
+    // high-risk manager's instinct to gamble; a weaker opponent or a
+    // fresh XI makes the gamble easier to justify.
+    const onIdsNow = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const allSidePlayers0 = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitchNow = (onIdsNow || []).map(id => allSidePlayers0.find(p => p.id === id)).filter(Boolean);
+    const avgFatigue = onPitchNow.length ? onPitchNow.reduce((s, p) => s + staminaMultiplier(p), 0) / onPitchNow.length : 1;
+    const oppGap = (calcTeamStrength(oppData).ovr || 75) - (calcTeamStrength(sideData).ovr || 75);
+    const reaction = getManagerMatchReaction(sideData.team, { minute, fatigue: avgFatigue, oppGap });
     const currentTac = (m.tactics && m.tactics[side]) || 'balanced';
     let targetTac = currentTac;
 
-    if (diff <= -1 && minute >= 60) {
+    // Urgency shifts how early a chasing manager pushes the panic button —
+    // a high-risk/low-composure manager presses/goes for it noticeably
+    // sooner than a patient one in the exact same scoreline.
+    const pressFrom = Math.round(60 - reaction.urgency * 12);
+    const allOutFrom = Math.round(72 - reaction.urgency * 10);
+    const allOutLatest = Math.round(82 - reaction.urgency * 6);
+    const easeFrom = Math.round(70 + (dna.matchManagement - 0.5) * 8);
+    const shutUpShopFrom = Math.round(83 + (dna.matchManagement - 0.5) * 6);
+
+    if (diff <= -1 && minute >= pressFrom) {
       // Chasing the game: press higher, and once it's later and/or a two-
-      // goal gap, go all out.
-      targetTac = (diff <= -2 && minute >= 72) || minute >= 82 ? 'attack' : 'press';
-    } else if (diff >= 1 && minute >= 70) {
-      // Protecting a lead: ease off first, then properly shut up shop
-      // as full time approaches.
-      targetTac = minute >= 83 ? 'defend' : 'balanced';
-    } else if (diff === 0 && minute >= 65 && aggressive) {
-      // Level game, aggressive manager identity — more likely to gamble
-      // on pressing for a winner than a patient/counter-minded one.
-      targetTac = seededRandom() < 0.35 ? 'press' : currentTac;
-    } else if (diff === 0 && minute < 60 && currentTac !== 'balanced' && seededRandom() < 0.1) {
-      // Early-game overreactions settle back down if the game's still level.
+      // goal gap, go all out — both thresholds pulled earlier for a more
+      // urgent manager identity.
+      targetTac = (diff <= -2 && minute >= allOutFrom) || minute >= allOutLatest ? 'attack' : 'press';
+    } else if (diff >= 1 && minute >= easeFrom) {
+      // Protecting a lead: ease off first, then properly shut up shop as
+      // full time approaches — a composed manager games this later/safer.
+      targetTac = minute >= shutUpShopFrom ? 'defend' : 'balanced';
+    } else if (diff === 0 && minute >= 65) {
+      // Level game — whether this manager gambles on pressing for a
+      // winner now comes straight from his own risk appetite/composure,
+      // not a fixed list of "aggressive" styles.
+      targetTac = seededRandom() < reaction.gambleChance ? 'press' : currentTac;
+    } else if (diff === 0 && minute < 60 && currentTac !== 'balanced' && seededRandom() < Math.max(0.03, 0.1 + (dna.matchManagement - 0.5) * 0.1)) {
+      // Early-game overreactions settle back down if the game's still
+      // level — a composed manager corrects course a little more readily.
       targetTac = 'balanced';
     }
 
-    if (targetTac !== currentTac && minute - ai.lastChange >= 12) {
+    if (targetTac !== currentTac && minute - ai.lastChange >= reaction.cooldown) {
       setTacticsLive(side, targetTac);
       ai.lastChange = minute;
     }
