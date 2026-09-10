@@ -10763,7 +10763,7 @@ var App = (() => {
         // lineup list (roleBadgesHTML()) and in the Teams tab preview
         // (roleBadgesForPreview()), just missing from this pitch view.
         const roleBadges = roleBadgesForIds(s.roles, p.id, 'sb-role-ic');
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}" onclick="App.showPlayerProfile('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.showPlayerProfile('${p.id}')}" role="button" tabindex="0" title="${(p.name || '').replace(/"/g, '&quot;')}">
           <span class="dot-pos">${slots[idx] || ''}</span>
           <span class="dot-avatar">${playerAvatarMark(p)}</span>${roleBadges}
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
