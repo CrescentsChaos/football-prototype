@@ -2020,6 +2020,45 @@ var App = (() => {
     'Shadow Marker':         'Tracks a single opponent tightly across the pitch, man-marking rather than holding a zone.'
   };
 
+  // Human-readable one-line description for each individual personality
+  // trait tag (see personality.md for the full, per-tag engine-hook detail)
+  // — shown as a tooltip wherever a personality badge is rendered in the
+  // player profile UI (ui/playerUI.js). Only ever populated for a player
+  // whose expanded attribute sheet actually lists a personality array;
+  // most players simply have none.
+  const PERSONALITY_DESCRIPTIONS = {
+    'Big-Game':             'Raises his own shot quality in high-stakes moments — derbies, finals, close games late on.',
+    'Fragile':              'The mirror of Big-Game — shot quality drops under those same high-stakes moments.',
+    'Ice-Cold':             'A cool head from the penalty spot and on free-kicks when the stakes are up.',
+    'Bottler':              'The mirror of Ice-Cold — penalty and free-kick conversion suffers when the stakes are up.',
+    'Big Occasion Flop':    'Passing accuracy drops specifically in high-stakes moments.',
+    'Big Occasion Riser':   'Match rating ceiling rises in cup and knockout fixtures.',
+    'Confidence Player':    'Grows in composure while on a scoring run this match, resetting the moment a chance goes begging.',
+    "Finisher's Instinct":  'An extra edge on shot quality late in a match, whatever the scoreline.',
+    'Homebody':             'Less effective in front of goal, in passing, and in dribbling away from home.',
+    'Set-Piece Specialist': 'A composure boost at corners and free-kicks, at all times.',
+    'Volatile':             'More likely to commit a foul himself.',
+    'Calm':                 'The mirror of Volatile — less likely to commit a foul himself.',
+    'Provocateur':          'Needles opponents into rash challenges, raising the marker\u2019s own foul probability.',
+    'Hot-Head':             'Extra second-yellow risk once already booked.',
+    'Cynical':              'More likely to concede a tactical foul to stop a breakaway, less likely to be carded for it.',
+    'Leader':               'Deepens the captain\u2019s aura — extra fatigue-drain and form-spread dampening for the team.',
+    'Talisman':             'A small composure lift for teammates and a fatigue-drain reduction for the side just by being on the pitch.',
+    'Brittle':              'A personal injury-risk multiplier layered on top of his raw injury resistance.',
+    'Iron Man':             'The mirror of Brittle — reduced injury chance and genuinely slower fatigue drain.',
+    'Determined':           'Fatigue drain eases late in a match specifically while his side is losing.',
+    'Slow Starter':         'Reduced overall effectiveness in the first 15 minutes, recovering back to normal by then.',
+    'Streaky':              'Runs hotter and colder than a normal Inconsistent player\u2019s form swings.',
+    'Selfish':              'Leans toward shooting and dribbling over passing on the ball.',
+    'Team Player':          'The mirror of Selfish — leans toward passing over personal shot/dribble volume.',
+    'Showboat':             'Attempts more dribbles, with a slightly higher turnover risk once he goes for it.',
+    'Grinder':              'Tackle and interception success rises specifically while his team is behind.',
+    'Loyal':                'Lower willingness to push for a move away from his current club.',
+    'Journeyman':           'The mirror of Loyal — higher willingness to move clubs.',
+    'Mentor':               'Speeds up the development of younger teammates who share his position group.',
+    'Prodigy':              'Faster development while young, at the cost of more volatile in-match form during those years.'
+  };
+
   // Individual eFootball-style playstyle tag -> which team manager
   // playstyles (see PLAYSTYLES above) it's naturally suited to. Shown in
   // the player profile UI (see ui/playerUI.js) as a "fits the setup" tag
@@ -3088,6 +3127,64 @@ var App = (() => {
     });
   }
 
+  // ===== Auto-assigned playstyles for regular (non-enhanced) players =====
+  // A "regular" player (no player-attributes.json entry, attrBoosted ===
+  // false) never gets an expanded attribute sheet, so they never carry a
+  // playstyle tag either — every playstyle-driven bonus in the engine
+  // (see engine/playstyleBehavior.js) and every playstyle badge in the UI
+  // silently no-ops for them. assignPlaystylesToRegularPlayers() closes
+  // that gap: every regular player is handed exactly one playstyle tag,
+  // drawn from the same tag pool an enhanced player at their position could
+  // hold, so regular squads still play with some individual identity on the
+  // pitch instead of every player at a given position behaving identically.
+  //
+  // Deliberately lightweight — this only ever sets p.expandedAttrs.playstyle
+  // (a bare object holding just that one array, plus p.autoPlaystyle so the
+  // UI can tell an assigned tag apart from an authored one). It never sets
+  // p.attrBoosted, never runs deriveStatsFromAttributes/positionalRawOverall,
+  // and never touches p.ovr/att/def/pac/phy/tec — a regular player's card
+  // stays exactly as scaled by applyExpandedPlayerAttributes() above; only
+  // their in-match decision-making/edges (which read expandedAttrs.playstyle
+  // directly, via playstyleTagsOf() in engine/playstyleBehavior.js) change.
+  const POSITION_PLAYSTYLE_POOL = {
+    GK:       ['Offensive Goalkeeper', 'Defensive Goalkeeper'],
+    CB:       ['Anchor Man', 'Build Up', 'High Line Master', 'Covering Role', 'Extra Frontman'],
+    FB:       ['Offensive Full-back', 'Defensive Full-back', 'Full-back Finisher'],
+    CDM:      ['Anchor Man', 'Destroyer', 'Pass Disruptor', 'Shadow Marker', 'Build Up', 'Orchestrator'],
+    CM:       ['Box-to-Box', 'Orchestrator', 'Build Up', 'Destroyer', 'Front Line Pressure'],
+    CAM:      ['Creative Playmaker', 'Classic No. 10', 'Hole Player', 'Deep-Lying Forward'],
+    WIDE_MID: ['Prolific Winger', 'Cross Specialist', 'Roaming Flank', 'Inside Forward', 'Attack Outlet'],
+    WINGER:   ['Prolific Winger', 'Cross Specialist', 'Inside Forward', 'Roaming Flank'],
+    FWD:      ['Goal Poacher', 'Fox in the Box', 'Target Man', 'Deep-Lying Forward', 'Dummy Runner', 'Hole Player']
+  };
+  // A dedicated deterministic PRNG, keyed off the player's own id — NOT
+  // seededRandom()/the shared mulberry32 stream everything else in the sim
+  // draws from. Reusing that shared stream here would mean the exact moment
+  // this function runs (which can shift release to release as unrelated
+  // startup code changes) perturbs every match/season roll that happens
+  // afterward. Hashing the player id instead means the same player always
+  // gets the same tag, every load, independent of call order — reuses
+  // _hashSeed() from js/rng.js (same file/closure) rather than duplicating
+  // that hashing logic.
+  function _playstyleAssignRoll(seedStr) {
+    return (_hashSeed(seedStr) % 100000) / 100000;
+  }
+  function assignPlaystylesToRegularPlayers(teams) {
+    (teams || []).forEach((team) => {
+      (team.players || []).forEach((p) => {
+        if (!p || p.attrBoosted) return; // enhanced players keep their own authored tag(s)
+        const existingTags = p.expandedAttrs && p.expandedAttrs.playstyle;
+        if (existingTags && existingTags.length) return; // already assigned (idempotent re-run)
+        const group = attrPosGroup(p.pos);
+        const pool = POSITION_PLAYSTYLE_POOL[group] || POSITION_PLAYSTYLE_POOL.CM;
+        const pick = pool[Math.floor(_playstyleAssignRoll(p.id + ':autoplaystyle') * pool.length)];
+        p.expandedAttrs = p.expandedAttrs || {};
+        p.expandedAttrs.playstyle = [pick];
+        p.autoPlaystyle = true;
+      });
+    });
+  }
+
   // ===== Expanded-attribute gameplay hooks =====
   // The functions below are what stop a boosted player's expanded sheet from
   // "fading into" the same generic att/def/pac/phy/tec/ovr numbers everyone
@@ -3735,6 +3832,13 @@ var App = (() => {
       // applyExpandedPlayerAttributes() (which is what sets pos from the
       // raw, non-canonical player-attributes.json codes in the first place).
       normalizeAllPositions(allTeams);
+      // Every regular (non-enhanced) player gets a playstyle tag assigned
+      // from the pool that fits their position, so squads without a
+      // player-attributes.json entry still carry individual playstyle
+      // identity into every match — see assignPlaystylesToRegularPlayers()
+      // in data/playerDatabase.js. Runs once here, before any match can be
+      // started this session.
+      assignPlaystylesToRegularPlayers(allTeams);
       populateTeamSelects();
       populateFormations();
       bindNav();
@@ -15472,7 +15576,52 @@ var App = (() => {
       </div>`;
     }).join('');
   }
-
+  // Five-axis attribute radar (ATT/PAC/TEC/DEF/PHY), rendered as a plain
+  // inline SVG rather than a canvas — unlike the rating/form and
+  // contribution charts, a pentagon needs no post-layout resize logic, so
+  // it can just be pure markup with no matching draw*() call. Works for
+  // every player regardless of attrBoosted status: those five compact
+  // stats always exist (see applyExpandedPlayerAttributes in
+  // data/playerDatabase.js), so this reads directly off player.att/def/
+  // pac/phy/tec rather than the expanded sheet.
+  const RADAR_AXES = [
+    ['PAC', 'pac'], ['ATT', 'att'], ['TEC', 'tec'], ['DEF', 'def'], ['PHY', 'phy']
+  ];
+  function renderPlayerAttributeRadarHTML(player) {
+    const cx = 100, cy = 96, r = 74, maxV = 99;
+    const angleFor = (i) => (Math.PI / 180) * (i * (360 / RADAR_AXES.length) - 90);
+    const pointFor = (i, val) => {
+      const dist = r * (Math.max(0, Math.min(maxV, val || 0)) / maxV);
+      const a = angleFor(i);
+      return [cx + dist * Math.cos(a), cy + dist * Math.sin(a)];
+    };
+    const ringPoints = (frac) => RADAR_AXES.map((_, i) => {
+      const a = angleFor(i);
+      return `${cx + r * frac * Math.cos(a)},${cy + r * frac * Math.sin(a)}`;
+    }).join(' ');
+    const dataPoints = RADAR_AXES.map(([, key], i) => pointFor(i, player[key]).join(',')).join(' ');
+    const labels = RADAR_AXES.map(([label, key], i) => {
+      const a = angleFor(i);
+      const lx = cx + (r + 18) * Math.cos(a);
+      const ly = cy + (r + 18) * Math.sin(a);
+      const v = player[key];
+      return `<text x="${lx}" y="${ly - 4}" text-anchor="middle" class="radar-axis-label">${label}</text>
+              <text x="${lx}" y="${ly + 9}" text-anchor="middle" class="radar-axis-val ${statTierClass(v)}">${v != null ? v : '-'}</text>`;
+    }).join('');
+    const rings = [0.25, 0.5, 0.75, 1].map(f => `<polygon points="${ringPoints(f)}" class="radar-ring"/>`).join('');
+    const spokes = RADAR_AXES.map((_, i) => {
+      const a = angleFor(i);
+      return `<line x1="${cx}" y1="${cy}" x2="${cx + r * Math.cos(a)}" y2="${cy + r * Math.sin(a)}" class="radar-spoke"/>`;
+    }).join('');
+    return `<div class="card-title" style="margin-top:14px">Attribute Radar</div>
+      <div class="player-chart-wrap radar-wrap">
+        <svg viewBox="0 0 200 192" class="radar-svg">
+          ${rings}${spokes}
+          <polygon points="${dataPoints}" class="radar-shape"/>
+          ${labels}
+        </svg>
+      </div>`;
+  }
   function showPlayerProfile(playerId) {
     let player = null, team = null;
     const found = findPlayerAndTeam(playerId);
@@ -15550,10 +15699,29 @@ var App = (() => {
     const signatureNote = (boosted && player.signatureBonus > 0)
       ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.signatureBonus} OVR — signature attributes for their playstyle run well above the rest of their sheet</div>`
       : '';
-    const playstyleTagsHTML = (boosted && player.expandedAttrs && (player.expandedAttrs.playstyle || []).length)
-      ? `<div style="margin-top:6px">${player.expandedAttrs.playstyle.map(s => {
+    // Playstyle tags render for ANY player who carries one — an enhanced
+    // player's own authored tag(s), or the position-appropriate tag every
+    // regular player now receives from assignPlaystylesToRegularPlayers()
+    // (data/playerDatabase.js). The auto-assigned case gets its own muted
+    // "· assigned" qualifier and a dashed tag style so it still reads as
+    // distinct from a hand-authored signature playstyle.
+    const playstyleList = (player.expandedAttrs && player.expandedAttrs.playstyle) || [];
+    const playstyleTagsHTML = playstyleList.length
+      ? `<div style="margin-top:6px">${playstyleList.map(s => {
           const desc = PLAYSTYLE_DESCRIPTIONS[s] || '';
-          return `<span class="playstyle-tag" title="${desc}">${s}</span>`;
+          const cls = player.autoPlaystyle ? 'playstyle-tag auto-assigned' : 'playstyle-tag';
+          const title = player.autoPlaystyle ? `${desc} (assigned by position)` : desc;
+          return `<span class="${cls}" title="${title}">${s}${player.autoPlaystyle ? ' <em>· assigned</em>' : ''}</span>`;
+        }).join('')}</div>`
+      : '';
+    // Personality traits only ever exist on a hand-authored expanded
+    // attribute sheet (player-attributes.json) — most players have none,
+    // so this whole block is naturally absent for them.
+    const personalityList = (player.expandedAttrs && player.expandedAttrs.personality) || [];
+    const personalityTagsHTML = personalityList.length
+      ? `<div style="margin-top:6px">${personalityList.map(s => {
+          const desc = PERSONALITY_DESCRIPTIONS[s] || '';
+          return `<span class="playstyle-tag personality-tag" title="${desc}">${s}</span>`;
         }).join('')}</div>`
       : '';
     // Bio block: age/height/foot only exist on the expanded attribute sheet
@@ -15583,11 +15751,13 @@ var App = (() => {
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${signatureNote}
           ${playstyleTagsHTML}
+          ${personalityTagsHTML}
         </div>
       </div>
       ${injuryHTML}
       ${matchBlock}
       ${bioHTML}
+      ${renderPlayerAttributeRadarHTML(player)}
       <div class="card-title">Career (competitive)</div>
       <div class="profile-stats-grid">
         <div class="profile-stat"><div class="val">${apps}</div><div class="lbl">Apps</div></div>
@@ -15607,6 +15777,7 @@ var App = (() => {
         <div class="profile-stat"><div class="val">${gaPer90 != null ? gaPer90.toFixed(2) : '—'}</div><div class="lbl">G+A / 90</div></div>
       </div>
       ${renderPlayerRatingFormChartHTML(player.id)}
+      ${renderPlayerContributionChartHTML(player.id)}
       ${renderPlayerMatchLogHTML(player.id)}
       ${renderPlayerInjuryLogHTML(player.id)}
       <div style="margin-top:8px">
@@ -15621,7 +15792,10 @@ var App = (() => {
     modal.classList.add('active');
     // Canvas needs real layout dimensions (clientWidth) to size itself —
     // wait a frame after the modal's just been made visible/laid out.
-    requestAnimationFrame(() => drawPlayerRatingFormChart(player.id));
+    requestAnimationFrame(() => {
+      drawPlayerRatingFormChart(player.id);
+      drawPlayerContributionChart(player.id);
+    });
   }
 
 
@@ -18539,6 +18713,97 @@ var App = (() => {
     ctx.textAlign = 'center';
     log.forEach((e, i) => {
       ctx.fillText((e.opponentShort || '').slice(0, 3).toUpperCase(), xFor(i), h - 4);
+    });
+    ctx.textAlign = 'left';
+  }
+
+
+  // ========== GOALS/ASSISTS/xG CONTRIBUTION CHART ==========
+  // Grouped bar chart for the player profile: for each of the player's last
+  // 8 logged matches (oldest -> newest, left to right), a goals bar and an
+  // assists bar side by side, with xG plotted as a line over the top — so
+  // a coach can see at a glance whether a player's output is keeping pace
+  // with the chances his xG says he's getting. Same markup/draw split as
+  // renderPlayerRatingFormChartHTML/drawPlayerRatingFormChart just above.
+  function renderPlayerContributionChartHTML(playerId) {
+    const log = playerMatchLog[playerId] || [];
+    if (!log.length) return '';
+    return `<div class="card-title" style="margin-top:14px">Goal Contribution <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(last ${Math.min(log.length, 8)})</span></div>
+      <div class="rating-form-wrap">
+        <canvas id="contribution-canvas" height="120"></canvas>
+        <div class="rating-form-legend">
+          <span><i class="rf-dot rf-dot-goals"></i>Goals</span>
+          <span><i class="rf-dot rf-dot-assists"></i>Assists</span>
+          <span><i class="rf-dot rf-dot-xg"></i>xG</span>
+        </div>
+      </div>`;
+  }
+
+  function drawPlayerContributionChart(playerId) {
+    const canvas = document.getElementById('contribution-canvas');
+    if (!canvas || !canvas.parentElement) return;
+    const log = (playerMatchLog[playerId] || []).slice(0, 8).map(readPlayerLogEntry).reverse();
+    if (!log.length) return;
+    const w = canvas.parentElement.clientWidth || 300;
+    const h = 120;
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0a1210';
+    ctx.fillRect(0, 0, w, h);
+
+    const padL = 22, padR = 10, padT = 10, padB = 18;
+    const plotW = Math.max(1, w - padL - padR), plotH = h - padT - padB;
+    const maxCount = Math.max(1, ...log.map(e => Math.max(e.goals || 0, e.assists || 0, e.xg || 0)));
+    const yFor = (v) => padT + plotH - (Math.min(maxCount, v) / maxCount) * plotH;
+    const slotW = plotW / log.length;
+    const barW = Math.max(3, slotW * 0.28);
+
+    // Gridlines
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.textAlign = 'left';
+    const steps = Math.min(4, maxCount);
+    for (let s = 0; s <= steps; s++) {
+      const v = (maxCount / steps) * s;
+      const y = yFor(v);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      ctx.fillText(String(Math.round(v)), 2, y + 3);
+    }
+
+    // Goals + assists grouped bars
+    log.forEach((e, i) => {
+      const slotX = padL + i * slotW + slotW / 2;
+      const gx = slotX - barW * 0.6, ax = slotX + barW * 0.6 - barW;
+      const gy = yFor(e.goals || 0), ay = yFor(e.assists || 0);
+      ctx.fillStyle = '#f0c14b';
+      ctx.fillRect(gx - barW / 2, gy, barW, (padT + plotH) - gy);
+      ctx.fillStyle = '#3d8bfd';
+      ctx.fillRect(ax - barW / 2, ay, barW, (padT + plotH) - ay);
+    });
+
+    // xG line (mint), drawn over the bars
+    ctx.beginPath();
+    log.forEach((e, i) => {
+      const x = padL + i * slotW + slotW / 2, y = yFor(e.xg || 0);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#3ddc97';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    log.forEach((e, i) => {
+      const x = padL + i * slotW + slotW / 2, y = yFor(e.xg || 0);
+      ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#3ddc97'; ctx.fill();
+    });
+
+    // X-axis: opponent short name per match
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    log.forEach((e, i) => {
+      ctx.fillText((e.opponentShort || '').slice(0, 3).toUpperCase(), padL + i * slotW + slotW / 2, h - 4);
     });
     ctx.textAlign = 'left';
   }
