@@ -1290,6 +1290,12 @@ var App = (() => {
           m.playerMatchStats[scorer.id].xg += 0.22 + seededRandom() * 0.15;
           m.playerMatchStats[taker.id].assists++;
           m.playerMatchStats[taker.id].xa += 0.2 + seededRandom() * 0.3;
+          // Same reasoning as the corner routine in resolveCorner()
+          // (engine/shooting.js): a converted free-kick delivery is a
+          // clear-cut chance for whoever heads it home, so the taker's
+          // Big Chances Created should move with the assist instead of
+          // being left at 0 for a set-piece-heavy creator.
+          bumpExtStat(taker, 'bigChancesCreated', 1);
           pushGoal(attackingSide, scorer, m.minute, 'header from a direct free-kick');
           addEvent(m.minute, 'goal', `Free-kick delivery converted. <span class="player">${scorer.name}</span> heads home`, attackingSide, true);
         }
@@ -1328,7 +1334,14 @@ var App = (() => {
       attTeam.stats.shotsOn++;
       attTeam.score++;
       recordStat('goals', scorer, attTeam.team);
-      if (scorer !== taker) recordStat('assists', taker, attTeam.team);
+      if (scorer !== taker) {
+        recordStat('assists', taker, attTeam.team);
+        // Same reasoning as the other set-piece assist paths above: the
+        // layoff that leads straight to a first-time finish is a
+        // clear-cut chance, so it counts toward the taker's Big Chances
+        // Created just like the assist does.
+        bumpExtStat(taker, 'bigChancesCreated', 1);
+      }
       if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
       m.playerMatchStats[scorer.id].goals++;
       m.playerMatchStats[scorer.id].xg += 0.18 + seededRandom() * 0.1;
@@ -8194,6 +8207,15 @@ var App = (() => {
       if (!m.playerMatchStats[corTaker.id]) m.playerMatchStats[corTaker.id] = blankPlayerMatchStats(corTaker);
       m.playerMatchStats[corTaker.id].assists++;
       m.playerMatchStats[corTaker.id].xa += 0.2 + seededRandom() * 0.3;
+      // A converted corner routine is, by definition, a clear-cut chance
+      // for whoever got on the end of it — same "genuinely big chance"
+      // standard resolveShot() applies to open play — so the delivery
+      // that created it should count toward the taker's Big Chances
+      // Created the same way an open-play assist does. Previously this
+      // path credited the assist but never the chance behind it, which
+      // is how a player could rack up several corner/set-piece assists
+      // a season and still show 0 Big Chances Created.
+      bumpExtStat(corTaker, 'bigChancesCreated', 1);
     }
     pushGoal(attackingSide, scorer, m.minute, GOAL_DESC[routine] || 'header from corner');
     addEvent(m.minute, 'goal', `Corner converted (${ROUTINE_LABEL[routine]}). <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);
@@ -15805,12 +15827,14 @@ var App = (() => {
     const xaTotal = playerCareerCount('xa', playerId);
     const avgRatingEntry = (careerStats.ratings || {})[playerId];
     const avgRating = avgRatingEntry && avgRatingEntry.count ? avgRatingEntry.avg : null;
-    // Goal+assist involvement per 90 minutes — needs a real minutes total
-    // (careerStats.minutes, fed by the same computeMinutesPlayed() figure
-    // used everywhere else) rather than just apps, since a bench-heavy
-    // career shouldn't read the same as a nailed-on starter's.
+    // Goal+assist involvement expressed as minutes per contribution (e.g.
+    // "a goal or assist every 80 minutes") rather than contributions per
+    // minute — needs a real minutes total (careerStats.minutes, fed by the
+    // same computeMinutesPlayed() figure used everywhere else) rather than
+    // just apps, since a bench-heavy career shouldn't read the same as a
+    // nailed-on starter's.
     const careerMinutes = ((careerStats.minutes || {})[playerId] || {}).count || 0;
-    const gaPer90 = careerMinutes > 0 ? ((g + a) * 90 / careerMinutes) : null;
+    const gaMinPerGA = (careerMinutes > 0 && (g + a) > 0) ? (careerMinutes / (g + a)) : null;
     const primary = (team && team.color) || '#d4af37';
     const secondary = (team && team.secondary) || '#fff';
     const ms = (currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) || null;
@@ -15921,7 +15945,7 @@ var App = (() => {
         <div class="profile-stat"><div class="val">${xaTotal.toFixed(2)}</div><div class="lbl">xA</div></div>
         <div class="profile-stat"><div class="val">${ints}</div><div class="lbl">Interceptions</div></div>
         <div class="profile-stat"><div class="val">${blk}</div><div class="lbl">Blocks</div></div>
-        <div class="profile-stat"><div class="val">${gaPer90 != null ? gaPer90.toFixed(2) : '—'}</div><div class="lbl">G+A / 90</div></div>
+        <div class="profile-stat"><div class="val">${gaMinPerGA != null ? Math.round(gaMinPerGA) : '—'}</div><div class="lbl">Mins / G+A</div></div>
       </div>
       ${renderPlayerRatingFormChartHTML(player.id)}
       ${renderPlayerContributionChartHTML(player.id)}
