@@ -7792,7 +7792,14 @@ var App = (() => {
   // build-up make it to a shot at all — median is ~0.77), so the
   // threshold sits well above the midpoint to keep "big chance" meaning
   // the clear-cut minority of shots rather than most of them.
-  const BIG_CHANCE_QUALITY = 0.85;
+  // Raised from 0.85: at that level, a genuinely elite finisher's shotQuality
+  // (which is capped at 0.98 and regularly sits in the low-to-mid 0.90s once
+  // finishingEdge/positioningEdge bonuses stack on top of already-high base
+  // attributes) cleared the bar on a large share of his shots, not just the
+  // clear-cut minority — producing seasons with well over a hundred "big
+  // chances" logged for a single elite player. 0.90 keeps the tag meaningful
+  // for that tier of player instead of nearly automatic.
+  const BIG_CHANCE_QUALITY = 0.90;
 
   // ===== GK phase (called once a shot is confirmed on target) =====
   // then folds straight back to Shots for a rebound, small % of the time.
@@ -7894,6 +7901,22 @@ var App = (() => {
       // any shot regardless of quality.
       if (opts.assistCandidate) bumpExtStat(opts.assistCandidate, 'bigChancesCreated', 1);
     }
+    // Expected Assists (xA): real-world xA is the sum of the xG of every
+    // shot a player's pass led to, tallied at the moment of the shot —
+    // not just the shots that actually went in. Previously this model only
+    // ever added to xa on the rare shot that both had an assistCandidate
+    // AND scored, so a player creating dozens of good chances a season that
+    // mostly got saved or blocked (the normal outcome, even for a big
+    // chance) ended up with an xa total barely above his actual assist
+    // count instead of well above it. Crediting it here, off this shot's own
+    // xG, keeps it linked to shot quality — a big chance contributes far
+    // more xa than a low-percentage effort — the same way it would from any
+    // other pass, on target or not.
+    if (opts.assistCandidate && opts.assistCandidate.id !== shooter.id) {
+      const shotXg = profile.baseXg + shotQuality * 0.3;
+      if (!m.playerMatchStats[opts.assistCandidate.id]) m.playerMatchStats[opts.assistCandidate.id] = blankPlayerMatchStats(opts.assistCandidate);
+      m.playerMatchStats[opts.assistCandidate.id].xa += shotXg;
+    }
     // Kicking Power feeds the shot's raw power independently of placement —
     // used below in the GK phase so a fiercely struck effort is genuinely
     // harder to keep out/hold onto than a technically similar but softer one.
@@ -7969,6 +7992,14 @@ var App = (() => {
     const closeRangeShot = !isHeader && (chanceType === 'dribble' || chanceType === 'openplay' || chanceType === 'counter' || chanceType === 'cutback');
     const saveResult = resolveGkSave(gk, shooter, shotQuality, { isHeader, chanceType, shotPower, closeRange: closeRangeShot });
     if (saveResult.saved) {
+      // A shot the keeper has to save was still a real, on-target chance —
+      // it needs to add to the shooter's xG just like a blocked or off-target
+      // effort does a few lines up. This was previously the one shot outcome
+      // that contributed nothing to xg at all, which meant the shots most
+      // likely to come from a genuine big chance (on target, therefore
+      // saveable) were exactly the ones missing from the season xG total —
+      // hence a big-chance-heavy, high-miss season reading as low-xG.
+      m.playerMatchStats[shooter.id].xg += profile.baseXg + shotQuality * 0.3;
       if (personality.includes('Confidence Player')) {
         if (!m.personalityMomentum) m.personalityMomentum = {};
         m.personalityMomentum[shooter.id] = 0;
@@ -8031,7 +8062,9 @@ var App = (() => {
       recordStat('assists', assister, attTeam.team);
       if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
       m.playerMatchStats[assister.id].assists++;
-      m.playerMatchStats[assister.id].xa += 0.3 + seededRandom() * 0.4;
+      // xa for this shot was already credited above at shot-resolution time
+      // (see the expected-assists block earlier in this function), so it's
+      // not added again here — only the actual assist counter is.
       addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}. Assisted by <span class="player">${assister.name}</span>.`, attackingSide, true);
     } else {
       addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}.`, attackingSide, true);
