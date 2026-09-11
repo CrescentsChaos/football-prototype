@@ -4005,10 +4005,36 @@ var App = (() => {
     // "everyone selected" every time this runs.
     if (tournamentType !== tourSelectedTeamIdsType) {
       tourTeamsSearch = '';
+      tourTeamsSort = 'name';
+      tourTeamsLeagueFilter = 'all';
+      tourTeamsRatingFilter = 'all';
       tourSelectedTeamIds = new Set();
       tourSelectedTeamIdsType = tournamentType;
       const search = document.getElementById('tour-teams-search');
       if (search) search.value = '';
+      const sortSel = document.getElementById('tour-teams-sort');
+      if (sortSel) sortSel.value = 'name';
+      const ratingSel = document.getElementById('tour-teams-rating');
+      if (ratingSel) ratingSel.value = 'all';
+    }
+    // League filter: only worth showing for pools that genuinely span more
+    // than one bucket (e.g. Champions League clubs across the top-5
+    // leagues) — a single-league cup pool would just offer "All leagues"
+    // and that one league, filtering nothing. National-team pools (World
+    // Cup, Euros, etc.) don't have a "league" concept at all, so the
+    // control stays hidden for those too.
+    const leagueWrap = document.getElementById('tour-league-wrap');
+    const leagueSelect = document.getElementById('tour-teams-league');
+    const leagueOpts = getTournamentLeagueOptions(tournamentType);
+    if (leagueOpts && leagueWrap && leagueSelect) {
+      leagueWrap.style.display = '';
+      leagueSelect.innerHTML = '<option value="all">All leagues</option>' +
+        leagueOpts.present.map(lg => `<option value="${lg}">${lg}</option>`).join('') +
+        (leagueOpts.hasOther ? '<option value="other">Other</option>' : '');
+      leagueSelect.value = tourTeamsLeagueFilter;
+    } else {
+      if (leagueWrap) leagueWrap.style.display = 'none';
+      tourTeamsLeagueFilter = 'all';
     }
     // Tournament Size picker — only World Cup/Champions League can scale
     // past their real-world field size (see SCALABLE_TOURNAMENT_SIZES);
@@ -12536,6 +12562,25 @@ var App = (() => {
     tournamentSize = (sizes && sizes.indexOf(n) !== -1) ? n : (sizes ? sizes[0] : null);
     updateTournamentSelectedCount();
   }
+  // Which domestic leagues (plus an "other" bucket, if applicable) are
+  // actually represented in a given tournament format's eligible pool —
+  // drives the Tournament tab's League filter options. Returns null when
+  // the format's pool isn't club-based, or spans fewer than two buckets
+  // (nothing meaningful to filter), so the caller knows to hide the
+  // control entirely rather than show a filter with only "All" in it.
+  function getTournamentLeagueOptions(formatKey) {
+    const cfg = TOURNAMENT_FORMATS[formatKey];
+    if (!cfg || cfg.pool !== 'club') return null;
+    const pool = getCompetitionEligiblePool(formatKey);
+    if (pool.length < 2) return null;
+    const poolIds = new Set(pool.map(t => t.id));
+    const present = DOMESTIC_LEAGUES.filter(lg => getLeagueTeamPool(lg).some(t => poolIds.has(t.id)));
+    const knownIds = new Set();
+    present.forEach(lg => getLeagueTeamPool(lg).forEach(t => { if (poolIds.has(t.id)) knownIds.add(t.id); }));
+    const hasOther = pool.some(t => !knownIds.has(t.id));
+    if (present.length + (hasOther ? 1 : 0) < 2) return null;
+    return { present, hasOther };
+  }
   function renderTournamentTeamSelect() {
     let pool = getCompetitionEligiblePool(tournamentType);
     if (tourTeamsSearch) {
@@ -12544,13 +12589,36 @@ var App = (() => {
         (t.short || '').toLowerCase().includes(tourTeamsSearch)
       );
     }
+    if (tourTeamsLeagueFilter !== 'all') {
+      // Mirrors getFilteredTeamsList()'s league matching (ui/teamUI.js) so
+      // "Premier League" here means exactly the clubs the Teams tab and
+      // Season Calendar would offer under that name.
+      if (tourTeamsLeagueFilter === 'other') {
+        const known = new Set();
+        DOMESTIC_LEAGUES.forEach(name => getLeagueTeamPool(name).forEach(t => known.add(t.id)));
+        pool = pool.filter(t => !known.has(t.id));
+      } else {
+        const ids = new Set(getLeagueTeamPool(tourTeamsLeagueFilter).map(t => t.id));
+        pool = pool.filter(t => ids.has(t.id));
+      }
+    }
+    if (tourTeamsRatingFilter !== 'all') {
+      pool = pool.filter(t => ovrTierMatches(teamAvgOvr(t), tourTeamsRatingFilter));
+    }
+    pool = [...pool];
+    if (tourTeamsSort === 'ovr') pool.sort((a, b) => teamAvgOvr(b) - teamAvgOvr(a));
+    else if (tourTeamsSort === 'players') pool.sort((a, b) => (b.players || []).length - (a.players || []).length);
+    else if (tourTeamsSort === 'flag') pool.sort((a, b) => (a.flag || '').localeCompare(b.flag || '') || (a.name || '').localeCompare(b.name || ''));
+    else pool.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const el = document.getElementById('tournament-teams');
     if (!el) return;
-    // First-ever render for this format (nothing selected yet, no search
-    // narrowing the pool) defaults every eligible team to checked — same
-    // "select all by default" behavior as before, just driven by
-    // tourSelectedTeamIds instead of a DOM snapshot now.
-    const firstRender = tourSelectedTeamIds.size === 0 && !tourTeamsSearch;
+    // First-ever render for this format (nothing selected yet, no
+    // search/league/rating filter narrowing the pool) defaults every
+    // eligible team to checked — same "select all by default" behavior as
+    // before, just driven by tourSelectedTeamIds instead of a DOM snapshot
+    // now.
+    const firstRender = tourSelectedTeamIds.size === 0 && !tourTeamsSearch &&
+      tourTeamsLeagueFilter === 'all' && tourTeamsRatingFilter === 'all';
     if (firstRender) getCompetitionEligiblePool(tournamentType).forEach(t => tourSelectedTeamIds.add(t.id));
     el.innerHTML = pool.map(t => {
       const checked = tourSelectedTeamIds.has(t.id);
@@ -15081,6 +15149,9 @@ var App = (() => {
   let teamsSearch = '';
   let teamsSort = 'name';
   let tourTeamsSearch = '';
+  let tourTeamsSort = 'name';
+  let tourTeamsLeagueFilter = 'all';   // 'all' | one of DOMESTIC_LEAGUES | 'other'
+  let tourTeamsRatingFilter = 'all';   // 'all' | 'elite' | 'great' | 'good' | 'dev' — see ovrTierMatches()
   // Authoritative record of which teams are checked for the tournament,
   // independent of the current search filter. renderTournamentTeamSelect()
   // only ever renders the pool matching the *current* search text, so a
@@ -15334,6 +15405,26 @@ var App = (() => {
       tourTeamsSearch = value;
       renderTournamentTeamSelect();
     }, 160);
+  }
+  // Sort/League/Rating filters for the Tournament tab's team picker — same
+  // controls as the Teams tab (sortTeams/filterTeamsLeague/filterTeamsRating
+  // above), reused here so people can narrow a large eligible pool (e.g.
+  // World Cup's 48+ national teams, or Champions League's few hundred
+  // clubs) down to the teams they actually want, instead of only being able
+  // to search by name.
+  function sortTournamentTeams(mode) {
+    tourTeamsSort = mode || 'name';
+    renderTournamentTeamSelect();
+  }
+
+  function filterTournamentTeamsLeague(league) {
+    tourTeamsLeagueFilter = league || 'all';
+    renderTournamentTeamSelect();
+  }
+
+  function filterTournamentTeamsRating(tier) {
+    tourTeamsRatingFilter = tier || 'all';
+    renderTournamentTeamSelect();
   }
 
 
@@ -19091,6 +19182,7 @@ var App = (() => {
     returnToTournament, showPlayerProfile, showTeamProfile, showTeamLineup, randomMatch, randomizeTeamSide,
     resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
+    sortTournamentTeams, filterTournamentTeamsLeague, filterTournamentTeamsRating,
     openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
     openSlotRolePicker, setSquadSlotRole,
     playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
