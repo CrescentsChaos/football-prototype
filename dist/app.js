@@ -1380,12 +1380,18 @@ var App = (() => {
     // their own goal-line for this one, so a first-time strike is far more
     // likely to cannon straight into a wall than beat it.
     addEvent(m.minute, 'whistle', `Indirect free-kick to ${attTeam.team.short} — defenders line up on their own goal-line`, attackingSide);
-    attTeam.stats.shots++;
-    if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
-    m.playerMatchStats[taker.id].shots++;
+    // Indirect free-kicks can't be shot straight in, so the taker rolls it
+    // to a team-mate whenever one's available — that team-mate, not the
+    // taker, is the one who actually strikes it. Crediting the shot to
+    // the taker regardless meant he racked up a "shot" on his stat line
+    // even on the passages where he never took one.
     const layoff = pickPlayer(attTeam, ['CM', 'CAM', 'ST'], taker.id);
+    const effectiveShooter = layoff || taker;
+    attTeam.stats.shots++;
+    if (!m.playerMatchStats[effectiveShooter.id]) m.playerMatchStats[effectiveShooter.id] = blankPlayerMatchStats(effectiveShooter);
+    m.playerMatchStats[effectiveShooter.id].shots++;
     if (seededRandom() < 0.18) {
-      const scorer = layoff || taker;
+      const scorer = effectiveShooter;
       attTeam.stats.shotsOn++;
       attTeam.score++;
       recordStat('goals', scorer, attTeam.team);
@@ -1428,16 +1434,45 @@ var App = (() => {
       addEvent(m.minute, 'whistle', `Long throw hurled into the box by <span class="player">${thrower.name}</span> (${team.team.short})`, side);
       const flickOnChance = 0.035 + (hasSkill(thrower, 'Long Throws') ? 0.01 : 0);
       if (seededRandom() < flickOnChance) {
+        const oppTeam = m[oppSide];
         const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p, false) * 2, thrower.id);
-        if (scorer) {
-          team.stats.shots++; team.stats.shotsOn++; team.score++;
-          recordStat('goals', scorer, team.team);
+        // The flick-on still has to win the header against a marker, the
+        // same aerial contest a long punt from a goal kick goes through
+        // (see resolveGoalKick below) — previously this rolled straight
+        // into a goal with no defender or goalkeeper anywhere in the way,
+        // making it a far more direct route to goal than any other
+        // set-piece delivery in the engine.
+        const defender = pickPlayerCustomWeighted(oppTeam, ['CB', 'CDM'], (p) => aerialSkill(p, true) * 2);
+        const wonHeader = scorer && (!defender || aerialSkill(scorer, false) + seededRandom() * 0.3 > aerialSkill(defender, true) + seededRandom() * 0.3);
+        if (wonHeader) {
           if (!m.playerMatchStats) m.playerMatchStats = {};
           if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
-          m.playerMatchStats[scorer.id].goals++;
+          team.stats.shots++;
+          m.playerMatchStats[scorer.id].shots++;
+          const gk = activeGoalkeeper(oppSide);
+          const shotQuality = Math.max(0.05, Math.min(0.98, aerialSkill(scorer, false)));
+          const saveResult = resolveGkSave(gk, scorer, shotQuality, { isHeader: true, closeRange: true, chanceType: 'cross' });
           m.playerMatchStats[scorer.id].xg += 0.16 + seededRandom() * 0.1;
-          pushGoal(side, scorer, m.minute, 'header from a long throw');
-          addEvent(m.minute, 'goal', `${emojiImg('goal', 'Goal')} Long throw flick-on converted! <span class="player">${scorer.name}</span> heads home`, side, true);
+          if (saveResult.saved) {
+            team.stats.shotsOn++;
+            if (gk) {
+              oppTeam.stats.saves++;
+              recordStat('saves', gk, oppTeam.team);
+              if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+              m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+              addEvent(m.minute, 'save', `🧤 Long throw flick-on from <span class="player">${scorer.name}</span> — kept out by <span class="player">${gk.name}</span>`, side);
+            } else {
+              addEvent(m.minute, 'miss', `Long throw flick-on from <span class="player">${scorer.name}</span> — off target`, side);
+            }
+          } else {
+            team.stats.shotsOn++; team.score++;
+            recordStat('goals', scorer, team.team);
+            m.playerMatchStats[scorer.id].goals++;
+            pushGoal(side, scorer, m.minute, 'header from a long throw');
+            addEvent(m.minute, 'goal', `${emojiImg('goal', 'Goal')} Long throw flick-on converted! <span class="player">${scorer.name}</span> heads home`, side, true);
+          }
+        } else if (defender) {
+          addEvent(m.minute, 'whistle', `Long throw claimed by the defence — <span class="player">${defender.name}</span> heads it clear`, oppSide);
         }
       }
     } else if (roll < (longThrowSpecialist ? 0.55 : 0.7)) {
@@ -7551,8 +7586,13 @@ var App = (() => {
         // per-player, same as before.
         const interceptCut = Math.min(0.75, 0.235 + actionEdge.interceptBias);
         if (roll < interceptCut) {
+          // Interception and tackle are alternative outcomes of this same
+          // roll (see the comment above interceptCut), not two separate
+          // actions — crediting both here double-counted every single
+          // interception as a tackle too, inflating both the individual
+          // and (via the interceptions/tackles totals the Defenders' Award
+          // sums in ui/statisticsUI.js) the season-long defensive totals.
           ps.interceptions = (ps.interceptions || 0) + 1;
-          ps.tackles = (ps.tackles || 0) + 1;
           team.stats.interceptions = (team.stats.interceptions || 0) + 1;
           if (seededRandom() < 0.14) addEvent(m.minute, 'whistle', pickOffBallDesc(OFFBALL_INTERCEPT_DESC, p, team), side);
         } else if (roll < 0.85) {
@@ -8024,9 +8064,30 @@ var App = (() => {
     // Big-Game/Fragile only kick in when the moment actually carries
     // stakes (derby / final / close-and-late).
     const stakes = computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score);
+    // Every personality edge below used to be its own sequential
+    // `shotQuality *=` — fine for a single tag, but a player who legitimately
+    // holds several at once (Big-Game + Confidence Player + Finisher's
+    // Instinct + Talisman is a perfectly normal combination in a tight,
+    // late cup match) had those multipliers chain on top of each other
+    // (1.15 * 1.09 * 1.12 * 1.03 ≈ +45%) rather than simply add up. They're
+    // now collected as one combined relative edge and applied once, so five
+    // separate +15% tags add to +75%, not compound toward doubling.
+    //
+    // That combined edge is then applied as headroom — closing that share
+    // of the gap remaining to the quality cap/floor — instead of scaling
+    // shotQuality directly. A flat multiplier rewards an already-elite
+    // finisher (shotQuality already sitting close to the 0.98 ceiling) with
+    // a far bigger *absolute* jump than it gives a merely-good one, which is
+    // backwards from every curve elsewhere in this file and is what made
+    // Big-Game alone such an enormous swing for a team's best players —
+    // effectively a near-automatic finish in a big moment. Headroom scaling
+    // keeps the same "edge in a big moment" idea without a top-tier player
+    // basically guaranteeing the chance, and it naturally self-limits even
+    // when several bonuses stack.
+    let personalityEdge = 0;
     if (stakes) {
-      if (personality.includes('Big-Game')) shotQuality *= 1.15;
-      if (personality.includes('Fragile')) shotQuality *= 0.85;
+      if (personality.includes('Big-Game')) personalityEdge += 0.15;
+      if (personality.includes('Fragile')) personalityEdge -= 0.15;
     }
     // Confidence Player: composure builds while he's on a live scoring run
     // this match and evaporates the moment an effort doesn't end in a goal
@@ -8036,23 +8097,29 @@ var App = (() => {
     // meaningful edge without becoming a lock.
     if (personality.includes('Confidence Player')) {
       const momentum = Math.min(3, (m.personalityMomentum && m.personalityMomentum[shooter.id]) || 0);
-      if (momentum > 0) shotQuality *= (1 + momentum * 0.03);
+      if (momentum > 0) personalityEdge += momentum * 0.03;
     }
     // Finisher's Instinct: extra late-game shot-quality bump distinct from
     // Big-Game's stakes gate above — fires purely off the clock, any
     // scoreline, including a dead rubber Big-Game's derby/final/close-
     // and-late gate would never trigger for.
-    if (personality.includes("Finisher's Instinct") && m.minute > 80) shotQuality *= 1.12;
+    if (personality.includes("Finisher's Instinct") && m.minute > 80) personalityEdge += 0.12;
     // Talisman aura: teammates play with a touch more composure while
     // he's out there with them — same aura pattern as the existing
     // Captaincy fatigue/form hooks, just read locally here since it only
     // touches shot quality.
     const onIdsTalisman = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
     if ((attTeam.squad.all || []).some(x => onIdsTalisman.includes(x.id) && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Talisman'))) {
-      shotQuality *= 1.03;
+      personalityEdge += 0.03;
     }
     // Homebody: genuinely worse away from home, nothing to do with stakes.
-    if (personality.includes('Homebody') && attackingSide === 'away') shotQuality *= 0.93;
+    if (personality.includes('Homebody') && attackingSide === 'away') personalityEdge -= 0.07;
+    // Belt-and-braces cap on the combined edge itself — even a player who
+    // somehow holds every stacking tag at once can't turn this into a
+    // guaranteed goal or a guaranteed miss.
+    personalityEdge = Math.max(-0.5, Math.min(0.5, personalityEdge));
+    if (personalityEdge > 0) shotQuality += (0.98 - shotQuality) * personalityEdge;
+    else if (personalityEdge < 0) shotQuality += (shotQuality - 0.05) * personalityEdge;
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality));
     // Genuinely clear-cut chance, read straight off this shot's own final
     // quality — everything downstream that doesn't end in a goal marks it
@@ -8319,13 +8386,35 @@ var App = (() => {
     const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2 * (designatedAttackerIds.has(p.id) ? 1.35 : 1));
     if (!scorer) return;
     attTeam.stats.shots++;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+    m.playerMatchStats[scorer.id].shots++;
+    // Getting on the end of the delivery only earns a shot on goal — it
+    // still has to beat the keeper, the same as any other header in the
+    // box. Previously this routine credited the goal the instant `chance`
+    // succeeded, with no goalkeeper involvement anywhere in the pipeline.
+    const gk = activeGoalkeeper(defendingSide);
+    const shotQuality = Math.max(0.05, Math.min(0.98, aerialSkill(scorer, false)));
+    if (gk) bumpExtStat(gk, 'psxg', +(0.24 + shotQuality * 0.18).toFixed(3));
+    const saveResult = resolveGkSave(gk, scorer, shotQuality, { isHeader: true, closeRange: routine === 'nearpost' || routine === 'crowd', chanceType: 'cross' });
+    m.playerMatchStats[scorer.id].xg += 0.24 + seededRandom() * 0.18;
+    if (saveResult.saved) {
+      attTeam.stats.shotsOn++;
+      if (gk) {
+        defTeam.stats.saves++;
+        recordStat('saves', gk, defTeam.team);
+        if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+        m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+        addEvent(m.minute, 'save', `🧤 ${ROUTINE_LABEL[routine]} met by <span class="player">${scorer.name}</span> — ${saveResult.saveType === 'catch' ? pickCatchDesc(gk, scorer) : pickSaveDesc(gk, scorer)}`, attackingSide);
+      } else {
+        addEvent(m.minute, 'miss', `${ROUTINE_LABEL[routine]} met by <span class="player">${scorer.name}</span> but it drifts off target`, attackingSide);
+      }
+      return;
+    }
     attTeam.stats.shotsOn++;
     attTeam.score++;
     recordStat('goals', scorer, attTeam.team);
-    if (!m.playerMatchStats) m.playerMatchStats = {};
-    if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
     m.playerMatchStats[scorer.id].goals++;
-    m.playerMatchStats[scorer.id].xg += 0.24 + seededRandom() * 0.18;
     // Out-swinging/far-post-style deliveries are taken from the side that
     // suits the right-footed/left-footed swing; in-swinging/near-post-style
     // ones from the other. Falls back to the generic pick if the
@@ -10291,6 +10380,18 @@ var App = (() => {
     if (!pool.length) pool = defs;
     return pool[Math.floor(seededRandom() * pool.length)];
   }
+  // How far apart two broad position groups (GK/DEF/MID/FWD, from
+  // posGroupOf() in engine/matchEngine.js) sit on the pitch — used to pick
+  // the least-bad emergency substitute when nobody on the bench plays the
+  // injured player's exact slot. DEF/MID and MID/FWD are adjacent (1);
+  // DEF/FWD is two steps apart (2); anything touching GK is kept as far
+  // away as possible short of literally having no other option.
+  function positionGroupDistance(g1, g2) {
+    const order = ['GK', 'DEF', 'MID', 'FWD'];
+    const i1 = order.indexOf(g1), i2 = order.indexOf(g2);
+    if (i1 < 0 || i2 < 0) return 99;
+    return Math.abs(i1 - i2);
+  }
   function tryInjury(side) {
     const m = currentMatch;
     if (!m) return;
@@ -10368,7 +10469,27 @@ var App = (() => {
         !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !isPlayerInjured(p.id) && !leftIds.includes(p.id));
       if (availableSubs.length) {
         let candidates = availableSubs.filter(p => canPlay(p, injured.slot || (injured.pos || ['CM'])[0]));
-        if (!candidates.length) candidates = availableSubs; // forced — the injured player must leave the pitch either way
+        if (!candidates.length) {
+          // Nobody on the bench plays the exact vacated slot. This used to
+          // just fall back to the entire bench regardless of position —
+          // which could send on a bench goalkeeper to play centre-forward,
+          // or a centre-back to cover a winger, purely because they had the
+          // highest ovr left. Instead, widen outward by broad position
+          // group (GK/DEF/MID/FWD) and only take whichever group is
+          // actually closest to the one the injured player played in, so
+          // the emergency sub is at least in a plausible area of the pitch.
+          const injuredGroup = posGroupOf(injured.pos, injured.slot || (injured.pos || ['CM'])[0]);
+          const outfieldSubs = availableSubs.filter(p => posGroupOf(p.pos, (p.pos || ['CM'])[0]) !== 'GK');
+          // Only reach for a bench goalkeeper if literally nobody else is
+          // left to bring on — still forced in that one genuine edge case.
+          const widenPool = outfieldSubs.length ? outfieldSubs : availableSubs;
+          let bestDist = Infinity;
+          widenPool.forEach(p => {
+            const d = positionGroupDistance(injuredGroup, posGroupOf(p.pos, (p.pos || ['CM'])[0]));
+            if (d < bestDist) bestDist = d;
+          });
+          candidates = widenPool.filter(p => positionGroupDistance(injuredGroup, posGroupOf(p.pos, (p.pos || ['CM'])[0])) === bestDist);
+        }
         candidates.sort((a, b) => (b.ovr || 70) - (a.ovr || 70));
         const inPlayer = candidates[Math.floor(seededRandom() * Math.min(3, candidates.length))];
         const idx = onPitchIds.indexOf(injured.id);
