@@ -156,8 +156,8 @@ var App = (() => {
   // pac/phy/tec/ovr as read from teams.json for that player are ignored —
   // see applyExpandedPlayerAttributes()).
   let playerAttributesData = {};
-  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
-  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+  let stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+  let tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
   // Permanent, never-reset per-player totals (goals, assists, apps, etc.)
   // across every season the save has ever played — this is what the
   // Players tab / player profile's "Career (competitive)" panel reads from.
@@ -166,7 +166,7 @@ var App = (() => {
   // wiped by archiveAndResetGlobalAwards() at every season end; careerStats
   // uses the exact same shape but is only ever added to, never reset, so
   // ending a season doesn't erase a player's lifetime totals.
-  let careerStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+  let careerStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
   // Which season competition (a league, or the UCL) is currently being simulated —
   // set for the duration of a simulateRoundFixtures() call so recordStat/recordRating
   // can also tally into that competition's own stat bucket (comp.stats), giving each
@@ -5517,7 +5517,7 @@ var App = (() => {
     return {
       shots: 0, shotsOn: 0, possession: 50, fouls: 0, corners: 0, saves: 0, passes: 0, passesCompleted: 0, interceptions: 0, blocks: 0, yellows: 0, reds: 0, xg: 0,
       // Attack
-      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
+      bigChances: 0, bigChancesMissed: 0, bigChancesCreated: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
       // Passing
       progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
       // Defense
@@ -6159,7 +6159,7 @@ var App = (() => {
       id: p.id, name: p.name, num: p.num, pos: (p.pos||[])[0], ovr: p.ovr,
       goals: 0, assists: 0, shots: 0, saves: 0, tackles: 0, passes: 0, xg: 0, xa: 0, rating: 6.0, yellow: false, red: false,
       // Attack
-      bigChances: 0, bigChancesMissed: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
+      bigChances: 0, bigChancesMissed: 0, bigChancesCreated: 0, touches: 0, touchesInBox: 0, progressiveCarries: 0, carries: 0, dribbles: 0, successfulDribbles: 0, offsides: 0,
       // Passing
       progressivePasses: 0, keyPasses: 0, throughBalls: 0, crosses: 0, switches: 0, longBalls: 0, finalThirdPasses: 0,
       // Defense
@@ -6221,7 +6221,7 @@ var App = (() => {
   // now derived deterministically from this player's own real workload this
   // match (how many real actions they were actually involved in) instead of
   // an independent random roll keyed only off position and minutes.
-  const EXTENDED_STAT_KEYS = ['bigChances','bigChancesMissed','touches','touchesInBox','progressiveCarries','carries',
+  const EXTENDED_STAT_KEYS = ['bigChances','bigChancesMissed','bigChancesCreated','touches','touchesInBox','progressiveCarries','carries',
     'dribbles','successfulDribbles','offsides','progressivePasses','keyPasses','throughBalls','crosses',
     'switches','longBalls','finalThirdPasses','tackles','clearances','headedClearances','defensiveErrors',
     'recoveries','pressures','aerialDuels','distance','sprints','highSpeedRuns','accelerations','decelerations',
@@ -7781,7 +7781,15 @@ var App = (() => {
     // quality — everything downstream that doesn't end in a goal marks it
     // missed instead of converted.
     const isBigChance = shotQuality >= BIG_CHANCE_QUALITY;
-    if (isBigChance) bumpExtStat(shooter, 'bigChances', 1);
+    if (isBigChance) {
+      bumpExtStat(shooter, 'bigChances', 1);
+      // Big Chances Created credits the actual creator of a genuinely
+      // clear-cut opportunity — the same assistCandidate condition (a real
+      // pass, not the shooter setting himself up) that governs whether an
+      // eventual goal here earns an assist, not just any pass that led to
+      // any shot regardless of quality.
+      if (opts.assistCandidate) bumpExtStat(opts.assistCandidate, 'bigChancesCreated', 1);
+    }
     // Kicking Power feeds the shot's raw power independently of placement —
     // used below in the GK phase so a fiercely struck effort is genuinely
     // harder to keep out/hold onto than a technically similar but softer one.
@@ -10243,17 +10251,20 @@ var App = (() => {
     // for every player who took part, then roll those up into each side's
     // team totals — see deriveExtendedMatchStats() below.
     deriveExtendedMatchStats(m);
-    // Chance creation ("Chances Created" on a player's profile/leaderboard)
-    // is the season/career total of key passes — passes that led directly
-    // to a shot. keyPasses only exists on ps once deriveExtendedMatchStats()
-    // above has run, so this has to be its own pass over `pool` rather than
-    // folding into the interceptions/tackles/blocks/xG/xA loop earlier,
-    // which runs before that derivation.
+    // Big Chances Created (player profile / leaderboard) is the season/
+    // career total of real big chances a player actually created for a
+    // teammate — see bigChancesCreated in engine/shooting.js::resolveShot —
+    // rather than every key pass regardless of the resulting chance's
+    // quality. Both this and bigChancesMissed only exist on ps once
+    // deriveExtendedMatchStats() above has run, so this has to be its own
+    // pass over `pool` rather than folding into the interceptions/tackles/
+    // blocks/xG/xA loop earlier, which runs before that derivation.
     pool.forEach(p => {
       const ps = m.playerMatchStats[p.id];
-      if (!ps || !(ps.keyPasses > 0)) return;
+      if (!ps) return;
       const teamObj = (m.home.squad.all||[]).find(x=>x.id===p.id) ? m.home.team : m.away.team;
-      recordStatCount('chancesCreated', p, teamObj, ps.keyPasses);
+      if (ps.bigChancesCreated > 0) recordStatCount('chancesCreated', p, teamObj, ps.bigChancesCreated);
+      if (ps.bigChancesMissed > 0) recordStatCount('bigChancesMissed', p, teamObj, ps.bigChancesMissed);
     });
     let best = null, bestR = -1;
     Object.values(m.playerMatchStats).forEach(ps => {
@@ -11089,7 +11100,7 @@ var App = (() => {
   // Shape used for every per-competition stat bucket: season leagues, the season's
   // UCL, and (already existing) the global `stats` / `tournamentStats` buckets.
   function blankCompStats() {
-    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+    return { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
   }
 
   function bumpStatBucket(bucket, type, player, team) {
@@ -11674,12 +11685,12 @@ var App = (() => {
     // tab / player profile) is a completely separate, never-reset bucket —
     // see its declaration in js/state.js — so ending a season no longer
     // wipes a player's career goals/assists/apps/etc.
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
     // otherwise this would wipe that tournament's own live leaderboard mid-run.
     if (!tournament || tournament.champion) {
-      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     }
     saveStats();
   }
@@ -12318,7 +12329,7 @@ var App = (() => {
       el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No ${type} recorded yet. Simulate matches!</p></div>`;
       return;
     }
-    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating', interceptions: 'Interceptions', tackles: 'Tackles', blocks: 'Blocks', chancesCreated: 'Chances Created', xg: 'xG', xa: 'xA' };
+    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating', interceptions: 'Interceptions', tackles: 'Tackles', blocks: 'Blocks', chancesCreated: 'Big Chances Created', bigChancesMissed: 'Big Chances Missed', xg: 'xG', xa: 'xA' };
     const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
     // xG/xA accumulate in fractional increments (a fraction of a goal/assist
     // "expected" per chance, not a whole-number event like a tackle or an
@@ -12481,7 +12492,7 @@ var App = (() => {
     if (selected.length < minTeams) { toast('Select at least ' + minTeams + ' teams'); return; }
 
     applyTournamentBranding(tournamentType);
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     // Wipe the player/team match logs for the new tournament. These logs
     // exist to show recent form (last 10, capped at 30) for whatever's
     // currently being played — carrying entries over from a finished
@@ -15483,8 +15494,8 @@ var App = (() => {
     const y = playerCareerCount('yellows', playerId);
     const rd = playerCareerCount('reds', playerId);
     const apps = playerCareerCount('ratings', playerId);
-    // Newer career totals — interceptions/blocks/chances created (key
-    // passes) and xA all accumulate the same way goals/assists do (see
+    // Newer career totals — interceptions/blocks/big chances created/missed
+    // and xG/xA all accumulate the same way goals/assists do (see
     // recordStatCount() calls in engine/matchEngine.js::endMatch), so they
     // read off careerStats via the same playerCareerCount() helper as
     // everything else above. Avg rating is the one exception: it's a mean,
@@ -15493,6 +15504,8 @@ var App = (() => {
     const ints = playerCareerCount('interceptions', playerId);
     const blk = playerCareerCount('blocks', playerId);
     const cc = playerCareerCount('chancesCreated', playerId);
+    const bcm = playerCareerCount('bigChancesMissed', playerId);
+    const xgTotal = playerCareerCount('xg', playerId);
     const xaTotal = playerCareerCount('xa', playerId);
     const avgRatingEntry = (careerStats.ratings || {})[playerId];
     const avgRating = avgRatingEntry && avgRatingEntry.count ? avgRatingEntry.avg : null;
@@ -15585,7 +15598,9 @@ var App = (() => {
         <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
         <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
         <div class="profile-stat"><div class="val">${avgRating != null ? avgRating.toFixed(2) : '—'}</div><div class="lbl">Avg Rating</div></div>
-        <div class="profile-stat"><div class="val">${cc}</div><div class="lbl">Chances Created</div></div>
+        <div class="profile-stat"><div class="val">${cc}</div><div class="lbl">Big Chances Created</div></div>
+        <div class="profile-stat"><div class="val">${bcm}</div><div class="lbl">Big Chances Missed</div></div>
+        <div class="profile-stat"><div class="val">${xgTotal.toFixed(2)}</div><div class="lbl">xG</div></div>
         <div class="profile-stat"><div class="val">${xaTotal.toFixed(2)}</div><div class="lbl">xA</div></div>
         <div class="profile-stat"><div class="val">${ints}</div><div class="lbl">Interceptions</div></div>
         <div class="profile-stat"><div class="val">${blk}</div><div class="lbl">Blocks</div></div>
