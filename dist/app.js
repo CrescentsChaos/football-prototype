@@ -1182,6 +1182,7 @@ var App = (() => {
       if (!m.playerMatchStats) m.playerMatchStats = {};
       if (!m.playerMatchStats[attacker.id]) m.playerMatchStats[attacker.id] = blankPlayerMatchStats(attacker);
       m.playerMatchStats[attacker.id].offsides = (m.playerMatchStats[attacker.id].offsides || 0) + 1;
+      m.playerMatchStats[attacker.id]._liveOffside = true; // tells deriveExtendedMatchStats not to overwrite this with a random backfill figure
       addEvent(m.minute, 'offside', `🚩 Flag up — <span class="player">${attacker.name}</span> caught offside by the last defender`, attackingSide);
     } else if (result.marginal) {
       addEvent(m.minute, 'offside', `Tight call — <span class="player">${attacker.name}</span> ruled level, play continues`, attackingSide);
@@ -6169,6 +6170,23 @@ var App = (() => {
       punches: 0, claims: 0, crossesStopped: 0, goalsPrevented: 0, psxg: 0, distribution: 0
     };
   }
+  // Shared live-tracking helper for the extended stat sheet (Attack/
+  // Passing/Defense/Physical/Goalkeeping) — ensures a player's match-stats
+  // record exists, then bumps one field by `amt` (default 1). Called from
+  // every phase of the pipeline (engine/possession.js, engine/passing.js,
+  // engine/shooting.js) so these numbers build up live, minute by minute,
+  // from genuine simulated events — the same pattern already used for the
+  // "core" stats (shots, passes, tackles, ...) — rather than being
+  // reconstructed out of thin air after the final whistle.
+  function bumpExtStat(p, key, amt) {
+    const m = currentMatch;
+    if (!m || !p) return null;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
+    const ps = m.playerMatchStats[p.id];
+    ps[key] = (ps[key] || 0) + (amt == null ? 1 : amt);
+    return ps;
+  }
 
   // Broad role bucket for extended-stats generation below — GK / DEF / MID / FWD.
   function posGroupOf(posArr, primaryPos) {
@@ -6180,16 +6198,29 @@ var App = (() => {
     return 'FWD';
   }
 
-  // Fills in the full extended stat sheet (Attack/Passing/Defense/Physical/
+  // Finalizes the full extended stat sheet (Attack/Passing/Defense/Physical/
   // Goalkeeping) for every player involved in the match, then sums each
   // field into the team totals so the team sheet always agrees exactly with
   // what's shown per-player underneath it. Runs once at full time (called
-  // from endMatch(), after ratings/goalsConceded are finalised) rather than
-  // tick-by-tick — a handful of the underlying numbers (shots, passes,
-  // passesCompleted, tackles, interceptions, blocks, saves, goals, assists)
-  // are the real minute-by-minute simulation output; everything else here
-  // is a plausible derived breakdown built from those, the player's role,
-  // and minutes played, in the same spirit as the existing rating formula.
+  // from endMatch(), after ratings/goalsConceded are finalised).
+  //
+  // Every field below is now built up LIVE, minute by minute, from genuine
+  // simulated events (see bumpExtStat() and its call sites across
+  // engine/possession.js, engine/passing.js, engine/shooting.js,
+  // engine/defending.js and engine/offside.js) rather than reconstructed
+  // from scratch here off nothing but the player's role and minutes played.
+  // This function's own job is now just three things: (1) a same-match
+  // backfill for the handful of fields a live loop can genuinely miss for a
+  // given player (clearances/headed clearances — see the ps._liveClr /
+  // ps._liveHeadedClr flags), (2) a couple of fields that are honestly
+  // still a deterministic *formula* over other real numbers rather than a
+  // directly-observable single event (touches, touches in the box,
+  // recoveries, distribution, goals prevented), and (3) the physical
+  // figures (distance/sprints/high-speed runs/accelerations/decelerations),
+  // which — with no literal player-position tracking in this engine — are
+  // now derived deterministically from this player's own real workload this
+  // match (how many real actions they were actually involved in) instead of
+  // an independent random roll keyed only off position and minutes.
   const EXTENDED_STAT_KEYS = ['bigChances','bigChancesMissed','touches','touchesInBox','progressiveCarries','carries',
     'dribbles','successfulDribbles','offsides','progressivePasses','keyPasses','throughBalls','crosses',
     'switches','longBalls','finalThirdPasses','tackles','clearances','headedClearances','defensiveErrors',
@@ -6200,7 +6231,6 @@ var App = (() => {
     if (!m) return;
     ['home', 'away'].forEach(side => {
       const teamSide = m[side];
-      const oppSide = side === 'home' ? m.away : m.home;
       const squadAll = (teamSide.squad && teamSide.squad.all) || [];
       squadAll.forEach(p => {
         const ps = m.playerMatchStats[p.id];
@@ -6211,93 +6241,60 @@ var App = (() => {
         const posArr = (ps.posArr && ps.posArr.length) ? ps.posArr : (p.pos || []);
         const group = posGroupOf(posArr, ps.pos);
         const minFrac = Math.max(0.15, Math.min(1, minutes / 90));
-        const shots = ps.shots || 0, passes = ps.passes || 0, passesC = ps.passesCompleted || 0;
-        const goals = ps.goals || 0, assists = ps.assists || 0;
+        const passes = ps.passes || 0, passesC = ps.passesCompleted || 0, shots = ps.shots || 0;
+        const tackles = ps.tackles || 0, ints = ps.interceptions || 0, blocks = ps.blocks || 0;
+        const carries = ps.carries || 0, dribbles = ps.dribbles || 0;
+        const saves = ps.saves || 0, claims = ps.claims || 0, punches = ps.punches || 0;
         const rv = (mean, spread) => Math.max(0, mean + (seededRandom() * 2 - 1) * spread);
-        const rr = (v) => Math.round(v);
 
+        // ---- Clearances/headed clearances: genuinely live-simulated
+        // minute-by-minute (see simulateDefensiveActions in
+        // engine/defending.js), which sets ps._liveClr / ps._liveHeadedClr —
+        // this backfill only kicks in as a fallback for a player that live
+        // loop never actually touched this match (e.g. a slot outside its
+        // table), so the sheet never shows a suspicious flat zero.
+        if (!ps._liveClr) {
+          ps.clearances = Math.round(rv((group === 'DEF' ? 7.3 : group === 'MID' ? 1.4 : 0.3) * minFrac, group === 'DEF' ? 3 : 0.7));
+        }
+        if (!ps._liveHeadedClr) {
+          ps.headedClearances = Math.round(ps.clearances * 0.3);
+        }
+
+        // ---- Touches / touches in the box: a real sum of every on-the-
+        // ball action this player is actually recorded for this match
+        // (attempted passes, carries, dribbles, shots, defensive actions,
+        // saves/claims/punches for a keeper) rather than a position-
+        // flavoured guess — a player who did more, touched the ball more.
+        ps.touches = passes + carries + dribbles + shots + tackles + ints + blocks + ps.clearances + saves + claims + punches;
+        ps.touchesInBox = shots + (ps.bigChances || 0);
+
+        // ---- Recoveries: every genuine regain is already tallied
+        // somewhere else on the sheet (a tackle, an interception, a block,
+        // a clearance IS a recovery), so this is a real sum, not an
+        // independent random figure.
+        ps.recoveries = tackles + ints + blocks + ps.clearances;
+
+        // ---- Physical: no literal player-position tracking exists in
+        // this engine, so these are built deterministically from this
+        // player's own real workload this match (touches, pressing/marking
+        // events, regains, minutes) instead of a random roll keyed only off
+        // position and minutes — two players with the same real involvement
+        // this match now read the same physically, too.
+        const roleBase = group === 'GK' ? 4.5 : group === 'DEF' ? 7.4 : group === 'MID' ? 8.6 : 8.0;
+        ps.distance = +(roleBase * minFrac + (ps.touches + ps.pressures + ps.recoveries) * 0.028).toFixed(1);
+        ps.sprints = Math.round(carries + dribbles + ps.pressures * 0.5 + ps.recoveries * 0.4);
+        ps.highSpeedRuns = Math.round(ps.sprints * (group === 'FWD' ? 0.5 : group === 'MID' ? 0.42 : 0.35));
+        ps.accelerations = Math.round(carries + dribbles + ps.pressures + ps.recoveries * 0.5);
+        ps.decelerations = Math.round(ps.accelerations * 0.9);
+
+        // ---- Distribution / Goals Prevented: both genuinely derived math
+        // over other real numbers, not invented — distribution is this
+        // player's own real pass accuracy, and Goals Prevented is real
+        // live-tallied psxg (see resolveShot in engine/shooting.js) minus
+        // real goals conceded, the usual "keeper overperformance" read.
+        ps.distribution = passes ? Math.round((passesC / passes) * 100) : 0;
         if (group === 'GK') {
-          const touches = rv(16 + minFrac * 12, 5);
-          ps.touches = rr(touches);
-          ps.touchesInBox = ps.touches;
-          ps.carries = rr(touches * 0.35);
-          ps.progressiveCarries = rr(ps.carries * 0.1);
-          ps.dribbles = 0; ps.successfulDribbles = 0; ps.bigChances = 0; ps.bigChancesMissed = 0; ps.offsides = 0;
-          ps.progressivePasses = rr(passesC * 0.22);
-          ps.keyPasses = 0; ps.throughBalls = 0; ps.crosses = 0;
-          ps.switches = rr(passesC * 0.04);
-          ps.longBalls = rr(passesC * (0.3 + seededRandom() * 0.2));
-          ps.finalThirdPasses = rr(passesC * 0.04);
-          ps.clearances = rr(rv(1.5 * minFrac, 1.4));
-          ps.headedClearances = rr(ps.clearances * 0.25);
-          ps.defensiveErrors = seededRandom() < 0.035 * minFrac ? 1 : 0;
-          ps.recoveries = rr(rv(2 * minFrac, 1.4));
-          ps.pressures = rr(rv(1 * minFrac, 1));
-          ps.aerialDuels = rr(rv(0.6 * minFrac, 0.8));
-          ps.distance = +(3.2 + minFrac * 3 + seededRandom()).toFixed(1);
-          ps.sprints = rr(rv(1.5 * minFrac, 1.2));
-          ps.highSpeedRuns = rr(rv(0.8 * minFrac, 0.8));
-          ps.accelerations = rr(rv(2.5 * minFrac, 1.5));
-          ps.decelerations = rr(rv(2.5 * minFrac, 1.5));
-          const shotsFaced = oppSide.stats.shotsOn || 0;
-          ps.punches = rr(rv(shotsFaced * 0.1, 0.6));
-          ps.claims = rr(rv(minFrac * 1.3, 1));
-          ps.crossesStopped = rr(rv(minFrac * 1.1, 1));
-          // Post-shot xG faced ≈ shots-on-target faced × a per-shot quality
-          // factor; Goals Prevented is the usual "keeper overperformance"
-          // read — how many more goals an average keeper would've conceded
-          // facing the same shots.
-          ps.psxg = +(shotsFaced * (0.28 + seededRandom() * 0.12)).toFixed(2);
-          ps.goalsPrevented = +(ps.psxg - (ps.goalsConceded || 0)).toFixed(2);
-          ps.distribution = passes ? rr((passesC / passes) * 100) : 0;
-        } else {
-          const isDef = group === 'DEF', isMid = group === 'MID', isFwd = group === 'FWD';
-          const tackles = ps.tackles || 0, ints = ps.interceptions || 0;
-          const touchBase = (isFwd ? 9 : isMid ? 15 : isDef ? 8 : 8) * minFrac;
-          ps.touches = rr(touchBase + passes * 1.15 + shots * 1.3 + tackles * 0.5 + ints * 0.4 + rv(0, 3));
-          ps.touchesInBox = rr((isFwd ? ps.touches * 0.16 : isMid ? ps.touches * 0.06 : isDef ? ps.touches * 0.025 : 0.03 * ps.touches) + shots * 0.6);
-          ps.carries = rr(ps.touches * (0.5 + seededRandom() * 0.12));
-          ps.progressiveCarries = rr(ps.carries * (isFwd ? 0.22 : isMid ? 0.18 : isDef ? 0.08 : 0.15));
-          const dribbleBase = (isFwd ? 2.0 : isMid ? 1.3 : isDef ? 0.35 : 1) * minFrac + shots * 0.12;
-          ps.dribbles = rr(rv(dribbleBase, 1.1));
-          ps.successfulDribbles = rr(ps.dribbles * (0.5 + seededRandom() * 0.25));
-          ps.offsides = (isFwd && seededRandom() < 0.16 * minFrac) ? (seededRandom() < 0.2 ? 2 : 1) : 0;
-
-          ps.progressivePasses = rr(passesC * (isMid ? 0.22 : isDef ? 0.15 : isFwd ? 0.12 : 0.1));
-          ps.keyPasses = rr(passesC * (isMid ? 0.055 : isFwd ? 0.045 : 0.018) + assists * 0.7);
-          ps.throughBalls = rr(ps.keyPasses * (0.12 + seededRandom() * 0.15));
-          const wide = WIDE_SLOTS.has((ps.slot || ps.pos || '').toUpperCase());
-          ps.crosses = rr(passes * (wide ? 0.14 : isFwd ? 0.04 : 0.015) + rv(0, 1));
-          ps.switches = rr(passesC * 0.018);
-          ps.longBalls = rr(passesC * (isDef ? 0.18 : isMid ? 0.08 : 0.04));
-          ps.finalThirdPasses = rr(passesC * (isFwd ? 0.35 : isMid ? 0.3 : isDef ? 0.12 : 0.2));
-
-          // Clearances are now genuinely live-simulated minute-by-minute
-          // (see simulateDefensiveActions in engine/defending.js), which
-          // sets ps._liveClr — this backfill only kicks in as a fallback
-          // for a player that loop never touched (e.g. a slot outside its
-          // table). Retuned toward the real-world per-game average for a
-          // starting CB (~7.3 clearances) rather than the old, much lower
-          // 3.2 mean.
-          if (!ps._liveClr) {
-            ps.clearances = rr(rv((isDef ? 7.3 : isMid ? 1.4 : 0.3) * minFrac, isDef ? 3 : 0.7));
-          }
-          ps.headedClearances = rr(ps.clearances * (0.3 + seededRandom() * 0.25));
-          ps.defensiveErrors = seededRandom() < (isDef ? 0.05 : 0.02) * minFrac ? 1 : 0;
-          ps.recoveries = rr(rv((isDef ? 5 : isMid ? 5.5 : 2.5) * minFrac, 2));
-          ps.pressures = rr(rv((isFwd ? 4 : isMid ? 5 : 3) * minFrac, 2));
-          ps.aerialDuels = rr(rv((isDef ? 3.5 : isFwd ? 2.2 : 1.2) * minFrac, 1.5));
-
-          ps.distance = +((isMid ? 8.8 : isDef ? 7.6 : isFwd ? 8.2 : 5) * minFrac + seededRandom() * 1.2).toFixed(1);
-          ps.sprints = rr(rv((isFwd ? 14 : isMid ? 11 : 9) * minFrac, 4));
-          ps.highSpeedRuns = rr(ps.sprints * (0.45 + seededRandom() * 0.2));
-          ps.accelerations = rr(rv((isFwd ? 10 : 8) * minFrac, 3));
-          ps.decelerations = rr(rv((isFwd ? 10 : 8) * minFrac, 3));
-
-          ps.bigChances = rr(ps.keyPasses * 0.35 + assists * 0.6 + (isFwd ? shots * 0.12 : 0));
-          const chanceShots = Math.min(shots, rr(shots * 0.4 + (isFwd ? 0.3 : 0)));
-          ps.bigChancesMissed = Math.max(0, chanceShots - goals);
-          ps.punches = 0; ps.claims = 0; ps.crossesStopped = 0; ps.psxg = 0; ps.goalsPrevented = 0; ps.distribution = 0;
+          ps.goalsPrevented = +((ps.psxg || 0) - (ps.goalsConceded || 0)).toFixed(2);
         }
       });
 
@@ -7319,6 +7316,7 @@ var App = (() => {
         const clrChance = Math.min(0.22, clrBase * clrSkillMult * pressureMult * staminaMultiplier(p));
         if (seededRandom() >= clrChance) return;
         ps.clearances = (ps.clearances || 0) + 1;
+        ps._liveHeadedClr = true; // tells deriveExtendedMatchStats not to overwrite this with a random backfill figure
         if (seededRandom() < 0.35) ps.headedClearances = (ps.headedClearances || 0) + 1;
         team.stats.clearances = (team.stats.clearances || 0) + 1;
         if (seededRandom() < 0.12) addEvent(m.minute, 'whistle', pickOffBallDesc(OFFBALL_CLEARANCE_DESC, p, team), side);
@@ -7413,11 +7411,16 @@ var App = (() => {
         if (tac === 'attack') { groundRate -= 0.012; loftedRate -= 0.018; }
         groundRate = Math.min(0.97, Math.max(0.4, groundRate + pmods.passAccDelta));
         loftedRate = Math.min(0.94, Math.max(0.3, loftedRate + pmods.passAccDelta));
-        let completed = 0;
+        let completed = 0, loftedCompleted = 0;
         for (let i = 0; i < groundCount; i++) { if (seededRandom() < groundRate) completed++; }
-        for (let i = 0; i < loftedCount; i++) { if (seededRandom() < loftedRate) completed++; }
+        for (let i = 0; i < loftedCount; i++) { if (seededRandom() < loftedRate) { completed++; loftedCompleted++; } }
         ps.passes = (ps.passes || 0) + count;
         ps.passesCompleted = (ps.passesCompleted || 0) + completed;
+        // Long balls: the real per-player lofted-pass share this model
+        // already computes above (role/skill-driven, not a flat guess) —
+        // previously worked out here and then thrown away, with the stat
+        // sheet showing an unrelated random figure instead.
+        ps.longBalls = (ps.longBalls || 0) + loftedCompleted;
         team.stats.passes = (team.stats.passes || 0) + count;
         team.stats.passesCompleted = (team.stats.passesCompleted || 0) + completed;
         if (side === 'home') homeCompletedMin += completed; else awayCompletedMin += completed;
@@ -7678,6 +7681,15 @@ var App = (() => {
     counter:     { baseOnTarget: 0.42, baseXg: 0.16, headerWeight: 0 }
   };
 
+  // A "big chance" is a genuinely clear-cut opportunity — read straight off
+  // this shot's own real shotQuality (see resolveShot below) rather than a
+  // guess reconstructed after the match from key passes/assists/shot counts.
+  // shotQuality in this model skews high (only chances that survive
+  // build-up make it to a shot at all — median is ~0.77), so the
+  // threshold sits well above the midpoint to keep "big chance" meaning
+  // the clear-cut minority of shots rather than most of them.
+  const BIG_CHANCE_QUALITY = 0.85;
+
   // ===== GK phase (called once a shot is confirmed on target) =====
   // then folds straight back to Shots for a rebound, small % of the time.
   function resolveShot(attackingSide, defendingSide, shooter, chanceType, opts) {
@@ -7687,6 +7699,10 @@ var App = (() => {
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
     const profile = CHANCE_TYPE_PROFILE[chanceType] || CHANCE_TYPE_PROFILE.openplay;
     const isHeader = profile.headerWeight > 0 && seededRandom() < profile.headerWeight;
+    if (isHeader) {
+      bumpExtStat(shooter, 'aerialDuels', 1);
+      if (opts.marker) bumpExtStat(opts.marker, 'aerialDuels', 1);
+    }
 
     // ---- Shots phase: shot quality drawn straight from the shooter's own
     // finishing-relevant attributes and playstyle edges.
@@ -7761,6 +7777,11 @@ var App = (() => {
     // Homebody: genuinely worse away from home, nothing to do with stakes.
     if (personality.includes('Homebody') && attackingSide === 'away') shotQuality *= 0.93;
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality));
+    // Genuinely clear-cut chance, read straight off this shot's own final
+    // quality — everything downstream that doesn't end in a goal marks it
+    // missed instead of converted.
+    const isBigChance = shotQuality >= BIG_CHANCE_QUALITY;
+    if (isBigChance) bumpExtStat(shooter, 'bigChances', 1);
     // Kicking Power feeds the shot's raw power independently of placement —
     // used below in the GK phase so a fiercely struck effort is genuinely
     // harder to keep out/hold onto than a technically similar but softer one.
@@ -7786,6 +7807,7 @@ var App = (() => {
         m.playerMatchStats[blocker.id].blocks = (m.playerMatchStats[blocker.id].blocks || 0) + 1;
       }
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.4;
+      if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
       if (blocker && seededRandom() < 0.4) {
         addEvent(m.minute, 'shot', `Attempt blocked. Blocked by <span class="player">${blocker.name}</span> (${defTeam.team.short}).`, defendingSide);
       } else {
@@ -7805,6 +7827,7 @@ var App = (() => {
     const onTargetChance = Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
+      if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
       if (personality.includes('Confidence Player')) {
         if (!m.personalityMomentum) m.personalityMomentum = {};
         m.personalityMomentum[shooter.id] = 0;
@@ -7826,6 +7849,11 @@ var App = (() => {
     // that context, so the two attributes actually mean different things
     // in different situations instead of being interchangeable.
     const gk = pickPlayer(defTeam, ['GK']);
+    // Post-shot xG faced: tallied live, per shot actually on target, from
+    // this exact shot's own real quality — the same read used for the
+    // shooter's own xg a few lines below — instead of shotsFaced times a
+    // random per-match factor.
+    if (gk) bumpExtStat(gk, 'psxg', +(profile.baseXg + shotQuality * 0.3).toFixed(3));
     const closeRangeShot = !isHeader && (chanceType === 'dribble' || chanceType === 'openplay' || chanceType === 'counter' || chanceType === 'cutback');
     const saveResult = resolveGkSave(gk, shooter, shotQuality, { isHeader, chanceType, shotPower, closeRange: closeRangeShot });
     if (saveResult.saved) {
@@ -7833,11 +7861,20 @@ var App = (() => {
         if (!m.personalityMomentum) m.personalityMomentum = {};
         m.personalityMomentum[shooter.id] = 0;
       }
+      if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
       if (gk) {
         defTeam.stats.saves++;
         recordStat('saves', gk, defTeam.team);
         if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
         m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+        // A cross (or cutback) the keeper deals with is a real cross
+        // stopped — a clean take is a claim, anything else he keeps out
+        // is a punch, same distinction the save type already encodes.
+        if (chanceType === 'cross' || chanceType === 'cutback') {
+          bumpExtStat(gk, 'crossesStopped', 1);
+          if (saveResult.saveType === 'catch') bumpExtStat(gk, 'claims', 1);
+          else bumpExtStat(gk, 'punches', 1);
+        }
         const desc = saveResult.saveType === 'catch' ? pickCatchDesc(gk, shooter) : pickSaveDesc(gk, shooter);
         addEvent(m.minute, 'save', desc, attackingSide);
         // Only a parry (not a clean catch) can leave a rebound behind, and
@@ -7856,6 +7893,16 @@ var App = (() => {
     }
 
     // GOAL
+    if (isBigChance && opts.marker) {
+      // A genuinely well-drilled defender concedes fewer of his big
+      // chances as outright errors than a shaky one — defensivePressure()
+      // is the same real skill read used to decide the marker in the
+      // first place, so the error rate scales with how good he actually
+      // is, not a flat per-position guess.
+      const markerQuality = Math.max(0, Math.min(1.3, defensivePressure(opts.marker) / 100));
+      const errorChance = Math.max(0.06, Math.min(0.4, 0.34 - markerQuality * 0.2));
+      if (seededRandom() < errorChance) bumpExtStat(opts.marker, 'defensiveErrors', 1);
+    }
     attTeam.score++;
     if (personality.includes('Confidence Player')) {
       if (!m.personalityMomentum) m.personalityMomentum = {};
@@ -8005,6 +8052,7 @@ var App = (() => {
     // attributes/playstyle plus the team's tactical stance, same as the
     // mid-pitch decision in runPossessionSequence().
     const marker = pickMarker(defTeam, mirrorDefenderPos('ATT_' + channel), null, mirrorZoneKey('ATT_' + channel));
+    if (marker) bumpExtStat(marker, 'pressures', 1);
     const decision = decideBallAction(carrier, marker, 'ATT_' + channel, tacSelf, tacOpp, mods,
       ['shoot', 'cross', 'throughball', 'dribble', 'pass']);
 
@@ -8012,6 +8060,12 @@ var App = (() => {
     switch (decision.action) {
       case 'dribble':
         chanceType = 'dribble'; shooter = carrier;
+        // A take-on that goes all the way to a shot himself — a genuine,
+        // successful dribble/carry into the box.
+        bumpExtStat(carrier, 'carries', 1);
+        bumpExtStat(carrier, 'progressiveCarries', 1);
+        bumpExtStat(carrier, 'dribbles', 1);
+        bumpExtStat(carrier, 'successfulDribbles', 1);
         break;
       case 'cross': {
         // A manager whose DNA leans toward cutbacks trades some of his
@@ -8025,6 +8079,7 @@ var App = (() => {
           shooter = pickPlayerWeighted(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
         } else {
           chanceType = 'cross';
+          bumpExtStat(carrier, 'crosses', 1);
           // aerialSkill(p) * 2 used to decide the cross target almost purely on
           // heading ability, regularly passing over a team's actual first-choice
           // striker in the box for a better header elsewhere on the pitch. A
@@ -8039,6 +8094,7 @@ var App = (() => {
       }
       case 'throughball':
         chanceType = 'throughball';
+        bumpExtStat(carrier, 'throughBalls', 1);
         shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
         break;
       case 'pass':
@@ -8081,7 +8137,11 @@ var App = (() => {
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
     m.playerMatchStats[shooter.id].shots++;
-    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null, qualityBonus: creationQualityBonus });
+    // A key pass is exactly this: the carrier found a different player who
+    // went on to actually shoot — the same condition that already governs
+    // whether an eventual goal here also earns the carrier an assist.
+    if (shooter.id !== carrier.id) bumpExtStat(carrier, 'keyPasses', 1);
+    resolveShot(attackingSide, defendingSide, shooter, chanceType, { assistCandidate: shooter.id !== carrier.id ? carrier : null, qualityBonus: creationQualityBonus, marker: marker });
   }
 
   // ===== Fouls / cards (reached from a lost duel or lost pass) =====
@@ -8652,6 +8712,10 @@ var App = (() => {
       // ===== they actually try to do with it? Evaluated fresh every time the
       // ball changes hands, rather than the engine always assuming "pass".
       const carrierMarker = pickMarker(defTeam, mirrorDefenderPos(fromThird + '_' + channel), null, mirrorZoneKey(fromThird + '_' + channel));
+      // A marker being called on to close the carrier down at all IS a
+      // genuine defensive-pressure event, whatever the carrier goes on to
+      // do with the ball — tallied live rather than guessed after the fact.
+      if (carrierMarker) bumpExtStat(carrierMarker, 'pressures', 1);
       const decision = decideBallAction(carrier, carrierMarker, fromThird + '_' + channel, tac, defTac, attMods,
         ['pass', 'dribble', 'carry', 'backpass', 'switch', 'hold']);
 
@@ -8668,6 +8732,7 @@ var App = (() => {
         channel = others[Math.floor(seededRandom() * others.length)];
         const chanName = channel === 'L' ? 'left' : channel === 'R' ? 'right' : 'middle';
         addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> switches the play out to the ${chanName}`, attackingSide);
+        bumpExtStat(carrier, 'switches', 1);
       } else if (seededRandom() < 0.1) {
         // Small residual drift so channel isn't only ever changed by an
         // explicit switch decision — real play still meanders a little.
@@ -8676,6 +8741,7 @@ var App = (() => {
 
       if (decision.action === 'dribble' || decision.action === 'carry') {
         const runMarker = pickMarker(defTeam, mirrorDefenderPos(fromThird + '_' + channel), null, mirrorZoneKey(fromThird + '_' + channel));
+        if (runMarker) bumpExtStat(runMarker, 'pressures', 1);
         const runPressure = runMarker ? defensivePressure(runMarker) : 60;
         // Base raised from 0.62 -> 0.72 (see passChance/duelChance below for
         // the full explanation): the old bases made a possession sequence
@@ -8688,10 +8754,21 @@ var App = (() => {
         const showboatPenalty = ((carrier.expandedAttrs && carrier.expandedAttrs.personality) || []).includes('Showboat') ? 0.04 : 0;
         const carryChance = Math.max(0.30, Math.min(0.93,
           0.86 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus - showboatPenalty));
-        if (seededRandom() >= carryChance) {
+        // Carries/dribbles are now tallied live off this exact roll — every
+        // attempt counts as a carry (and, if this was specifically a
+        // take-on rather than just driving forward, a dribble attempt
+        // too); a successful one that survives the roll below also
+        // advances the ball a full zone, i.e. it's progressive by
+        // definition in this model.
+        bumpExtStat(carrier, 'carries', 1);
+        if (decision.action === 'dribble') bumpExtStat(carrier, 'dribbles', 1);
+        const carrySuccess = seededRandom() < carryChance;
+        if (!carrySuccess) {
           resolveTurnover(attackingSide, defendingSide, carrier, runMarker, fromThird, toThird, 'carry', channel);
           return;
         }
+        bumpExtStat(carrier, 'progressiveCarries', 1);
+        if (decision.action === 'dribble') bumpExtStat(carrier, 'successfulDribbles', 1);
         if (seededRandom() < 0.25) {
           addEvent(m.minute, 'skill', `${carrier.name} ${decision.action === 'dribble' ? 'dribbles past a challenge' : 'drives forward with the ball'}`, attackingSide);
         }
@@ -8716,6 +8793,7 @@ var App = (() => {
       // ===== Passing phase: can the carrier find them? =====
       const passerSkill = passingAbility(carrier);
       const marker = pickMarker(defTeam, mirrorDefenderPos(targetZone), null, mirrorZoneKey(targetZone));
+      if (marker) bumpExtStat(marker, 'pressures', 1);
       const pressure = marker ? defensivePressure(marker) : 60;
       // Base raised from 0.5 -> 0.62: with two zone transitions (DEF->MID,
       // MID->ATT) chained together and EACH one gated behind both this pass
@@ -8762,6 +8840,12 @@ var App = (() => {
         addEvent(m.minute, 'skill', `✨ ${pickSkillDesc(targetPlayer, marker)}`, attackingSide);
       }
 
+      // The pass just survived both the pass check and the duel check —
+      // a genuinely completed pass that advanced the ball a full zone
+      // (progressive by definition here), into the final third specifically
+      // when this was the MID->ATT transition.
+      bumpExtStat(carrier, 'progressivePasses', 1);
+      if (toThird === 'ATT') bumpExtStat(carrier, 'finalThirdPasses', 1);
       carrier = targetPlayer;
     }
 
