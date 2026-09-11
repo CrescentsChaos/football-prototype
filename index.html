@@ -314,6 +314,25 @@
             <select id="tour-size-select" onchange="App.selectTournamentSize(this.value)" aria-label="Tournament size" style="min-width:150px"></select>
           </label>
           <input type="search" id="tour-teams-search" placeholder="Search teams to select..." oninput="App.searchTournamentTeams(this.value)" autocomplete="off" aria-label="Search tournament teams" style="flex:1;min-width:200px">
+          <select id="tour-teams-sort" onchange="App.sortTournamentTeams(this.value)" aria-label="Sort teams">
+            <option value="name">Sort: Name</option>
+            <option value="ovr">Sort: Strength</option>
+            <option value="players">Sort: Squad size</option>
+            <option value="flag">Sort: Flag</option>
+          </select>
+          <label id="tour-league-wrap" style="display:none;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--text-secondary)">
+            League
+            <select id="tour-teams-league" onchange="App.filterTournamentTeamsLeague(this.value)" aria-label="Filter league" style="min-width:150px">
+              <option value="all">All leagues</option>
+            </select>
+          </label>
+          <select id="tour-teams-rating" onchange="App.filterTournamentTeamsRating(this.value)" aria-label="Filter by strength">
+            <option value="all">All strengths</option>
+            <option value="elite">Elite (85+)</option>
+            <option value="great">Great (75-84)</option>
+            <option value="good">Good (65-74)</option>
+            <option value="dev">Development (&lt;65)</option>
+          </select>
         </div>
         <div class="teams-checkbox-grid" id="tournament-teams"></div>
         <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
