@@ -1394,6 +1394,22 @@ label { font-size: 0.8rem; color: var(--text-2); font-weight: 600; display: bloc
 .playstyle-tag.affinity-match {
   background: rgba(240,193,75,0.14); border-color: var(--gold-dim); color: var(--gold);
 }
+/* A playstyle tag assigned automatically by position (see
+   assignPlaystylesToRegularPlayers() in data/playerDatabase.js) rather
+   than hand-authored in player-attributes.json — dashed border keeps it
+   readable as "the sim's best guess" rather than a signature trait. */
+.playstyle-tag.auto-assigned {
+  border-style: dashed; opacity: 0.85;
+}
+.playstyle-tag.auto-assigned em {
+  font-style: normal; color: var(--text-3); margin-left: 3px;
+}
+/* Personality trait badge — reuses .playstyle-tag's shape/sizing but with
+   its own tint so traits read as a distinct category from playstyles at a
+   glance in the player profile header. */
+.playstyle-tag.personality-tag {
+  background: rgba(61,139,253,0.12); border-color: rgba(61,139,253,0.35); color: #8fb8ff;
+}
 .pm-player {
   display: flex; align-items: center; gap: 8px; padding: 8px;
   border-radius: 8px; font-size: 0.85rem; margin-bottom: 2px;
@@ -2398,6 +2414,30 @@ select.ss-native {
 .rf-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .rf-dot-rating { background: #f0c14b; }
 .rf-dot-form { background: #3d8bfd; }
+/* Goal-contribution chart legend dots (player profile modal) */
+.rf-dot-goals { background: #f0c14b; }
+.rf-dot-assists { background: #3d8bfd; }
+.rf-dot-xg { background: #3ddc97; }
+
+/* Attribute radar (pentagon) chart — player profile modal */
+.player-chart-wrap {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 6px;
+}
+.radar-wrap { display: flex; justify-content: center; }
+.radar-svg { width: 100%; max-width: 260px; height: auto; overflow: visible; }
+.radar-ring { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+.radar-spoke { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+.radar-shape { fill: rgba(240,193,75,0.22); stroke: var(--gold); stroke-width: 1.5; stroke-linejoin: round; }
+.radar-axis-label { fill: var(--text-3); font-size: 8px; font-weight: 700; text-transform: uppercase; }
+.radar-axis-val { fill: var(--text-2); font-size: 9px; font-weight: 800; font-family: var(--display); }
+.radar-axis-val.stat-tier-mint { fill: #3ee8b8; }
+.radar-axis-val.stat-tier-green { fill: #5fd873; }
+.radar-axis-val.stat-tier-orange { fill: #f5a623; }
+.radar-axis-val.stat-tier-red { fill: #ff6b6f; }
 
 /* ===================================================================
    SQUAD BUILDER — full-page lineup & formation editor
