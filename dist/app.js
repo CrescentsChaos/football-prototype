@@ -529,6 +529,61 @@ var App = (() => {
   // formation's bonus/penalty is measured as a delta off this neutral shape.
   const SHAPE_BASELINE = { def: 3.6, fwd: 2.5, mid: 3.0 };
   const formationShapeCache = {};
+
+  // ---- Per-position contribution to team ATTACKING/DEFENSIVE strength
+  // (calcTeamStrength() in engine/matchEngine.js). These are distinct from
+  // the SHAPE_* weights above: SHAPE_* measures how a *formation's slot
+  // count* shifts strength (more forwards = more attacking bodies on the
+  // pitch), while POS_ATT_WEIGHT/POS_DEF_WEIGHT measure how much a given
+  // *player*, in the slot he's actually playing, should count toward each
+  // end of the team's strength rating. Previously every outfield player
+  // (and the GK) counted equally toward both att and def regardless of
+  // position, so a back four could make a mediocre attack look dangerous
+  // and a strong front three drag a poor defense's rating up — this table
+  // is what makes a striker's finishing actually drive attacking strength
+  // and a center-back's defending actually drive defensive strength, while
+  // a player miscast out of position (or out of possession entirely, like
+  // a CB's attacking input) counts for comparatively little.
+  // The goalkeeper is intentionally 0 in both: his shot-stopping is its own
+  // separate contribution (see gkShotStoppingRating() in
+  // engine/goalkeeper.js and the `gk` field calcTeamStrength() returns),
+  // not a blend into the outfield att/def numbers.
+  const POS_ATT_WEIGHT = {
+    GK: 0,
+    CB: 0.10, RB: 0.10, LB: 0.10, RWB: 0.10, LWB: 0.10,
+    CDM: 0.25,
+    CM: 0.45,
+    CAM: 0.75,
+    RM: 0.55, LM: 0.55,
+    RW: 0.85, LW: 0.85,
+    ST: 1.00, CF: 1.00
+  };
+  const POS_DEF_WEIGHT = {
+    GK: 0,
+    CB: 1.00,
+    RB: 0.85, LB: 0.85, RWB: 0.85, LWB: 0.85,
+    CDM: 0.75,
+    CM: 0.35,
+    CAM: 0.20,
+    RM: 0.25, LM: 0.25,
+    RW: 0.10, LW: 0.10,
+    ST: 0, CF: 0
+  };
+  // Whichever slot a player is actually deployed in this match (their
+  // formation slot, falling back to their primary listed position) is what
+  // should decide their positional weight — a winger pushed into CM should
+  // weigh in like a CM, not like a winger.
+  function posWeightSlot(p) {
+    return (p && (p.slot || (p.pos || [])[0])) || 'CM';
+  }
+  function posAttWeight(p) {
+    const slot = posWeightSlot(p);
+    return POS_ATT_WEIGHT[slot] != null ? POS_ATT_WEIGHT[slot] : 0.45;
+  }
+  function posDefWeight(p) {
+    const slot = posWeightSlot(p);
+    return POS_DEF_WEIGHT[slot] != null ? POS_DEF_WEIGHT[slot] : 0.35;
+  }
   const TOURNAMENT_FORMATS = {
     'worldcup': { name: 'World Cup', short: 'World Cup', engine: 'groups', pool: 'national', leaguesKey: null,
       desc: 'Select national teams. Supports groups (48 teams, World Cup style — use the Tournament Size picker below to scale up to a 64- or 128-team field instead).' },
@@ -1236,7 +1291,7 @@ var App = (() => {
       attTeam.stats.shots++;
       if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
       m.playerMatchStats[taker.id].shots++;
-      const fkGk = pickPlayer(defTeam, ['GK']);
+      const fkGk = activeGoalkeeper(defendingSide);
       addEvent(m.minute, 'shot', quick
         ? `<span class="player">${taker.name}</span> takes it quickly — the defence isn't set!`
         : `<span class="player">${taker.name}</span> stands over the free-kick...`, attackingSide);
@@ -1410,7 +1465,7 @@ var App = (() => {
     const team = m[side];
     const oppSide = side === 'home' ? 'away' : 'home';
     const oppTeam = m[oppSide];
-    const gk = pickPlayer(team, ['GK']);
+    const gk = activeGoalkeeper(side);
     if (!gk) return;
     const tac = (m.tactics && m.tactics[side]) || 'balanced';
     // GK Low Punt sharpens exactly the short/medium distribution this
@@ -3511,6 +3566,28 @@ var App = (() => {
     const catchChance = gkCatchChance(gk, shotPower, closeRange);
     if (seededRandom() < catchChance) return { saved: true, saveType: 'catch', reboundDanger: 0 };
     return { saved: true, saveType: 'parry', reboundDanger: gkParryReboundDanger(gk) };
+  }
+  // Single-number shot-stopping rating for a goalkeeper, on the same ~0-99
+  // scale as an outfield attribute. This is the GK's own, completely
+  // separate contribution to team strength (see the `gk` field
+  // calcTeamStrength() returns in engine/matchEngine.js) — it is never
+  // blended into the team's outfield att/def averages (POS_ATT_WEIGHT/
+  // POS_DEF_WEIGHT in js/state.js both give GK a weight of 0 there).
+  // Built from the same expanded goalkeeping attributes resolveGkSave()
+  // above reads shot-by-shot (awareness/positioning, reflexes, reach,
+  // catching), so a keeper who actually profiles as an elite shot-stopper
+  // in-match also shows up as one here — with the same def/ovr/tec fallback
+  // resolveGkSave() uses for a keeper with no expanded attribute sheet.
+  function gkShotStoppingRating(gk) {
+    if (!gk) return 70;
+    if (!gk.expandedAttrs) {
+      return curvedAttr(gk.def || 70, 70) * 0.6 + curvedAttr(gk.ovr || 75, 75) * 0.25 + curvedAttr(gk.tec || 70, 70) * 0.15;
+    }
+    const awr = xattr(gk, 'gk_awr', 75);
+    const reflex = xattr(gk, 'gk_reflex', 75);
+    const reach = xattr(gk, 'gk_reach', 75);
+    const catchAttr = xattr(gk, 'gk_catch', 65);
+    return awr * 0.30 + reflex * 0.30 + reach * 0.20 + catchAttr * 0.20;
   }
   // Free-kick taker edge — curl/placement plus specialist skills.
   function fkTakerEdge(p) {
@@ -5812,7 +5889,7 @@ var App = (() => {
     if (!takers.length) return;
     const taker = takers[kickIndex % takers.length];
     const oppSide = side === 'home' ? 'away' : 'home';
-    const gk = ((m[oppSide].squad && m[oppSide].squad.all) || []).find(p => (p.pos || [])[0] === 'GK');
+    const gk = activeGoalkeeper(oppSide);
     const out = pickPenOutcome(taker, gk);
     const teamShort = m[side].team.short;
     if (out.scored) {
@@ -5898,10 +5975,11 @@ var App = (() => {
     addEvent(m.minute, 'goal', `${emojiImg('goal', 'Own goal')} Own goal! <span class="player">${culprit.name}</span> (${defTeam.team.short}) ${desc || 'turns it into his own net'}.`, attackingSide, true);
     return true;
   }
-  function maybeOffsideDisallow(side, scorer, minute, moment) {
+  function maybeOffsideDisallow(side, scorer, minute, moment, extra) {
     const m = currentMatch;
     if (!m) return false;
     moment = moment || 'openplay';
+    extra = extra || {};
     // Corners, penalties, and a direct free-kick effort are all exempt from
     // this recheck under the actual Laws of the Game — nobody can be ruled
     // offside receiving directly from a corner, and there's no separate
@@ -5936,14 +6014,35 @@ var App = (() => {
           }
         }
       }
-      // undo goal stat (best effort)
-      if (stats.goals && stats.goals[scorer.id]) stats.goals[scorer.id].count = Math.max(0, stats.goals[scorer.id].count - 1);
-      if (tournament && tournamentStats.goals && tournamentStats.goals[scorer.id]) {
-        tournamentStats.goals[scorer.id].count = Math.max(0, tournamentStats.goals[scorer.id].count - 1);
-      }
+      // Undo every leaderboard-facing stat this goal touched, in full —
+      // not just the two buckets ('stats' and, if a tournament is running,
+      // 'tournamentStats') the old code reached into by hand. recordStat()
+      // actually fans a goal out to up to four buckets (stats, careerStats,
+      // tournamentStats, currentSeasonComp.stats), so a hand-rolled partial
+      // undo left careerStats and the active season competition's own
+      // stats permanently overcounted — a disallowed goal that still shows
+      // up forever in a player's career and season totals even though the
+      // match's own boxscore correctly shows it reversed. recordStatCount's
+      // -1 goes through the exact same competitive/tournament/season
+      // conditionals recordStat used to credit it, so it can only touch a
+      // bucket that was actually incremented in the first place.
+      recordStatCount('goals', scorer, team.team, -1);
       if (m.playerMatchStats && m.playerMatchStats[scorer.id]) {
         m.playerMatchStats[scorer.id].goals = Math.max(0, (m.playerMatchStats[scorer.id].goals || 1) - 1);
       }
+      // The assist (if one was actually credited on this goal) and any
+      // Puskás nomination are just as much "goal that never happened" as
+      // the goal itself — previously neither was touched at all, so an
+      // assister's season/career assist count (and a Puskás contender
+      // tally) just kept the credit permanently regardless of the goal
+      // being overturned.
+      if (extra.assister) {
+        recordStatCount('assists', extra.assister, team.team, -1);
+        if (m.playerMatchStats && m.playerMatchStats[extra.assister.id]) {
+          m.playerMatchStats[extra.assister.id].assists = Math.max(0, (m.playerMatchStats[extra.assister.id].assists || 1) - 1);
+        }
+      }
+      if (extra.puskas) recordStatCount('puskas', scorer, team.team, -1);
       addEvent(minute, 'var', `VAR: Goal disallowed — <span class="player">${scorer.name}</span> was offside`, side);
       renderGoalTimeline();
       return true;
@@ -6329,6 +6428,34 @@ var App = (() => {
     const ps = m.playerMatchStats[p.id];
     ps[key] = (ps[key] || 0) + (amt == null ? 1 : amt);
     return ps;
+  }
+  // The single source of truth for "who is actually in goal for this side
+  // right now". A real specialist keeper still out there always wins. If
+  // he's been sent off (see handleGoalkeeperSentOff in engine/tactics.js),
+  // this falls back to whichever outfield player that side has designated
+  // to wear the gloves for the rest of the match (sideData.emergencyGkId) —
+  // a persistent, explicit stand-in rather than every call site quietly
+  // re-picking a different random outfield player of its own. Every GK
+  // lookup used for actual gameplay (shot-stopping, penalties, corners,
+  // free-kicks, the shootout) should go through this instead of a raw
+  // position filter, or a keeper who's been sent off keeps "saving" shots
+  // as a phantom, and the shootout/clean-sheet code can end up crediting
+  // him for a match he was dismissed from.
+  function activeGoalkeeper(side) {
+    const m = currentMatch;
+    if (!m) return null;
+    const sideData = m[side];
+    if (!sideData) return null;
+    const onIds = side === 'home' ? (m.homeOnPitch || []) : (m.awayOnPitch || []);
+    const leftIds = (m.leftPitch && m.leftPitch[side]) || [];
+    const pool = sideData.squad.all || [];
+    const realGk = pool.find(p => onIds.includes(p.id) && !leftIds.includes(p.id) && (p.pos || []).includes('GK'));
+    if (realGk) return realGk;
+    const emgId = sideData.emergencyGkId;
+    if (emgId && onIds.includes(emgId) && !leftIds.includes(emgId)) {
+      return pool.find(p => p.id === emgId) || null;
+    }
+    return null;
   }
 
   // Broad role bucket for extended-stats generation below — GK / DEF / MID / FWD.
@@ -8022,7 +8149,7 @@ var App = (() => {
     // set for — resolveGkSave() weights gk_reflex vs. gk_reach by exactly
     // that context, so the two attributes actually mean different things
     // in different situations instead of being interchangeable.
-    const gk = pickPlayer(defTeam, ['GK']);
+    const gk = activeGoalkeeper(defendingSide);
     // Post-shot xG faced: tallied live, per shot actually on target, from
     // this exact shot's own real quality — the same read used for the
     // shooter's own xg a few lines below — instead of shotsFaced times a
@@ -8097,10 +8224,12 @@ var App = (() => {
     m.playerMatchStats[shooter.id].goals++;
     m.playerMatchStats[shooter.id].xg += (profile.baseXg + shotQuality * 0.3);
     const assister = opts.assistCandidate;
+    let assistCredited = null;
     if (assister && assister.id !== shooter.id && seededRandom() < 0.7) {
       recordStat('assists', assister, attTeam.team);
       if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
       m.playerMatchStats[assister.id].assists++;
+      assistCredited = assister;
       // xa for this shot was already credited above at shot-resolution time
       // (see the expected-assists block earlier in this function), so it's
       // not added again here — only the actual assist counter is.
@@ -8108,7 +8237,11 @@ var App = (() => {
     } else {
       addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}.`, attackingSide, true);
     }
-    maybeOffsideDisallow(attackingSide, shooter, m.minute);
+    // maybeOffsideDisallow needs to know exactly what this goal credited
+    // (assist recipient, Puskás nomination) so a later disallowal can undo
+    // precisely those things — see the note on that function for why the
+    // old "undo goal stat (best effort)" comment was the actual bug.
+    maybeOffsideDisallow(attackingSide, shooter, m.minute, undefined, { assister: assistCredited, puskas: !!method.puskas });
   }
 
   // ===== Corner set piece (reached from a blocked cross/shot) =====
@@ -8387,7 +8520,7 @@ var App = (() => {
         if (!m.playerMatchStats) m.playerMatchStats = {};
         if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
         m.playerMatchStats[taker.id].shots++;
-        const penGk = pickPlayer(defTeam, ['GK']);
+        const penGk = activeGoalkeeper(defendingSide);
         const po = pickPenOutcome(taker, penGk);
         if (po.scored) {
           attTeam.stats.shotsOn++;
@@ -9303,14 +9436,34 @@ var App = (() => {
   }
 
   function calcTeamStrength(side) {
-    if (!currentMatch || !side) return { att: 50, def: 50, tec: 50 };
+    if (!currentMatch || !side) return { att: 50, def: 50, tec: 50, gk: 70 };
     const isHome = side === currentMatch.home;
     const ids = isHome ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
     const onPitch = (side.squad.all || []).filter(p => ids.includes(p.id));
-    if (!onPitch.length) return { att: 50, def: 50, tec: 50 };
+    if (!onPitch.length) return { att: 50, def: 50, tec: 50, gk: 70 };
     const mgr = (side.team.manager && side.team.manager.ovr) || 75;
     const pmods = getPlaystyleMods(side.team);
     const avg = (key, fallback) => onPitch.reduce((s, p) => s + (p[key] != null ? p[key] : fallback), 0) / onPitch.length;
+    // ---- Positional weighting: att/def are no longer a flat average across
+    // every player on the pitch (which let a GK/CB weigh in on attacking
+    // strength exactly as much as a striker, and a striker drag down
+    // defensive strength exactly as much as a center-back). Each player's
+    // contribution is scaled by posAttWeight()/posDefWeight() (js/state.js),
+    // keyed off the slot he's actually deployed in this match — a striker's
+    // finishing now drives attacking strength, a center-back's defending
+    // now drives defensive strength, and the goalkeeper contributes 0 to
+    // both (his shot-stopping is the separate `gk` field below instead).
+    // Falls back to a even split if, somehow, every weight comes back 0
+    // (e.g. a side stuck with only its GK on the pitch).
+    const weightedAvg = (statKey, weightFn, fallback) => {
+      let wSum = 0, vSum = 0;
+      onPitch.forEach(p => {
+        const w = weightFn(p);
+        wSum += w;
+        vSum += w * (p[statKey] != null ? p[statKey] : fallback);
+      });
+      return wSum > 0 ? vSum / wSum : avg(statKey, fallback);
+    };
     // Small, realistic home-field boost — crowd support and matchday familiarity
     // lift a side's sharpness a touch, on both ends of the pitch.
     const homeBoostAtt = isHome ? 1.2 : 0;
@@ -9323,17 +9476,22 @@ var App = (() => {
     const attShape = (shape.fwd - SHAPE_BASELINE.fwd) * 1.6 + (shape.mid - SHAPE_BASELINE.mid) * 0.25;
     const defShape = (shape.def - SHAPE_BASELINE.def) * 1.7 - (shape.fwd - SHAPE_BASELINE.fwd) * 0.35 + (shape.mid - SHAPE_BASELINE.mid) * 0.15;
     const midShape = (shape.mid - SHAPE_BASELINE.mid) * 0.4;
+    // The goalkeeper's own shot-stopping contribution, entirely separate
+    // from the outfield att/def numbers above (see gkShotStoppingRating()
+    // in engine/goalkeeper.js).
+    const gk = activeGoalkeeper(isHome ? 'home' : 'away');
     return {
       // Manager overall now carries real weight: a top tactician visibly lifts
       // both ends of the pitch, a poor one visibly drags them down.
-      att: avg('att', 70) + (mgr - 75) * 0.18 + pmods.attBonus + homeBoostAtt + attShape,
-      def: avg('def', 70) + (mgr - 75) * 0.16 + pmods.defBonus + homeBoostDef + defShape,
+      att: weightedAvg('att', posAttWeight, 70) + (mgr - 75) * 0.18 + pmods.attBonus + homeBoostAtt + attShape,
+      def: weightedAvg('def', posDefWeight, 70) + (mgr - 75) * 0.16 + pmods.defBonus + homeBoostDef + defShape,
       tec: avg('tec', 70) + midShape,
       ovr: avg('ovr', 75),
       phy: avg('phy', 70),
       pac: avg('pac', 70),
       mgr: mgr,
-      shape: shape
+      shape: shape,
+      gk: gkShotStoppingRating(gk)
     };
   }
 
@@ -9767,9 +9925,83 @@ var App = (() => {
   // to restore defensive numbers. This is a reaction, not a guarantee: it
   // only fires for a lost defender, needs a defender left on the bench, and
   // doesn't happen every single time (some managers/situations just play on).
+  // A sent-off goalkeeper is a special case of the above, not an omission:
+  // real Laws of the Game let a team bring on a substitute at all (the red
+  // card only removes that one player, it doesn't forbid using a sub slot),
+  // so a manager with subs in hand brings on the reserve keeper — sacrificing
+  // an outfield player for him, same "who gets sacrificed" logic as the
+  // defender reshuffle below. Previously nothing at all handled a sent-off
+  // GK: the team was left with zero players actually on the pitch flagged
+  // as goalkeeper, and every shot/penalty/corner GK lookup elsewhere in the
+  // engine would silently fall back to weighting the *entire* outfield pool
+  // by attacking ability — meaning a different random attacker "made the
+  // save" almost every time, re-rolled shot to shot, with GK stats
+  // (saves/claims/psxg) piling up on whoever that happened to be. Bringing
+  // on a real reserve keeper when one's available — and, when it isn't,
+  // designating a single persistent outfield stand-in (sideData.emergencyGkId,
+  // read by activeGoalkeeper() in engine/matchEngine.js) for the rest of the
+  // match — replaces that phantom with either a genuine keeper or a
+  // consistent, visible converted defender, exactly once.
+  function handleGoalkeeperSentOff(side, sentOffGk) {
+    const m = currentMatch;
+    if (!m || !sentOffGk || m.finished) return;
+    const sideData = m[side];
+    const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    if (!m.leftPitch) m.leftPitch = { home: [], away: [] };
+    const leftIds = m.leftPitch[side] || (m.leftPitch[side] = []);
+    const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+
+    if (used < (m.maxSubs || 5)) {
+      const availableSubs = (sideData.squad.subs || []).filter(p =>
+        !onPitchIds.includes(p.id) && !m.injuries.includes(p.id) && !leftIds.includes(p.id));
+      const benchGk = availableSubs.filter(p => (p.pos || []).includes('GK')).sort((a, b) => (b.ovr || 70) - (a.ovr || 70))[0];
+      if (benchGk) {
+        const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+        const onPitch = allPlayers.filter(p => onPitchIds.includes(p.id) && p.id !== sentOffGk.id && !m.injuries.includes(p.id));
+        if (!onPitch.length) return;
+        // Sacrifice the weakest remaining outfield player to make room for
+        // the specialist — unlike the defender reshuffle, shape doesn't
+        // matter here (any outfield slot can be freed up for a keeper), so
+        // this just takes the lowest-rated player on the pitch.
+        const outPlayer = [...onPitch].sort((a, b) => (a.ovr || 70) - (b.ovr || 70))[0];
+        const idx = onPitchIds.indexOf(outPlayer.id);
+        if (idx >= 0) onPitchIds[idx] = benchGk.id;
+        markLeftPitch(m, side, outPlayer.id);
+        resetFatigueFor(m, side, benchGk.id);
+        if (side === 'home') m.homeSubsUsed++; else m.awaySubsUsed++;
+        if (!m.subLog) m.subLog = { home: {}, away: {} };
+        const subDispMin = m.dispMin != null ? m.dispMin : m.minute;
+        m.subLog[side][outPlayer.id] = Object.assign({}, m.subLog[side][outPlayer.id] || {}, { outMin: subDispMin, replacedBy: benchGk.name });
+        m.subLog[side][benchGk.id] = Object.assign({}, m.subLog[side][benchGk.id] || {}, { inMin: subDispMin, replaced: outPlayer.name });
+        benchGk.slot = 'GK';
+        const newUsed = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
+        addEvent(m.minute, 'sub',
+          `Goalkeeper sent off · ${sideData.team.short} bring on a replacement keeper<br><span style="color:#4ade80">▲ In</span> <span class="player">${benchGk.name}</span> <span style="opacity:0.6">(GK)</span><br><span style="color:#f87171">▼ Out</span> <span class="player">${outPlayer.name}</span> <span style="opacity:0.6">(${newUsed}/${m.maxSubs})</span>`,
+          side);
+        if (!m.quietSim) { renderLineups(); renderPitch(); }
+        return;
+      }
+    }
+
+    // No fit reserve keeper available (or no subs left) — an outfield
+    // player has to pull on the gloves for the rest of the match. Prefer a
+    // recognised defender over whichever attacker happens to be on the
+    // ball next, same instinct real managers show, and make the choice
+    // once rather than re-deciding it shot by shot.
+    const onPitch = (sideData.squad.all || []).filter(p => onPitchIds.includes(p.id) && p.id !== sentOffGk.id);
+    if (!onPitch.length) return;
+    const standIn = [...onPitch].sort((a, b) => {
+      const aDef = lineOf(a) === 'DEF' ? 1 : 0, bDef = lineOf(b) === 'DEF' ? 1 : 0;
+      if (aDef !== bDef) return bDef - aDef;
+      return (b.ovr || 70) - (a.ovr || 70);
+    })[0];
+    sideData.emergencyGkId = standIn.id;
+    addEvent(m.minute, 'sub', `${sideData.team.short} have no keeper left to bring on — <span class="player">${standIn.name}</span> takes the gloves for the rest of the match.`, side);
+  }
   function handleRedCardReshuffle(side, sentOffPlayer) {
     const m = currentMatch;
     if (!m || !sentOffPlayer || m.finished) return;
+    if (lineOf(sentOffPlayer) === 'GK') { handleGoalkeeperSentOff(side, sentOffPlayer); return; }
     if (lineOf(sentOffPlayer) !== 'DEF') return;
     const used = side === 'home' ? m.homeSubsUsed : m.awaySubsUsed;
     if (used >= (m.maxSubs || 5)) return;
@@ -10338,7 +10570,17 @@ var App = (() => {
       const onPitchIds = side === 'home' ? (m.homeOnPitch || []) : (m.awayOnPitch || []);
       const allSquad = (m[side].squad && m[side].squad.all) || [];
       const ids = new Set();
-      const gk = (m[side].squad.starting || []).find(p => (p.pos || []).includes('GK'));
+      // Whoever is actually in goal at the final whistle — not just
+      // whichever GK started the match. squad.starting never changes once
+      // the teamsheet is set, so a sent-off keeper (removed from onPitchIds
+      // by removeFromPitch(), see engine/injuries.js) still showed up here
+      // and picked up a clean-sheet credit for a match he didn't finish,
+      // while a substitute keeper who came on and actually saw it through
+      // got nothing. Filtering on onPitchIds fixes both sides of that at
+      // once: it naturally resolves to the sub if one came on, and to
+      // nobody at all if the team's had to finish with an outfield
+      // stand-in (activeGoalkeeper() in this file) rather than a specialist.
+      const gk = allSquad.find(p => onPitchIds.includes(p.id) && (p.pos || []).includes('GK'));
       if (gk) ids.add(gk.id);
       allSquad.forEach(p => {
         if (onPitchIds.includes(p.id) && (p.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) ids.add(p.id);
