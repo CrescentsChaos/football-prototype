@@ -9305,8 +9305,31 @@ var App = (() => {
     // single overall number, same principle as the main picker below —
     // a player's actual finishing/technical ability should matter more than
     // the one flattened rating.
+    //
+    // `att` is derived almost entirely from finishing/shooting attributes
+    // (see deriveStatsFromAttributes in data/playerDatabase.js — fin,
+    // off_awr, head, place_kick, kick_pwr), while `tec` is the
+    // passing/vision/dribbling composite (ball_con, dribb, low_pass,
+    // lofted_pass, curl, tight_pos). This function is the one that decides
+    // who actually receives the ball at every stage of a possession
+    // sequence — including build-up (DEF zone) and midfield (MID zone),
+    // where nobody is shooting. Leading with `att` there used to mean
+    // strikers/wingers consistently out-weighted genuine playmakers and
+    // attacking full-backs for the ball in zones where finishing ability
+    // has nothing to do with who should be found — starving them of the
+    // touches (and progressive/final-third passes) they'd need to actually
+    // rack up the assists their real-world counterparts do. Only in the
+    // final third (ATT zone) — and for the no-zoneKey secondary events
+    // this function also serves (corners, fouls, throw-ins, etc.), where a
+    // live scoring threat finding space is a fair proxy for "who gets
+    // found" — does `att` lead; build-up and midfield selection leads with
+    // `tec` instead.
+    const zoneThird = zoneKey ? zoneKey.slice(0, 3) : null;
+    const isBuildupOrMidfield = zoneThird === 'DEF' || zoneThird === 'MID';
     const weights = pool.map(p => {
-      const composite = (p.att || 70) * 0.6 + (p.tec || 70) * 0.4 + (p.ovr || 70) * 0.5;
+      const composite = isBuildupOrMidfield
+        ? (p.tec || 70) * 0.6 + (p.att || 70) * 0.4 + (p.ovr || 70) * 0.5
+        : (p.att || 70) * 0.6 + (p.tec || 70) * 0.4 + (p.ovr || 70) * 0.5;
       // Offensive Awareness is specifically about finding space/making
       // yourself available when the team is attacking — so it nudges how
       // often a player gets found at all, on top of (not instead of) the
