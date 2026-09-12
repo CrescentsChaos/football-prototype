@@ -1334,7 +1334,13 @@ var App = (() => {
       addEvent(m.minute, 'whistle', `<span class="player">${taker.name}</span> whips the free-kick into the box`, attackingSide);
       const crossChance = 0.075 + (hasSkill(taker, 'Pinpoint Crossing') || hasSkill(taker, 'Edged Crossing') ? 0.02 : 0);
       if (seededRandom() < crossChance) {
-        const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p, false) * 2, taker.id);
+        // Same designated-target boost as resolveCorner() (engine/
+        // shooting.js) — this delivery is functionally a corner, so the
+        // players actually pushed forward and stationed for exactly this
+        // situation should be the ones more likely to get on the end of
+        // it, not just whoever has the single highest aerial rating on
+        // the roster regardless of where they're tactically posted.
+        const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p, false) * 2 * aerialTargetBoost(attTeam, p.id), taker.id);
         if (scorer) {
           attTeam.stats.shots++; attTeam.stats.shotsOn++; attTeam.score++;
           recordStat('goals', scorer, attTeam.team);
@@ -1435,7 +1441,12 @@ var App = (() => {
       const flickOnChance = 0.035 + (hasSkill(thrower, 'Long Throws') ? 0.01 : 0);
       if (seededRandom() < flickOnChance) {
         const oppTeam = m[oppSide];
-        const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p, false) * 2, thrower.id);
+        // Same designated-target boost as resolveCorner()/the free-kick
+        // crossing routine above — a long throw is delivered into the
+        // same kind of crowded box, so it should find the same tactically
+        // posted aerial targets more often, not just whoever has the
+        // highest raw heading stat regardless of where they're playing.
+        const scorer = pickPlayerCustomWeighted(team, ['ST', 'CB', 'CDM'], (p) => aerialSkill(p, false) * 2 * aerialTargetBoost(team, p.id), thrower.id);
         // The flick-on still has to win the header against a marker, the
         // same aerial contest a long punt from a goal kick goes through
         // (see resolveGoalKick below) — previously this rolled straight
@@ -1535,7 +1546,11 @@ var App = (() => {
         if (receiver) resolveChanceCreation(side, oppSide, receiver, 'C');
       }
     } else {
-      const target = pickPlayerCustomWeighted(team, ['ST', 'CB'], (p) => aerialSkill(p, false) * 2);
+      // Same designated-target boost as the other deliveries above — a
+      // long punt is the keeper's own version of finding a specific
+      // aerial outlet, so it should favor whoever's actually the team's
+      // go-to target in the air, not just the single best heading stat.
+      const target = pickPlayerCustomWeighted(team, ['ST', 'CB'], (p) => aerialSkill(p, false) * 2 * aerialTargetBoost(team, p.id));
       const defender = pickPlayerCustomWeighted(oppTeam, ['CB'], (p) => aerialSkill(p, true) * 2);
       // GK High Punt: a sharper, more accurate long punt gives the target a
       // genuinely better sight of winning the header, not just a coin-flip
@@ -1785,6 +1800,24 @@ var App = (() => {
   // actual kickoff, without needing a live match to source them from.
   function roleBadgesForPreview(roles, playerId) {
     return roleBadgesForIds(roles, playerId, 'sb-role-ic');
+  }
+
+  // Shared "who's actually the team's dedicated aerial outlet" check —
+  // meant to be used everywhere a cross, free-kick delivery, long throw,
+  // or long goal-kick punt has to decide who it's most likely to find in
+  // the box. Previously only resolveCorner() (engine/shooting.js) applied
+  // a boost like this; every other delivery type weighted purely on raw
+  // aerial attributes, so a strong CF could out-weigh the team's actual
+  // designated targets on, say, a free-kick delivery or a long throw,
+  // even though those are the same players tactically pushed forward and
+  // stationed in the box for exactly this kind of ball. Same 1.35x
+  // resolveCorner already used — not a guarantee (any delivery into a
+  // crowded box is still a scramble), just a meaningful nudge toward
+  // whoever's actually posted there instead of whoever merely has the
+  // highest heading stat on the sheet.
+  function aerialTargetBoost(team, playerId) {
+    const targets = (team && team.roles && team.roles.cornerAttackers) || [];
+    return targets.some((p) => p && p.id === playerId) ? 1.35 : 1;
   }
   function formationShape(formationKey) {
     const key = formationKey || '4-3-3';
@@ -8408,8 +8441,7 @@ var App = (() => {
     // formula) are the players actually stationed in the danger areas for
     // this routine — they're more likely to be the one who gets on the
     // end of it, not guaranteed, since a corner is still a scramble.
-    const designatedAttackerIds = new Set(((attTeam.roles && attTeam.roles.cornerAttackers) || []).map(p => p.id));
-    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2 * (designatedAttackerIds.has(p.id) ? 1.35 : 1));
+    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2 * aerialTargetBoost(attTeam, p.id));
     if (!scorer) return;
     attTeam.stats.shots++;
     if (!m.playerMatchStats) m.playerMatchStats = {};
