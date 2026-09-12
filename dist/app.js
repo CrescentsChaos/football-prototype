@@ -7294,7 +7294,15 @@ var App = (() => {
         }
         m.status = 'Stoppage Time';
         if (elapsed >= m.periodDuration + m.periodStoppage) {
-          const drawn = m.home.score === m.away.score;
+          // Two-legged ties (see simTwoLegTie in simulation/tournamentEngine.js)
+          // pass aggHomeStart/aggAwayStart — the goals already banked from leg
+          // 1 — so a tie can go to extra time even when THIS leg alone isn't
+          // level, as long as the tie is level on aggregate (real UEFA rule
+          // since the away-goals rule was scrapped in 2021). For a single-leg
+          // match (domestic cups, World Cup, the Final) both start at 0, so
+          // this is identical to the old plain m.home.score === m.away.score
+          // check.
+          const drawn = (m.home.score + (m.aggHomeStart || 0)) === (m.away.score + (m.aggAwayStart || 0));
           if (drawn && (m.allowET || m.allowPens)) {
             // Instant/bulk sims have no one to click the prompt, so resolve
             // immediately instead of stalling on a prompt nobody can answer.
@@ -7372,7 +7380,11 @@ var App = (() => {
         }
         m.status = 'Stoppage Time (ET)';
         if (elapsed >= m.periodDuration + m.periodStoppage) {
-          if (m.home.score === m.away.score && m.allowPens) {
+          // Same aggregate-aware check as the full-time draw check above —
+          // still level on aggregate after extra time means penalties,
+          // even if this leg alone finished ahead/behind on the night.
+          const stillDrawn = (m.home.score + (m.aggHomeStart || 0)) === (m.away.score + (m.aggAwayStart || 0));
+          if (stillDrawn && m.allowPens) {
             if (m.silentDeep) {
               addEvent(m.minute, 'et', 'Extra time finished — still level. Straight to penalties.', null);
               runPenaltyShootout();
@@ -7618,7 +7630,22 @@ var App = (() => {
         if (!clrBase) return;
         if (!m.playerMatchStats[p.id]) m.playerMatchStats[p.id] = blankPlayerMatchStats(p);
         const ps = m.playerMatchStats[p.id];
+        // Both flags are set here, unconditionally, for every eligible
+        // on-pitch player every minute — BEFORE we know whether this
+        // minute's clearance/headed-clearance rolls actually succeed.
+        // Previously _liveHeadedClr was only set inside the "a clearance
+        // just happened" branch below, so a player who racked up real
+        // clearances but never once won the 35% headed-clearance sub-roll
+        // still had _liveHeadedClr stuck at its default (falsy) — and
+        // deriveExtendedMatchStats() then "backfilled" their genuine,
+        // live-simulated zero with a formula guess derived from their
+        // clearance total, silently replacing a real number with a
+        // synthetic one. Marking both as live-tracked up front means a
+        // real zero stays a real zero; only a player the live loop never
+        // reached at all (no CLEARANCE_BASE entry for their slot — GK)
+        // still gets the random backfill.
         ps._liveClr = true; // tells deriveExtendedMatchStats not to overwrite this with a random backfill figure
+        ps._liveHeadedClr = true; // ditto — for headedClearances specifically
         const defAwr = xattr(p, 'def_awr', p.def != null ? p.def : 70);
         const jmp = xattr(p, 'jmp', p.phy != null ? p.phy : 70);
         const phyCon = xattr(p, 'phy_con', p.phy != null ? p.phy : 70);
@@ -7626,7 +7653,6 @@ var App = (() => {
         const clrChance = Math.min(0.22, clrBase * clrSkillMult * pressureMult * staminaMultiplier(p));
         if (seededRandom() >= clrChance) return;
         ps.clearances = (ps.clearances || 0) + 1;
-        ps._liveHeadedClr = true; // tells deriveExtendedMatchStats not to overwrite this with a random backfill figure
         if (seededRandom() < 0.35) ps.headedClearances = (ps.headedClearances || 0) + 1;
         team.stats.clearances = (team.stats.clearances || 0) + 1;
         if (seededRandom() < 0.12) addEvent(m.minute, 'whistle', pickOffBallDesc(OFFBALL_CLEARANCE_DESC, p, team), side);
@@ -14629,19 +14655,33 @@ var App = (() => {
     // Leg 1 at away stadium (away hosts)
     const r1 = simQuickMatch(m.away, m.home, { allowET: false, allowPens: false });
     m.leg1 = { played: true, homeScore: r1.home, awayScore: r1.away, report: r1.report };
-    // Leg 2 at home stadium
-    const r2 = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+    // Leg 2 at home stadium. aggHomeStart/aggAwayStart tell the match engine
+    // what each side is already carrying over from leg 1, so it can decide
+    // to go to extra time/penalties based on the AGGREGATE scoreline —
+    // exactly like real two-legged UEFA ties — rather than only when leg 2
+    // itself happens to finish level (a tie can easily be level on
+    // aggregate, e.g. 2-0 then 0-2, while leg 2 alone finishes decisively).
+    const r2 = simQuickMatch(m.home, m.away, {
+      allowET: true, allowPens: true,
+      aggHomeStart: r1.away, aggAwayStart: r1.home
+    });
     m.leg2 = { played: true, homeScore: r2.home, awayScore: r2.away, report: r2.report };
     m.aggHome = r1.away + r2.home;
     m.aggAway = r1.home + r2.away;
     m.homeScore = m.aggHome;
     m.awayScore = m.aggAway;
-    if (m.aggHome > m.aggAway) m.winner = m.home;
-    else if (m.aggAway > m.aggHome) m.winner = m.away;
-    else {
-      if (r2.pens) { m.winner = r2.pens.home > r2.pens.away ? m.home : m.away; m.pens = r2.pens; }
-      else m.winner = seededRandom() < 0.5 ? m.home : m.away;
+    // r2.pens is now populated whenever the AGGREGATE was level after leg 2
+    // (see the aggHomeStart/aggAwayStart-aware checks in engine/
+    // matchEngine.js), so it's always trustworthy here — no more coin-flip
+    // fallback needed for a tie that's genuinely level on aggregate.
+    if (r2.pens) {
+      m.winner = r2.pens.home > r2.pens.away ? m.home : m.away;
+      m.pens = r2.pens;
       m.penalties = true;
+    } else if (m.aggHome > m.aggAway) {
+      m.winner = m.home;
+    } else {
+      m.winner = m.away;
     }
     m.played = true;
     m.report = r2.report;
@@ -14946,6 +14986,20 @@ var App = (() => {
     if (match) simThirdPlacePlayoffNow(match);
   }
 
+  // Writes the real 3rd Place Play-off result into tournament.thirdPlace/
+  // fourthPlace. Called both from setChampion() (bulk-sim path, where the
+  // playoff is always already played by the time the Final concludes) and
+  // from afterKnockoutMatchPlayed() (single-match Live/Instant path, where
+  // the user can play the Final and the 3rd Place Play-off in either
+  // order) — so however the two fixtures get played, tournament.thirdPlace/
+  // fourthPlace always end up reflecting the actual playoff result, not a
+  // semi-final-loser guess that never gets corrected.
+  function updateThirdPlaceFromPlayoff(match) {
+    if (!match || !match.played) return;
+    tournament.thirdPlace = match.winner || null;
+    tournament.fourthPlace = match.winner ? (match.winner.id === match.home.id ? match.away : match.home) : null;
+  }
+
   function createNextKnockoutRound(winners, finishedRound) {
     let list = (winners || []).filter(Boolean);
     if (list.length % 2 === 1) list = list.slice(0, list.length - 1);
@@ -14981,12 +15035,14 @@ var App = (() => {
       tournament.runnersUp = (fm.winner && fm.winner.id === fm.home.id) ? fm.away : fm.home;
     }
     // Third place: use the actual 3rd Place Play-off result when it exists
-    // (World Cup mode), otherwise fall back to the semi-final losers.
+    // (World Cup mode), otherwise fall back to the semi-final losers (an
+    // interim guess for when the Final finished before the playoff was
+    // played — see updateThirdPlaceFromPlayoff(), which overwrites this
+    // with the real result the moment that match is actually played,
+    // whichever order the user tackles the two fixtures in).
     const thirdPlaceRound = (tournament.knockout || []).find(r => r.name === '3rd Place Play-off');
     if (thirdPlaceRound && thirdPlaceRound.matches && thirdPlaceRound.matches[0] && thirdPlaceRound.matches[0].played) {
-      const tm = thirdPlaceRound.matches[0];
-      tournament.thirdPlace = tm.winner || null;
-      tournament.fourthPlace = tm.winner ? (tm.winner.id === tm.home.id ? tm.away : tm.home) : null;
+      updateThirdPlaceFromPlayoff(thirdPlaceRound.matches[0]);
     } else {
       const sf = (tournament.knockout || []).find(r => r.name === 'Semi-finals');
       if (sf && sf.matches && sf.matches.length >= 2) {
@@ -15107,6 +15163,12 @@ var App = (() => {
       goalList: [],
       allowET: !!opts.allowET,
       allowPens: !!opts.allowPens,
+      // Goals already banked from leg 1 of a two-legged tie (see
+      // simTwoLegTie in simulation/tournamentEngine.js) — 0/0 for every
+      // single-leg match, which makes the aggregate-aware draw checks
+      // above behave exactly like the old single-match checks.
+      aggHomeStart: opts.aggHomeStart || 0,
+      aggAwayStart: opts.aggAwayStart || 0,
       silentDeep: true,
       quietSim: true,
       countForLeaderboard: tournament ? true : !!opts.countForLeaderboard,
@@ -15456,8 +15518,19 @@ var App = (() => {
     // round — it has just one match, so without this check the generic
     // "winners.length === 1" branch below would wrongly crown its winner
     // tournament champion. Its result only feeds tournament.thirdPlace/
-    // fourthPlace, which setChampion() reads once the real Final finishes.
+    // fourthPlace — normally read by setChampion() once the real Final
+    // finishes, but the user is free to play the Final first (both
+    // fixtures appear together as soon as the semis finish), so this
+    // always writes the real result here too. Without it, a playoff played
+    // after the Final was silently discarded — setChampion() had already
+    // locked in a semi-final-loser guess and, once tournament.champion is
+    // set, never runs again to pick up the actual result.
     if (current.name === '3rd Place Play-off') {
+      updateThirdPlaceFromPlayoff(current.matches[0]);
+      if (tournament.champion) {
+        renderTournamentPodium();
+        persistAll();
+      }
       renderBracket();
       renderTournamentLeaderboard();
       return;
