@@ -1342,13 +1342,41 @@ var App = (() => {
         // the roster regardless of where they're tactically posted.
         const scorer = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM'], (p) => aerialSkill(p, false) * 2 * aerialTargetBoost(attTeam, p.id), taker.id);
         if (scorer) {
-          attTeam.stats.shots++; attTeam.stats.shotsOn++; attTeam.score++;
-          recordStat('goals', scorer, attTeam.team);
-          recordStat('assists', taker, attTeam.team);
+          attTeam.stats.shots++;
           if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
           if (!m.playerMatchStats[taker.id]) m.playerMatchStats[taker.id] = blankPlayerMatchStats(taker);
-          m.playerMatchStats[scorer.id].goals++;
+          m.playerMatchStats[scorer.id].shots++;
+          // Getting on the end of the delivery only earns a shot on goal —
+          // it still has to beat the keeper, the same fix already applied
+          // to the equivalent corner routine (resolveCorner, engine/
+          // shooting.js). This used to credit the goal the instant
+          // crossChance succeeded, with no goalkeeper anywhere in the
+          // pipeline — a free-kick delivery run as its own separate goal
+          // engine instead of through the shared save resolution every
+          // other chance in the match goes through.
+          const gk = activeGoalkeeper(defendingSide);
+          const shotQuality = Math.max(0.05, Math.min(0.98, aerialSkill(scorer, false)));
+          if (gk) bumpExtStat(gk, 'psxg', +(0.22 + shotQuality * 0.15).toFixed(3));
+          const saveResult = resolveGkSave(gk, scorer, shotQuality, { isHeader: true, closeRange: false, chanceType: 'cross' });
           m.playerMatchStats[scorer.id].xg += 0.22 + seededRandom() * 0.15;
+          if (saveResult.saved) {
+            attTeam.stats.shotsOn++;
+            if (gk) {
+              defTeam.stats.saves++;
+              recordStat('saves', gk, defTeam.team);
+              if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+              m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+              addEvent(m.minute, 'save', `🧤 Free-kick delivery met by <span class="player">${scorer.name}</span> — ${saveResult.saveType === 'catch' ? pickCatchDesc(gk, scorer) : pickSaveDesc(gk, scorer)}`, attackingSide);
+            } else {
+              addEvent(m.minute, 'miss', `Free-kick delivery met by <span class="player">${scorer.name}</span> but it drifts off target`, attackingSide);
+            }
+            return;
+          }
+          attTeam.stats.shotsOn++;
+          attTeam.score++;
+          recordStat('goals', scorer, attTeam.team);
+          recordStat('assists', taker, attTeam.team);
+          m.playerMatchStats[scorer.id].goals++;
           m.playerMatchStats[taker.id].assists++;
           m.playerMatchStats[taker.id].xa += 0.2 + seededRandom() * 0.3;
           // Same reasoning as the corner routine in resolveCorner()
@@ -1398,6 +1426,28 @@ var App = (() => {
     m.playerMatchStats[effectiveShooter.id].shots++;
     if (seededRandom() < 0.18) {
       const scorer = effectiveShooter;
+      // Beating the wall only earns a shot on target — it still has to get
+      // past the keeper, the same fix already applied to the equivalent
+      // corner and free-kick-crossing routines. This used to credit the
+      // goal outright with no goalkeeper anywhere in the pipeline.
+      const gk = activeGoalkeeper(defendingSide);
+      const shotQuality = Math.max(0.05, Math.min(0.98, finishingEdge(scorer) + positioningEdge(scorer) + 0.6));
+      if (gk) bumpExtStat(gk, 'psxg', +(0.18 + shotQuality * 0.15).toFixed(3));
+      const saveResult = resolveGkSave(gk, scorer, shotQuality, { closeRange: false, chanceType: 'freekick' });
+      if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+      m.playerMatchStats[scorer.id].xg += 0.18 + seededRandom() * 0.1;
+      if (saveResult.saved) {
+        if (gk) {
+          defTeam.stats.saves++;
+          recordStat('saves', gk, defTeam.team);
+          if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+          m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+          addEvent(m.minute, 'save', `🧤 First-time strike from <span class="player">${scorer.name}</span> — ${saveResult.saveType === 'catch' ? pickCatchDesc(gk, scorer) : pickSaveDesc(gk, scorer)}`, attackingSide);
+        } else {
+          addEvent(m.minute, 'miss', `First-time strike from <span class="player">${scorer.name}</span> drifts off target`, attackingSide);
+        }
+        return;
+      }
       attTeam.stats.shotsOn++;
       attTeam.score++;
       recordStat('goals', scorer, attTeam.team);
@@ -1409,9 +1459,7 @@ var App = (() => {
         // Created just like the assist does.
         bumpExtStat(taker, 'bigChancesCreated', 1);
       }
-      if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
       m.playerMatchStats[scorer.id].goals++;
-      m.playerMatchStats[scorer.id].xg += 0.18 + seededRandom() * 0.1;
       pushGoal(attackingSide, scorer, m.minute, 'first-time strike from an indirect routine');
       addEvent(m.minute, 'goal', `${emojiImg('goal', 'Goal')} Worked short and finished! <span class="player">${scorer.name}</span> converts the indirect routine`, attackingSide, true);
     } else {
@@ -3603,7 +3651,10 @@ var App = (() => {
     shotContext = shotContext || {};
     const isHeader = !!shotContext.isHeader;
     const closeRange = !!shotContext.closeRange;
-    const isLongRange = shotContext.chanceType === 'longshot';
+    // A direct free-kick is judged like a longshot for reach purposes —
+    // it's a placed, dead-ball effort from distance, the same situation
+    // gk_reach is meant to represent, not a snap reaction at close range.
+    const isLongRange = shotContext.chanceType === 'longshot' || shotContext.chanceType === 'freekick';
     const isCrossType = shotContext.chanceType === 'cross';
     const shotPower = shotContext.shotPower != null ? shotContext.shotPower : 0.5;
     const fatigueMult = gk ? staminaMultiplier(gk) : 1;
@@ -8839,8 +8890,13 @@ var App = (() => {
 
     const roll = seededRandom();
     if (roll < 0.55) {
+      // Interception and tackle are alternative outcomes of this same roll,
+      // not two separate actions — crediting both here double-counted every
+      // interception as a tackle too, inflating both the individual and
+      // (via the interceptions/tackles totals the Defenders' Award sums in
+      // ui/statisticsUI.js) the season-long defensive totals. Same fix
+      // already applied to the equivalent off-ball roll in defending.js.
       ps.interceptions = (ps.interceptions || 0) + 1;
-      ps.tackles = (ps.tackles || 0) + 1;
       defTeam.stats.interceptions = (defTeam.stats.interceptions || 0) + 1;
       if (seededRandom() < 0.4) {
         const flavor = styleFlavor(defenderPlayer, INTERCEPTION_FLAVOR);
@@ -8850,6 +8906,10 @@ var App = (() => {
       }
     } else {
       ps.tackles = (ps.tackles || 0) + 1;
+      // Team tackles for a normal tackle win — the interception branch
+      // above already updates defTeam.stats.interceptions live; a tackle
+      // win was only ever credited to the player, never the team.
+      defTeam.stats.tackles = (defTeam.stats.tackles || 0) + 1;
       if (seededRandom() < 0.4) {
         const flavor = styleFlavor(defenderPlayer, TACKLE_FLAVOR);
         addEvent(m.minute, 'tackle', flavor
