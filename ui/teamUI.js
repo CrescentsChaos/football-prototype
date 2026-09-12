@@ -559,7 +559,12 @@
     }
     list = [...list];
     if (teamsSort === 'name') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    else if (teamsSort === 'ovr') list.sort((a, b) => teamAvgOvr(b) - teamAvgOvr(a));
+    else if (teamsSort === 'ovr') {
+      // Performance Optimization: Pre-compute team average OVRs in a local Map
+      // before sorting to avoid re-summing player OVRs N*log(N) times during comparisons.
+      const ovrMap = new Map(list.map(t => [t, teamAvgOvr(t)]));
+      list.sort((a, b) => ovrMap.get(b) - ovrMap.get(a));
+    }
     else if (teamsSort === 'players') list.sort((a, b) => (b.players || []).length - (a.players || []).length);
     else if (teamsSort === 'flag') list.sort((a, b) => (a.flag || '').localeCompare(b.flag || '') || (a.name || '').localeCompare(b.name || ''));
     return list;
