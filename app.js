@@ -11507,13 +11507,13 @@ var App = (() => {
       scores[p.id].assists = p.count;
       scores[p.id].pts += p.count * 0.8;
     });
+    // Bonus if player is a striker on roster (O(1) index lookup via findPlayerAndTeam)
     Object.values(scores).forEach(s => {
-      let isST = false;
-      for (const t of allTeams) {
-        const pl = (t.players || []).find(x => x.id === s.id);
-        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
+      const pInfo = findPlayerAndTeam(s.id);
+      const pl = pInfo ? pInfo.player : null;
+      if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) {
+        s.pts += 2;
       }
-      if (isST) s.pts += 2;
     });
     return Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals);
   }
@@ -15616,14 +15616,13 @@ var App = (() => {
         scores[p.id].assists = p.count;
         scores[p.id].pts += p.count * 0.8;
       });
-      // Bonus if player is a striker on roster
+      // Bonus if player is a striker on roster (O(1) index lookup via findPlayerAndTeam)
       Object.values(scores).forEach(s => {
-        let isST = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
+        const pInfo = findPlayerAndTeam(s.id);
+        const pl = pInfo ? pInfo.player : null;
+        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) {
+          s.pts += 2;
         }
-        if (isST) s.pts += 2;
       });
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
@@ -15672,14 +15671,13 @@ var App = (() => {
       Object.values(stats.ratings || {}).forEach(p => {
         if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.25;
       });
-      // Bonus if the player is actually a defender on their roster (CB/RB/LB/RWB/LWB).
+      // Bonus if the player is actually a defender on their roster (CB/RB/LB/RWB/LWB) (O(1) index lookup via findPlayerAndTeam).
       Object.values(scores).forEach(s => {
-        let isDef = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) { isDef = true; break; }
+        const pInfo = findPlayerAndTeam(s.id);
+        const pl = pInfo ? pInfo.player : null;
+        if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) {
+          s.pts += 3;
         }
-        if (isDef) s.pts += 3;
       });
       const data = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧱</div><p>No defensive stats yet.</p></div>'; return; }
@@ -15702,11 +15700,13 @@ var App = (() => {
       });
       const data = Object.values(byMgr).sort((a,b) => b.count - a.count || b.latest - a.latest).slice(0, 50);
       const leader = data[0];
-      const leaderTeam = allTeams.find(t => t.manager && t.manager.name === leader.name);
+      const managerTeamMap = {};
+      allTeams.forEach(t => { if (t.manager && t.manager.name) managerTeamMap[t.manager.name] = t; });
+      const leaderTeam = managerTeamMap[leader.name] || null;
       el.innerHTML = '<div class="award-card">' + managerAvatarMark(leaderTeam ? leaderTeam.manager : { name: leader.name }, 64) + '<div class="award-info"><h4>👔 Manager of the Moment</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.count + ' award' + (leader.count===1?'':'s') + ' won</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Manager</th><th>Team</th><th>Awards</th></tr></thead><tbody>' +
         data.map((m,i) => {
-          const t = allTeams.find(tt => tt.manager && tt.manager.name === m.name);
+          const t = managerTeamMap[m.name] || null;
           return '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player"><div class="lb-player-cell">' + managerAvatarMark(t ? t.manager : { name: m.name }, 34) + '<span class="lb-player-name">'+m.name+'</span></div></td><td class="lb-team">'+m.team+'</td><td style="font-weight:700;color:var(--gold)">'+m.count+'</td></tr>';
         }).join('') +
         '</tbody></table></div>';
