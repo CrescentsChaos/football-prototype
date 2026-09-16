@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APEX SIM — Football Simulator</title>
+  <meta name="description" content="APEX SIM — a browser-based football simulation platform with a live match engine, formations, injuries, domestic seasons, a 36-team Champions League format and a full World Cup.">
+  <meta name="theme-color" content="#05080f">
+  <meta property="og:title" content="APEX SIM — Football Simulator">
+  <meta property="og:description" content="A football simulation platform with a live match engine, domestic seasons and international tournaments.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23111a2b' stroke='%23f0c14b' stroke-width='6'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">⚽</div>
+        <span>APEX SIM</span>
+      </div>
+      <nav class="nav-tabs" aria-label="Main navigation">
+        <button class="nav-tab active" data-view="home" aria-current="page">Home</button>
+        <button class="nav-tab" data-view="match">Match</button>
+        <button class="nav-tab" data-view="tournament">Tournament</button>
+        <button class="nav-tab" data-view="season">Season</button>
+        <button class="nav-tab" data-view="leaderboard">Leaderboard</button>
+        <button class="nav-tab" data-view="awards">Awards</button>
+        <button class="nav-tab" data-view="history">History</button>
+        <button class="nav-tab" data-view="teams">Teams</button>
+        <button class="nav-tab" data-view="players">Players</button>
+        <button class="nav-tab" data-view="hospital">🏥 Hospital</button>
+        <button class="nav-tab" data-view="extras">🧰 Extras</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- HOME -->
+    <section id="view-home" class="view active">
+      <div class="hero">
+        <h1>APEX SIM</h1>
+        <p>A football simulation platform with a full live match engine, domestic seasons and international tournaments.</p>
+        <div class="mode-grid">
+          <div class="mode-card" role="button" tabindex="0" onclick="App.goToMatch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToMatch()}">
+            <div class="icon">🏟️</div>
+            <h3>Kick Off</h3>
+            <p>Select two teams and formations — or go random, or build your own lineup with Squad Builder — then simulate live.</p>
+          </div>
+          <div class="mode-card" role="button" tabindex="0" onclick="App.goToTournament()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.goToTournament()}">
+            <div class="icon"><img src="assets/trophies/world-cup.png" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.textContent='🏆'"></div>
+            <h3>Tournament</h3>
+            <p>World Cup, Champions League, continental championships, domestic cups and Super Cups — pick a format in the Tournament tab and go.</p>
+          </div>
+          <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('season')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('season')}">
+            <div class="icon">📅</div>
+            <h3>Season Calendar</h3>
+            <p>Run a full season across the Premier League, La Liga, Serie A, Bundesliga, League One and the Champions League.</p>
+          </div>
+          <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('leaderboard')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('leaderboard')}">
+            <div class="icon">📊</div>
+            <h3>Leaderboards</h3>
+            <p>Career statistics across every match played — goals, assists, saves and clean sheets.</p>
+          </div>
+          <div class="mode-card" role="button" tabindex="0" onclick="App.switchView('awards')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.switchView('awards')}">
+            <div class="icon">🏆</div>
+            <h3>Awards</h3>
+            <p>Golden Boot, Ballon d'Or and Player of the Match, awarded automatically as results come in.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MATCH -->
+    <section id="view-match" class="view">
+      <div id="match-setup">
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-title">Select Teams & Formations</div>
+          <div class="team-select-grid">
+            <div class="team-panel">
+              <h3>HOME</h3>
+              <select id="home-team" class="team-dropdown" onchange="App.updateTeamPreview('home')" aria-label="Home team"></select>
+              <div id="home-preview" class="team-preview"></div>
+              <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
+              <select id="home-formation" class="formation-select" onchange="App.onFormationChange('home')" aria-label="Home formation"></select>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('home','club')">🎲 Club</button>
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('home','national')">🎲 National</button>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('home')">⚙️ Squad Builder</button>
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="team-panel">
+              <h3>AWAY</h3>
+              <select id="away-team" class="team-dropdown" onchange="App.updateTeamPreview('away')" aria-label="Away team"></select>
+              <div id="away-preview" class="team-preview"></div>
+              <label style="font-size:0.85rem;color:var(--text-secondary)">Formation</label>
+              <select id="away-formation" class="formation-select" onchange="App.onFormationChange('away')" aria-label="Away formation"></select>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('away','club')">🎲 Club</button>
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1" onclick="App.randomizeTeamSide('away','national')">🎲 National</button>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="App.openSquadBuilder('away')">⚙️ Squad Builder</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-top:12px">
+            <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="opt-et" style="accent-color:var(--accent-gold);width:16px;height:16px"> Extra Time if draw
+            </label>
+            <label style="font-size:0.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="opt-pens" style="accent-color:var(--accent-gold);width:16px;height:16px"> Penalties if still draw
+            </label>
+          </div>
+          <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="App.startMatch()">⚽ Kick Off</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="match-live" style="display:none">
+        <div class="match-arena">
+          <div class="scoreboard">
+            <div class="score-team home">
+              <span class="flag" id="live-home-flag"></span>
+              <span class="name" id="live-home-name"></span>
+              <span class="formation" id="live-home-form"></span>
+              <span class="mgr" id="live-home-mgr"></span>
+              <div class="goal-scorers home-scorers" id="home-goal-scorers"></div>
+            </div>
+            <div class="score-center" id="score-center">
+              <div class="score-numbers"><span id="live-home-score">0</span> - <span id="live-away-score">0</span></div>
+              <div class="score-time" id="live-minute">0'</div>
+              <div class="match-status"><span class="live-dot"></span><span id="live-status">1st Half</span></div>
+              <div class="match-venue" id="live-venue" style="font-size:0.7rem;color:var(--text-muted);margin-top:2px"></div>
+            </div>
+            <div class="score-team away">
+              <span class="flag" id="live-away-flag"></span>
+              <span class="name" id="live-away-name"></span>
+              <span class="formation" id="live-away-form"></span>
+              <span class="mgr" id="live-away-mgr"></span>
+              <div class="goal-scorers away-scorers" id="away-goal-scorers"></div>
+            </div>
+          </div>
+          <div class="events-container">
+            <div class="events-feed" id="events-feed"></div>
+            <div class="match-stats-panel">
+              <div class="stat-label">Match Stats</div>
+              <div id="live-stats"></div>
+            </div>
+          </div>
+          <div class="match-controls">
+            <button class="btn btn-primary btn-sm" id="btn-play" onclick="App.toggleSim()">▶ Play</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.finishMatch()">⏩ Finish Match</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.resetMatch()">↺ New Match</button>
+            <button class="btn btn-secondary btn-sm" id="btn-career-manage" style="display:none" onclick="App.toggleCareerPanel()">🎮 Manage</button>
+            <span style="margin-left:auto;color:var(--text-muted);font-size:0.85rem" id="sim-speed-label">Speed: Normal</span>
+            <select id="sim-speed" onchange="App.setSpeed(this.value)" style="padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)">
+              <option value="800">Slow</option>
+              <option value="400" selected>Normal</option>
+              <option value="150">Fast</option>
+              <option value="40">Turbo</option>
+            </select>
+          </div>
+          <div class="card career-manage-panel" id="career-manage-panel" style="display:none;margin-top:10px">
+            <div class="card-title">🎮 Managing <span id="career-team-label"></span></div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">You're in control — the AI won't change tactics or make substitutions for your side. Set these whenever you like, including mid-match.</div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px">Team Instructions</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-attack" onclick="App.applyUserTactic('attack')">⚔️ Attack</button>
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-press" onclick="App.applyUserTactic('press')">🔥 Press</button>
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-balanced" onclick="App.applyUserTactic('balanced')">⚖️ Balanced</button>
+                <button class="btn btn-secondary btn-sm career-tac-btn" id="career-tac-defend" onclick="App.applyUserTactic('defend')">🛡️ Defend</button>
+              </div>
+            </div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px">Formation</div>
+              <select id="career-formation-select" onchange="App.applyUserFormation(this.value)" style="padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)"></select>
+            </div>
+            <div>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px" id="career-subs-label">Substitutions: 0/5</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="career-sub-out" style="flex:1;min-width:160px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)"></select>
+                <span style="color:var(--text-muted)">→</span>
+                <select id="career-sub-in" style="flex:1;min-width:160px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)"></select>
+                <button class="btn btn-primary btn-sm" id="career-sub-confirm" onclick="App.confirmUserSub()">Make Substitution</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pitch-wrap" id="pitch-display"></div>
+        <div class="lineup-grid" id="lineup-display"></div>
+        <div class="card post-match-panel" id="post-match-ratings" style="display:none"></div>
+        <div class="back-tour-btn" id="back-to-tournament" style="display:none">
+          <button class="btn btn-primary" onclick="App.returnToTournament()">← Back to Tournament</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SQUAD BUILDER (full-page lineup & formation editor) -->
+    <section id="view-squadbuilder" class="view sb-page">
+      <div class="sb-page-header">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="App.closeSquadBuilder()">← Back</button>
+        <div class="sb-page-title" id="sb-page-title">Squad Builder</div>
+        <div class="sb-side-switch">
+          <button type="button" class="btn btn-secondary btn-sm" id="sb-side-home-btn" onclick="App.sbSwitchSide()">HOME</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="sb-side-away-btn" onclick="App.sbSwitchSide()">AWAY</button>
+        </div>
+      </div>
+
+      <div class="sb-toolbar">
+        <label class="sb-toolbar-label" for="sb-formation-select">Formation</label>
+        <select id="sb-formation-select" class="formation-select" onchange="App.sbSelectFormationPreset(this.value)" aria-label="Formation preset"></select>
+        <button type="button" class="btn btn-secondary btn-sm" id="sb-edit-mode-btn" onclick="App.sbToggleEditMode()">✥ Edit Formation Shape</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="App.sbResetFormationShape()">↺ Reset Shape</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="App.autoFillSquadBuilder()">⚡ Auto-fill Best XI</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="sb-export-formation-btn" onclick="App.sbExportFormation()" title="Download this formation's slots and coordinates to add to FORMATIONS by hand">⬇ Export Formation</button>
+      </div>
+      <p class="sb-hint" id="sb-hint">Drag a player onto the pitch, bench or reserves to place them — or tap a player, then tap where they should go.</p>
+
+      <div class="sb-layout">
+        <div class="sb-pitch-col">
+          <div id="sb-pitch" class="mini-pitch sb-pitch"></div>
+          <div class="sb-counts" id="sb-counts"></div>
+          <div id="sb-picker" class="sb-picker" style="display:none"></div>
+        </div>
+        <div class="sb-panel-col">
+          <div class="sb-tabs">
+            <button type="button" class="sb-tab active" data-sb-tab="bench" onclick="App.sbSwitchTab('bench')">Substitutes</button>
+            <button type="button" class="sb-tab" data-sb-tab="reserves" onclick="App.sbSwitchTab('reserves')">Reserves</button>
+            <button type="button" class="sb-tab" data-sb-tab="roles" onclick="App.sbSwitchTab('roles')">Match Roles</button>
+          </div>
+          <div class="sb-tab-panel" id="sb-tab-bench" data-sb-drop="bench" onpointerdown="App.sbZoneGrab(event,'bench')">
+            <div id="sb-bench-list" class="sb-chip-list"></div>
+          </div>
+          <div class="sb-tab-panel" id="sb-tab-reserves" style="display:none" data-sb-drop="reserve" onpointerdown="App.sbZoneGrab(event,'reserve')">
+            <div id="sb-reserves-list" class="sb-chip-list"></div>
+          </div>
+          <div class="sb-tab-panel" id="sb-tab-roles" style="display:none">
+            <div id="sb-roles" class="sb-roles"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sb-actions">
+        <button class="btn btn-primary" onclick="App.saveSquadBuilder()">💾 Save Lineup</button>
+        <button class="btn btn-secondary" onclick="App.closeSquadBuilder()">Cancel</button>
+      </div>
+    </section>
+
+    <!-- TOURNAMENT -->
+    <section id="view-tournament" class="view">
+      <div id="tournament-setup" class="card">
+        <div class="tour-header-row card-title" style="margin-bottom:14px">
+          <img id="tour-logo-setup" class="tour-logo" alt="" style="display:none">
+          <span id="tournament-title">World Cup Setup</span>
+          <span id="tour-format-badge-setup" class="tour-format-badge"></span>
+        </div>
+        <p style="color:var(--text-secondary);margin-bottom:16px" id="tournament-desc">Select national teams to participate. Minimum 4, recommended 8 or 16.</p>
+        <div class="teams-toolbar" style="margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--text-secondary)">
+            Format
+            <select id="tour-format-select" onchange="App.selectTournamentFormat(this.value)" aria-label="Tournament format" style="min-width:220px">
+              <optgroup label="International">
+                <option value="worldcup">World Cup</option>
+                <option value="nations-league">Nations League</option>
+              </optgroup>
+              <optgroup label="Continental">
+                <option value="euros">European Championship (Euros)</option>
+                <option value="copa-america">Copa América</option>
+                <option value="afcon">Africa Cup of Nations (AFCON)</option>
+                <option value="asian-cup">AFC Asian Cup</option>
+                <option value="gold-cup">CONCACAF Gold Cup</option>
+              </optgroup>
+              <optgroup label="Club — Europe">
+                <option value="ucl">Champions League</option>
+              </optgroup>
+              <optgroup label="Domestic Leagues">
+                <option value="premier-league">Premier League</option>
+                <option value="la-liga">La Liga</option>
+                <option value="serie-a">Serie A</option>
+                <option value="bundesliga">Bundesliga</option>
+                <option value="ligue-1">Ligue 1</option>
+              </optgroup>
+              <optgroup label="Club — England">
+                <option value="fa-cup">FA Cup</option>
+                <option value="efl-cup">EFL Cup</option>
+                <option value="community-shield">FA Community Shield</option>
+              </optgroup>
+              <optgroup label="Club — Spain">
+                <option value="copa-del-rey">Copa del Rey</option>
+                <option value="supercopa-esp">Supercopa de España</option>
+              </optgroup>
+              <optgroup label="Club — Germany">
+                <option value="dfb-pokal">DFB-Pokal</option>
+                <option value="dfl-supercup">DFL-Supercup</option>
+              </optgroup>
+              <optgroup label="Club — Italy">
+                <option value="coppa-italia">Coppa Italia</option>
+                <option value="supercoppa-ita">Supercoppa Italiana</option>
+              </optgroup>
+              <optgroup label="Club — France">
+                <option value="coupe-de-france">Coupe de France</option>
+                <option value="trophee-des-champions">Trophée des Champions</option>
+              </optgroup>
+            </select>
+          </label>
+          <label id="tour-size-wrap" style="display:none;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--text-secondary)">
+            Tournament Size
+            <select id="tour-size-select" onchange="App.selectTournamentSize(this.value)" aria-label="Tournament size" style="min-width:150px"></select>
+          </label>
+          <input type="search" id="tour-teams-search" placeholder="Search teams to select..." oninput="App.searchTournamentTeams(this.value)" autocomplete="off" aria-label="Search tournament teams" style="flex:1;min-width:200px">
+          <select id="tour-teams-sort" onchange="App.sortTournamentTeams(this.value)" aria-label="Sort teams">
+            <option value="name">Sort: Name</option>
+            <option value="ovr">Sort: Strength</option>
+            <option value="players">Sort: Squad size</option>
+            <option value="flag">Sort: Flag</option>
+          </select>
+          <label id="tour-league-wrap" style="display:none;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--text-secondary)">
+            League
+            <select id="tour-teams-league" onchange="App.filterTournamentTeamsLeague(this.value)" aria-label="Filter league" style="min-width:150px">
+              <option value="all">All leagues</option>
+            </select>
+          </label>
+          <select id="tour-teams-rating" onchange="App.filterTournamentTeamsRating(this.value)" aria-label="Filter by strength">
+            <option value="all">All strengths</option>
+            <option value="elite">Elite (85+)</option>
+            <option value="great">Great (75-84)</option>
+            <option value="good">Good (65-74)</option>
+            <option value="dev">Development (&lt;65)</option>
+          </select>
+        </div>
+        <div class="teams-checkbox-grid" id="tournament-teams"></div>
+        <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="App.selectAllTeams()">Select All</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.deselectAllTeams()">Clear</button>
+          <button class="btn btn-primary" onclick="App.startTournament()">🏆 Start Tournament</button>
+        </div>
+      </div>
+
+      <div id="tournament-live" style="display:none">
+        <div class="card" style="margin-bottom:20px">
+          <div class="tour-header-row card-title" style="margin-bottom:14px">
+            <img id="tour-logo-live" class="tour-logo" alt="" style="display:none">
+            <span id="tour-stage-title">Group Stage</span>
+            <span id="tour-format-badge-live" class="tour-format-badge"></span>
+          </div>
+          <div id="groups-container" class="groups-grid"></div>
+          <div id="fixture-list" class="fixture-list"></div>
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="btn-sim-round" onclick="App.simTournamentRound()">Simulate Round</button>
+            <button class="btn btn-secondary" onclick="App.simAllTournament()">⚡ Simulate All</button>
+            <button class="btn btn-secondary" onclick="App.resetTournament()">↺ Reset</button>
+          </div>
+        </div>
+        <div class="card" id="tour-bracket-card">
+          <div class="card-title">Knockout Bracket</div>
+          <div class="bracket-container">
+            <div class="bracket" id="bracket"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px" id="tour-leaderboard-mini">
+          <div class="card-title">Tournament Stats</div>
+          <div id="tour-awards"></div><div id="tour-stats-preview"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEASON CALENDAR -->
+    <section id="view-season" class="view">
+      <div id="season-setup" class="card">
+        <div class="card-title">Season Setup</div>
+        <p style="color:var(--text-secondary);margin-bottom:16px">Clubs for each league are pulled automatically from leagues.json (fall back to picking manually if a league has no match yet). Every league plays a full home-and-away, double round-robin season — the table topper is crowned champion. The top 4 clubs from each league automatically qualify as Champions League candidates for next season, just like real life.</p>
+        <div id="season-setup-comps"></div>
+        <div id="season-setup-msg" style="color:var(--text-muted);font-size:0.85rem;margin-top:10px"></div>
+        <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="App.autoFillSeason()">🎲 Auto-Fill All</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.clearSeasonSetup()">↺ Clear</button>
+          <button class="btn btn-primary" onclick="App.startSeason()">📅 Start Season</button>
+        </div>
+      </div>
+
+      <div id="season-dashboard" style="display:none">
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title" id="season-status-title">Year 1 · Matchday 0</div>
+          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="App.simulateSeasonWeek()">▶ Simulate Next Matchday</button>
+            <button class="btn btn-secondary" onclick="App.simulateSeasonToEnd()">⚡ Simulate To End of Season</button>
+            <button class="btn btn-secondary" onclick="App.startNewSeasonYear()">🔁 Start Next Season</button>
+            <button class="btn btn-danger btn-sm" onclick="App.resetSeason()" style="margin-left:auto">↺ Reset Season</button>
+          </div>
+          <div id="season-congestion"></div>
+          <div id="season-career-banner"></div>
+          <div id="season-due-banner"></div>
+        </div>
+        <div class="card">
+          <div class="leaderboard-tabs" id="season-comp-tabs"></div>
+          <div id="season-comp-content"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEADERBOARD -->
+    <section id="view-leaderboard" class="view">
+      <div class="card">
+        <div class="card-title">Global Leaderboards</div>
+        <div class="leaderboard-tabs">
+          <button class="lb-tab active" data-lb="goals" onclick="App.showLeaderboard('goals')"><img src="assets/images/goal.png" alt="" class="emoji-icon-img"> Goals</button>
+          <button class="lb-tab" data-lb="assists" onclick="App.showLeaderboard('assists')"><img src="assets/images/assist.png" alt="" class="emoji-icon-img"> Assists</button>
+          <button class="lb-tab" data-lb="saves" onclick="App.showLeaderboard('saves')">🧤 Saves</button>
+          <button class="lb-tab" data-lb="cleanSheets" onclick="App.showLeaderboard('cleanSheets')">🛡️ Clean Sheets</button>
+          <button class="lb-tab" data-lb="interceptions" onclick="App.showLeaderboard('interceptions')">🧱 Interceptions</button>
+          <button class="lb-tab" data-lb="blocks" onclick="App.showLeaderboard('blocks')">🚫 Blocks</button>
+          <button class="lb-tab" data-lb="chancesCreated" onclick="App.showLeaderboard('chancesCreated')">🎯 Big Chances Created</button>
+          <button class="lb-tab" data-lb="xa" onclick="App.showLeaderboard('xa')">🅰️ xA</button>
+          <button class="lb-tab" data-lb="xg" onclick="App.showLeaderboard('xg')">🎯 xG</button>
+          <button class="lb-tab" data-lb="yellows" onclick="App.showLeaderboard('yellows')"><img src="assets/images/yellow_card.png" alt="" class="emoji-icon-img"> Yellows</button>
+          <button class="lb-tab" data-lb="reds" onclick="App.showLeaderboard('reds')"><img src="assets/images/red_card.png" alt="" class="emoji-icon-img"> Reds</button>
+          <button class="lb-tab" data-lb="motm" onclick="App.showLeaderboard('motm')">⭐ MOTM</button>
+          <button class="lb-tab" data-lb="puskas" onclick="App.showLeaderboard('puskas')">🏆 Puskas</button>
+          <button class="lb-tab" data-lb="ratings" onclick="App.showLeaderboard('ratings')">📊 Avg Rating</button>
+          <button class="btn btn-danger btn-sm" onclick="App.resetLeaderboard()" style="margin-left:auto">Reset Stats</button>
+        </div>
+        <div id="leaderboard-content">
+          <div class="empty-state">
+            <div class="icon">📊</div>
+            <p>Simulate matches to populate the leaderboards.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AWARDS -->
+    <section id="view-awards" class="view">
+      <div class="card">
+        <div class="card-title">Trophies & Awards</div>
+        <div class="award-tabs">
+          <button class="award-tab active" data-award="overview" onclick="App.showAwards('overview')">Overview</button>
+          <button class="award-tab" data-award="ballon" onclick="App.showAwards('ballon')">Ballon d'Or</button>
+          <button class="award-tab" data-award="puskas" onclick="App.showAwards('puskas')">Puskás</button>
+          <button class="award-tab" data-award="muller" onclick="App.showAwards('muller')">Gerd Müller</button>
+          <button class="award-tab" data-award="yashin" onclick="App.showAwards('yashin')">Yashin</button>
+          <button class="award-tab" data-award="defenders" onclick="App.showAwards('defenders')">Defenders' Award</button>
+          <button class="award-tab" data-award="manager" onclick="App.showAwards('manager')">Manager</button>
+          <button class="award-tab" data-award="trophies" onclick="App.showAwards('trophies')">Trophies</button>
+        </div>
+        <div id="awards-content">
+          <div class="empty-state"><div class="icon">🏆</div><p>Simulate matches and tournaments to unlock awards.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="view-history" class="view">
+      <div class="card">
+        <div class="card-title">History — Previous Winners</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Every champion and individual award crowned so far, newest first. Team trophies and season/global awards live on permanently here even after the leaderboard resets for a new season.</p>
+        <div class="award-tabs">
+          <button class="award-tab active" data-history="team" onclick="App.showHistory('team')">🏆 Team Trophies</button>
+          <button class="award-tab" data-history="individual" onclick="App.showHistory('individual')">⭐ Individual Awards</button>
+        </div>
+        <div class="teams-toolbar" style="margin:10px 0">
+          <select id="history-award-filter" onchange="App.filterHistoryAward(this.value)" aria-label="Filter by award">
+            <option value="all">All Awards</option>
+          </select>
+        </div>
+        <div id="history-content">
+          <div class="empty-state"><div class="icon">📜</div><p>No history yet — finish a tournament or a season to start the record books.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEAMS -->
+    <section id="view-teams" class="view">
+      <div class="card">
+        <div class="card-title">Team Database</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Browse squads, managers & ratings. Tap a team for full profile.</p>
+        <div class="teams-toolbar">
+          <input type="search" id="teams-search" placeholder="Search teams..." oninput="App.searchTeams(this.value)" autocomplete="off" aria-label="Search teams">
+          <select id="teams-sort" onchange="App.sortTeams(this.value)" aria-label="Sort teams">
+            <option value="name">Sort: Name</option>
+            <option value="ovr">Sort: Strength</option>
+            <option value="players">Sort: Squad size</option>
+            <option value="flag">Sort: Flag</option>
+          </select>
+          <select id="teams-type" onchange="App.filterTeams(this.value)" aria-label="Filter team type">
+            <option value="all">All teams</option>
+            <option value="national">National</option>
+            <option value="club">Clubs</option>
+          </select>
+          <select id="teams-league" onchange="App.filterTeamsLeague(this.value)" aria-label="Filter league">
+            <option value="all">All leagues</option>
+            <option value="Premier League">Premier League</option>
+            <option value="La Liga">La Liga</option>
+            <option value="Serie A">Serie A</option>
+            <option value="Bundesliga">Bundesliga</option>
+            <option value="Ligue 1">Ligue 1</option>
+            <option value="other">Other / National</option>
+          </select>
+          <select id="teams-rating" onchange="App.filterTeamsRating(this.value)" aria-label="Filter by strength">
+            <option value="all">All strengths</option>
+            <option value="elite">Elite (85+)</option>
+            <option value="great">Great (75-84)</option>
+            <option value="good">Good (65-74)</option>
+            <option value="dev">Development (&lt;65)</option>
+          </select>
+        </div>
+        <div id="teams-list" class="teams-checkbox-grid" style="max-height:none"></div>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">Tap a team to open its full profile (manager, squad, colors).</p>
+      </div>
+    </section>
+
+    <!-- PLAYERS -->
+    <section id="view-players" class="view">
+      <div class="card">
+        <div class="card-title">Player Database</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Browse every player across every team. Tap a player for their full profile, or turn on Compare to line two or three up side by side.</p>
+        <div class="teams-toolbar">
+          <input type="search" id="players-search" placeholder="Search players..." oninput="App.searchPlayers(this.value)" autocomplete="off" aria-label="Search players">
+          <select id="players-sort" onchange="App.sortPlayers(this.value)" aria-label="Sort players">
+            <option value="ovr">Sort: OVR</option>
+            <option value="liveRating">Sort: Live Rating</option>
+            <option value="name">Sort: Name</option>
+            <option value="goals">Sort: Goals</option>
+            <option value="assists">Sort: Assists</option>
+            <option value="apps">Sort: Apps</option>
+            <option value="trophies">Sort: Trophies</option>
+            <option value="age">Sort: Age</option>
+            <option value="height">Sort: Height</option>
+          </select>
+          <select id="players-pos" onchange="App.filterPlayersPos(this.value)" aria-label="Filter position">
+            <option value="all">All positions</option>
+            <option value="GK">Goalkeepers (all)</option>
+            <optgroup label="Defenders">
+              <option value="DEF">All defenders</option>
+              <option value="CB">Centre-Back</option>
+              <option value="RB">Right-Back</option>
+              <option value="LB">Left-Back</option>
+              <option value="RWB">Right Wing-Back</option>
+              <option value="LWB">Left Wing-Back</option>
+            </optgroup>
+            <optgroup label="Midfielders">
+              <option value="MID">All midfielders</option>
+              <option value="CDM">Defensive Mid</option>
+              <option value="CM">Central Mid</option>
+              <option value="CAM">Attacking Mid</option>
+              <option value="RM">Right Mid</option>
+              <option value="LM">Left Mid</option>
+            </optgroup>
+            <optgroup label="Forwards">
+              <option value="FWD">All forwards</option>
+              <option value="RW">Right Wing</option>
+              <option value="LW">Left Wing</option>
+              <option value="ST">Striker</option>
+            </optgroup>
+          </select>
+          <select id="players-type" onchange="App.filterPlayersType(this.value)" aria-label="Filter team type">
+            <option value="all">All teams</option>
+            <option value="national">National</option>
+            <option value="club">Clubs</option>
+          </select>
+          <select id="players-rating" onchange="App.filterPlayersRating(this.value)" aria-label="Filter by rating">
+            <option value="all">All ratings</option>
+            <option value="elite">Elite (85+)</option>
+            <option value="great">Great (75-84)</option>
+            <option value="good">Good (65-74)</option>
+            <option value="dev">Development (&lt;65)</option>
+          </select>
+          <button type="button" class="btn btn-secondary btn-sm" id="players-compare-toggle" onclick="App.togglePlayersCompareMode()">⚖️ Compare</button>
+        </div>
+        <div id="players-compare-tray" class="compare-tray" style="display:none">
+          <span style="color:var(--text-muted);font-size:0.8rem">Tap players below to add them to comparison (up to 3)</span>
+        </div>
+        <div id="players-compare-actions" class="compare-tray-actions" style="display:none">
+          <button type="button" class="btn btn-primary btn-sm" id="players-compare-go" onclick="App.openPlayersCompare()" disabled>Compare selected</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="App.clearPlayersCompare()">Clear</button>
+        </div>
+        <p id="players-count" style="color:var(--text-muted);font-size:0.78rem;margin:10px 0 8px"></p>
+        <div id="players-list" class="teams-checkbox-grid" style="max-height:none"></div>
+        <div style="text-align:center;margin-top:16px">
+          <button type="button" class="btn btn-secondary btn-sm" id="players-load-more" onclick="App.loadMorePlayers()" style="display:none">Load more players</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOSPITAL -->
+    <section id="view-hospital" class="view">
+      <div class="card">
+        <div class="card-title">🏥 Injury Ward</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Every player currently sidelined, across every team — the injury itself, how it happened, and how many matches until they're back.</p>
+        <div class="teams-toolbar">
+          <input type="search" id="hospital-search" placeholder="Search injured players, teams, injuries..." oninput="App.searchHospital(this.value)" autocomplete="off" aria-label="Search injured players">
+          <select id="hospital-severity" onchange="App.filterHospitalSeverity(this.value)" aria-label="Filter by severity">
+            <option value="all">All severities</option>
+            <option value="Minor">Minor</option>
+            <option value="Moderate">Moderate</option>
+            <option value="Major">Major</option>
+            <option value="Severe">Severe</option>
+          </select>
+          <select id="hospital-sort" onchange="App.sortHospital(this.value)" aria-label="Sort injured players">
+            <option value="matchesLeft">Sort: Matches left</option>
+            <option value="name">Sort: Name</option>
+            <option value="team">Sort: Team</option>
+            <option value="severity">Sort: Severity</option>
+          </select>
+        </div>
+        <div id="hospital-summary"></div>
+        <div id="hospital-list">
+          <div class="empty-state"><div class="icon">🏥</div><p>No injuries right now — every squad is fully fit.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EXTRAS -->
+    <section id="view-extras" class="view">
+      <div class="card">
+        <div class="card-title">🧰 Extras</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Save your progress, or export/import it as a file to move it between browsers or keep a backup.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;max-width:320px">
+          <button class="save-btn" id="manual-save-btn" onclick="App.manualSave()" title="Save your progress now" aria-label="Save game" style="justify-content:flex-start">
+            <span class="save-btn-icon">💾</span><span class="save-btn-label">Save</span>
+          </button>
+          <button class="save-btn save-btn-ghost" onclick="App.exportSave()" title="Export your save to a file" aria-label="Export save" style="justify-content:flex-start">
+            <span class="save-btn-icon">⬇️</span><span class="save-btn-label">Export</span>
+          </button>
+          <button class="save-btn save-btn-ghost" onclick="App.triggerImportSave()" title="Import a save file" aria-label="Import save" style="justify-content:flex-start">
+            <span class="save-btn-icon">⬆️</span><span class="save-btn-label">Import</span>
+          </button>
+        </div>
+        <input type="file" id="import-save-input" accept="application/json,.json" style="display:none" onchange="App.importSaveFile(event)">
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">🏁 End Season</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Close out the current Season Calendar run right now — finishes any fixtures still outstanding, crowns every league &amp; Champions League winner, hands out the season's awards (Golden Boot, Ballon d'Or, Puskás Award and more), then kicks off next season. Past winners stay on record in the History tab.</p>
+        <div style="max-width:320px">
+          <button class="save-btn save-btn-ghost" id="end-season-btn" onclick="App.endSeasonAndAnnounce()" title="End the current season now" aria-label="End season">
+            <span class="save-btn-icon">🏁</span><span class="save-btn-label">End Season</span>
+          </button>
+        </div>
+        <div id="end-season-summary"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="match-report-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Match report">
+    <div class="modal" id="match-report-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
+  </div>
+  <div class="modal-overlay" id="player-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player profile">
+    <div class="modal" id="player-modal-content" style="max-width:420px"></div>
+  </div>
+  <div class="modal-overlay" id="team-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team profile">
+    <div class="modal" id="team-modal-content" style="max-width:520px"></div>
+  </div>
+  <div class="modal-overlay" id="lineup-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team lineup">
+    <div class="modal" id="lineup-modal-content" style="max-width:420px"></div>
+  </div>
+  <div class="modal-overlay" id="compare-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player comparison">
+    <div class="modal" id="compare-modal-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
+  </div>
+  <div class="modal-overlay" id="modal" role="dialog" aria-modal="true">
+    <div class="modal" id="modal-content"></div>
+  </div>
+
+  <div class="scroll-fab-group" id="scroll-fab-group">
+    <button type="button" class="scroll-fab" id="scroll-fab-top" title="Scroll to top" aria-label="Scroll to top">▲</button>
+    <button type="button" class="scroll-fab" id="scroll-fab-bottom" title="Scroll to bottom" aria-label="Scroll to bottom">▼</button>
+  </div>
+
+  <script src="dist/app.js"></script>
+<div class="toast" id="toast"></div>
+</body>
+</html>
