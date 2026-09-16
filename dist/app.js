@@ -73,14 +73,24 @@
   // callers multiply by whatever weight they need for their own formula.
   // (power > 1 is deliberately "convex": it flattens the middle of the
   // scale and steepens the extremes — the opposite of a flat multiplier.)
+  // Memoization cache for curvedStat to avoid redundant Math.pow calculations during simulation
+  const _curvedStatCache = {};
   function curvedStat(value, baseline, span, power) {
     baseline = baseline != null ? baseline : 70;
     span = span != null ? span : (99 - baseline);
     power = power != null ? power : 1.6;
     if (!span) return 0;
+
+    // Fast numeric composite key for discrete player ratings and typical defaults
+    const key = (value * 100000) + (baseline * 1000) + (span * 10) + (power === 1.6 ? 0 : power);
+    let res = _curvedStatCache[key];
+    if (res !== undefined) return res;
+
     let raw = (value - baseline) / span;
     raw = Math.max(-1, Math.min(1, raw));
-    return Math.sign(raw) * Math.pow(Math.abs(raw), power);
+    res = Math.sign(raw) * Math.pow(Math.abs(raw), power);
+    _curvedStatCache[key] = res;
+    return res;
   }
 
   // Same curve, but returned as an "effective" rating back on the original
