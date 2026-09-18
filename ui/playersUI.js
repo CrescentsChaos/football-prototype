@@ -119,13 +119,18 @@
 
   function getFilteredSortedPlayers() {
     let list = getAllPlayersFlat();
+    let isCopy = false;
+
     // hasNational/hasClub (not the single isNational flag) so a merged
     // player who appears on both sides still shows up under either filter.
-    if (playersFilter === 'national') list = list.filter(e => e.hasNational);
-    else if (playersFilter === 'club') list = list.filter(e => e.hasClub);
+    if (playersFilter === 'national') { list = list.filter(e => e.hasNational); isCopy = true; }
+    else if (playersFilter === 'club') { list = list.filter(e => e.hasClub); isCopy = true; }
+
     if (playersPosFilter !== 'all') {
       list = list.filter(e => POS_LINE[(e.player.pos || [])[0]] === playersPosFilter);
+      isCopy = true;
     }
+
     if (playersSearch) {
       list = list.filter(e => {
         const p = e.player;
@@ -137,8 +142,12 @@
           skills.some(s => s.toLowerCase().includes(playersSearch)) ||
           styles.some(s => s.toLowerCase().includes(playersSearch));
       });
+      isCopy = true;
     }
-    list = [...list];
+
+    // Only clone with .slice() if no filter operation was run, avoiding redundant array allocations
+    if (!isCopy) list = list.slice();
+
     if (playersSort === 'name') list.sort((a, b) => (a.player.name || '').localeCompare(b.player.name || ''));
     else if (playersSort === 'goals') list.sort((a, b) => playerCareerCount('goals', b.player.id) - playerCareerCount('goals', a.player.id));
     else if (playersSort === 'assists') list.sort((a, b) => playerCareerCount('assists', b.player.id) - playerCareerCount('assists', a.player.id));
@@ -167,6 +176,7 @@
       });
     }
     else list.sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0));
+
     return list;
   }
 

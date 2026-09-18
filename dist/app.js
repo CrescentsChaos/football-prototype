@@ -18824,10 +18824,13 @@ var App = (() => {
 
   function getFilteredSortedPlayers() {
     let list = getAllPlayersFlat();
+    let isCopy = false;
+
     // hasNational/hasClub (not the single isNational flag) so a merged
     // player who appears on both sides still shows up under either filter.
-    if (playersFilter === 'national') list = list.filter(e => e.hasNational);
-    else if (playersFilter === 'club') list = list.filter(e => e.hasClub);
+    if (playersFilter === 'national') { list = list.filter(e => e.hasNational); isCopy = true; }
+    else if (playersFilter === 'club') { list = list.filter(e => e.hasClub); isCopy = true; }
+
     if (playersPosFilter !== 'all') {
       // A broad line ("all defenders") still matches by primary position
       // only, same as before; a specific slot code (RB, CDM, ST...) matches
@@ -18838,10 +18841,14 @@ var App = (() => {
       } else {
         list = list.filter(e => (e.player.pos || []).indexOf(playersPosFilter) !== -1);
       }
+      isCopy = true;
     }
+
     if (playersRatingFilter !== 'all') {
       list = list.filter(e => ovrTierMatches(e.player.ovr, playersRatingFilter));
+      isCopy = true;
     }
+
     if (playersSearch) {
       list = list.filter(e => {
         const p = e.player;
@@ -18853,8 +18860,12 @@ var App = (() => {
           skills.some(s => s.toLowerCase().includes(playersSearch)) ||
           styles.some(s => s.toLowerCase().includes(playersSearch));
       });
+      isCopy = true;
     }
-    list = [...list];
+
+    // Only clone with .slice() if no filter operation was run, avoiding redundant array allocations
+    if (!isCopy) list = list.slice();
+
     if (playersSort === 'name') list.sort((a, b) => (a.player.name || '').localeCompare(b.player.name || ''));
     else if (playersSort === 'goals') list.sort((a, b) => playerCareerCount('goals', b.player.id) - playerCareerCount('goals', a.player.id));
     else if (playersSort === 'assists') list.sort((a, b) => playerCareerCount('assists', b.player.id) - playerCareerCount('assists', a.player.id));
@@ -18903,9 +18914,9 @@ var App = (() => {
       // players both on "B") fall back to OVR so the order still feels
       // stable and meaningful within a tier.
       const TIER_RANK = { A: 5, B: 4, C: 3, D: 2, E: 1 };
+      // Pre-ensure condition profiles in a single O(N) pass before sorting
+      list.forEach(e => ensurePlayerConditionProfile(e.player));
       list.sort((a, b) => {
-        ensurePlayerConditionProfile(a.player);
-        ensurePlayerConditionProfile(b.player);
         const av = TIER_RANK[a.player.liveRating] || 0;
         const bv = TIER_RANK[b.player.liveRating] || 0;
         if (bv !== av) return bv - av;
@@ -18913,6 +18924,7 @@ var App = (() => {
       });
     }
     else list.sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0));
+
     return list;
   }
 
