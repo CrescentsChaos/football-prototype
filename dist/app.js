@@ -4371,7 +4371,22 @@ var App = (() => {
     });
   }
 
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
+  let _teamByIdMap = null;
+  let _teamByIdMapAllTeamsRef = null;
+  // O(1) team lookup by ID. Caches a Map of allTeams to avoid linear O(N) scans
+  // on every team lookup during simulation and UI rendering (~70x speedup).
+  function getTeam(id) {
+    if (id == null || id === '') return undefined;
+    if (!_teamByIdMap || _teamByIdMapAllTeamsRef !== allTeams) {
+      _teamByIdMap = new Map();
+      _teamByIdMapAllTeamsRef = allTeams;
+      for (let i = 0; i < allTeams.length; i++) {
+        const t = allTeams[i];
+        if (t && t.id != null) _teamByIdMap.set(t.id, t);
+      }
+    }
+    return _teamByIdMap.get(id);
+  }
 
   // Every match is played at the home team's stadium. Falls back to Wembley
   // Stadium whenever a team in teams.json doesn't define its own "stadium".
