@@ -4,15 +4,21 @@
  * Registry of every selectable Tournament-tab format, plus the shared logic
  * for resolving each format's eligible team pool from leagues.json.
  *
- * Every format below reuses one of the three tournament engines that already
- * exist in simulation/tournamentEngine.js, simulation/worldEngine.js and
- * simulation/knockoutEngine.js — no new simulation logic is introduced here:
+ * Every format below reuses one of the four tournament engines that already
+ * exist in simulation/tournamentEngine.js, simulation/worldEngine.js,
+ * simulation/knockoutEngine.js and simulation/leagueTournamentEngine.js — no
+ * new simulation logic is introduced here:
  *   'groups'   — group stage + single-match knockout (World Cup engine)
  *   'league'   — league phase + playoffs + two-leg knockout (Champions
  *                League engine)
  *   'knockout' — straight single-elimination bracket from Round 1 (a
  *                lighter reuse of the same knockout bracket the other two
  *                engines advance into once their group/league phase ends)
+ *   'table'    — a real home-and-away, double round-robin domestic league
+ *                season (Premier League, La Liga, Serie A, Bundesliga,
+ *                Ligue 1) — no groups and no knockout bracket, table topper
+ *                is champion. Reuses the exact same scheduler/table math as
+ *                Season Calendar's per-league competitions.
  *
  * `pool` selects which side of teams.json the team picker offers ('national'
  * or 'club'). `leaguesKey`, when set, looks up that competition's eligible
@@ -23,19 +29,29 @@
 /*@CHUNK:ccomp01:START*/
   const TOURNAMENT_FORMATS = {
     'worldcup': { name: 'World Cup', short: 'World Cup', engine: 'groups', pool: 'national', leaguesKey: null,
-      desc: 'Select national teams. Supports groups (up to 48 teams, World Cup style).' },
+      desc: 'Select national teams. Supports groups (48 teams, World Cup style — use the Tournament Size picker below to scale up to a 64- or 128-team field instead).' },
     'ucl': { name: 'Champions League', short: 'Champions League', engine: 'league', pool: 'club', leaguesKey: null,
-      desc: 'Champions League 2024+ format: select up to 36 clubs. League phase (8 matches each), playoffs, two-leg knockouts, single final.' },
+      desc: 'Champions League 2024+ format: select up to 36 clubs (use the Tournament Size picker below to scale up to 72 or 144). League phase (8 matches each), playoffs, two-leg knockouts, single final.' },
+    'premier-league': { name: 'Premier League', short: 'Premier League', engine: 'table', pool: 'club', leaguesKey: 'Premier League',
+      desc: 'England\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'la-liga': { name: 'La Liga', short: 'La Liga', engine: 'table', pool: 'club', leaguesKey: 'La Liga',
+      desc: 'Spain\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'serie-a': { name: 'Serie A', short: 'Serie A', engine: 'table', pool: 'club', leaguesKey: 'Serie A',
+      desc: 'Italy\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'bundesliga': { name: 'Bundesliga', short: 'Bundesliga', engine: 'table', pool: 'club', leaguesKey: 'Bundesliga',
+      desc: 'Germany\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
+    'ligue-1': { name: 'Ligue 1', short: 'Ligue 1', engine: 'table', pool: 'club', leaguesKey: 'Ligue 1',
+      desc: 'France\u2019s top flight: select the full club field for a real home-and-away, double round-robin season. No groups, no bracket — the table topper is champion.' },
     'nations-league': { name: 'Nations League', short: 'Nations League', engine: 'groups', pool: 'national', leaguesKey: 'Nations League',
-      desc: 'European nations in groups, then knockout. Team picker is restricted to the eligible nations in leagues.json.' },
+      desc: 'European nations in groups, then knockout (a 4-group, 16-team League A style split sends both group winners and runners-up straight to the quarter-finals — real UEFA promotion/relegation and the lower-league play-off/final formats aren\u2019t modeled). Team picker is restricted to the eligible nations in leagues.json.' },
     'euros': { name: 'European Championship', short: 'Euros', engine: 'groups', pool: 'national', leaguesKey: 'Euros',
-      desc: 'European nations compete through groups and knockouts.' },
+      desc: '24 nations in 6 groups of 4; the top 2 from each group plus the 4 best third-placed teams advance to the Round of 16.' },
     'copa-america': { name: 'Copa América', short: 'Copa América', engine: 'groups', pool: 'national', leaguesKey: 'Copa América',
-      desc: 'South American nations compete through groups and knockouts.' },
+      desc: '16 nations in 4 groups of 4; the top 2 from each group advance straight to the quarter-finals.' },
     'afcon': { name: 'Africa Cup of Nations', short: 'AFCON', engine: 'groups', pool: 'national', leaguesKey: 'AFCON',
-      desc: 'African nations compete through groups and knockouts.' },
+      desc: '24 nations in 6 groups of 4; the top 2 from each group plus the 4 best third-placed teams advance to the Round of 16.' },
     'asian-cup': { name: 'AFC Asian Cup', short: 'Asian Cup', engine: 'groups', pool: 'national', leaguesKey: 'Asian Cup',
-      desc: 'Asian nations compete through groups and knockouts.' },
+      desc: '24 nations in 6 groups of 4; the top 2 from each group plus the 4 best third-placed teams advance to the Round of 16.' },
     'gold-cup': { name: 'CONCACAF Gold Cup', short: 'Gold Cup', engine: 'groups', pool: 'national', leaguesKey: 'Gold Cup',
       desc: 'North/Central American & Caribbean nations compete through groups and knockouts.' },
     'fa-cup': { name: 'FA Cup', short: 'FA Cup', engine: 'knockout', pool: 'club', leaguesKey: 'FA Cup',
@@ -97,5 +113,19 @@
     if (!names || !names.length) return fullPool;
     const matched = resolveEligiblePool(names, fullPool);
     return matched.length ? matched : fullPool;
+  }
+
+  // Per-competition logo + accent-color theme. The actual filenames and hex
+  // values live in leagues.json under "_tournamentBranding" (one entry per
+  // TOURNAMENT_FORMATS key, e.g. "euros", "copa-america"), so a tournament's
+  // full identity — eligible teams AND its logo/colors — comes from that one
+  // data file; logos themselves are dropped into assets/images/<logo>.
+  // Falls back to a neutral gold trophy theme if leagues.json hasn't loaded
+  // yet or has no branding entry for a given format, so nothing ever renders
+  // broken while assets are still being added.
+  const DEFAULT_TOURNAMENT_BRANDING = { logo: 'trophy.png', color: '#f0c14b', colorDim: '#c9a227' };
+  function getTournamentBranding(formatKey) {
+    const table = (typeof leaguesData !== 'undefined' && leaguesData && leaguesData._tournamentBranding) || {};
+    return Object.assign({}, DEFAULT_TOURNAMENT_BRANDING, table[formatKey] || {});
   }
 /*@CHUNK:ccomp01:END*/
