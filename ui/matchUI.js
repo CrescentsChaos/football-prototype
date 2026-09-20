@@ -66,20 +66,33 @@
   }
 
   async function init() {
+    // Show a loading overlay for the whole boot sequence — fetching
+    // teams.json (2MB+ with 5,500+ players) and then repairing/normalizing
+    // it, populating every dropdown, and rendering the Teams list plus
+    // whichever Tournament/Season dashboards were left in progress all runs
+    // synchronously below with nothing painted in between, which is what
+    // made a refresh look like the tab had frozen for a couple of seconds.
+    // The double-rAF wait mirrors withLoading()'s trick of giving the
+    // overlay an actual frame to paint before the heavy synchronous work
+    // starts, instead of everything happening back-to-back in one tick.
+    showLoading('Loading Apex…');
+    await simTick();
+    await simTick();
     try {
       const isHosted = location.protocol === 'http:' || location.protocol === 'https:';
       const urlSet = (file) => isHosted
         ? [file + '?v=' + Date.now() + '&r=' + seededRandom().toString(36).slice(2), './' + file + '?v=' + Date.now(), file]
         : [file + '?v=' + Date.now()];
 
-      // All 6 startup JSON files (1 required, 5 optional) load concurrently.
-      const [teamsJson, leaguesJson, playersJson, trophiesJson, managersJson, attrJson] = await Promise.all([
+      // All 7 startup JSON files (1 required, 6 optional) load concurrently.
+      const [teamsJson, leaguesJson, playersJson, trophiesJson, managersJson, attrJson, injuryJson] = await Promise.all([
         fetchFirstJson(urlSet('teams.json'), 'teams'),
         fetchFirstJson(urlSet('leagues.json'), 'leagues'),
         fetchFirstJson(urlSet('players.json'), 'player portraits'),
         fetchFirstJson(urlSet('trophies.json'), 'trophy images'),
         fetchFirstJson(urlSet('managers.json'), 'manager portraits'),
-        fetchFirstJson(urlSet('player-attributes.json'), 'expanded player attributes')
+        fetchFirstJson(urlSet('player-attributes.json'), 'expanded player attributes'),
+        fetchFirstJson(urlSet('injury.json'), 'injury definitions')
       ]);
 
       let loaded = null;
@@ -127,13 +140,30 @@
       }
 
       // player-attributes.json — optional; the app works exactly as before
-      // for any player not listed here.
-      if (attrJson) playerAttributesData = attrJson;
+      // for any player not listed here. Canonicalize every entry's
+      // playstyle tag spelling/casing right away (see
+      // normalizePlayerPlaystyleTags) so a hand-authored casing mismatch
+      // like "Fox In The Box" vs "Fox in the Box" can never silently drop
+      // that player's entire playstyle-driven bonus stack.
+      if (attrJson) {
+        playerAttributesData = attrJson;
+        normalizePlayerPlaystyleTags(playerAttributesData);
+      }
+
+      // injury.json — optional; the embedded INJURY_DEFS_DATA fallback
+      // (js/state.js) already covers the app working with no server at
+      // all. A valid fetched file with at least one entry fully replaces
+      // it, so editing/extending injury.json's injury catalogue works
+      // without a rebuild — same treatment as leagues.json/trophies.json.
+      if (injuryJson && Array.isArray(injuryJson.injuries) && injuryJson.injuries.length) {
+        injuryDefsData = injuryJson.injuries;
+      }
 
       loadStats();
       loadPersistedGameState();
       restorePlayerForms();
       applyExpandedPlayerAttributes();
+      ensureAllPlayerConditionProfiles();
       // Canonicalize every player's position codes (CF -> ST, RWF -> RW,
       // CMF -> CM, DMF -> CDM, SS/AMF -> CAM, etc.) so formation auto-fill,
       // substitutions, and position filters treat every naming variant of
@@ -142,6 +172,13 @@
       // applyExpandedPlayerAttributes() (which is what sets pos from the
       // raw, non-canonical player-attributes.json codes in the first place).
       normalizeAllPositions(allTeams);
+      // Every regular (non-enhanced) player gets a playstyle tag assigned
+      // from the pool that fits their position, so squads without a
+      // player-attributes.json entry still carry individual playstyle
+      // identity into every match — see assignPlaystylesToRegularPlayers()
+      // in data/playerDatabase.js. Runs once here, before any match can be
+      // started this session.
+      assignPlaystylesToRegularPlayers(allTeams);
       populateTeamSelects();
       populateFormations();
       bindNav();
@@ -166,6 +203,8 @@
     } catch (e) {
       console.error(e);
       alert('Error loading game: ' + e.message);
+    } finally {
+      hideLoading();
     }
   }
 
@@ -204,6 +243,7 @@
     if (view === 'history') showHistory(historyActiveTab || 'team');
     if (view === 'teams') renderTeamsList();
     if (view === 'players') renderPlayersList(false);
+    if (view === 'hospital') renderHospitalList();
     if (view === 'season') goToSeason();
   }
 /*@CHUNK:c0055:END*/
@@ -236,6 +276,35 @@
     toast(`${home.flag||''} ${home.name} vs ${away.flag||''} ${away.name}`);
   }
 /*@CHUNK:c0057:END*/
+
+/*@CHUNK:c0057b:START*/
+  // Randomizes a single side (home or away) from a chosen pool (club or
+  // national), leaving the other side exactly as it is — unlike
+  // randomMatch() above, which always re-rolls both sides together from
+  // the same pool. Lets the person mix, e.g. a random club side at home
+  // against a random national side away, or just re-roll one side without
+  // disturbing a pick they already like on the other.
+  function randomizeTeamSide(side, category) {
+    const otherSide = side === 'home' ? 'away' : 'home';
+    let pool = category === 'national' ? (teamsData.national || []) : (teamsData.club || []);
+    if (!pool.length) { toast('No teams available'); return; }
+    const otherSel = document.getElementById(otherSide + '-team');
+    const otherId = otherSel ? otherSel.value : null;
+    // Prefer a pick that doesn't duplicate whatever's already on the other
+    // side, but fall back to the full pool if that would leave nothing to
+    // choose from (e.g. a two-team national pool).
+    let candidates = pool.filter(t => t.id !== otherId);
+    if (!candidates.length) candidates = pool;
+    const pick = shuffleArray(candidates)[0];
+    goToMatch();
+    const sel = document.getElementById(side + '-team');
+    if (sel) sel.value = pick.id;
+    updateTeamPreview(side);
+    const formSel = document.getElementById(side + '-formation');
+    if (formSel) formSel.value = pickTeamFormation(pick);
+    toast(`${pick.flag||''} ${pick.name} set as ${side === 'home' ? 'Home' : 'Away'}`);
+  }
+/*@CHUNK:c0057b:END*/
 
 /*@CHUNK:c0058:START*/
 
@@ -326,7 +395,7 @@
     }
     const goals = currentMatch.goalList || [];
     const fmt = (arr) => arr.map(g => {
-      return `<div class="scorer-line"><span class="gt-min">${g.minute}'</span> ${g.player}${g.pen ? ' <span class="pen-tag">[Penalty]</span>' : ''}${g.num != null && g.num !== '' ? ' · '+g.num : ''}</div>`;
+      return `<div class="scorer-line"><span class="gt-min">${g.dispLabel || (g.minute + "'")}</span> ${g.player}${g.pen ? ' <span class="pen-tag">[Penalty]</span>' : ''}${g.num != null && g.num !== '' ? ' · '+g.num : ''}</div>`;
     }).join('');
     if (homeEl) homeEl.innerHTML = fmt(goals.filter(g => g.side === 'home'));
     if (awayEl) awayEl.innerHTML = fmt(goals.filter(g => g.side === 'away'));
@@ -343,7 +412,7 @@
   function renderRatingRow(p, motmId) {
     const isMotm = motmId != null && p.id === motmId;
     const rc = isMotm ? 'rating-motm' : (p.rating || 0) >= 7.5 ? 'rating-high' : (p.rating || 0) >= 6.5 ? 'rating-mid' : 'rating-low';
-    const icons = (p.goals ? '⚽'.repeat(Math.min(p.goals, 3)) : '') + (p.assists ? '🎯'.repeat(Math.min(p.assists, 2)) : '');
+    const icons = (p.goals ? emojiImg('goal', 'Goal').repeat(Math.min(p.goals, 3)) : '') + (p.assists ? emojiImg('assist', 'Assist').repeat(Math.min(p.assists, 2)) : '');
     return `<div class="pm-player" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer">
         <span class="player-num">${p.num || ''}</span>
         <span style="flex:1;font-weight:600">${playerNameHTML(p)}${isMotm ? ' <span title="Man of the Match">⭐</span>' : ''}</span>
@@ -411,19 +480,70 @@
       : `${h.score} - ${a.score}`;
     const goalsH = (report.goals || []).filter(g => g.side === 'home');
     const goalsA = (report.goals || []).filter(g => g.side === 'away');
-    const fmtG = (arr) => arr.map(g => `${g.minute}' ${g.player}${g.pen || /^penalty/i.test(g.method || '') ? ' <span class="pen-tag">[Penalty]</span>' : ''}`).join('<br>') || '—';
+    const fmtG = (arr) => arr.map(g => `${g.dispLabel || (g.minute + "'")} ${g.player}${g.pen || /^penalty/i.test(g.method || '') ? ' <span class="pen-tag">[Penalty]</span>' : ''}`).join('<br>') || '—';
+    // Auto-simmed fixtures (anything the user didn't watch live) only carry
+    // a lightweight report — score, scorers, cards, MOTM — with none of the
+    // full stat sheet or per-player ratings a watched match's report has.
+    // See buildLightMatchReport() in engine/matchEngine.js.
+    if (report.light) {
+      const fmtCards = (arr) => (arr || []).map(c => `${c.dispLabel || (c.minute != null ? c.minute + "'" : '')} ${c.player} ${c.type === 'red' ? '🟥' : '🟨'}`.trim()).join('<br>') || '—';
+      const fmtCount = (arr) => (arr || []).map(p => `${p.player}${p.count > 1 ? ' x' + p.count : ''}`).join('<br>') || '—';
+      const fmtInjuries = (arr) => (arr || []).map(inj => `${inj.minute != null ? inj.minute + "'" : ''} ${inj.player}${inj.type ? ' — ' + inj.type : ''}${inj.matchesOut ? ` (out ${inj.matchesOut} match${inj.matchesOut > 1 ? 'es' : ''})` : ''}`.trim()).join('<br>') || '—';
+      const legTabsHtml2 = (ctx && ctx.legs && ctx.legs.length > 1)
+        ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap">
+            ${ctx.legs.map((leg, i) => `<button class="btn btn-sm ${i === ctx.activeIdx ? 'btn-primary' : 'btn-secondary'}" onclick="App.showMatchReportLeg(${i})">${leg.label}</button>`).join('')}
+          </div>
+          ${ctx.aggText ? `<div style="text-align:center;font-size:0.8rem;color:var(--accent-gold);margin-bottom:8px">${ctx.aggText}</div>` : ''}`
+        : '';
+      content.innerHTML = `
+        <div style="text-align:center;margin-bottom:14px">
+          <div style="font-size:0.85rem;color:var(--text-muted)">Match Summary</div>
+          ${legTabsHtml2}
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px">
+            <div style="flex:1;text-align:left"><div style="font-size:1.4rem">${teamMark(h, 28)}</div><strong>${h.name}</strong><div class="goal-scorers">${fmtG(goalsH)}</div></div>
+            <div style="font-size:1.6rem;font-weight:800;color:var(--accent-gold)">${scoreLine}</div>
+            <div style="flex:1;text-align:right"><div style="font-size:1.4rem">${teamMark(a, 28)}</div><strong>${a.name}</strong><div class="goal-scorers away-scorers">${fmtG(goalsA)}</div></div>
+          </div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">${h.formation||''} vs ${a.formation||''}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">🏟️ ${report.venue || 'Wembley Stadium'}</div>
+        </div>
+        <div class="card-title">Assists</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtCount(h.assists)}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtCount(a.assists)}</div>
+        </div>
+        <div class="card-title">Saves</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtCount(h.saves)}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtCount(a.saves)}</div>
+        </div>
+        <div class="card-title">Cards</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtCards(h.cards || (report.cards && report.cards.home))}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtCards(a.cards || (report.cards && report.cards.away))}</div>
+        </div>
+        <div class="card-title">Injuries</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <div style="flex:1;text-align:left;font-size:0.85rem">${fmtInjuries(report.injuries && report.injuries.home)}</div>
+          <div style="flex:1;text-align:right;font-size:0.85rem">${fmtInjuries(report.injuries && report.injuries.away)}</div>
+        </div>
+        <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">This fixture was auto-simmed, so only a lightweight summary was kept — no full ratings or extended stats.</div>
+        <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('match-report-modal').classList.remove('active')">Close</button></div>`;
+      modal.classList.add('active');
+      return;
+    }
     // Prefer the home/away-split ratings captured by buildMatchReport; fall back
     // to the old flat map for any legacy report objects saved before this split existed.
     const homeRatings = h.ratings || Object.values(report.ratings || {});
     const awayRatings = a.ratings || [];
     let eventsHtml = (report.events || []).filter(e => e.type !== 'pressure' || seededRandom() < 0.3).slice(-80).map(e => {
       const t = (e.text || '').replace(/<[^>]+>/g, '');
-      return `<div class="report-event"><span class="re-min">${e.minute}'</span> <span class="re-type">${e.type}</span> ${t}</div>`;
+      return `<div class="report-event"><span class="re-min">${e.dispLabel || (e.minute + "'")}</span> <span class="re-type">${e.type}</span> ${t}</div>`;
     }).join('');
     // show important events only for cleaner view
     eventsHtml = (report.events || []).filter(e => ['goal','yellow','red','injury','sub','pen','var','motm','whistle','save','miss'].includes(e.type)).map(e => {
       const t = (e.text || '').replace(/<[^>]+>/g, '');
-      return `<div class="report-event"><span class="re-min">${e.minute}'</span> ${t}</div>`;
+      return `<div class="report-event"><span class="re-min">${e.dispLabel || (e.minute + "'")}</span> ${t}</div>`;
     }).join('');
     const legTabsHtml = (ctx && ctx.legs && ctx.legs.length > 1)
       ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap">
@@ -510,7 +630,7 @@
     const m = tournament && tournament.knockout[ri] && tournament.knockout[ri].matches[mi];
     if (!m) { toast('No detailed report for this match'); return; }
     if (m.twoLeg !== false && m.leg1 && m.leg2 && m.leg1.report && m.leg2.report) {
-      const aggText = (m.aggHome != null) ? `Aggregate: ${m.home.short} ${m.aggHome} - ${m.aggAway} ${m.away.short}${m.penalties ? ' (on penalties)' : ''}` : '';
+      const aggText = (m.aggHome != null) ? `Aggregate: ${m.home.short} ${m.aggHome} - ${m.aggAway} ${m.away.short}${m.penalties ? (m.pens ? ` (pens ${m.pens.home}-${m.pens.away})` : ' (on penalties)') : ''}` : '';
       const legs = [
         { label: `Leg 1 · ${m.leg1.report.home.short} home`, report: m.leg1.report },
         { label: `Leg 2 · ${m.leg2.report.home.short} home`, report: m.leg2.report }
@@ -561,7 +681,7 @@
         else if (e.type === 'save') d = e.side === 'home' ? -0.8 : (e.side === 'away' ? 0.8 : 0);
         else if (e.type === 'yellow' || e.type === 'red') d = e.side === 'home' ? -0.5 : (e.side === 'away' ? 0.5 : 0);
         mom = Math.max(-12, Math.min(12, mom + d));
-        pts.push({ x: (e.minute || i) / Math.max(m.minute, 90), y: mom });
+        pts.push({ x: (e.dispMin != null ? e.dispMin : (e.minute || i)) / Math.max(m.dispMin || m.minute, 90), y: mom });
       });
       const homeCol = m.home.team.color || '#3d8bfd';
       const awayCol = m.away.team.color || '#ef4444';
@@ -652,16 +772,30 @@
 /*@CHUNK:c0266:END*/
 
 /*@CHUNK:c0267:START*/
-  function addEvent(minute, type, text, side, isGoal) {
+  // Renders one of the curated PNGs in assets/images/ as an inline,
+  // emoji-sized icon. Used everywhere a status emoji (goal, assist,
+  // captain, penalty, card, ...) used to be a plain unicode character —
+  // see the .emoji-icon-img rule in styles.css for sizing.
+  function emojiImg(name, title) {
+    const t = title || '';
+    return `<img src="assets/images/${name}.png" alt="${t}" title="${t}" class="emoji-icon-img">`;
+  }
+  function addEvent(minute, type, text, side, isGoal, isPenalty) {
     if (!currentMatch) return;
-    currentMatch.events.push({ minute, type, text, side });
+    // dispLabel/dispMin reflect the match clock at the moment this event
+    // happened (see updateMatchClock in matchEngine.js) — e.g. "45+2'" or
+    // "96'" during extra time — while the raw `minute` is kept only for
+    // internal ordering/filtering (computeAddedTime, the momentum chart).
+    const dispLabel = currentMatch.inPens ? 'Pens' : (currentMatch.dispLabel || (minute + "'"));
+    const dispMin = currentMatch.inPens ? (currentMatch.dispMin || 120) : (currentMatch.dispMin != null ? currentMatch.dispMin : minute);
+    currentMatch.events.push({ minute, dispMin, dispLabel, type, text, side });
     if (currentMatch.quietSim) return;
     const feed = document.getElementById('events-feed');
     if (!feed) return;
-    const icons = { goal: '⚽', save: '🧤', yellow: '🟨', red: '🟥', sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', tackle: '🦵', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: '📢', pressure: '🔥', motm: '⭐', var: '📺', pen: '⚽', skill: '✨', handball: '✋', et: '⏱️' };
+    const icons = { goal: emojiImg(isPenalty ? 'penalty_goal' : 'goal', isPenalty ? 'Penalty goal' : 'Goal'), save: '🧤', yellow: emojiImg('yellow_card', 'Yellow card'), red: emojiImg('red_card', 'Red card'), sub: '🔄', injury: '🩹', corner: '🚩', foul: '⚠️', tackle: '🦵', shot: '👟', miss: '❌', pass: '➡️', offside: '🚫', whistle: emojiImg('whistle', 'Whistle'), pressure: '🔥', motm: '⭐', var: '📺', pen: emojiImg('penalty_goal', 'Penalty'), skill: '✨', handball: '✋', et: '⏱️' };
     const div = document.createElement('div');
-    div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '');
-    div.innerHTML = `<span class="event-time">${minute}'</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
+    div.className = 'event-item' + (isGoal || type === 'goal' ? ' event-goal' : '') + (type === 'red' ? ' event-card-red' : '') + (type === 'injury' ? ' event-injury' : '') + (type === 'var' ? ' event-var' : '') + (type === 'pen' ? ' event-pen' : '') + (type === 'sub' ? ' event-sub' : '') + (side === 'home' ? ' event-home' : side === 'away' ? ' event-away' : '');
+    div.innerHTML = `<span class="event-time">${dispLabel}</span><span class="event-icon">${icons[type] || '•'}</span><span class="event-text">${text}</span>`;
     feed.insertBefore(div, feed.firstChild);
     if (['goal','sub','yellow','red','injury','pen'].includes(type)) {
       try { renderLineups(); } catch (e) {}
@@ -712,10 +846,117 @@
     };
     popIfChanged('live-home-score', hs);
     popIfChanged('live-away-score', as_);
-    set('live-minute', m.inPens ? 'Pens' : (m.minute + "'"));
+    set('live-minute', m.inPens ? 'Pens' : (m.dispLabel || (m.minute + "'")));
     set('live-status', m.status);
+    // Sofascore-style pulsing dot next to the status label — on while the
+    // clock is actually running, off during Half Time/shootouts/Full Time.
+    const scoreCenter = document.getElementById('score-center');
+    if (scoreCenter) {
+      const status = m.status || '';
+      const finished = /Full Time/.test(status);
+      const onBreak = !finished && (m.inPens || /Half Time/.test(status));
+      scoreCenter.classList.toggle('is-live', !finished && !onBreak);
+      scoreCenter.classList.toggle('is-break', onBreak);
+    }
     set('live-venue', '🏟️ ' + getStadium(m.home.team));
     renderGoalTimeline();
+    if (m.userSide) renderCareerPanel();
+  }
+
+  // ========== CAREER MODE — MANAGE PANEL ==========
+  // Renders (and keeps in sync every tick, via the updateScoreboard() call
+  // above) the manual tactics/formation/substitution controls for whichever
+  // side the person is controlling (currentMatch.userSide — set once in
+  // startMatch(), see engine/matchEngine.js). The AI side never gets this
+  // panel and keeps making its own decisions via runTacticalAI/
+  // trySubstitution as normal.
+  function renderCareerPanel() {
+    const m = currentMatch;
+    const panel = document.getElementById('career-manage-panel');
+    if (!panel) return;
+    if (!m || !m.userSide) { panel.style.display = 'none'; return; }
+    const side = m.userSide;
+    const sideData = m[side];
+    if (!sideData) { panel.style.display = 'none'; return; }
+
+    const label = document.getElementById('career-team-label');
+    if (label) label.textContent = sideData.team.short || sideData.team.name || '';
+
+    const curTactic = (m.tactics && m.tactics[side]) || 'balanced';
+    ['attack', 'press', 'balanced', 'defend'].forEach(t => {
+      const btn = document.getElementById('career-tac-' + t);
+      if (btn) btn.classList.toggle('active', t === curTactic);
+    });
+
+    const formSel = document.getElementById('career-formation-select');
+    if (formSel) {
+      if (!formSel.options.length) {
+        formSel.innerHTML = Object.keys(FORMATIONS).map(k => `<option value="${k}">${k}</option>`).join('');
+      }
+      if (document.activeElement !== formSel) formSel.value = sideData.squad.formation || '4-3-3';
+    }
+
+    const used = side === 'home' ? (m.homeSubsUsed || 0) : (m.awaySubsUsed || 0);
+    const max = m.maxSubs || 5;
+    const subsLabel = document.getElementById('career-subs-label');
+    if (subsLabel) subsLabel.textContent = `Substitutions: ${used}/${max}`;
+
+    const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const allPlayers = [...(sideData.squad.starting || []), ...(sideData.squad.subs || [])];
+    const onPitch = allPlayers.filter(p => onIds.includes(p.id) && !(m.injuries || []).includes(p.id));
+    const leftIds = (m.leftPitch && m.leftPitch[side]) || [];
+    const bench = (sideData.squad.subs || []).filter(p =>
+      !onIds.includes(p.id) && !(m.injuries || []).includes(p.id) && !leftIds.includes(p.id));
+
+    const outSel = document.getElementById('career-sub-out');
+    const inSel = document.getElementById('career-sub-in');
+    const canSub = used < max && onPitch.length > 0 && bench.length > 0 && !m.finished;
+    if (outSel && document.activeElement !== outSel) {
+      outSel.innerHTML = onPitch.map(p => `<option value="${p.id}">${p.slot || ''} · ${p.name}</option>`).join('') || '<option value="">—</option>';
+    }
+    if (inSel && document.activeElement !== inSel) {
+      inSel.innerHTML = bench.map(p => `<option value="${p.id}">${p.slot || (p.pos || [])[0] || ''} · ${p.name}</option>`).join('') || '<option value="">—</option>';
+    }
+    const subBtn = document.getElementById('career-sub-confirm');
+    if (subBtn) subBtn.disabled = !canSub;
+  }
+
+  // Shows/hides the manage panel (the 🎮 Manage button in match-controls).
+  function toggleCareerPanel() {
+    const panel = document.getElementById('career-manage-panel');
+    if (!panel) return;
+    const show = panel.style.display === 'none' || !panel.style.display;
+    panel.style.display = show ? 'block' : 'none';
+    if (show) renderCareerPanel();
+  }
+
+  // Wired to the four tactic buttons in the Manage panel.
+  function applyUserTactic(tactic) {
+    const m = currentMatch;
+    if (!m || !m.userSide) return;
+    setTacticsLive(m.userSide, tactic);
+    renderCareerPanel();
+  }
+
+  // Wired to the formation <select> in the Manage panel.
+  function applyUserFormation(formKey) {
+    const m = currentMatch;
+    if (!m || !m.userSide) return;
+    changeFormationLive(m.userSide, formKey);
+    renderCareerPanel();
+  }
+
+  // Wired to the "Make Substitution" button in the Manage panel.
+  function confirmUserSub() {
+    const m = currentMatch;
+    if (!m || !m.userSide) return;
+    const outSel = document.getElementById('career-sub-out');
+    const inSel = document.getElementById('career-sub-in');
+    const outId = outSel && outSel.value;
+    const inId = inSel && inSel.value;
+    if (!outId || !inId) { toast('Pick a player to bring off and a player to bring on'); return; }
+    manualSubstitute(m.userSide, outId, inId);
+    renderCareerPanel();
   }
 /*@CHUNK:c0269:END*/
 
@@ -733,21 +974,23 @@
     const el = document.getElementById('live-stats');
     if (!el) return;
     const hp = (v, t) => t ? Math.round((v/t)*100) : 50;
-    el.innerHTML = `
-      <div class="stat-row"><span class="stat-val">${h.shots}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shots,ts)}%"></div><div class="stat-bar-away" style="width:${hp(a.shots,ts)}%"></div></div><span class="stat-val">${a.shots}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Shots</div>
-      <div class="stat-row"><span class="stat-val">${h.shotsOn}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.shotsOn,ton)}%"></div><div class="stat-bar-away" style="width:${hp(a.shotsOn,ton)}%"></div></div><span class="stat-val">${a.shotsOn}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">On Target</div>
-      <div class="stat-row"><span class="stat-val">${h.possession}%</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${h.possession}%"></div><div class="stat-bar-away" style="width:${a.possession}%"></div></div><span class="stat-val">${a.possession}%</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Possession</div>
-      <div class="stat-row"><span class="stat-val">${h.corners}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.corners,tc)}%"></div><div class="stat-bar-away" style="width:${hp(a.corners,tc)}%"></div></div><span class="stat-val">${a.corners}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Corners</div>
-      <div class="stat-row"><span class="stat-val">${h.fouls}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.fouls,tf)}%"></div><div class="stat-bar-away" style="width:${hp(a.fouls,tf)}%"></div></div><span class="stat-val">${a.fouls}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Fouls</div>
-      <div class="stat-row"><span class="stat-val">${h.saves}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.saves,tsv)}%"></div><div class="stat-bar-away" style="width:${hp(a.saves,tsv)}%"></div></div><span class="stat-val">${a.saves}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px">Saves</div>
-      <div class="stat-row"><span class="stat-val">${h.yellows}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${hp(h.yellows,h.yellows+a.yellows||1)}%"></div><div class="stat-bar-away" style="width:${hp(a.yellows,h.yellows+a.yellows||1)}%"></div></div><span class="stat-val">${a.yellows}</span></div>
-      <div style="text-align:center;font-size:0.75rem;color:var(--text-muted)">Yellow Cards</div>`;
+    // Sofascore-style stat rows: label centered above, home value / bar /
+    // away value below — each pair wrapped in its own .stat-block so
+    // spacing between rows is consistent instead of relying on stray
+    // inline margins between two independently-ordered divs.
+    const block = (label, hv, av, pctH, pctA) => `
+      <div class="stat-block">
+        <div class="stat-name">${label}</div>
+        <div class="stat-row"><span class="stat-val">${hv}</span><div class="stat-bar-wrap"><div class="stat-bar-home" style="width:${pctH}%"></div><div class="stat-bar-away" style="width:${pctA}%"></div></div><span class="stat-val">${av}</span></div>
+      </div>`;
+    el.innerHTML =
+      block('Shots', h.shots, a.shots, hp(h.shots, ts), hp(a.shots, ts)) +
+      block('On Target', h.shotsOn, a.shotsOn, hp(h.shotsOn, ton), hp(a.shotsOn, ton)) +
+      block('Possession', h.possession + '%', a.possession + '%', h.possession, a.possession) +
+      block('Corners', h.corners, a.corners, hp(h.corners, tc), hp(a.corners, tc)) +
+      block('Fouls', h.fouls, a.fouls, hp(h.fouls, tf), hp(a.fouls, tf)) +
+      block('Saves', h.saves, a.saves, hp(h.saves, tsv), hp(a.saves, tsv)) +
+      block('Yellow Cards', h.yellows, a.yellows, hp(h.yellows, (h.yellows + a.yellows) || 1), hp(a.yellows, (h.yellows + a.yellows) || 1));
   }
 /*@CHUNK:c0271:END*/
 
@@ -757,6 +1000,114 @@
 /*@CHUNK:c0272:END*/
 
 /*@CHUNK:c0273:START*/
+  // ===================================================================
+  // ================= DYNAMIC PITCH POSITIONING MODEL ==================
+  // ===================================================================
+  // Each formation slot's [x,y] in FORMATIONS is now only a *base*/resting
+  // coordinate, not the drawn position. The actual marker position is
+  // recalculated on every renderPitch() call from four live inputs:
+  //   1. Ball location  — m.ballZone (set by engine/possession.js and
+  //      engine/transitions.js as the simulation runs) tells us which
+  //      third/channel of the pitch the ball is currently in, and which
+  //      side has it.
+  //   2. Tactical stance — both sides' m.tactics entries shift how far a
+  //      team pushes up in possession / drops off out of possession, and
+  //      how eagerly it holds a high line under an opponent press.
+  //   3. Role — a winger or full-back roams far more than a centre-back or
+  //      goalkeeper; per-slot mobility tables scale how far each position
+  //      is willing to travel from its base spot.
+  //   4. Teammate/opponent spacing — the existing collision-avoidance pass
+  //      still nudges markers apart from their own teammates so labels
+  //      never overlap; since each side renders on its own mini-pitch
+  //      panel (not a single shared canvas — see .pitch-pair in
+  //      styles.css) there's no literal opposing marker to collide with,
+  //      so opponent influence is folded into the ball-zone/tactic model
+  //      above instead (i.e. a side's shape reacts to how far the OTHER
+  //      side has advanced, which is what actually drives real spacing).
+  // Every player still has a stable "home" position (their formation
+  // coordinate) and only ever *deviates* from it — this keeps the shape
+  // recognizable as the chosen formation while making it visibly breathe
+  // with the run of play instead of sitting frozen.
+  const ROLE_MOBILITY = {
+    //         vertical (forward/back push)   horizontal (width shift)
+    GK:  { v: 0.10, h: 0.10 },
+    CB:  { v: 0.35, h: 0.25 },
+    RB:  { v: 0.70, h: 0.90 }, LB:  { v: 0.70, h: 0.90 },
+    RWB: { v: 0.85, h: 0.95 }, LWB: { v: 0.85, h: 0.95 },
+    CDM: { v: 0.55, h: 0.30 },
+    CM:  { v: 0.80, h: 0.40 },
+    CAM: { v: 0.90, h: 0.35 },
+    RM:  { v: 0.90, h: 0.85 }, LM:  { v: 0.90, h: 0.85 },
+    RW:  { v: 0.90, h: 0.85 }, LW:  { v: 0.90, h: 0.85 },
+    ST:  { v: 0.60, h: 0.30 }, CF:  { v: 0.60, h: 0.30 }
+  };
+  const PHASE_VALUE = { DEF: -1, MID: 0, ATT: 1 };
+  const CHANNEL_VALUE = { L: -1, C: 0, R: 1 };
+  const MAX_VERTICAL_SHIFT = 12;   // percentage points of pitch height
+  const MAX_HORIZONTAL_SHIFT = 9;  // percentage points of pitch width
+  const MIRROR_THIRD = { ATT: 'DEF', DEF: 'ATT', MID: 'MID' };
+
+  // Tiny deterministic hash so the same player/minute combination always
+  // produces the same jitter (no visible flicker on incidental re-renders)
+  // while still changing minute to minute — a stand-in for the constant
+  // small drift real players show even while "holding" a position.
+  function _pitchJitterSeed(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h;
+  }
+
+  // Computes this player's live [x, y] from their formation base coordinate,
+  // the current ball zone, both sides' tactics, and their own role's
+  // mobility. `side` is which mini-pitch panel is being drawn (see the note
+  // above on why that's the unit of "opponent awareness" here).
+  function computeDynamicPosition(baseX, baseY, slotCode, side, playerId) {
+    const m = currentMatch;
+    const zone = (m && m.ballZone) || { side: null, third: 'MID', channel: 'C' };
+    const oppSide = side === 'home' ? 'away' : 'home';
+
+    // This side's own phase of play: directly the ball's third if this side
+    // has it, the mirrored third if the opponent has it (their ATT third is
+    // literally bearing down on our goal, i.e. our DEF third), or neutral
+    // at kickoff/before the ball has moved.
+    const ownPhase = !zone.side ? 'MID' : (zone.side === side ? zone.third : (MIRROR_THIRD[zone.third] || 'MID'));
+    const channel = zone.channel || 'C';
+
+    const tac = (m && m.tactics && m.tactics[side]) || 'balanced';
+    const oppTac = (m && m.tactics && m.tactics[oppSide]) || 'balanced';
+
+    // How far the team pushes up while it has the ball forward of its own
+    // half, and how far it's willing to drop off when it doesn't.
+    const attackMult = tac === 'attack' ? 1.35 : tac === 'press' ? 1.15 : tac === 'defend' ? 0.7 : 1.0;
+    const retreatMult = tac === 'defend' ? 1.3 : tac === 'press' ? 0.55 : tac === 'attack' ? 0.85 : 1.0;
+    // A wide-open opponent (playing Attack) stretches the game both ways;
+    // a packed-in opponent (playing Defend) compresses it. Balanced/Press
+    // are treated as roughly neutral for this specific effect.
+    const spaceFactor = oppTac === 'attack' ? 1.15 : oppTac === 'defend' ? 0.8 : 1.0;
+
+    const phaseVal = PHASE_VALUE[ownPhase] || 0;
+    const vBias = (phaseVal > 0 ? phaseVal * attackMult : phaseVal * retreatMult) * spaceFactor;
+    const hBias = CHANNEL_VALUE[channel] || 0;
+
+    const mob = ROLE_MOBILITY[slotCode] || { v: 0.6, h: 0.5 };
+    // Negative sign: a positive (attacking) phase should pull y DOWN toward
+    // the opponent's goal, which is the lower end of the formation's y
+    // scale (see FORMATIONS — GK sits at y:92, forwards up around y:15-20).
+    const dy = -vBias * mob.v * MAX_VERTICAL_SHIFT;
+    const dx = hBias * mob.h * MAX_HORIZONTAL_SHIFT;
+
+    const seed = _pitchJitterSeed(`${playerId}-${(m && m.minute) || 0}`);
+    const jitterX = ((seed % 100) - 50) / 50 * 1.4;
+    const jitterY = ((Math.floor(seed / 100) % 100) - 50) / 50 * 1.4;
+
+    return [
+      Math.max(6, Math.min(94, baseX + dx + jitterX)),
+      Math.max(6, Math.min(94, baseY + dy + jitterY))
+    ];
+  }
+/*@CHUNK:c0273:END*/
+
+/*@CHUNK:c0273b:START*/
   function renderPitch() {
     if (!currentMatch) return;
     const m = currentMatch;
@@ -775,7 +1126,12 @@
     const drawTeam = (side) => {
       const s = m[side];
       const form = FORMATIONS[s.squad.formation] || FORMATIONS['4-3-3'];
-      const coords = form.coords || [];
+      // A hand-built lineup from the Squad Builder's formation editor may
+      // carry its own custom marker positions (squad.customCoords) rather
+      // than the preset's default coords — see saveSquadBuilder() and
+      // sbResetFormationShape() in ui/teamUI.js. Falls back to the preset
+      // shape for auto-built squads, exactly as before.
+      const coords = s.squad.customCoords || form.coords || [];
       const slots = form.slots || [];
       const onPitchIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
       const allPlayers = [...(s.squad.starting || []), ...(s.squad.subs || []), ...(s.squad.all || [])];
@@ -786,9 +1142,34 @@
       const onPitchPlayers = onPitchIds.map(id => byId[id]).filter(Boolean);
       const assigned = new Set();
       const slotPlayers = [];
+      // Pass 1 — a player's own recorded `.slot` (set authoritatively by
+      // buildSquad/trySubstitution/pickSlotForIncomingSub/changeFormationLive)
+      // always claims the formation slot it names, before anything else gets
+      // a look-in. This used to be OR'd together with a loose secondary-
+      // position check (p.pos.includes(slot)) in a single find() — since a
+      // player's pos array often lists more than one position (e.g. a CDM
+      // who can also play CM), that loose check could win the very first
+      // slot iterated (array order, not each player's true slot) and drag a
+      // player away from the slot they were actually placed in, while a
+      // completely different player then got shuffled into their vacated
+      // spot. That's what made a formation change or a substitution *look*
+      // like it had put a striker at CDM or a CM at CB on the pitch view,
+      // even though the underlying match data (p.slot) was always correct.
       slots.forEach((slot, idx) => {
-        // Prefer player already marked with this slot
-        let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.slot === slot || (p.pos || []).includes(slot)));
+        const pick = onPitchPlayers.find(p => !assigned.has(p.id) && p.slot === slot);
+        if (pick) {
+          assigned.add(pick.id);
+          slotPlayers[idx] = pick;
+        }
+      });
+      // Pass 2 — only for slots nobody's own `.slot` matched (e.g. stale
+      // data after an edge-case state change). Loosen to secondary
+      // position, then broad compatibility, then whoever's left — same as
+      // before, just demoted to a fallback instead of competing on equal
+      // footing with an exact match.
+      slots.forEach((slot, idx) => {
+        if (slotPlayers[idx]) return;
+        let pick = onPitchPlayers.find(p => !assigned.has(p.id) && (p.pos || []).includes(slot));
         if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id) && canPlay(p, slot));
         if (!pick) pick = onPitchPlayers.find(p => !assigned.has(p.id));
         if (pick) {
@@ -811,7 +1192,11 @@
       slotPlayers.forEach((p, idx) => {
         if (!p) return;
         let c = coords[idx] || [50, 50];
-        let x = c[0], y = c[1];
+        // Base/resting coordinate from the formation preset (or a custom
+        // Squad Builder shape) — now only the anchor that
+        // computeDynamicPosition() continuously deviates from, rather than
+        // the drawn position itself. See the model notes above renderPitch().
+        let [x, y] = computeDynamicPosition(c[0], c[1], slots[idx], side, p.id);
         // Collision avoidance: name labels are wider than the dot, so push
         // apart when two dots sit too close together (weighted distance,
         // since labels overflow horizontally more than vertically).
@@ -847,22 +1232,46 @@
         if (idx !== 0) used.push({ x, y });
 
         const isSubOn = (s.squad.subs || []).some(sub => sub.id === p.id);
-        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}">
-          <span class="dot-avatar">${playerAvatarMark(p)}</span>
+        // Captain armband + set-piece duty badges — same roles shown in the
+        // lineup list (roleBadgesHTML()) and in the Teams tab preview
+        // (roleBadgesForPreview()), just missing from this pitch view.
+        const roleBadges = roleBadgesForIds(s.roles, p.id, 'sb-role-ic');
+        // Goal/assist/rating badges only make sense once the player has
+        // actually appeared and picked up match stats — an unused sub or
+        // a brand-new kickoff view (no playerMatchStats entry yet) just
+        // gets the plain dot, same as before this feature existed.
+        const ps = m.playerMatchStats && m.playerMatchStats[p.id];
+        const statBadges = dotStatBadges(ps);
+        const ratingBadge = dotRatingBadge(ps);
+        dots += `<div class="player-dot${isSubOn ? ' sub-on' : ''}${ratingBadge ? ' has-rating' : ''}" style="left:${x}%;top:${y}%;background:${primary};border:2px solid ${secondary}" onclick="App.showPlayerProfile('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();App.showPlayerProfile('${p.id}')}" role="button" tabindex="0" title="${(p.name || '').replace(/"/g, '&quot;')}">
+          <span class="dot-pos">${slots[idx] || ''}</span>
+          <span class="dot-avatar">${playerAvatarMark(p)}</span>${roleBadges}${statBadges}${ratingBadge}
           <span class="dot-label"><span class="dot-num">${p.num || ''}</span><span class="dot-name">${playerNameHTML(p, abbreviateName(p.name))}</span></span>
         </div>`;
       });
-      const mgrTag = s.team.manager && s.team.manager.name
-        ? `<span class="pitch-mgr">${managerAvatarMark(s.team.manager, 16)} ${s.team.manager.name}</span>` : '';
+      const mgrStyle = getManagerPlaystyle(s.team);
+      // Sits in the same top strip as the team/formation label, tucked into
+      // whichever top corner is the *outer* edge of this pitch box (left
+      // corner for the home column, right corner for the away column) so
+      // its name+playstyle label — which is wider than the box's own
+      // corner margin — grows outward into open space instead of into the
+      // other team's pitch across the narrow gap between them.
+      const mgrSide = `left:${side === 'away' ? '91' : '9'}%;`;
+      const mgrDot = s.team.manager && s.team.manager.name
+        ? `<div class="player-dot manager-dot" style="${mgrSide}top:11%">
+          <span class="dot-avatar">${managerAvatarMark(s.team.manager, 46)}</span>
+          <span class="dot-label"><span class="dot-name">${s.team.manager.name}${mgrStyle ? ' · ' + mgrStyle : ''}</span></span>
+        </div>` : '';
       return `<div class="mini-pitch team-pitch">
-        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}${mgrTag}</div>
+        <div class="pitch-label">${teamMark(s.team, 16)} ${s.team.short} · ${form.name}</div>
         ${dots}
+        ${mgrDot}
       </div>`;
     };
 
     wrap.innerHTML = `<div class="pitch-pair">${drawTeam('home')}${drawTeam('away')}</div>`;
   }
-/*@CHUNK:c0273:END*/
+/*@CHUNK:c0273b:END*/
 
 /*@CHUNK:c0274:START*/
 
@@ -873,10 +1282,10 @@
   function playerLineIcons(ps, subInfo, onPitch, inj) {
     let icons = '';
     if (ps) {
-      for (let i = 0; i < (ps.goals || 0); i++) icons += '<span class="li-icon" title="Goal">⚽</span>';
-      for (let i = 0; i < (ps.assists || 0); i++) icons += '<span class="li-icon" title="Assist">🅰️</span>';
-      if (ps.yellow) icons += '<span class="li-icon" title="Yellow">🟨</span>';
-      if (ps.red) icons += '<span class="li-icon" title="Red">🟥</span>';
+      for (let i = 0; i < (ps.goals || 0); i++) icons += `<span class="li-icon" title="Goal">${emojiImg('goal', 'Goal')}</span>`;
+      for (let i = 0; i < (ps.assists || 0); i++) icons += `<span class="li-icon" title="Assist">${emojiImg('assist', 'Assist')}</span>`;
+      if (ps.yellow) icons += `<span class="li-icon" title="Yellow">${emojiImg('yellow_card', 'Yellow card')}</span>`;
+      if (ps.red) icons += `<span class="li-icon" title="Red">${emojiImg('red_card', 'Red card')}</span>`;
     }
     if (inj) icons += '<span class="li-icon" title="Injured">🩹</span>';
     if (subInfo && subInfo.outMin != null) icons += `<span class="li-sub out" title="Subbed off">🔻${subInfo.outMin}'</span>`;
@@ -898,6 +1307,43 @@
     return `<span class="rating-badge ${cls}">${r.toFixed(1)}</span>`;
   }
 /*@CHUNK:c0277:END*/
+
+/*@CHUNK:c0277b:START*/
+  // Sofascore-style rating chip anchored to the BOTTOM edge of a formation
+  // pitch dot (see renderPitch()), overlapping the avatar circle the same
+  // way Sofascore's lineup pitch overlaps its player photos. Reuses the
+  // same .rating-badge color thresholds/classes as the lineup-list rating
+  // (liveRatingBadge) so a player reads the same score in both places —
+  // just re-shelled with a dot-specific wrapper class for pitch styling
+  // (rounder corners, border, drop shadow) instead of the list's pill.
+  function dotRatingBadge(ps) {
+    if (!ps) return '';
+    const r = calcPlayerRating(ps);
+    ps.rating = r;
+    // Man of the Match always renders blue on the pitch dot too, same
+    // override renderRatingRow() already applies in the post-match ratings
+    // list — takes priority over the usual high/mid/low performance color.
+    const isMotm = currentMatch && currentMatch.motmId != null && currentMatch.motmId === ps.id;
+    const cls = isMotm ? 'rating-motm' : r >= 7.5 ? 'rating-high' : r >= 6.5 ? 'rating-mid' : 'rating-low';
+    return `<span class="dot-rating ${cls}">${r.toFixed(1)}</span>`;
+  }
+
+  // Sofascore-style goal/assist corner badges for a formation pitch dot:
+  // one small ball icon if the player scored, one small boot/assist icon
+  // if they set one up, each carrying its own count (e.g. "2", "3") when
+  // the player has more than one — rather than repeating the icon per
+  // goal the way the lineup-list icon strip does (playerLineIcons()),
+  // since stacking that many tiny icons on a dot this size would just
+  // blur into a smudge.
+  function dotStatBadges(ps) {
+    if (!ps) return '';
+    let out = '';
+    if (ps.goals) out += `<span class="dot-stat-badge dot-stat-goal" title="${ps.goals} goal${ps.goals > 1 ? 's' : ''}">${emojiImg('goal', 'Goal')}${ps.goals > 1 ? `<span class="dot-stat-count">${ps.goals}</span>` : ''}</span>`;
+    if (ps.assists) out += `<span class="dot-stat-badge dot-stat-assist" title="${ps.assists} assist${ps.assists > 1 ? 's' : ''}">${emojiImg('assist', 'Assist')}${ps.assists > 1 ? `<span class="dot-stat-count">${ps.assists}</span>` : ''}</span>`;
+    if (!out) return '';
+    return `<span class="dot-stat-badges">${out}</span>`;
+  }
+/*@CHUNK:c0277b:END*/
 
 /*@CHUNK:c0278:START*/
 
@@ -923,18 +1369,15 @@
       const sentOff = !!ps.red;
       const icons = playerLineIcons(ps, subInfo, on, inj);
       const rating = liveRatingBadge(ps);
+      const cond = conditionBadgeHTML(p);
       const dim = (!on && !inj && !sentOff && !(subInfo && subInfo.outMin != null)) ? 'opacity:0.55' : '';
       const pos = p.slot || (p.pos || [''])[0] || '';
-      const passAcc = ps.passes ? Math.round(100 * (ps.passesCompleted || 0) / ps.passes) : null;
-      const passInfo = (ps.passes > 0)
-        ? `<span class="player-passes" title="Passes completed / attempted">${ps.passesCompleted || 0}/${ps.passes} <em>(${passAcc}%)</em></span>`
-        : '';
       return `<li class="player-item ${isSubList ? 'sub' : ''} ${inj ? 'injured' : ''} ${sentOff ? 'sent-off' : ''}" onclick="App.showPlayerProfile('${p.id}')" style="cursor:pointer;${dim}">
         <span class="player-num">${p.num || ''}</span>
         <span class="player-pos">${pos}</span>
-        <span class="player-name">${playerNameHTML(p)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
-        ${passInfo}
+        <span class="player-name">${playerNameHTML(p)}${roleBadgesHTML(p, side)}${sentOff ? ' <span class="sent-off-tag">SENT OFF</span>' : ''}</span>
         <span class="player-icons">${icons}</span>
+        ${cond}
         ${rating}
       </li>`;
     };
@@ -1225,27 +1668,39 @@
 
   return {
     setRngSeed, getRngSeed,
-    init, switchView, goToMatch, goToTournament, selectTournamentFormat, updateTeamPreview,
+    init, switchView, goToMatch, goToTournament, selectTournamentFormat, selectTournamentSize, updateTeamPreview,
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, finishMatch, resetMatch,
     showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
-    simTournamentRound, simAllTournament, resetTournament, filterTeams,
+    simTournamentRound, simAllTournament, resetTournament, filterTeams, filterTeamsLeague, filterTeamsRating,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
-    returnToTournament, showPlayerProfile, showTeamProfile, randomMatch,
-    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile,
+    playLeagueTournamentFixture, simLeagueTournamentFixture,
+    returnToTournament, showPlayerProfile, showTeamProfile, showTeamLineup, randomMatch, randomizeTeamSide,
+    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
-    openSquadBuilder, setSquadSlot, toggleBench, openSlotPicker, closeSlotPicker,
+    sortTournamentTeams, filterTournamentTeamsLeague, filterTournamentTeamsRating,
+    openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
+    openSlotRolePicker, setSquadSlotRole,
     playKnockoutMatch, updateTournamentSelectedCount, autoFillSquadBuilder,
     saveSquadBuilder, closeSquadBuilder, onFormationChange, changeFormationLive,
+    sbSwitchSide, sbSwitchTab, sbSelectFormationPreset, sbToggleEditMode,
+    sbResetFormationShape, sbGrab, sbZoneGrab, sbEmptySlotTap, sbSetRole,
+    sbMoveToBench, sbMoveToReserve, sbExportFormation,
     setTacticsLive, continueToET, continueToPens, skipETAndEnd,
     renderMomentumAndHeat, showLoading, hideLoading, refreshTournamentStatsUI,
     simKnockoutMatch, viewFixtureReport, viewKnockoutReport, showMatchReport, showMatchReportLeg,
     simUCLFixture, playUCLFixture, simPlayoffTie, viewPlayoffReport,
+    playLeagueTournamentFixture, simLeagueTournamentFixture,
     goToSeason, searchSeasonTeams, toggleSeasonTeam, autoFillSeason, clearSeasonSetup,
     startSeason, simulateSeasonWeek, simulateSeasonToEnd, startNewSeasonYear, resetSeason,
-    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory,
+    endSeasonNow, endSeasonAndAnnounce, renderSeasonEndAnnouncement,
+    showSeasonComp, showSeasonSubTab, viewSeasonReport, showHistory, filterHistoryAward,
     simSeasonFixture, playSeasonFixture,
-    searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, loadMorePlayers,
-    togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare
+    simulateWorldCupStep, simulateQualifyingRound, renderSeasonDashboard, advanceCongestionSlotIfComplete,
+    searchPlayers, sortPlayers, filterPlayersPos, filterPlayersType, filterPlayersRating, loadMorePlayers,
+    togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare,
+    renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital,
+    setCareerTeam, clearCareerTeam, findCareerFixtureDue,
+    manualSubstitute, toggleCareerPanel, applyUserTactic, applyUserFormation, confirmUserSub
   };
 })();
 
@@ -1350,6 +1805,15 @@ try { window.App = App; } catch (e) {}
       let items = collectOptions(select);
       if (isTeamSelect && activeCat !== 'all') items = items.filter(i => i.group === activeCat);
       if (q) items = items.filter(i => i.label.toLowerCase().includes(q));
+      // Kickoff team dropdowns: keep results alphabetical by team name
+      // (within each group) instead of raw teams.json order, so a search
+      // like "re" doesn't come back in a random-looking order.
+      if (isTeamSelect) {
+        items = items.slice().sort((a, b) => {
+          if (a.group !== b.group) return (a.group || '').localeCompare(b.group || '');
+          return (a.name || a.label || '').localeCompare(b.name || b.label || '');
+        });
+      }
       if (!items.length) { optionsEl.innerHTML = '<div class="ss-empty">No matches</div>'; return; }
       let html = '';
       let lastGroup;

@@ -148,7 +148,8 @@
 
 /*@CHUNK:c0084:START*/
   function lbPlayerCell(p, size) {
-    return `<div class="lb-player-cell">${lbAvatar(p, size)}<span class="lb-player-name">${playerNameHTML(p)}</span></div>`;
+    const clickable = p && p.id != null;
+    return `<div class="lb-player-cell${clickable ? ' player-clickable' : ''}"${clickable ? ` onclick="App.showPlayerProfile('${p.id}')"` : ''}>${lbAvatar(p, size)}<span class="lb-player-name">${playerNameHTML(p)}</span></div>`;
   }
 /*@CHUNK:c0084:END*/
 
@@ -184,6 +185,41 @@
     return `<span class="trophy-mark trophy-mark-fallback" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.6)}px">🏆</span>`;
   }
 /*@CHUNK:c0088:END*/
+
+/*@CHUNK:cchamp01:START*/
+  // Shared "champion presentation" banner — the competition's own trophy
+  // (trophyMark, keyed off the competition/trophy name in trophies.json)
+  // next to the winning team's own crest (teamMark) and name, in one
+  // consistent hero card. Used anywhere a competition announces its
+  // winner — the Tournament tab's Final Standings and a Season domestic
+  // cup/World Cup summary — instead of each screen inventing its own
+  // plain-text "Champion: <name>" line or a bare numbered "1" podium slot.
+  function championBannerHTML(compName, champion, opts) {
+    opts = opts || {};
+    const trophySize = opts.trophySize || 52;
+    const teamSize = opts.teamSize || 32;
+    const label = opts.label || 'Champions';
+    if (!champion) {
+      return `<div class="champion-banner champion-banner-empty">
+        <div class="champion-banner-trophy">${trophyMark(compName, trophySize)}</div>
+        <div class="champion-banner-body">
+          <div class="champion-banner-label">${label}</div>
+          <div class="champion-banner-tbd">TBD</div>
+        </div>
+      </div>`;
+    }
+    return `<div class="champion-banner">
+      <div class="champion-banner-trophy">${trophyMark(compName, trophySize)}</div>
+      <div class="champion-banner-body">
+        <div class="champion-banner-label">${label}</div>
+        <div class="champion-banner-team">
+          ${teamMark(champion, teamSize)}
+          <span class="champion-banner-name">${champion.name}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+/*@CHUNK:cchamp01:END*/
 
 /*@CHUNK:c0089:START*/
 
@@ -227,17 +263,72 @@
 /*@CHUNK:c0476:START*/
 
 
-  // Trophy Cabinet: every individual award a player (matched by exact name,
-  // same convention as playerPortraits/trophyImages) has won, newest first.
+  // Trophy Cabinet: every trophy a player has personally won, newest first —
+  // both individual awards (Golden Boot, Ballon d'Or, ...) AND team trophies
+  // (World Cup, Champions League, league titles, cups) earned by any squad
+  // they were part of. Matched by player id (not name) so two different
+  // players who happen to share a name never share a cabinet — trophies
+  // recorded before this fix (with no id/playerIds on file) fall back to a
+  // name match so nothing already won just disappears.
 /*@CHUNK:c0476:END*/
 
+/*@CHUNK:c0476b:START*/
+  function playerWonTrophies(player) {
+    if (!player) return [];
+    return trophies.filter(t => {
+      if (t.playerId != null) return t.playerId === player.id;
+      if (Array.isArray(t.playerIds) && t.playerIds.length) return t.playerIds.includes(player.id);
+      // Legacy entry from before ids were recorded — name is all we have.
+      return t.player === player.name;
+    });
+  }
+/*@CHUNK:c0476b:END*/
+
+/*@CHUNK:c0476c:START*/
+  // The `type` recorded alongside a trophy (e.g. "Premier League (Y1)",
+  // "World Cup Tournament", "Season Y2 (Global)") identifies which
+  // competition/run it actually came from. Strips only the
+  // year/round number so the SAME competition repeated across years still
+  // reads as one recurring honor, while two DIFFERENT competitions that
+  // happen to hand out an award with the same name (Golden Boot, Golden
+  // Ball and Golden Glove are each awarded separately by the league, by
+  // the Champions League, by a standalone World Cup, etc.) stay distinct.
+  function trophySeriesKey(t) {
+    const normalized = (t.type || '')
+      .replace(/\(Y\d+\)/g, '')
+      .replace(/Awards Round \d+/, 'Awards Round')
+      .trim();
+    return t.name + '::' + normalized;
+  }
+
+  // Groups a player's won trophies so winning the same trophy in the same
+  // competition/tournament more than once shows as a single card with a
+  // "×N" badge instead of one card per win — but a Golden Boot/Golden
+  // Ball/Golden Glove (or any other award) won in a DIFFERENT competition
+  // or tournament gets its own separate card, keyed by trophySeriesKey()
+  // above rather than by award name alone. Keeps the most recent
+  // date/type for display/sort ordering.
+  function groupPlayerTrophies(list) {
+    const groups = {};
+    list.forEach(t => {
+      const key = trophySeriesKey(t);
+      if (!groups[key] || (t.date || 0) > (groups[key].date || 0)) {
+        groups[key] = { name: t.name, type: t.type, date: t.date || 0, count: (groups[key] ? groups[key].count : 0) + 1 };
+      } else {
+        groups[key].count++;
+      }
+    });
+    return Object.values(groups).sort((a, b) => (b.date || 0) - (a.date || 0));
+  }
+/*@CHUNK:c0476c:END*/
+
 /*@CHUNK:c0477:START*/
-  function playerTrophyCabinetHTML(playerName) {
-    const won = trophies.filter(t => t.player === playerName).sort((a, b) => (b.date || 0) - (a.date || 0));
-    if (!won.length) return '';
+  function playerTrophyCabinetHTML(player) {
+    const grouped = groupPlayerTrophies(playerWonTrophies(player));
+    if (!grouped.length) return '';
     return `<div class="card-title" style="margin-top:14px">🏆 Trophy Cabinet</div>
       <div class="trophy-cabinet-grid">
-        ${won.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 56)}<div class="tc-name">${t.name}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
+        ${grouped.map(t => `<div class="trophy-cabinet-item" title="${t.type || ''}">${trophyMark(t.name, 56)}<div class="tc-name">${t.name}${t.count > 1 ? ` <span class="tc-count">×${t.count}</span>` : ''}</div><div class="tc-type">${t.type || ''}</div></div>`).join('')}
       </div>`;
   }
 /*@CHUNK:c0477:END*/
@@ -280,28 +371,34 @@
 
 /*@CHUNK:c0478b:END*/
 
+/*@CHUNK:cstat01:START*/
+  // Color tier for any 0-100(+) stat/attribute bar: red under 70, orange
+  // 70-79, green 80-89, mint 90+. Used everywhere a raw attribute or the
+  // compact ATT/DEF/PHY/PAC/TEC bars are rendered, so the same number
+  // always reads the same color regardless of which view it's shown in.
+  function statTierClass(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return 'stat-tier-red';
+    if (n >= 90) return 'stat-tier-mint';
+    if (n >= 80) return 'stat-tier-green';
+    if (n >= 70) return 'stat-tier-orange';
+    return 'stat-tier-red';
+  }
+/*@CHUNK:cstat01:END*/
+
 /*@CHUNK:c0479:START*/
   function expandedAttrRowsHTML(player) {
     const attr = player.expandedAttrs || {};
-    const boostedKeys = new Set();
-    if (player.managerAttrBoosted && player.affinityStyle) {
-      (attr.playstyle || []).forEach((style) => {
-        const suited = PLAYSTYLE_AFFINITY[style];
-        if (suited && suited.includes(player.affinityStyle)) {
-          (PLAYSTYLE_KEY_ATTRS[style] || []).forEach(k => boostedKeys.add(k));
-        }
-      });
-    }
     return EXPANDED_ATTR_GROUPS.map((group) => {
       const rows = group.keys.filter(([k]) => typeof attr[k] === 'number');
       if (!rows.length) return '';
       return `<div class="expanded-attr-group">
         <div class="expanded-attr-group-title">${group.label}</div>
         ${rows.map(([k, label]) => `
-          <div class="attr-bar-row expanded${boostedKeys.has(k) ? ' mgr-boosted' : ''}">
+          <div class="attr-bar-row expanded">
             <span class="attr-name">${label}</span>
-            <div class="attr-track"><div class="attr-fill" style="width:${attr[k]}%"></div></div>
-            <span class="attr-val">${attr[k]}</span>
+            <div class="attr-track"><div class="attr-fill ${statTierClass(attr[k])}" style="width:${Math.min(100, attr[k])}%"></div></div>
+            <span class="attr-val ${statTierClass(attr[k])}">${attr[k]}</span>
           </div>`).join('')}
       </div>`;
     }).join('');
@@ -309,7 +406,52 @@
 /*@CHUNK:c0479:END*/
 
 /*@CHUNK:c0480:START*/
-
+  // Five-axis attribute radar (ATT/PAC/TEC/DEF/PHY), rendered as a plain
+  // inline SVG rather than a canvas — unlike the rating/form and
+  // contribution charts, a pentagon needs no post-layout resize logic, so
+  // it can just be pure markup with no matching draw*() call. Works for
+  // every player regardless of attrBoosted status: those five compact
+  // stats always exist (see applyExpandedPlayerAttributes in
+  // data/playerDatabase.js), so this reads directly off player.att/def/
+  // pac/phy/tec rather than the expanded sheet.
+  const RADAR_AXES = [
+    ['PAC', 'pac'], ['ATT', 'att'], ['TEC', 'tec'], ['DEF', 'def'], ['PHY', 'phy']
+  ];
+  function renderPlayerAttributeRadarHTML(player) {
+    const cx = 100, cy = 96, r = 74, maxV = 99;
+    const angleFor = (i) => (Math.PI / 180) * (i * (360 / RADAR_AXES.length) - 90);
+    const pointFor = (i, val) => {
+      const dist = r * (Math.max(0, Math.min(maxV, val || 0)) / maxV);
+      const a = angleFor(i);
+      return [cx + dist * Math.cos(a), cy + dist * Math.sin(a)];
+    };
+    const ringPoints = (frac) => RADAR_AXES.map((_, i) => {
+      const a = angleFor(i);
+      return `${cx + r * frac * Math.cos(a)},${cy + r * frac * Math.sin(a)}`;
+    }).join(' ');
+    const dataPoints = RADAR_AXES.map(([, key], i) => pointFor(i, player[key]).join(',')).join(' ');
+    const labels = RADAR_AXES.map(([label, key], i) => {
+      const a = angleFor(i);
+      const lx = cx + (r + 18) * Math.cos(a);
+      const ly = cy + (r + 18) * Math.sin(a);
+      const v = player[key];
+      return `<text x="${lx}" y="${ly - 4}" text-anchor="middle" class="radar-axis-label">${label}</text>
+              <text x="${lx}" y="${ly + 9}" text-anchor="middle" class="radar-axis-val ${statTierClass(v)}">${v != null ? v : '-'}</text>`;
+    }).join('');
+    const rings = [0.25, 0.5, 0.75, 1].map(f => `<polygon points="${ringPoints(f)}" class="radar-ring"/>`).join('');
+    const spokes = RADAR_AXES.map((_, i) => {
+      const a = angleFor(i);
+      return `<line x1="${cx}" y1="${cy}" x2="${cx + r * Math.cos(a)}" y2="${cy + r * Math.sin(a)}" class="radar-spoke"/>`;
+    }).join('');
+    return `<div class="card-title" style="margin-top:14px">Attribute Radar</div>
+      <div class="player-chart-wrap radar-wrap">
+        <svg viewBox="0 0 200 192" class="radar-svg">
+          ${rings}${spokes}
+          <polygon points="${dataPoints}" class="radar-shape"/>
+          ${labels}
+        </svg>
+      </div>`;
+  }
 /*@CHUNK:c0480:END*/
 
 /*@CHUNK:c0481:START*/
@@ -325,13 +467,38 @@
         : ((currentMatch.away.squad.all || []).find(p => p.id === playerId) ? currentMatch.away.team : { name: '—', flag: '', color: '#d4af37', secondary: '#fff' });
     }
     if (!player) { toast('Player not found'); return; }
-    const g = (stats.goals[playerId] || {}).count || 0;
-    const a = (stats.assists[playerId] || {}).count || 0;
-    const s = (stats.saves[playerId] || {}).count || 0;
-    const motm = (stats.motm[playerId] || {}).count || 0;
-    const y = (stats.yellows[playerId] || {}).count || 0;
-    const rd = (stats.reds[playerId] || {}).count || 0;
-    const apps = (stats.ratings[playerId] || {}).count || 0;
+    // "Career (competitive)" below reads from careerStats (never reset by
+    // End Season), not the season-scoped `stats` leaderboard bucket.
+    const g = playerCareerCount('goals', playerId);
+    const a = playerCareerCount('assists', playerId);
+    const s = playerCareerCount('saves', playerId);
+    const motm = playerCareerCount('motm', playerId);
+    const y = playerCareerCount('yellows', playerId);
+    const rd = playerCareerCount('reds', playerId);
+    const apps = playerCareerCount('ratings', playerId);
+    // Newer career totals — interceptions/blocks/big chances created/missed
+    // and xG/xA all accumulate the same way goals/assists do (see
+    // recordStatCount() calls in engine/matchEngine.js::endMatch), so they
+    // read off careerStats via the same playerCareerCount() helper as
+    // everything else above. Avg rating is the one exception: it's a mean,
+    // not a running total, so it's read straight off the ratings bucket's
+    // own `.avg` field instead.
+    const ints = playerCareerCount('interceptions', playerId);
+    const blk = playerCareerCount('blocks', playerId);
+    const cc = playerCareerCount('chancesCreated', playerId);
+    const bcm = playerCareerCount('bigChancesMissed', playerId);
+    const xgTotal = playerCareerCount('xg', playerId);
+    const xaTotal = playerCareerCount('xa', playerId);
+    const avgRatingEntry = (careerStats.ratings || {})[playerId];
+    const avgRating = avgRatingEntry && avgRatingEntry.count ? avgRatingEntry.avg : null;
+    // Goal+assist involvement expressed as minutes per contribution (e.g.
+    // "a goal or assist every 80 minutes") rather than contributions per
+    // minute — needs a real minutes total (careerStats.minutes, fed by the
+    // same computeMinutesPlayed() figure used everywhere else) rather than
+    // just apps, since a bench-heavy career shouldn't read the same as a
+    // nailed-on starter's.
+    const careerMinutes = ((careerStats.minutes || {})[playerId] || {}).count || 0;
+    const gaMinPerGA = (careerMinutes > 0 && (g + a) > 0) ? (careerMinutes / (g + a)) : null;
     const primary = (team && team.color) || '#d4af37';
     const secondary = (team && team.secondary) || '#fff';
     const ms = (currentMatch && currentMatch.playerMatchStats && currentMatch.playerMatchStats[playerId]) || null;
@@ -362,28 +529,48 @@
     }
     const boosted = !!player.attrBoosted;
     const boostBadge = boosted
-      ? `<span class="attr-boost-badge" title="Overall derived from expanded attribute data, position, and manager-tactic affinity">★ Enhanced</span>`
-      : '';
-    const affinityNote = (boosted && player.affinityBonus > 0)
-      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.affinityBonus} OVR — fits ${team ? team.name + "'s" : "the"} ${player.affinityStyle} setup</div>`
+      ? `<span class="attr-boost-badge" title="Overall derived from expanded attribute data and position">★ Enhanced</span>`
       : '';
     const signatureNote = (boosted && player.signatureBonus > 0)
       ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.signatureBonus} OVR — signature attributes for their playstyle run well above the rest of their sheet</div>`
       : '';
-    const managerAttrNote = (boosted && player.managerAttrBoosted)
-      ? `<div style="color:var(--gold);font-size:0.75rem;margin-top:2px">⬆ Manager coaching is sharpening this player's playstyle attributes (marked below)</div>`
-      : '';
-    const playstyleTagsHTML = (boosted && player.expandedAttrs && (player.expandedAttrs.playstyle || []).length)
-      ? `<div style="margin-top:6px">${player.expandedAttrs.playstyle.map(s => {
-          const suited = (PLAYSTYLE_AFFINITY[s] || []).includes(player.affinityStyle);
+    // Playstyle tags render for ANY player who carries one — an enhanced
+    // player's own authored tag(s), or the position-appropriate tag every
+    // regular player now receives from assignPlaystylesToRegularPlayers()
+    // (data/playerDatabase.js). The auto-assigned case gets its own muted
+    // "· assigned" qualifier and a dashed tag style so it still reads as
+    // distinct from a hand-authored signature playstyle.
+    const playstyleList = (player.expandedAttrs && player.expandedAttrs.playstyle) || [];
+    const playstyleTagsHTML = playstyleList.length
+      ? `<div style="margin-top:6px">${playstyleList.map(s => {
           const desc = PLAYSTYLE_DESCRIPTIONS[s] || '';
-          return `<span class="playstyle-tag${suited ? ' affinity-match' : ''}" title="${desc}">${s}</span>`;
+          const cls = player.autoPlaystyle ? 'playstyle-tag auto-assigned' : 'playstyle-tag';
+          const title = player.autoPlaystyle ? `${desc} (assigned by position)` : desc;
+          return `<span class="${cls}" title="${title}">${s}${player.autoPlaystyle ? ' <em>· assigned</em>' : ''}</span>`;
+        }).join('')}</div>`
+      : '';
+    // Personality traits only ever exist on a hand-authored expanded
+    // attribute sheet (player-attributes.json) — most players have none,
+    // so this whole block is naturally absent for them.
+    const personalityList = (player.expandedAttrs && player.expandedAttrs.personality) || [];
+    const personalityTagsHTML = personalityList.length
+      ? `<div style="margin-top:6px">${personalityList.map(s => {
+          const desc = PERSONALITY_DESCRIPTIONS[s] || '';
+          return `<span class="playstyle-tag personality-tag" title="${desc}">${s}</span>`;
         }).join('')}</div>`
       : '';
     // Bio block: age/height/foot only exist on the expanded attribute sheet
     // (player-attributes.json), so this whole section is naturally absent
     // for a regular, non-enhanced player rather than showing empty fields.
     const bioHTML = (boosted && player.expandedAttrs) ? renderPlayerBioHTML(player.expandedAttrs) : '';
+    // Currently-injured banner — full detail lives on the Hospital tab, but
+    // a quick pointer here means a coach checking a specific player's
+    // profile doesn't have to go hunting for it separately.
+    const injRec = (typeof isPlayerInjured === 'function' && isPlayerInjured(playerId)) ? injuryBook[playerId] : null;
+    const injuryHTML = injRec ? `
+      <div class="hospital-inline-banner">
+        🩹 <strong>${injRec.type || 'Injured'}</strong>${injRec.bodyPart ? ' (' + injRec.bodyPart + ')' : ''} — out for ${injRec.matchesLeft} more match${injRec.matchesLeft > 1 ? 'es' : ''}${injRec.cause ? `<div style="color:var(--text-2);font-size:0.78rem;margin-top:2px">${injRec.cause}${injRec.opponent ? ' vs ' + injRec.opponent : ''}</div>` : ''}
+      </div>` : '';
     content.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar" style="background:${primary};border:3px solid ${secondary};color:${secondary}">${playerAvatarMark(player)}</div>
@@ -397,14 +584,15 @@
             return `${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''}`;
           })()} · ${(player.pos||[])[0] || ''}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
-          ${affinityNote}
           ${signatureNote}
-          ${managerAttrNote}
           ${playstyleTagsHTML}
+          ${personalityTagsHTML}
         </div>
       </div>
+      ${injuryHTML}
       ${matchBlock}
       ${bioHTML}
+      ${renderPlayerAttributeRadarHTML(player)}
       <div class="card-title">Career (competitive)</div>
       <div class="profile-stats-grid">
         <div class="profile-stat"><div class="val">${apps}</div><div class="lbl">Apps</div></div>
@@ -414,18 +602,35 @@
         <div class="profile-stat"><div class="val">${s}</div><div class="lbl">Saves</div></div>
         <div class="profile-stat"><div class="val">${y}</div><div class="lbl">Yellows</div></div>
         <div class="profile-stat"><div class="val">${rd}</div><div class="lbl">Reds</div></div>
+        <div class="profile-stat"><div class="val">${avgRating != null ? avgRating.toFixed(2) : '—'}</div><div class="lbl">Avg Rating</div></div>
+        <div class="profile-stat"><div class="val">${cc}</div><div class="lbl">Big Chances Created</div></div>
+        <div class="profile-stat"><div class="val">${bcm}</div><div class="lbl">Big Chances Missed</div></div>
+        <div class="profile-stat"><div class="val">${xgTotal.toFixed(2)}</div><div class="lbl">xG</div></div>
+        <div class="profile-stat"><div class="val">${xaTotal.toFixed(2)}</div><div class="lbl">xA</div></div>
+        <div class="profile-stat"><div class="val">${ints}</div><div class="lbl">Interceptions</div></div>
+        <div class="profile-stat"><div class="val">${blk}</div><div class="lbl">Blocks</div></div>
+        <div class="profile-stat"><div class="val">${gaMinPerGA != null ? Math.round(gaMinPerGA) : '—'}</div><div class="lbl">Mins / G+A</div></div>
       </div>
+      ${renderPlayerRatingFormChartHTML(player.id)}
+      ${renderPlayerContributionChartHTML(player.id)}
       ${renderPlayerMatchLogHTML(player.id)}
+      ${renderPlayerInjuryLogHTML(player.id)}
       <div style="margin-top:8px">
         ${boosted && player.expandedAttrs
           ? expandedAttrRowsHTML(player)
           : [['ATT',player.att],['DEF',player.def],['PHY',player.phy],['PAC',player.pac],['TEC',player.tec]].map(([n,v]) => `
               <div class="attr-bar-row"><span class="attr-name">${n}</span>
-                <div class="attr-track"><div class="attr-fill" style="width:${v||50}%"></div></div>
-                <span class="attr-val">${v||'-'}</span></div>`).join('')}
+                <div class="attr-track"><div class="attr-fill ${statTierClass(v)}" style="width:${Math.min(100, v||50)}%"></div></div>
+                <span class="attr-val ${statTierClass(v)}">${v||'-'}</span></div>`).join('')}
       </div>
-      ${playerTrophyCabinetHTML(player.name)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
+      ${playerTrophyCabinetHTML(player)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
+    // Canvas needs real layout dimensions (clientWidth) to size itself —
+    // wait a frame after the modal's just been made visible/laid out.
+    requestAnimationFrame(() => {
+      drawPlayerRatingFormChart(player.id);
+      drawPlayerContributionChart(player.id);
+    });
   }
 /*@CHUNK:c0481:END*/
 
@@ -445,6 +650,8 @@
     const mgrAwardCount = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
     const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
     const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
+    const formKey = pickTeamFormation(team);
+    const formation = (FORMATIONS[formKey] && FORMATIONS[formKey].name) || formKey;
     const modal = document.getElementById('team-modal');
     const content = document.getElementById('team-modal-content');
     if (!modal || !content) return;
@@ -455,6 +662,7 @@
           <h2 style="margin:0 0 4px;font-size:1.25rem">${team.name}</h2>
           <div style="color:var(--text-2);font-size:0.85rem">${team.short || ''} · ${players.length} players · Avg OVR ${avg}</div>
           <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px">🏟️ ${getStadium(team)}</div>
+          <div style="color:var(--gold);font-size:0.8rem;margin-top:2px;font-weight:700">🧩 ${formation}</div>
         </div>
       </div>
       <div class="card-title" style="margin-top:14px">Manager</div>
@@ -469,7 +677,7 @@
       <div class="card-title" style="margin-top:14px">Squad <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem">(🏆 = trophy cabinet)</span></div>
       <div class="team-squad-list">
         ${players.map(p => {
-          const wonCount = trophies.filter(t => t.player === p.name).length;
+          const wonCount = playerWonTrophies(p).length;
           return `
           <button type="button" class="team-squad-row" onclick="App.showPlayerProfile('${p.id}')">
             <span class="tsr-avatar">${playerAvatarMark(p)}</span>
