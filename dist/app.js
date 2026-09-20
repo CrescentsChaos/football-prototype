@@ -1229,7 +1229,7 @@ var App = (() => {
   // it against both the live event feed and the receiver's own offside
   // count. A marginal-but-onside call still gets VAR-style flavor text so
   // genuinely close decisions read as tense rather than routine.
-  function checkLiveOffside(attackingSide, attacker, moment) {
+  function checkLiveOffside(attackingSide, attacker, moment, quietMarginal) {
     const m = currentMatch;
     const result = evaluateOffside(attackingSide, attacker, moment);
     if (!result.checked) return result;
@@ -1239,11 +1239,396 @@ var App = (() => {
       m.playerMatchStats[attacker.id].offsides = (m.playerMatchStats[attacker.id].offsides || 0) + 1;
       m.playerMatchStats[attacker.id]._liveOffside = true; // tells deriveExtendedMatchStats not to overwrite this with a random backfill figure
       addEvent(m.minute, 'offside', `🚩 Flag up — <span class="player">${attacker.name}</span> caught offside by the last defender`, attackingSide);
-    } else if (result.marginal) {
+    } else if (result.marginal && !quietMarginal) {
       addEvent(m.minute, 'offside', `Tight call — <span class="player">${attacker.name}</span> ruled level, play continues`, attackingSide);
     }
     return result;
   }
+
+  // ===================================================================
+  // ======================== SPATIAL MODEL =============================
+  // ===================================================================
+  // A shared, reusable layer of positional metrics for the possession
+  // pipeline (engine/possession.js), defending (engine/defending.js), and
+  // chance creation (engine/passing.js) — built on top of the SAME
+  // coordinate convention the offside engine already established
+  // (engine/offside.js's playerAdvancement()/defensiveLineContext()):
+  // every on-pitch player has an (x,y) implied by their formation slot
+  // (FORMATIONS[key].coords — js/state.js), collapsed to a 0-1
+  // "advancement" value (0 = own goal, 1 = opponent's goal) that's
+  // directly comparable between the two sides.
+  //
+  // This does NOT replace the existing 3-thirds x 3-channels zone
+  // pipeline — it sits alongside it and answers questions the zone
+  // labels alone can't: how deep/high the defensive line actually is,
+  // how compact a back line is against its own midfield, how tightly a
+  // specific marker is actually goal-side of the carrier, and whether a
+  // zone is currently a numbers-up or numbers-down situation for the
+  // side on the ball. Existing callers (defensivePressure(), chance
+  // creation) fold these in as extra inputs to their existing rolls,
+  // rather than as new independent dice.
+  //
+  // Nothing here is simulated frame-by-frame; it's recomputed cheaply
+  // from each side's current on-pitch XI whenever a caller asks, which
+  // matches the granularity (once or twice per minute, at zone
+  // transitions) the rest of the possession pipeline already runs at.
+  
+  // On-pitch outfield players (goalkeeper excluded) for one side of the
+  // current match, with their formation key attached to each lookup site
+  // rather than assumed globally — same pattern as
+  // offside.js::defensiveLineContext().
+  function onPitchOutfield(sideKey) {
+    const m = currentMatch;
+    if (!m) return [];
+    const teamSide = m[sideKey];
+    if (!teamSide) return [];
+    const ids = sideKey === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const all = (teamSide.squad && teamSide.squad.all) || [];
+    return (ids || [])
+      .map((id) => all.find((p) => p.id === id))
+      .filter((p) => p && (p.slot || (p.pos || [])[0]) !== 'GK');
+  }
+  
+  // Shared line/channel helpers. POS_LINE (js/state.js) reports a
+  // player's nominal line as 'FWD', not 'ATT' — normalizedLine() maps
+  // that onto the DEF/MID/ATT vocabulary the rest of this module (and
+  // the zone system's own third labels) use, and folds GK in as DEF so
+  // an outfield-only caller never has to special-case it.
+  const LINE_ORDER = { DEF: 0, MID: 1, ATT: 2 };
+  function normalizedLine(p) {
+    const line = lineOf(p);
+    if (line === 'FWD') return 'ATT';
+    if (line === 'GK') return 'DEF';
+    return line;
+  }
+  // Which side of the pitch a slot naturally occupies, straight off its
+  // name (RB/RM/RW/RWB -> 'R', LB/LM/LW/LWB -> 'L', everything else,
+  // including every central slot, -> 'C') — the same convention the
+  // formation slot codes already follow everywhere else in the engine.
+  function naturalChannelOf(slot) {
+    if (/^R/.test(slot)) return 'R';
+    if (/^L/.test(slot)) return 'L';
+    return 'C';
+  }
+  
+  // ===== Shared pitch frame =====
+  // Every formation coordinate (FORMATIONS[key].coords, or a hand-built
+  // squad.customCoords shape) is written in the OWNING side's own frame:
+  // that side attacks "up" the page, its own goal line sits at y~92, and
+  // x=0 is its own left touchline. That's ideal for drawing one team on
+  // its own mini-pitch and useless for measuring anything BETWEEN the two
+  // teams — an away CB and a home ST both read as "y~75 / y~18".
+  //
+  // toSharedFrame() puts both teams on ONE 0-100 x 0-100 pitch by taking
+  // the home side's frame as the reference (untouched) and rotating the
+  // away side 180 degrees onto it: x' = 100 - x, y' = 100 - y. After that
+  // the home side defends the high-y end and attacks toward y=0, the away
+  // side defends the low-y end and attacks toward y=100, and a plain
+  // Euclidean distance between any two players (or a player and the ball)
+  // means what it says.
+  const PITCH_MAX = 100;
+  function toSharedFrame(sideKey, x, y) {
+    return sideKey === 'away' ? { x: PITCH_MAX - x, y: PITCH_MAX - y } : { x: x, y: y };
+  }
+
+  // Shared-frame position of every on-pitch player on one side, keyed by
+  // player id. Formation slot codes repeat (two CBs, two CMs, two STs), so
+  // a plain formation.slots.indexOf(slot) would give BOTH centre-backs the
+  // first CB's x — harmless for the y-only advancement maths elsewhere in
+  // this file, but wrong the moment x matters. Players are therefore
+  // dealt into slot INDEXES the same way the pitch view does it
+  // (ui/matchUI.js::renderPitch, "Pass 1/Pass 2"): a player's own recorded
+  // .slot claims the first still-free slot of that code, then leftover
+  // slots fall back to secondary position / canPlay() / whoever is left.
+  // A hand-built shape (squad.customCoords) is honoured just like the
+  // pitch view honours it.
+  function sidePitchLayout(sideKey) {
+    const m = currentMatch;
+    const squad = m && m[sideKey] && m[sideKey].squad;
+    if (!squad) return {};
+    const form = FORMATIONS[squad.formation] || FORMATIONS['4-3-3'];
+    const coords = squad.customCoords || form.coords || [];
+    const slots = form.slots || [];
+    const ids = (sideKey === 'home' ? m.homeOnPitch : m.awayOnPitch) || [];
+    const all = squad.all || [];
+    const players = ids.map((id) => all.find((p) => p.id === id)).filter(Boolean);
+    const bySlot = [];
+    const used = new Set();
+    const claim = (idx, p) => { used.add(p.id); bySlot[idx] = p; };
+    slots.forEach((slot, idx) => {
+      const p = players.find((q) => !used.has(q.id) && q.slot === slot);
+      if (p) claim(idx, p);
+    });
+    slots.forEach((slot, idx) => {
+      if (bySlot[idx]) return;
+      const p = players.find((q) => !used.has(q.id) && (q.pos || []).includes(slot))
+        || players.find((q) => !used.has(q.id) && canPlay(q, slot))
+        || players.find((q) => !used.has(q.id));
+      if (p) claim(idx, p);
+    });
+    const layout = {};
+    bySlot.forEach((p, idx) => {
+      const c = coords[idx] || [50, 50];
+      layout[p.id] = toSharedFrame(sideKey, c[0], c[1]);
+    });
+    return layout;
+  }
+
+  // {x, y} of one on-pitch player in the shared frame, or null if they
+  // aren't on the pitch (bench, sent off) or there is no live match.
+  function playerPitchPos(p) {
+    const ctx = playerSideData(p);
+    if (!ctx) return null;
+    return sidePitchLayout(ctx.sideKey)[p.id] || null;
+  }
+
+  // Accepts either a player object or an already-resolved shared-frame
+  // {x, y} point (e.g. m.ballPos) so the geometry helpers below take both.
+  function toPitchPoint(o) {
+    if (!o) return null;
+    if (typeof o.x === 'number' && typeof o.y === 'number') return o;
+    return playerPitchPos(o);
+  }
+
+  // ===== Ball position =====
+  // A {third, channel} zone resolved to a point: the CENTRE of that zone
+  // in the possessing side's own frame (thirds of the 0-100 pitch, own
+  // goal at y=100 / attacking end at y=0, L = low x), then run through
+  // toSharedFrame() so it lands in the same frame as the players.
+  const ZONE_CENTER_Y = { DEF: 83.3, MID: 50, ATT: 16.7 };
+  const ZONE_CENTER_X = { L: 16.7, C: 50, R: 83.3 };
+  function ballPointForZone(sideKey, third, channel) {
+    const y = ZONE_CENTER_Y[third];
+    const x = ZONE_CENTER_X[channel];
+    return toSharedFrame(sideKey, x != null ? x : 50, y != null ? y : 50);
+  }
+
+  // The one place m.ballZone is written. ballZone keeps its exact old
+  // shape (ui/matchUI.js::computeDynamicPosition reads it), and ballPos is
+  // the same information as a shared-frame point.
+  function setBallZone(sideKey, third, channel) {
+    const m = currentMatch;
+    if (!m) return;
+    m.ballZone = { side: sideKey, third: third, channel: channel };
+    m.ballPos = ballPointForZone(sideKey, third, channel);
+  }
+  
+  // Average advancement (own-frame, per playerAdvancement() in
+  // offside.js) of each of a side's three tactical lines right now, from
+  // whoever is actually on the pitch — not the formation's static
+  // template. Falls back to a neutral, evenly-spaced shape if a line is
+  // empty (e.g. a back-three system has no natural "wide" DEF body).
+  function teamLineAdvancements(sideKey) {
+    const m = currentMatch;
+    const teamSide = m && m[sideKey];
+    const formationKey = teamSide && teamSide.squad && teamSide.squad.formation;
+    const groups = { DEF: [], MID: [], ATT: [] };
+    onPitchOutfield(sideKey).forEach((p) => {
+      const line = normalizedLine(p);
+      (groups[line] || groups.MID).push(playerAdvancement(p, formationKey));
+    });
+    const avg = (arr, fallback) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : fallback);
+    return {
+      DEF: avg(groups.DEF, 0.18),
+      MID: avg(groups.MID, 0.5),
+      ATT: avg(groups.ATT, 0.82)
+    };
+  }
+  
+  // Defensive line height in the same universal "shared" units offside.js
+  // already computes (higher = further up the pitch, comparable between
+  // sides) — a thin wrapper so callers outside offside.js don't need to
+  // know its internal lineShared/lineAdv naming.
+  function defensiveLineHeight(sideKey) {
+    const m = currentMatch;
+    const teamSide = m && m[sideKey];
+    if (!teamSide) return 0.3;
+    return defensiveLineContext(teamSide, sideKey).lineShared;
+  }
+  
+  // How compact a side's back line is against its own midfield right now
+  // (own-frame advancement gap between the two lines) — a small gap is a
+  // team defending as a coordinated, compact block; a large one means
+  // real space for an attacker to run into between the lines. Bounded to
+  // a sane range so a temporarily empty line can't return a nonsense
+  // (near-zero or negative) gap.
+  function lineCompactness(sideKey) {
+    const lines = teamLineAdvancements(sideKey);
+    return Math.max(0.08, Math.min(0.75, lines.MID - lines.DEF));
+  }
+  
+  // Real marking distance between a ball carrier and the marker sent to
+  // close them down: the straight-line (Euclidean) distance between the
+  // two players' positions on the shared 0-100 x 0-100 pitch (see
+  // toSharedFrame() above), so it's in pitch-percent units and counts the
+  // sideways gap as well as the vertical one. It used to be only the
+  // vertical gap between the two players' advancement values, i.e. a
+  // marker standing on the far touchline read as "tight" as long as he
+  // was on the right line. Falls back to a neutral 30 when either player
+  // has no position (not on the pitch / no live match).
+  function markingDistance(carrier, marker) {
+    const a = toPitchPoint(carrier), b = toPitchPoint(marker);
+    if (!a || !b) return 30;
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+  
+  // Shortest distance from point p to the SEGMENT a-b (not the infinite
+  // line through it): p is projected onto a-b, the projection is clamped
+  // to the segment's ends, and the distance is measured to that clamped
+  // point. A point beyond either end is therefore measured to that end
+  // rather than to an imaginary extension of the line.
+  function pointToSegmentDistance(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+  }
+
+  // A defender within this many pitch-percent units of the pass line is
+  // close enough to get a foot/body on it.
+  const LANE_BLOCK_RADIUS = 4;
+
+  // Is the straight passing lane from `from` to `to` free of defenders?
+  // `from` / `to` / each entry of `defenders` may be a player object or a
+  // shared-frame {x, y} point. A defender blocks the lane when his
+  // distance to the from->to SEGMENT is under `laneRadius`, which (per
+  // pointToSegmentDistance) includes one standing right on the passer or
+  // the receiver. Anyone without a position is ignored; with nothing to
+  // go on the lane is reported open.
+  function passingLaneOpen(from, to, defenders, laneRadius) {
+    const a = toPitchPoint(from), b = toPitchPoint(to);
+    if (!a || !b) return true;
+    const radius = laneRadius == null ? LANE_BLOCK_RADIUS : laneRadius;
+    return !(defenders || []).some((d) => {
+      const pt = toPitchPoint(d);
+      return pt && pointToSegmentDistance(pt, a, b) < radius;
+    });
+  }
+  
+  // How wide an angle (radians) a defender's body blocks off from the
+  // passer's view of the pitch behind him: the visual angle a disc of
+  // `bodyRadius` subtends at the ball, 2 * asin(r / d). It is widest when
+  // the defender is right on the ball (capped at PI once he is within one
+  // body radius of it) and shrinks with distance. `ball` is a shared-frame
+  // {x, y} point (m.ballPos) or a player; if omitted, the live ball is used.
+  const DEFENDER_BODY_RADIUS = 1;
+  function coverShadow(defender, ball, bodyRadius) {
+    const d = toPitchPoint(defender);
+    const b = toPitchPoint(ball || (currentMatch && currentMatch.ballPos));
+    if (!d || !b) return 0;
+    const r = bodyRadius == null ? DEFENDER_BODY_RADIUS : bodyRadius;
+    const dist = Math.hypot(d.x - b.x, d.y - b.y);
+    if (dist <= r) return Math.PI;
+    return 2 * Math.asin(r / dist);
+  }
+  
+  // How much of a given on-pitch player's attention is actually in a
+  // given zone right now — a soft, continuous read instead of "is this
+  // slot on the zone's eligible-position list" (ZONE_POS_MAP), which
+  // only ever reflects a player's TYPICAL role and can't see a fullback
+  // who's pushed forward on the overlap while the rest of his back line
+  // holds. Built from: how far the zone's third sits from the player's
+  // own tactical line, how well the zone's channel matches the side of
+  // the pitch his slot naturally plays, then adjusted by the team's
+  // current tactical stance and manager DNA — overlaps/width specifically
+  // push a wide defender's presence further up the pitch than his line
+  // alone would suggest, positionalFreedom loosens everyone's positional
+  // discipline in general. Returns roughly 0.04-1, never exactly 0, since
+  // nobody's presence anywhere is truly impossible, just unlikely.
+  function zonePresence(player, zoneKey, sideKey) {
+    const m = currentMatch;
+    const [zThird, zChannel] = zoneKey.split('_');
+    const slot = player.slot || (player.pos || [])[0] || 'CM';
+    const pLine = normalizedLine(player);
+    const lineDist = Math.abs((LINE_ORDER[zThird] != null ? LINE_ORDER[zThird] : 1)
+      - (LINE_ORDER[pLine] != null ? LINE_ORDER[pLine] : 1));
+    let lineWeight = lineDist === 0 ? 1 : lineDist === 1 ? 0.35 : 0.08;
+
+    const natChannel = naturalChannelOf(slot);
+    let channelWeight = natChannel === zChannel ? 1 : (natChannel === 'C' || zChannel === 'C') ? 0.5 : 0.12;
+
+    const teamSide = m && m[sideKey];
+    const dna = teamSide ? getManagerDNA(teamSide.team) : null;
+    if (dna) {
+      // A genuinely fluid side doesn't stay in its lanes — loosen both
+      // penalties toward "could be anywhere" as positional freedom rises.
+      lineWeight = lineWeight + (1 - lineWeight) * dna.positionalFreedom * 0.4;
+      channelWeight = channelWeight + (1 - channelWeight) * dna.positionalFreedom * 0.3;
+
+      // The overlapping-fullback case a static list can't see: a wide
+      // defender specifically trying to occupy a MORE ADVANCED zone on
+      // his own natural side gets a direct presence bonus from the
+      // manager's overlap/width DNA. Never applied dropping back, so it
+      // can't inflate his presence in his own defensive third.
+      const isWideDefender = slot === 'RB' || slot === 'LB' || slot === 'RWB' || slot === 'LWB';
+      if (isWideDefender && LINE_ORDER[zThird] > LINE_ORDER.DEF && natChannel === zChannel) {
+        lineWeight += (dna.overlaps - 0.5) * 0.5 + (dna.width - 0.5) * 0.25;
+      }
+
+      // Overall attacking/defensive stance shifts the whole side's
+      // weight toward or away from advanced zones — the same directional
+      // effect the pitch view's own live dot-shifting already models
+      // (ui/matchUI.js::computeDynamicPosition), just feeding zone
+      // presence here instead of a rendered position.
+      const tac = (m.tactics && m.tactics[sideKey]) || 'balanced';
+      const advanceBias = tac === 'attack' ? 0.12 : tac === 'press' ? 0.06 : tac === 'defend' ? -0.12 : 0;
+      if (advanceBias !== 0) {
+        const towardAdvanced = LINE_ORDER[zThird] > LINE_ORDER[pLine];
+        lineWeight += towardAdvanced ? advanceBias : -advanceBias * 0.6;
+      }
+    }
+
+    return Math.max(0.04, Math.min(1, lineWeight * channelWeight));
+  }
+
+  // Summed zone presence across each side's on-pitch XI, attacking side
+  // in the zone as given, defending side in its mirrored (same physical
+  // area) zone — a positive result is a genuine attacking overload
+  // there, negative is the defence outnumbering the attack. Same
+  // signature as before, so existing callers (decisionModel.js,
+  // possession.js) don't need to change, just get a truer number.
+  function localOverload(attackingSide, defendingSide, zoneKey) {
+    const defZoneKey = mirrorZoneKey(zoneKey);
+    const attPresence = onPitchOutfield(attackingSide)
+      .reduce((sum, p) => sum + zonePresence(p, zoneKey, attackingSide), 0);
+    const defPresence = onPitchOutfield(defendingSide)
+      .reduce((sum, p) => sum + zonePresence(p, defZoneKey, defendingSide), 0);
+    return attPresence - defPresence;
+  }
+  
+  // Which vertical band of the pitch a player's formation slot sits in
+  // right now — wide, half-space, or central — read straight off the
+  // formation's own x-coordinates rather than a fixed per-position
+  // assumption (a back-three's wide centre-back and a back-four's
+  // winger can both be "wide" or not depending on the actual shape).
+  function halfSpaceOf(p) {
+    const ctx = playerSideData(p);
+    if (!ctx) return 'central';
+    const formationKey = ctx.side.squad && ctx.side.squad.formation;
+    const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
+    const slot = p.slot || (p.pos || [])[0] || 'CM';
+    const idx = formation.slots.indexOf(slot);
+    const x = (formation.coords[idx >= 0 ? idx : 0] || [50, 50])[0];
+    if (x < 20 || x > 80) return x < 20 ? 'wideLeft' : 'wideRight';
+    if (x < 40 || x > 60) return x < 40 ? 'halfSpaceLeft' : 'halfSpaceRight';
+    return 'central';
+  }
+  
+  // A single ready-made chance-quality adjustment for the final-third
+  // decision in passing.js::resolveChanceCreation() — a high, stretched
+  // defensive line (high defensiveLineHeight, wide lineCompactness gap)
+  // genuinely creates more/better through-ball and cutback opportunities
+  // than a deep, compact block, independent of either side's raw
+  // attributes. Centered near 0 for an average mid-block so it nudges
+  // the existing roll rather than dominating it.
+  function chanceSpaceBonus(defendingSide) {
+    const height = defensiveLineHeight(defendingSide); // ~0-1, higher = defensive line pushed up
+    const gap = lineCompactness(defendingSide);         // ~0.08-0.75, higher = more stretched
+    const bonus = (height - 0.32) * 0.05 + (gap - 0.25) * 0.06;
+    return Math.max(-0.05, Math.min(0.08, bonus));
+  }
+  
 
   // ===================================================================
   // ================== FREE-KICK ROUTINES (open play) =================
@@ -3676,8 +4061,12 @@ var App = (() => {
     // a bit hot versus the ~33% real-world benchmark noted below — this
     // small bump brings scoring back toward that line without undoing the
     // shot-volume fix itself.
+    // Nudged 0.62 -> 0.66: with corners, cleared-cross corners and routine
+    // free-kick openings now generating realistic set-piece volume (see
+    // engine/passing.js / referee.js), overall conversion had drifted to
+    // ~36% of shots on target — this brings it back toward the ~33% line.
     const saveChance = Math.min(0.94, Math.max(0.28,
-      0.62 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
+      0.66 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
     if (seededRandom() >= saveChance) return { saved: false };
 
     // A save happened — decide whether it's a clean catch or a parry (and,
@@ -7754,6 +8143,16 @@ var App = (() => {
     GK: 0.42, CB: 0.14, RB: 0.34, LB: 0.34, RWB: 0.4, LWB: 0.4,
     CDM: 0.14, CM: 0.18, CAM: 0.16, RM: 0.38, LM: 0.38, RW: 0.4, LW: 0.4, ST: 0.12
   };
+
+  // Per-pass chance that a pass is a cross into the box — wide players and
+  // wing-backs deliver most of them. Feeds the crosses stat and cleared-
+  // cross corners in simulateMinutePassing() below (only crosses that turned
+  // into a shot were counted before, ~6 a match against ~25-30 in a real
+  // one). Rolled per pass rather than off the lofted-ball count: the
+  // lofted split rounds to zero for most single-pass minutes.
+  const CROSS_PER_PASS = {
+    RB: 0.05, LB: 0.05, RWB: 0.085, LWB: 0.085, RM: 0.085, LM: 0.085, RW: 0.075, LW: 0.075, CAM: 0.015, CM: 0.008
+  };
   function simulateMinutePassing() {
     const m = currentMatch;
     if (!m) return;
@@ -7806,6 +8205,7 @@ var App = (() => {
         return { p, w };
       });
       const totalW = weighted.reduce((s, x) => s + x.w, 0) || 1;
+      let cornersWon = 0;
       weighted.forEach(({ p, w }) => {
         const raw = vol * (w / totalW);
         const count = Math.floor(raw) + (seededRandom() < (raw - Math.floor(raw)) ? 1 : 0);
@@ -7825,8 +8225,10 @@ var App = (() => {
         const groundCount = count - loftedCount;
         const groundSkill = groundPassingAbility(p) / 100;
         const loftedSkill = aerialPassingAbility(p) / 100;
-        let groundRate = Math.min(0.97, Math.max(0.55, 0.68 + groundSkill * 0.30));
-        let loftedRate = Math.min(0.94, Math.max(0.42, 0.56 + loftedSkill * 0.34));
+        // Base rates eased ~3.5 points: league-wide completion was landing near 89%
+        // against roughly 84-86% in the real top flights.
+        let groundRate = Math.min(0.97, Math.max(0.55, 0.645 + groundSkill * 0.30));
+        let loftedRate = Math.min(0.94, Math.max(0.42, 0.53 + loftedSkill * 0.34));
         if (tac === 'press') { groundRate -= 0.03; loftedRate -= 0.03; }
         if (tac === 'attack') { groundRate -= 0.012; loftedRate -= 0.018; }
         groundRate = Math.min(0.97, Math.max(0.4, groundRate + pmods.passAccDelta));
@@ -7843,8 +8245,32 @@ var App = (() => {
         ps.longBalls = (ps.longBalls || 0) + loftedCompleted;
         team.stats.passes = (team.stats.passes || 0) + count;
         team.stats.passesCompleted = (team.stats.passesCompleted || 0) + completed;
+        // Crosses: wide players and full-backs deliver most. Most are cleared, intercepted or overhit; a fair share of the
+        // cleared ones go behind for a corner.
+        const crossRate = CROSS_PER_PASS[slot] || 0;
+        if (crossRate) {
+          let crossAtt = 0;
+          for (let i = 0; i < count; i++) { if (seededRandom() < crossRate) crossAtt++; }
+          if (crossAtt) {
+            ps.crosses = (ps.crosses || 0) + crossAtt;
+            for (let i = 0; i < crossAtt; i++) { if (seededRandom() < 0.2) cornersWon++; }
+          }
+        }
         if (side === 'home') homeCompletedMin += completed; else awayCompletedMin += completed;
       });
+      // Balls in behind the line: a forward gambles on the run and the
+      // pass, and the flag goes up on a share of them. Only the through-
+      // ball chances that became shots were judged for offside before
+      // (~0.4 flags a match against ~3-4 in the real thing); this judges
+      // the many runs that never produced a shot, through the same
+      // spatial model (engine/offside.js), so the flags follow the defensive
+      // line, pace and awareness rather than a flat roll.
+      const runP = 0.125 * (tac === 'attack' ? 1.2 : tac === 'defend' ? 0.75 : tac === 'press' ? 0.9 : 1);
+      if (seededRandom() < runP) {
+        const runner = pickPlayerWeighted(team, ['ST', 'RW', 'LW', 'CAM'], GOAL_ROLE_WEIGHT);
+        if (runner) checkLiveOffside(side, runner, 'throughball', true); // quiet: a 'tight call, play on' line for every background run would flood the feed
+      }
+      for (let i = 0; i < cornersWon; i++) resolveCorner(side);
     });
     return { homeCompletedMin, awayCompletedMin };
   }
@@ -8015,7 +8441,14 @@ var App = (() => {
     }
     return (curvedAttr(p.tec || 70, 70) * 0.65 + curvedAttr(p.ovr || 75, 75) * 0.35) * conditionMultiplier(p) * bigOccasionMult;
   }
-  function defensivePressure(p) {
+  // `carrier` is optional (existing call sites that don't have one in
+  // scope keep working exactly as before) — when supplied, a genuine
+  // spatial read (engine/spatialModel.js::markingDistance()) tightens or
+  // loosens the attribute-based pressure number below: the same marker
+  // closing down from 3 pitch-length-units away presses harder than one
+  // still 25 units off, on top of whatever their attributes already say
+  // about how good they are at applying it once there.
+  function defensivePressure(p, carrier) {
     if (p && p.expandedAttrs) {
       // Distinct weighting instead of a flat average: Defensive Awareness
       // (positioning/anticipation) and Tackling (execution) are what
@@ -8051,7 +8484,23 @@ var App = (() => {
         bonus += (dna.pressing - 0.5) * 3 + (dna.compactness - 0.5) * 2;
       }
       // A tired defender presses/closes down a yard slower than a fresh one.
-      return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p);
+      let distanceMult = 1;
+      if (carrier) {
+        // markingDistance() is now the true straight-line distance on the
+        // shared pitch (sideways gap included), where a possession-sequence
+        // marker typically sits ~10 units away (a tight, goal-side marking
+        // job) to ~60+ (loose, covering off a zone rather than a man) —
+        // mapped onto a 0.7x-1.25x multiplier so genuinely tight marking
+        // meaningfully outweighs loose zonal coverage, without a wildly
+        // out-of-position marker ever pressing harder than a well-attributed
+        // one standing right next to the carrier. Recalibrated from the
+        // old 1.3 - dist/50 (tuned for the vertical-gap-only distance) so
+        // the AVERAGE multiplier — and with it the match balance — is
+        // unchanged now that the distance also counts the sideways gap.
+        const dist = markingDistance(carrier, p);
+        distanceMult = Math.max(0.7, Math.min(1.25, 1.39 - dist / 64));
+      }
+      return (base + bonus) * staminaMultiplier(p) * conditionMultiplier(p) * distanceMult;
     }
     return (curvedAttr(p.def || 70, 70) * 0.7 + curvedAttr(p.ovr || 75, 75) * 0.3) * conditionMultiplier(p);
   }
@@ -8291,7 +8740,9 @@ var App = (() => {
       } else {
         addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
       }
-      if (seededRandom() < 0.4) resolveCorner(attackingSide);
+      // A blocked effort loops behind for a corner far more often than
+      // the old flat 40% allowed.
+      if (seededRandom() < 0.55) resolveCorner(attackingSide);
       return;
     }
 
@@ -8366,13 +8817,21 @@ var App = (() => {
         // Only a parry (not a clean catch) can leave a rebound behind, and
         // how likely that rebound actually is comes straight from the
         // keeper's own gk_parry rating via saveResult.reboundDanger.
+        let reboundTaken = false;
         if (saveResult.saveType === 'parry' && seededRandom() < saveResult.reboundDanger) {
           const reboundShooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, shooter.id);
           if (reboundShooter) {
+            reboundTaken = true;
             attTeam.stats.shots++;
             addEvent(m.minute, 'shot', `The rebound falls to <span class="player">${reboundShooter.name}</span>!`, attackingSide);
             resolveShot(attackingSide, defendingSide, reboundShooter, 'openplay', { qualityBonus: 0.16, onTargetBonus: 0.1 });
           }
+        }
+        // A keeper who can't hold it (parry or punch) with no shot following
+        // very often turns it behind for a corner — the most common way a
+        // save leads to a set piece in real matches.
+        if (!reboundTaken && saveResult.saveType !== 'catch' && seededRandom() < 0.3) {
+          resolveCorner(attackingSide);
         }
       }
       return;
@@ -8625,6 +9084,9 @@ var App = (() => {
         // Opts to recycle rather than force a low-quality look — the chance
         // fizzles out safely instead of every final-third entry ending in a shot.
         addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> pulls it back rather than force it`, attackingSide);
+        // Sustained pressure that doesn't yield a shot still forces the
+        // odd clearance behind.
+        if (seededRandom() < 0.2) resolveCorner(attackingSide);
         return;
       case 'shoot':
       default:
@@ -8646,6 +9108,15 @@ var App = (() => {
     // who doesn't — the raw attribute matters on top of the skill tags.
     if (chanceType === 'cross') creationQualityBonus += ((xattr(carrier, 'lofted_pass', 70) - 70) / 100) * 0.03;
     if (hasSkill(carrier, 'No Look Pass') || hasSkill(carrier, 'Heel Trick') || hasSkill(carrier, 'Rabona')) creationQualityBonus += 0.015;
+    // A through ball/cutback that actually arrives at a runner in the
+    // half-space (not central, not pinned to the touchline — see
+    // engine/spatialModel.js::halfSpaceOf()) is a genuinely sharper angle
+    // on goal than the same delivery to a central or wide-on-the-line
+    // teammate.
+    if ((chanceType === 'throughball' || chanceType === 'cutback') && shooter) {
+      const shooterHs = halfSpaceOf(shooter);
+      if (shooterHs === 'halfSpaceLeft' || shooterHs === 'halfSpaceRight') creationQualityBonus += 0.03;
+    }
 
     // A through ball is a genuine forward pass into space beyond the
     // defence — the one chance type actively judged for offside before the
@@ -8762,16 +9233,24 @@ var App = (() => {
     // foul on, and every increment is smaller, so repeat fouling still
     // clearly raises the odds of a card without turning into a near-certain
     // yellow (or a cheap second yellow) by a player's third or fourth foul.
-    let yellowChance = Math.min(0.45, 0.04 * aggression + (foulCount - 1) * 0.06 + (alreadyYellow ? 0.07 : 0) + (foulCount >= 4 ? 0.05 : 0));
+    // Recalibrated for realistic foul volume (~20+ a match, see
+    // simulateRoutineFouls below): with that many fouls the per-foul card
+    // rate has to sit near the real-world ~1 yellow per 6-7 fouls, so the
+    // base slope is raised while the repeat-offender escalation stays gentle.
+    let yellowChance = Math.min(0.45, 0.105 * aggression + (foulCount - 1) * 0.05 + (alreadyYellow ? 0.05 : 0) + (foulCount >= 4 ? 0.04 : 0));
     // Hot-Head: once already booked, a second yellow becomes a genuinely
     // live risk on top of the flat alreadyYellow bump above.
+    // Referees are markedly reluctant to send a player off for a second
+    // yellow on an ordinary foul — with realistic foul volume, leaving the
+    // full escalation in place produced ~4x the real-world red-card rate.
+    if (alreadyYellow) yellowChance *= 0.22;
     if (alreadyYellow && personality.includes('Hot-Head')) yellowChance = Math.min(0.6, yellowChance + 0.08);
     // Cynical: the flip side of the extra tactical-foul willingness applied
     // in resolveTurnover (engine/transitions.js) — a professional foul in
     // that same breakaway context draws fewer cards than a genuine mistimed
     // challenge would.
     if (context === 'breakaway' && personality.includes('Cynical')) yellowChance *= 0.6;
-    const straightRedChance = 0.0013 * aggression;
+    const straightRedChance = 0.0006 * aggression;
     const roll = seededRandom();
     if (roll < straightRedChance && !alreadyYellow) {
       defTeam.stats.reds++;
@@ -8805,9 +9284,69 @@ var App = (() => {
         return { outcome: 'yellow' };
       }
     } else {
-      addEvent(m.minute, 'foul', foulText + (foulCount > 1 ? ' — referee has a word' : ''), defendingSide);
+      // Routine mid-pitch fouls are all counted, but only some make the
+      // live feed — a real text feed doesn't narrate every whistle.
+      if (context !== 'routine' || foulCount > 1 || seededRandom() < 0.35) {
+        addEvent(m.minute, 'foul', foulText + (foulCount > 1 ? ' — referee has a word' : ''), defendingSide);
+      }
       return { outcome: 'foul' };
     }
+  }
+
+  // ===== Routine fouls =====
+  // The fouls the possession pipeline models (duel losses, tactical fouls,
+  // the off-ball defensive loop) only add up to ~6 a match — real football
+  // sits around 20-25, most of them ordinary mid-pitch contact that never
+  // becomes a shot. This runs once per minute per side and adds that missing
+  // volume: who commits it (weighted by position and foul-proneness), who
+  // wins it (dribblers/pacy attackers get fouled most), how often it happens
+  // (pressing sides and the weaker side foul more, a side chasing the game
+  // late fouls more) — all routed through resolveFoul so cards, foul counts
+  // and repeat-offender escalation stay in one place.
+  const FOUL_POS_WEIGHT = { CDM: 1.5, CM: 1.25, CB: 1.05, RB: 1.0, LB: 1.0, RWB: 1.0, LWB: 1.0, CAM: 0.65, RM: 0.7, LM: 0.7, RW: 0.6, LW: 0.6, ST: 0.55, CF: 0.55, GK: 0 };
+  const FOULED_POS_WEIGHT = { RW: 1.4, LW: 1.4, CAM: 1.2, ST: 1.0, CF: 1.0, CM: 1.0, RM: 1.1, LM: 1.1, CDM: 0.6, RWB: 0.7, LWB: 0.7, RB: 0.6, LB: 0.6, CB: 0.35, GK: 0.02 };
+  function simulateRoutineFouls() {
+    const m = currentMatch;
+    if (!m) return;
+    const dm = m.dispMin != null ? m.dispMin : m.minute;
+    ['home', 'away'].forEach(defSide => {
+      const attSide = defSide === 'home' ? 'away' : 'home';
+      const defTeam = m[defSide], attTeam = m[attSide];
+      const defIds = defSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+      const outfield = (defTeam.squad.all || []).filter(p => defIds.includes(p.id) && (p.slot || (p.pos || [])[0]) !== 'GK');
+      if (!outfield.length) return;
+      const tac = (m.tactics && m.tactics[defSide]) || 'balanced';
+      let rate = 0.075;
+      if (tac === 'press') rate *= 1.25;
+      else if (tac === 'defend') rate *= 0.9;
+      // A side second-best on quality spends more of the game chasing the
+      // ball; the stronger side needs to foul less.
+      const ownStr = calcTeamStrength(defTeam), oppStr = calcTeamStrength(attTeam);
+      rate *= 1 + Math.max(-0.15, Math.min(0.25, ((oppStr.ovr || 75) - (ownStr.ovr || 75)) / 60));
+      // Rougher squad, more fouls (league-average foulProneness is ~1).
+      rate *= outfield.reduce((s, p) => s + foulProneness(p), 0) / outfield.length;
+      // Game state: chasing the game late gets scrappier.
+      const diff = (defTeam.score || 0) - (attTeam.score || 0);
+      if (dm > 65 && diff < 0) rate *= 1.15;
+      if (seededRandom() >= rate) return;
+      const fouler = pickPlayerCustomWeighted(defTeam, null, (p) => {
+        const slot = p.slot || (p.pos || [])[0] || 'CM';
+        return (FOUL_POS_WEIGHT[slot] != null ? FOUL_POS_WEIGHT[slot] : 0.8) * foulProneness(p);
+      });
+      if (!fouler) return;
+      const victim = pickPlayerCustomWeighted(attTeam, null, (p) => {
+        const slot = p.slot || (p.pos || [])[0] || 'CM';
+        const carry = (xattr(p, 'dribb', p.tec || 70) * 0.6 + xattr(p, 'spd', p.pac || 70) * 0.4) / 70;
+        return (FOULED_POS_WEIGHT[slot] != null ? FOULED_POS_WEIGHT[slot] : 0.7) * carry;
+      });
+      const result = resolveFoul(defSide, attSide, fouler, victim, false, false, 'routine');
+      // A small share of fouls are won in a dangerous spot — most just
+      // restart play, which is why this is far lower than the secondary
+      // free-kick path's own rate.
+      if (result && result.outcome !== 'red' && result.outcome !== 'penalty' && seededRandom() < 0.05) {
+        resolveFreeKickRoutine(attSide, defSide, seededRandom() < 0.4);
+      }
+    });
   }
 
   // ===== Transitions phase: a fast break for the side that just won the ball =====
@@ -8832,7 +9371,7 @@ var App = (() => {
     const breakChannel = seededRandom() < 0.5 ? 'L' : (seededRandom() < 0.5 ? 'C' : 'R');
     // A break goes straight at the exposed defence — the ball is already
     // effectively in the attacking third by the time it's sprung.
-    m.ballZone = { side: breakingSide, third: 'ATT', channel: breakChannel };
+    setBallZone(breakingSide, 'ATT', breakChannel);
     resolveChanceCreation(breakingSide, otherSide, shooter, breakChannel, speedEdge);
   }
 
@@ -8850,7 +9389,13 @@ var App = (() => {
     // Purely a rendering aid for ui/matchUI.js::renderPitch (see the note in
     // possession.js) — never read by the simulation itself.
     const mirroredThird = toThird === 'ATT' ? 'DEF' : toThird === 'DEF' ? 'ATT' : 'MID';
-    m.ballZone = { side: defendingSide, third: mirroredThird, channel: channel || 'C' };
+    setBallZone(defendingSide, mirroredThird, channel || 'C');
+    // The zone label above is written from the winner's side and reuses the
+    // attacker's channel label as-is, but the ball itself hasn't moved — it
+    // is still where the attacker lost it — so its point is resolved from
+    // the attacker's own zone instead (otherwise a wide turnover would
+    // teleport the ball to the opposite touchline).
+    m.ballPos = ballPointForZone(attackingSide, toThird, channel || 'C');
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[defenderPlayer.id]) m.playerMatchStats[defenderPlayer.id] = blankPlayerMatchStats(defenderPlayer);
     const ps = m.playerMatchStats[defenderPlayer.id];
@@ -9079,7 +9624,7 @@ var App = (() => {
     const posGroup = positionGroupOf(player);
     const base = baseActionWeights(third, posGroup);
     const attr = attributeActionScores(player);
-    const pressure = ctx.marker ? defensivePressure(ctx.marker) : 55;
+    const pressure = ctx.marker ? defensivePressure(ctx.marker, player) : 55;
     const allowed = ctx.allowed || BALL_ACTIONS;
     // How much heavier pressure discourages (positive) or encourages
     // (negative, i.e. safety-first actions become relatively more attractive)
@@ -9180,6 +9725,39 @@ var App = (() => {
         if (action === 'cross' || action === 'shoot') w *= 0.9;
       }
 
+      // Half-spaces: a carrier actually standing in a half-space (not
+      // central, not touchline-wide — see engine/spatialModel.js::
+      // halfSpaceOf()) has a genuinely better passing angle into the box
+      // than the same player central or pinned to the line, so through
+      // balls/incisive passes get a real bump specifically from being
+      // there; a winger pinned wide leans toward the cross he actually
+      // has an angle for instead.
+      const hs = halfSpaceOf(player);
+      if (hs === 'halfSpaceLeft' || hs === 'halfSpaceRight') {
+        if (action === 'throughball') w *= 1.15;
+        if (action === 'pass') w *= 1.05;
+      } else if (hs === 'wideLeft' || hs === 'wideRight') {
+        if (action === 'cross') w *= 1.08;
+        if (action === 'throughball') w *= 0.92;
+      }
+
+      // Local numbers: a genuine attacking overload in this zone right
+      // now (engine/spatialModel.js::localOverload()) means more support
+      // to actually find — pass/throughball become relatively more
+      // attractive than forcing a dribble/shot into a crowded area, and
+      // vice versa when the defence actually outnumbers the attack here.
+      const sideCtx = playerSideData(player);
+      const overload = sideCtx
+        ? localOverload(sideCtx.sideKey, sideCtx.sideKey === 'home' ? 'away' : 'home', ctx.zoneKey || (third + '_C'))
+        : 0;
+      if (overload > 0) {
+        if (action === 'pass' || action === 'throughball') w *= 1 + Math.min(0.24, overload * 0.08);
+        if (action === 'dribble') w *= 1 - Math.min(0.15, overload * 0.05);
+      } else if (overload < 0) {
+        if (action === 'dribble' || action === 'shoot') w *= 1 + Math.min(0.12, -overload * 0.04);
+        if (action === 'throughball') w *= 1 - Math.min(0.18, -overload * 0.06);
+      }
+
       scores[action] = Math.max(0.05, w);
     });
     return scores;
@@ -9231,7 +9809,7 @@ var App = (() => {
     // the ball currently is, from the possessing side's own perspective.
     // Purely a rendering aid — nothing in the simulation math reads this
     // back, so it's safe to update at every phase without affecting results.
-    m.ballZone = { side: attackingSide, third: 'DEF', channel: channel };
+    setBallZone(attackingSide, 'DEF', channel);
     // Attack Trigger: while this player has the ball, the whole team reads
     // the attacking picture better — a small boost to both finding a
     // team-mate and winning the ball back under pressure for as long as
@@ -9275,7 +9853,7 @@ var App = (() => {
       if (decision.action === 'dribble' || decision.action === 'carry') {
         const runMarker = pickMarker(defTeam, mirrorDefenderPos(fromThird + '_' + channel), null, mirrorZoneKey(fromThird + '_' + channel));
         if (runMarker) bumpExtStat(runMarker, 'pressures', 1);
-        const runPressure = runMarker ? defensivePressure(runMarker) : 60;
+        const runPressure = runMarker ? defensivePressure(runMarker, carrier) : 60;
         // Base raised from 0.62 -> 0.72 (see passChance/duelChance below for
         // the full explanation): the old bases made a possession sequence
         // die out long before reaching the final third far more often than
@@ -9305,7 +9883,7 @@ var App = (() => {
         if (seededRandom() < 0.25) {
           addEvent(m.minute, 'skill', `${carrier.name} ${decision.action === 'dribble' ? 'dribbles past a challenge' : 'drives forward with the ball'}`, attackingSide);
         }
-        m.ballZone = { side: attackingSide, third: toThird, channel: channel };
+        setBallZone(attackingSide, toThird, channel);
         continue; // carrier advances the ball themselves — no pass needed this phase
       }
 
@@ -9321,13 +9899,13 @@ var App = (() => {
       // The move is developing into this zone even before the pass is
       // resolved below — a real side shifts its shape toward the ball as
       // it travels, not only once it safely arrives.
-      m.ballZone = { side: attackingSide, third: toThird, channel: channel };
+      setBallZone(attackingSide, toThird, channel);
 
       // ===== Passing phase: can the carrier find them? =====
       const passerSkill = passingAbility(carrier);
       const marker = pickMarker(defTeam, mirrorDefenderPos(targetZone), null, mirrorZoneKey(targetZone));
       if (marker) bumpExtStat(marker, 'pressures', 1);
-      const pressure = marker ? defensivePressure(marker) : 60;
+      const pressure = marker ? defensivePressure(marker, carrier) : 60;
       // Base raised from 0.5 -> 0.62: with two zone transitions (DEF->MID,
       // MID->ATT) chained together and EACH one gated behind both this pass
       // check AND the duel check right below, the old 0.5/0.78 bases only
@@ -9341,6 +9919,11 @@ var App = (() => {
       // this hard before the ball even reaches a dangerous area.
       let passChance = 0.80 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus
         + holdBonus + (decision.action === 'switch' ? 0.05 : 0);
+      // A genuine numbers-up situation in the zone the ball is going into
+      // gives the receiver real support to actually find, on top of
+      // whatever the pass/pressure numbers already say — and the reverse
+      // when the defence outnumbers the attack there.
+      passChance += Math.max(-0.06, Math.min(0.06, localOverload(attackingSide, defendingSide, targetZone) * 0.02));
       if (tac === 'attack') passChance -= 0.03;
       if (tac === 'press') passChance -= 0.015;
       if (defTac === 'press') passChance -= 0.05;
@@ -9383,7 +9966,12 @@ var App = (() => {
     }
 
     // ===== Chance Creation phase (reached the final third) =====
-    resolveChanceCreation(attackingSide, defendingSide, carrier, channel);
+    // A genuinely high/stretched defensive line (engine/spatialModel.js::
+    // chanceSpaceBonus) creates a real edge here on top of whatever the
+    // carrier's own attributes/playstyle already earn — a deep, compact
+    // block should be harder to create a clean chance against than the
+    // exact same defenders standing in a high, stretched line.
+    resolveChanceCreation(attackingSide, defendingSide, carrier, channel, chanceSpaceBonus(defendingSide));
   }
 
   // ===== Secondary match texture: set pieces / handballs / VAR that the =====
@@ -9543,6 +10131,7 @@ var App = (() => {
     // tackle counts building up realistically across 90 minutes.
     simulateMinutePassing();
     simulateDefensiveActions();
+    simulateRoutineFouls();
 
     const homeStr = calcTeamStrength(m.home);
     const awayStr = calcTeamStrength(m.away);
