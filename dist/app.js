@@ -3189,15 +3189,16 @@ var App = (() => {
     GK: makeNonlinearWeights(['gk_awr', 'gk_catch', 'gk_parry', 'gk_reflex', 'gk_reach'])
   };
 
-  // Maps a player's raw (pre-canonicalization) position string to one of
-  // the position groups above. Deliberately reads posArr[0] — the primary
-  // position — BEFORE normalizeAllPositions() runs (see init() in
-  // ui/matchUI.js — expanded attributes are applied first) so 'SS' is
-  // never collapsed into 'CAM'/'AMF' here the way the broader canonPos()
-  // system does elsewhere; this resolver is scoped to the OVR calc only
-  // and doesn't affect formation/substitution logic.
-  function resolveAttrPositionGroup(posArr) {
-    const raw = String((posArr && posArr[0]) || 'CM').toUpperCase();
+  // Maps ONE raw (pre-canonicalization) position string to one of the
+  // position groups above. Deliberately works off the raw code BEFORE
+  // normalizeAllPositions() runs (see init() in ui/matchUI.js — expanded
+  // attributes are applied first) so 'SS' is never collapsed into
+  // 'CAM'/'AMF' here the way the broader canonPos() system does
+  // elsewhere; this resolver is scoped to the OVR calc only and doesn't
+  // affect formation/substitution logic. Canonical codes (ST, CAM, CM,
+  // CDM, ...) resolve to the same groups as their raw spellings.
+  function attrGroupForRawPos(rawPos) {
+    const raw = String(rawPos || 'CM').toUpperCase();
     if (raw === 'GK') return 'GK';
     if (raw === 'CF' || raw === 'ST') return 'CF';
     if (raw === 'SS') return 'SS';
@@ -3208,6 +3209,13 @@ var App = (() => {
     if (raw === 'CB' || raw === 'SW') return 'CB';
     if (['LB', 'RB', 'LWB', 'RWB'].includes(raw)) return 'FB';
     return 'CMF';
+  }
+
+  // Group of a player's PRIMARY (first-listed) position only. Kept for
+  // anything that still wants the main-position group on its own; the
+  // overall itself is now decided by bestPositionalOverall() below.
+  function resolveAttrPositionGroup(posArr) {
+    return attrGroupForRawPos(posArr && posArr[0]);
   }
 
   // ----- Elite-value curve -----
@@ -3326,6 +3334,69 @@ var App = (() => {
     const supportBonus = Math.min(OVR_SUPPORT_CAP, OVR_SUPPORT_MULT * Math.pow(supportGap, OVR_SUPPORT_EXP));
 
     return leaned + massBonus + supportBonus;
+  }
+
+  // ===== Best-known-position overall =====
+  // A player's overall used to be scored ONLY at his first-listed
+  // position, so a player listed "ST" whose sheet is really an attacking
+  // midfielder's (ball control / dribbling / passing over finishing) got
+  // marked down by a striker's weights even though he's a listed AMF/CAM
+  // too. Now every position the player is actually known to play is
+  // scored with that position's own attribute weights and the HIGHEST
+  // result becomes his overall — his sheet decides which of his known
+  // positions he is best at, not the order they happen to be listed in.
+  //
+  // Because p.ovr is a single number that no slot/formation code ever
+  // discounts, this also means a swap between any two of his known
+  // positions (Squad Builder, substitutions, in-match reshapes) can never
+  // starve him of overall: he carries his best-position overall into
+  // every one of them.
+  //
+  // "Known positions" = every position the player's data lists: his own
+  // p.pos list first, in listed order (so p.pos[0], his main position,
+  // wins exact ties — for a national-team call-up that's the federation's
+  // teams.json list), then any further positions on his attribute sheet.
+  // Including the sheet keeps a national-team player from ever scoring
+  // BELOW what his sheet's own position list gave him before (the
+  // federation's list is often shorter than the club sheet's). A
+  // goalkeeper is only ever scored as a goalkeeper, and an outfielder is
+  // never scored as one (the GK weights are 100% gk_* ratings an
+  // outfielder doesn't have). A player with a single position group gets
+  // exactly the overall he always did, and nobody's overall can come out
+  // lower than it used to.
+  //
+  // Returns { score, group, pos, isAlt, byPos } — score is the
+  // un-rounded, soft-kneed number (caller clamps/rounds it), group/pos
+  // the winning position group and a label for it, isAlt whether that is
+  // a different group from the main position's, and byPos a
+  // { label: overall } map of every distinct group scored.
+  function bestPositionalOverall(attr, knownPos, sheetPos, isGK, signatureBonus) {
+    const rawList = (knownPos || []).concat(sheetPos || []);
+    const candidates = []; // one per distinct position group, in listed order
+    const seen = new Set();
+    rawList.forEach((raw) => {
+      if (!raw) return;
+      const up = String(raw).toUpperCase();
+      const group = attrGroupForRawPos(up);
+      if (isGK ? group !== 'GK' : group === 'GK') return;
+      if (seen.has(group)) return;
+      seen.add(group);
+      // Display label: the listed code, canonicalized (CF -> ST, AMF ->
+      // CAM, ...) except SS, which stays its own position here.
+      candidates.push({ group, label: up === 'SS' ? 'SS' : canonPos(up) });
+    });
+    if (!candidates.length) candidates.push({ group: isGK ? 'GK' : 'CMF', label: isGK ? 'GK' : 'CM' });
+    let best = null;
+    const byPos = {};
+    candidates.forEach((c) => {
+      const score = applySoftKnee(positionalRawOverall(attr, c.group) + (signatureBonus || 0));
+      byPos[c.label] = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(score)));
+      // Strict '>' so the main position (first candidate) wins ties.
+      if (!best || score > best.score) best = { score, group: c.group, pos: c.label };
+    });
+    best.isAlt = best.group !== candidates[0].group;
+    best.byPos = byPos;
+    return best;
   }
   // Gets a team's fully blended tactical mods: the archetype baseline
   // (PLAYSTYLE_MODS), regressed toward neutral in proportion to how
@@ -3681,10 +3752,14 @@ var App = (() => {
         // Position-based eFootball 2027-style overall: weighs the raw
         // attribute sheet directly using this exact position's own
         // strongly-valued attribute list (see POSITION_ATTR_WEIGHTS).
-        const posGroup = resolveAttrPositionGroup(posArr);
-        const rawScore = positionalRawOverall(attr, posGroup) + signatureBonus;
-        const base = applySoftKnee(rawScore);
-        const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(base)));
+        //
+        // The overall is scored at EVERY position this player is known to
+        // play (his p.pos list — set from the sheet just above for a club
+        // player, still the federation's teams.json list for a
+        // national-team call-up) and the best one wins; p.pos[0] stays his
+        // main position and wins exact ties. See bestPositionalOverall.
+        const best = bestPositionalOverall(attr, p.pos, posArr, isGK, signatureBonus);
+        const boostedBase = Math.max(OVERALL_FLOOR, Math.min(OVERALL_CAP, Math.round(best.score)));
         p.baseOvr = boostedBase;
         // Card overall is fixed to baseOvr — see the non-expanded branch
         // above for why the old form-delta is gone from this line too.
@@ -3692,6 +3767,12 @@ var App = (() => {
         p.expandedAttrs = attr;
         p.attrBoosted = true;
         p.signatureBonus = signatureBonus;
+        // Which known position the overall above is based on, plus the
+        // per-position breakdown (used by the player profile to explain
+        // an overall that comes from a position other than the main one).
+        p.ovrPos = best.pos;
+        p.ovrPosAlt = best.isAlt;
+        p.ovrByPos = best.byPos;
       });
     });
   }
@@ -17004,6 +17085,17 @@ var App = (() => {
     const signatureNote = (boosted && player.signatureBonus > 0)
       ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.signatureBonus} OVR — signature attributes for their playstyle run well above the rest of their sheet</div>`
       : '';
+    // When the overall is based on a known position other than the main
+    // one (see bestPositionalOverall in data/playerDatabase.js), say so and
+    // show what the other known positions rate, so an ST whose card reads
+    // like a winger's isn't a mystery.
+    const positionNote = (boosted && player.ovrPosAlt && player.ovrPos)
+      ? (function () {
+          const others = Object.keys(player.ovrByPos || {}).filter(k => k !== player.ovrPos)
+            .map(k => `${k} ${player.ovrByPos[k]}`).join(' · ');
+          return `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">OVR rated at ${player.ovrPos} — his best known position${others ? ' (' + others + ')' : ''}</div>`;
+        })()
+      : '';
     // Playstyle tags render for ANY player who carries one — an enhanced
     // player's own authored tag(s), or the position-appropriate tag every
     // regular player now receives from assignPlaystylesToRegularPlayers()
@@ -17055,6 +17147,7 @@ var App = (() => {
           })()} · ${(player.pos||[])[0] || ''}</div>
           <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${signatureNote}
+          ${positionNote}
           ${playstyleTagsHTML}
           ${personalityTagsHTML}
         </div>
