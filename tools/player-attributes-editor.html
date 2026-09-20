@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Apex — Player Attributes Editor</title>
+<title>Apex — Player Attributes Editor v2</title>
 <style>
   :root{
     --bg-0:#05080f; --bg-1:#0a101c; --bg-2:#111a2b; --bg-3:#1a2740;
@@ -220,13 +220,37 @@
   }
   .modal p{font-size:0.88rem; color:var(--text-2); line-height:1.5;}
   .modal .btn-row{margin-top:14px;}
+
+  /* --- v2 additions --- */
+  .modal.wide{max-width:460px;}
+  .modal .findresults{max-height:300px;}
+  .statline{
+    display:flex; flex-wrap:wrap; gap:10px; margin:2px 0 14px;
+    font-size:0.72rem; color:var(--text-3); font-family:'Courier New',monospace;
+  }
+  .statline span b{color:var(--gold-dim);}
+  .skilltag.legacy{border-color:rgba(245,158,11,0.5); background:rgba(245,158,11,0.06);}
+  .legacy-flag{color:var(--orange); font-size:0.68rem;}
+  .fieldhint{font-size:0.68rem; color:var(--text-3); margin-top:4px; line-height:1.4;}
+  .toolbar-row{display:flex; gap:8px; margin-top:8px;}
+  .toolbar-row > button{width:auto; flex:1;}
+  .badge-row{display:flex; gap:4px; flex-wrap:wrap; margin-top:2px;}
+  .mini-badge{
+    font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.3px;
+    padding:1px 5px; border-radius:4px; color:var(--text-2);
+    background:rgba(255,255,255,0.06); border:1px solid var(--border);
+  }
+  .mini-badge.form-Unwavering{color:var(--green); border-color:rgba(34,197,94,0.4);}
+  .mini-badge.form-Standard{color:var(--blue); border-color:rgba(61,139,253,0.4);}
+  .mini-badge.form-Inconsistent{color:var(--orange); border-color:rgba(245,158,11,0.4);}
+  select#posFilterSelect{margin-top:8px;}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🧬 Attribute Editor <span class="badge">Local</span></h1>
-  <p>Search a player from teams.json and build/edit their expanded sheet in player-attributes.json.</p>
+  <h1>🧬 Attribute Editor <span class="badge">v2</span></h1>
+  <p>Search a player from teams.json and build/edit their expanded sheet in player-attributes.json. Now with Form, Personality, and a copy-from-player starting point.</p>
 </header>
 
 <main>
@@ -264,11 +288,21 @@
       <button data-f="expanded">Has sheet</button>
       <button data-f="plain">No sheet yet</button>
     </div>
+    <select id="posFilterSelect">
+      <option value="">All positions</option>
+      <option value="GK">Goalkeepers</option>
+      <option value="DEF">Defenders</option>
+      <option value="MID">Midfielders</option>
+      <option value="FWD">Forwards</option>
+    </select>
     <div class="searchwrap" style="margin-top:8px;">
-      <input type="text" id="findSearch" placeholder="Search by name or player id…" autocomplete="off">
+      <input type="text" id="findSearch" placeholder="Search by name, player id, or club…" autocomplete="off">
       <button class="clear" id="findClearBtn">✕</button>
     </div>
     <div class="findresults" id="findResults"></div>
+    <div class="toolbar-row">
+      <button class="btn-ghost btn-sm" id="randomPlainBtn" style="width:auto; flex:1;">🎲 Random player with no sheet yet</button>
+    </div>
   </section>
 
   <!-- STEP 2: Editor -->
@@ -280,8 +314,13 @@
         <div class="meta" id="editorMeta"></div>
         <div class="id-pill" id="editorId"></div>
         <div id="editorSheetStatus"></div>
+        <div class="toolbar-row">
+          <button class="btn-ghost btn-sm" id="copyFromBtn" style="width:auto;">📋 Copy from another player</button>
+        </div>
       </div>
     </div>
+
+    <div class="statline" id="statSummary"></div>
 
     <h3>Basic</h3>
     <div class="formgrid cols3">
@@ -289,7 +328,7 @@
       <div><label>Height (cm)</label><input type="number" id="aHeight" min="140" max="230"></div>
       <div><label>Squad #</label><input type="number" id="aNum" min="1" max="99"></div>
     </div>
-    <div class="formgrid" style="margin-top:10px;">
+    <div class="formgrid cols3" style="margin-top:10px;">
       <div>
         <label>Preferred foot</label>
         <select id="aFoot"><option>Right</option><option>Left</option><option>Both</option></select>
@@ -297,6 +336,15 @@
       <div>
         <label>Weak foot (1-99)</label>
         <input type="number" id="aWeakFoot" min="1" max="99">
+      </div>
+      <div>
+        <label>Form</label>
+        <select id="aForm">
+          <option value="">Unset (defaults Inconsistent)</option>
+          <option>Unwavering</option>
+          <option>Standard</option>
+          <option>Inconsistent</option>
+        </select>
       </div>
       <div class="full">
         <label>Injury resilience</label>
@@ -330,6 +378,15 @@
     <button class="btn-sm btn-ghost" id="addSkillBtn" style="width:auto; margin-top:8px;">＋ Add skill</button>
     <div class="skilltags" id="skillTags"></div>
 
+    <h3>Personality <span class="hint" style="text-transform:none; font-weight:400;">changes real match/season behavior — hover a tag for what it does</span></h3>
+    <div class="searchwrap">
+      <input type="text" id="personalityInput" list="personalityOptions" placeholder="Type a trait and press Add…" autocomplete="off">
+    </div>
+    <datalist id="personalityOptions"></datalist>
+    <button class="btn-sm btn-ghost" id="addPersonalityBtn" style="width:auto; margin-top:8px;">＋ Add trait</button>
+    <div class="skilltags" id="personalityTags"></div>
+    <div class="fieldhint">Tags outlined in orange with ⚠ aren't in the known trait list — they're kept as-is but have no effect in the engine unless the spelling matches exactly.</div>
+
     <div id="editorStatus"></div>
     <div class="btn-row" style="margin-top:16px;">
       <button class="btn-ghost" id="editorCancelBtn">Cancel</button>
@@ -361,6 +418,20 @@
     <div class="btn-row">
       <button class="btn-ghost" id="confirmCancel">Cancel</button>
       <button class="btn-gold" id="confirmOk">Remove</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="copyOverlay">
+  <div class="modal wide">
+    <h2 style="margin-top:0;">Copy attributes from…</h2>
+    <p>Pick a player who already has an expanded sheet. Every numeric attribute, foot, weak foot, injury resilience, form, playstyle, skills, and personality will be copied in as a starting point — name, position, and squad number stay <b id="copyTargetName"></b>'s own. Nothing is saved until you hit Save Sheet.</p>
+    <div class="searchwrap">
+      <input type="text" id="copySearch" placeholder="Search players with an existing sheet…" autocomplete="off">
+    </div>
+    <div class="findresults" id="copyResults"></div>
+    <div class="btn-row">
+      <button class="btn-ghost" id="copyCancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -408,6 +479,57 @@
     gk:       [['gk_awr','GK Awareness'], ['gk_catch','GK Catch'], ['gk_parry','GK Parry'], ['gk_reflex','GK Reflexes'], ['gk_reach','GK Reach']]
   };
 
+  // Broad position lines, mirroring js/state.js POS_LINE, used for the
+  // search position filter (a player's raw pos codes may be eFootball-style
+  // variants — CMF/DMF/etc — so we normalize before grouping).
+  const POS_LINE = {
+    GK: 'GK', SW: 'DEF', CB: 'DEF', RB: 'DEF', LB: 'DEF', RWB: 'DEF', LWB: 'DEF',
+    CDM: 'MID', DMF: 'MID', DM: 'MID', CM: 'MID', CMF: 'MID', MF: 'MID',
+    CAM: 'MID', AM: 'MID', AMF: 'MID', SS: 'MID', RM: 'MID', RMF: 'MID', LM: 'MID', LMF: 'MID',
+    RW: 'FWD', RWF: 'FWD', RF: 'FWD', LW: 'FWD', LWF: 'FWD', LF: 'FWD', ST: 'FWD', CF: 'FWD'
+  };
+  function posLine(pos){
+    for (const code of (pos || [])) { if (POS_LINE[code]) return POS_LINE[code]; }
+    return '';
+  }
+
+  // Known personality traits (see personality.md), grouped for the tooltip
+  // text shown on each chip. A tag not in this map still round-trips fine —
+  // it's just flagged with a legacy/unknown warning badge in the UI.
+  const PERSONALITY_DESCRIPTIONS = {
+    'Big-Game': 'Shot quality boosted in high-stakes moments (derby, final, close-and-late).',
+    'Fragile': 'The mirror of Big-Game — shot quality reduced under the same stakes.',
+    'Ice-Cold': 'Penalty and free-kick conversion boosted.',
+    'Bottler': 'The mirror of Ice-Cold — penalty and free-kick conversion reduced.',
+    'Big Occasion Flop': 'Passing accuracy drops under high-stakes situations.',
+    'Big Occasion Riser': 'Match-rating ceiling raised in cup/knockout matches.',
+    'Confidence Player': 'Composure builds on a live scoring run this match, resets on a miss.',
+    "Finisher's Instinct": 'Extra late-game (80th min+) shot-quality bump, any scoreline.',
+    'Homebody': 'Lower shooting/passing/dribbling effectiveness in away fixtures.',
+    'Set-Piece Specialist': 'Composure boost on corners and free-kicks, always on.',
+    'Volatile': "Raises the fouler's own aggression/foul probability.",
+    'Calm': 'The mirror of Volatile — lowers the fouler\'s own aggression.',
+    'Provocateur': "Raises the marker's (victim's) foul probability, not the Provocateur's own.",
+    'Hot-Head': 'Second-yellow risk raised once already booked.',
+    'Cynical': 'More likely to commit a tactical breakaway foul, less likely carded for it.',
+    'Leader': 'Deepens the Captaincy aura (fatigue-drain/form dampening). Requires the Captaincy skill.',
+    'Talisman': 'Small composure lift for teammates + fatigue-drain reduction, just from being on the pitch.',
+    'Brittle': 'Personality-level injury-risk multiplier, on top of injury_res.',
+    'Iron Man': 'The mirror of Brittle — reduced injury chance, slower fatigue drain.',
+    'Determined': 'Fatigue drain reduced late in a match while losing.',
+    'Slow Starter': 'Reduced effectiveness in the first ~15 minutes, recovering by minute 15.',
+    'Streaky': "Amplifies an Inconsistent player's form spread — runs hotter and colder.",
+    'Selfish': 'Nudges decisions toward shooting/dribbling, away from passing.',
+    'Team Player': 'The mirror of Selfish — nudges toward passing, away from personal shot/dribble volume.',
+    'Showboat': 'Higher dribble attempt rate, slightly higher turnover risk.',
+    'Grinder': 'Tackle/interception success rises while his team is behind on the scoreboard.',
+    'Loyal': 'Lowers willingness to engineer a move away from his club (off-pitch).',
+    'Journeyman': 'The mirror of Loyal — raises willingness to move clubs (off-pitch).',
+    'Mentor': 'Speeds up development of younger teammates in his position group (off-pitch).',
+    'Prodigy': 'Faster own development while young, but more volatile in-match form (off-pitch + form.js).'
+  };
+  const KNOWN_PERSONALITIES = Object.keys(PERSONALITY_DESCRIPTIONS);
+
   const PLAYSTYLE_DESCRIPTIONS = {
     'Goal Poacher':          'A striker who constantly looks to run behind the defensive line and attack scoring positions.',
     'Fox in the Box':        'A penalty-box specialist who focuses on finding space and finishing chances inside the area.',
@@ -430,7 +552,13 @@
     'Offensive Full-back':   'A full-back who aggressively pushes forward to support attacks and provide width.',
     'Full-back Finisher':    'A full-back who makes attacking runs into dangerous areas and can arrive in scoring positions.',
     'Offensive Goalkeeper':  'Proactively comes off his line to sweep up through balls and support a high defensive line.',
-    'Defensive Goalkeeper':  'Stays closer to his goal and prioritizes traditional shot-stopping and positioning.'
+    'Defensive Goalkeeper':  'Stays closer to his goal and prioritizes traditional shot-stopping and positioning.',
+    'Pass Disruptor':        'A defensive midfielder who blocks passing lanes and reads the game to intercept before a tackle is needed.',
+    'Front Line Pressure':   'Leads the press from the front, hunting the ball high up the pitch to force turnovers.',
+    'Attack Outlet':         'Stays high up the pitch as an out-ball, ready to break in behind on the counter-attack.',
+    'High Line Master':      'Steps up in unison with the defensive line to catch attackers offside and keep the team compact.',
+    'Covering Role':     'Drops off to cover space behind the back line and sweep up danger before it reaches goal.',
+    'Shadow Marker':         'Tracks a single opponent tightly across the pitch, man-marking rather than holding a zone.'
   };
 
   const SKILL_OPTIONS = [
@@ -460,7 +588,29 @@
   buildFieldGrid('grpDefense', GROUPS.defense);
   buildFieldGrid('grpGK', GROUPS.gk);
 
+  // Live "avg of entered attributes so far" readout per group — purely a
+  // sanity-check display, not saved anywhere.
+  function updateStatSummary(){
+    const parts = [];
+    ['offense','ball','physical','defense','gk'].forEach(g => {
+      const vals = [];
+      GROUPS[g].forEach(([key]) => {
+        const raw = $('a_' + key).value;
+        if (raw !== '') { const n = Number(raw); if (!isNaN(n)) vals.push(n); }
+      });
+      if (vals.length) {
+        const avg = Math.round(vals.reduce((a,b) => a+b, 0) / vals.length);
+        parts.push('<span>' + g.toUpperCase() + ' <b>' + avg + '</b></span>');
+      }
+    });
+    $('statSummary').innerHTML = parts.length ? parts.join('') : '<span>Fill in attributes to see group averages here.</span>';
+  }
+  ['grpOffense','grpBall','grpPhysical','grpDefense','grpGK'].forEach(id => {
+    $(id).addEventListener('input', updateStatSummary);
+  });
+
   $('skillOptions').innerHTML = SKILL_OPTIONS.map(s => '<option value="' + escapeHtml(s) + '">').join('');
+  $('personalityOptions').innerHTML = KNOWN_PERSONALITIES.map(s => '<option value="' + escapeHtml(s) + '">').join('');
 
   function renderPlaystyleChips(){
     const active = (currentPlayer && attrData[currentPlayer.id] && attrData[currentPlayer.id].playstyle) || [];
@@ -496,6 +646,34 @@
     if (!skillTagsState.some(s => s.toLowerCase() === v.toLowerCase())) skillTagsState.push(v);
     $('skillInput').value = '';
     renderSkillTags();
+  }
+
+  // ---- Personality tags (same tag-input pattern as skills, plus a
+  // known/unknown distinction since these drive real engine behavior) ----
+  let personalityState = [];
+  function renderPersonalityTags(){
+    $('personalityTags').innerHTML = personalityState.map((s, i) => {
+      const known = KNOWN_PERSONALITIES.includes(s);
+      const title = known ? PERSONALITY_DESCRIPTIONS[s] : 'Not a recognized personality trait — kept as-is, but has no effect in the engine unless the spelling matches exactly.';
+      return '<span class="skilltag' + (known ? '' : ' legacy') + '" title="' + escapeHtml(title) + '">' +
+        (known ? '' : '<span class="legacy-flag">⚠ </span>') + escapeHtml(s) +
+        '<button type="button" data-i="' + i + '">✕</button></span>';
+    }).join('');
+    $('personalityTags').querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => { personalityState.splice(Number(b.getAttribute('data-i')), 1); renderPersonalityTags(); });
+    });
+  }
+  $('addPersonalityBtn').addEventListener('click', addPersonalityFromInput);
+  $('personalityInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addPersonalityFromInput(); } });
+  function addPersonalityFromInput(){
+    const raw = $('personalityInput').value.trim();
+    if (!raw) return;
+    // Snap to the known trait's canonical casing if it's a case-insensitive match.
+    const known = KNOWN_PERSONALITIES.find(k => k.toLowerCase() === raw.toLowerCase());
+    const v = known || raw;
+    if (!personalityState.some(s => s.toLowerCase() === v.toLowerCase())) personalityState.push(v);
+    $('personalityInput').value = '';
+    renderPersonalityTags();
   }
 
   // ================= Load teams.json =================
@@ -587,27 +765,47 @@
   });
   $('findSearch').addEventListener('input', renderFindResults);
   $('findClearBtn').addEventListener('click', () => { $('findSearch').value=''; renderFindResults(); });
+  $('posFilterSelect').addEventListener('change', renderFindResults);
+
+  function matchesFilters(p, q, posFilterVal){
+    if (searchFilter === 'expanded' && !attrData[p.id]) return false;
+    if (searchFilter === 'plain' && attrData[p.id]) return false;
+    if (posFilterVal && posLine(p.pos) !== posFilterVal) return false;
+    if (q) {
+      const hay = (p.name||'').toLowerCase() + ' ' + (p.id||'').toLowerCase() + ' ' +
+        (p.club.short||'').toLowerCase() + ' ' + (p.club.name||'').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }
+
+  function frowTitle(p, has){
+    if (!has) return 'No expanded sheet yet';
+    const s = attrData[p.id];
+    const bits = [];
+    if (s.form) bits.push('Form: ' + s.form);
+    if (s.personality && s.personality.length) bits.push('Personality: ' + s.personality.join(', '));
+    return bits.length ? bits.join(' · ') : 'Has an expanded sheet';
+  }
 
   function renderFindResults(){
     const q = ($('findSearch').value || '').trim().toLowerCase();
+    const posFilterVal = $('posFilterSelect').value;
     $('findClearBtn').style.display = q ? 'block' : 'none';
     const box = $('findResults');
 
-    let list = allPlayers;
-    if (searchFilter === 'expanded') list = list.filter(p => !!attrData[p.id]);
-    if (searchFilter === 'plain') list = list.filter(p => !attrData[p.id]);
-    if (q) list = list.filter(p => (p.name||'').toLowerCase().includes(q) || (p.id||'').toLowerCase().includes(q));
+    let list = allPlayers.filter(p => matchesFilters(p, q, posFilterVal));
     list = list.slice().sort((a,b) => (b.ovr||0) - (a.ovr||0));
 
-    if (!q && searchFilter === 'all') {
-      box.innerHTML = '<div class="empty-hint">Type a name or player id to search ' + allPlayers.length + ' players.</div>';
+    if (!q && searchFilter === 'all' && !posFilterVal) {
+      box.innerHTML = '<div class="empty-hint">Type a name, player id, or club to search ' + allPlayers.length + ' players.</div>';
       return;
     }
     if (!list.length) { box.innerHTML = '<div class="empty-hint">No players match.</div>'; return; }
 
     box.innerHTML = list.slice(0, 80).map((p, i) => {
       const has = !!attrData[p.id];
-      return '<div class="frow' + (currentPlayer && currentPlayer.id === p.id ? ' active-entry' : '') + '" data-i="' + i + '">' +
+      return '<div class="frow' + (currentPlayer && currentPlayer.id === p.id ? ' active-entry' : '') + '" data-i="' + i + '" title="' + escapeHtml(frowTitle(p, has)) + '">' +
         teamMark(p.club, 22) +
         '<div class="info">' +
           '<div class="nm">' + escapeHtml(p.name) + (has ? '<span class="expanded-badge">Sheet</span>' : '') + '</div>' +
@@ -622,6 +820,18 @@
     });
   }
 
+  $('randomPlainBtn').addEventListener('click', () => {
+    const plain = allPlayers.filter(p => !attrData[p.id]);
+    if (!plain.length) { setStatus('attrStatus', 'Every loaded player already has a sheet!', 'ok'); return; }
+    const pick = plain[Math.floor(Math.random() * plain.length)];
+    searchFilter = 'plain';
+    $('searchCard').querySelectorAll('.filterchips button').forEach(x => x.classList.toggle('active', x.getAttribute('data-f') === 'plain'));
+    $('posFilterSelect').value = '';
+    $('findSearch').value = pick.name;
+    renderFindResults();
+    openEditor(pick);
+  });
+
   // ================= Editor =================
   function openEditor(player){
     currentPlayer = player;
@@ -629,6 +839,7 @@
     hadExistingSheet = !!existing;
     editorPlaystyle = existing && existing.playstyle ? existing.playstyle.slice() : [];
     skillTagsState = existing && existing.skills ? existing.skills.slice() : [];
+    personalityState = existing && existing.personality ? existing.personality.slice() : [];
 
     $('editorName').textContent = player.name;
     $('editorMeta').textContent = (player.pos||[]).join('/') + ' · OVR ' + (player.ovr != null ? player.ovr : '—') +
@@ -645,6 +856,7 @@
     $('aFoot').value = (existing && existing.preferred_foot) || 'Right';
     $('aWeakFoot').value = existing && existing['weak foot'] != null ? existing['weak foot'] : '';
     $('aInjury').value = (existing && existing.injury_res) || 'Medium';
+    $('aForm').value = (existing && existing.form) || '';
 
     ['offense','ball','physical','defense','gk'].forEach(g => {
       GROUPS[g].forEach(([key]) => {
@@ -659,8 +871,10 @@
 
     renderPlaystyleChips();
     renderSkillTags();
+    renderPersonalityTags();
+    updateStatSummary();
     $('editorStatus').textContent = '';
-    $('editorCard').style.display = '';
+    $('editorCard').style.display = 'block';
     $('editorCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -673,23 +887,36 @@
     if (!currentPlayer) return;
     const before = attrData[currentPlayer.id] ? JSON.parse(JSON.stringify(attrData[currentPlayer.id])) : null;
 
-    const sheet = { name: currentPlayer.name, pos: currentPlayer.pos.slice() };
-    const num = numOrUndef('aNum'); if (num !== undefined) sheet.num = num;
-    const age = numOrUndef('aAge'); if (age !== undefined) sheet.age = age;
-    const height = numOrUndef('aHeight'); if (height !== undefined) sheet.height_cm = height;
+    // Start from a copy of whatever sheet already existed (empty object for a
+    // brand-new sheet) rather than building from scratch. This is the fix for
+    // the compatibility break: the previous version always constructed a
+    // fresh object from only the fields it knew about, so saving through it
+    // silently deleted any field the engine had since added (this game's
+    // "form" and "personality" fields, and whatever comes after those).
+    // Anything this editor doesn't recognize survives untouched; every field
+    // it does recognize is explicitly set or removed below based on the form.
+    const sheet = before ? JSON.parse(JSON.stringify(before)) : {};
+
+    sheet.name = currentPlayer.name;
+    sheet.pos = currentPlayer.pos.slice();
+
+    setOrDelete(sheet, 'num', numOrUndef('aNum'));
+    setOrDelete(sheet, 'age', numOrUndef('aAge'));
+    setOrDelete(sheet, 'height_cm', numOrUndef('aHeight'));
     sheet.preferred_foot = $('aFoot').value;
-    const weakFoot = numOrUndef('aWeakFoot'); if (weakFoot !== undefined) sheet['weak foot'] = weakFoot;
+    setOrDelete(sheet, 'weak foot', clamp(numOrUndef('aWeakFoot'), 1, 99));
     sheet.injury_res = $('aInjury').value;
+    setOrDelete(sheet, 'form', $('aForm').value || undefined);
 
     ['offense','ball','physical','defense','gk'].forEach(g => {
       GROUPS[g].forEach(([key]) => {
-        const v = numOrUndef('a_' + key);
-        if (v !== undefined) sheet[key] = v;
+        setOrDelete(sheet, key, clamp(numOrUndef('a_' + key), 1, 99));
       });
     });
 
     sheet.playstyle = editorPlaystyle.slice();
     sheet.skills = skillTagsState.slice();
+    sheet.personality = personalityState.slice();
 
     attrData[currentPlayer.id] = sheet;
     actionLog.push({ type: 'save', id: currentPlayer.id, name: currentPlayer.name, before, wasNew: !before });
@@ -703,6 +930,19 @@
     const v = $(id).value;
     return v === '' || v === null ? undefined : Number(v);
   }
+  // Keeps hand-typed attribute values inside the range the engine expects
+  // (1-99) instead of silently saving an out-of-range number that would
+  // skew match sim math. Leaves an unset field alone.
+  function clamp(v, lo, hi){
+    if (v === undefined || isNaN(v)) return v;
+    return Math.min(hi, Math.max(lo, v));
+  }
+  // Sets sheet[key] = val, or removes the key entirely when val is undefined
+  // (blank field) — mirrors how the original editor omitted unset fields,
+  // but now also correctly clears a field the player used to have.
+  function setOrDelete(sheet, key, val){
+    if (val === undefined) delete sheet[key]; else sheet[key] = val;
+  }
 
   $('editorDeleteBtn').addEventListener('click', () => {
     if (!currentPlayer || !attrData[currentPlayer.id]) return;
@@ -710,6 +950,61 @@
       '</b>? They\'ll fall back to their base teams.json stats in-game. You can still undo this in the session log.';
     $('confirmOverlay').classList.add('show');
   });
+  // ================= Copy attributes from another player =================
+  $('copyFromBtn').addEventListener('click', () => {
+    if (!currentPlayer) return;
+    $('copyTargetName').textContent = currentPlayer.name;
+    $('copySearch').value = '';
+    renderCopyResults();
+    $('copyOverlay').classList.add('show');
+    $('copySearch').focus();
+  });
+  $('copyCancel').addEventListener('click', () => $('copyOverlay').classList.remove('show'));
+  $('copySearch').addEventListener('input', renderCopyResults);
+
+  function renderCopyResults(){
+    const q = ($('copySearch').value || '').trim().toLowerCase();
+    const box = $('copyResults');
+    let list = allPlayers.filter(p => attrData[p.id] && (!currentPlayer || p.id !== currentPlayer.id));
+    if (q) list = list.filter(p => (p.name||'').toLowerCase().includes(q) || (p.club.short||'').toLowerCase().includes(q));
+    list = list.slice().sort((a,b) => (b.ovr||0) - (a.ovr||0)).slice(0, 60);
+
+    if (!list.length) { box.innerHTML = '<div class="empty-hint">No sheets match — try a different search.</div>'; return; }
+    box.innerHTML = list.map((p, i) =>
+      '<div class="frow" data-i="' + i + '">' + teamMark(p.club, 22) +
+      '<div class="info"><div class="nm">' + escapeHtml(p.name) + '</div>' +
+      '<div class="meta">' + (p.pos||[]).join('/') + ' · ' + escapeHtml(p.club.short || p.club.name) + '</div></div>' +
+      '<div class="ovr">' + (p.ovr != null ? p.ovr : '—') + '</div></div>'
+    ).join('');
+    box.querySelectorAll('.frow').forEach(row => {
+      row.addEventListener('click', () => applyCopyFrom(list[Number(row.getAttribute('data-i'))]));
+    });
+  }
+
+  function applyCopyFrom(source){
+    const sheet = attrData[source.id];
+    if (!sheet || !currentPlayer) return;
+    $('aFoot').value = sheet.preferred_foot || 'Right';
+    $('aWeakFoot').value = sheet['weak foot'] != null ? sheet['weak foot'] : '';
+    $('aInjury').value = sheet.injury_res || 'Medium';
+    $('aForm').value = sheet.form || '';
+    ['offense','ball','physical','defense','gk'].forEach(g => {
+      GROUPS[g].forEach(([key]) => {
+        const input = $('a_' + key);
+        if (input) input.value = sheet[key] != null ? sheet[key] : '';
+      });
+    });
+    editorPlaystyle = (sheet.playstyle || []).slice();
+    skillTagsState = (sheet.skills || []).slice();
+    personalityState = (sheet.personality || []).slice();
+    renderPlaystyleChips();
+    renderSkillTags();
+    renderPersonalityTags();
+    updateStatSummary();
+    $('copyOverlay').classList.remove('show');
+    setStatus('editorStatus', 'Copied attributes from ' + source.name + ' — review, then Save Sheet to apply.', 'ok');
+  }
+
   $('confirmCancel').addEventListener('click', () => $('confirmOverlay').classList.remove('show'));
   $('confirmOk').addEventListener('click', () => {
     $('confirmOverlay').classList.remove('show');
@@ -777,7 +1072,9 @@
   }
 
   $('downloadBtn').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(attrData, null, 2)], { type: 'application/json' });
+    // Compact output (no whitespace) to match the format
+    // player-attributes.json is now shipped in.
+    const blob = new Blob([JSON.stringify(attrData)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

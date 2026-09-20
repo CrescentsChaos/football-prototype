@@ -96,9 +96,9 @@
   #status.err{color:var(--red);}
 
   /* --- Top-level tabs (Transfer / Squad) --- */
-  #tabbar{display:none; gap:8px; margin-bottom:14px;}
+  #tabbar{display:none; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
   #tabbar button{
-    width:auto; flex:1; padding:11px 10px; font-size:0.82rem;
+    width:auto; flex:1 1 29%; padding:10px 6px; font-size:0.78rem;
     background:rgba(255,255,255,0.03); color:var(--text-2); border:1px solid var(--border);
   }
   #tabbar button.active{
@@ -225,10 +225,28 @@
   }
   .frow:last-child{border-bottom:none;}
   .frow:active{background:rgba(255,255,255,0.04);}
+  .frow.selected{background:rgba(240,193,75,0.1); border-radius:8px;}
   .frow .info{flex:1; min-width:0;}
   .frow .info .nm{font-size:0.87rem; font-weight:600;}
   .frow .info .meta{font-size:0.72rem; color:var(--text-3);}
   .frow .ovr{font-family:'Courier New',monospace; font-weight:800; color:var(--gold); font-size:0.86rem;}
+
+  /* --- Merge player ids --- */
+  .mrow{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 8px; border-bottom:1px solid var(--border);
+  }
+  .mrow:last-child{border-bottom:none;}
+  .mrow .info{flex:1; min-width:0;}
+  .mrow .info .nm{font-size:0.87rem; font-weight:600;}
+  .mrow .info .meta{font-size:0.72rem; color:var(--text-3); font-family:'Courier New',monospace;}
+  .mrow-tag{
+    flex:none; font-size:0.62rem; font-weight:800; letter-spacing:0.4px;
+    padding:3px 7px; border-radius:6px; text-transform:uppercase;
+    color:var(--bg-0); background:linear-gradient(135deg,var(--gold),var(--gold-dim));
+  }
+  .mrow:not(:first-child) .mrow-tag{ color:var(--blue); background:rgba(61,139,253,0.12); }
+  .mrow-remove{flex:none; width:auto; padding:6px 10px; font-size:0.76rem;}
 
   /* --- Log --- */
   #log{max-height:240px; overflow-y:auto;}
@@ -242,6 +260,7 @@
   .logrow .tag-add .to{color:var(--blue);}
   .logrow .tag-release .to{color:var(--orange);}
   .logrow .tag-delete .to{color:var(--red);}
+  .logrow .tag-merge .to{color:var(--blue);}
   .logrow .icon{flex:none; font-size:0.9rem;}
   .logrow .undo{width:auto; margin-left:auto; padding:5px 9px; font-size:0.7rem; color:var(--text-3);}
   .empty-hint{color:var(--text-3); font-size:0.82rem; text-align:center; padding:14px 4px;}
@@ -274,13 +293,72 @@
   .sheet-player{font-weight:700; font-size:0.95rem; margin-bottom:2px;}
   .sheet-meta{font-size:0.78rem; color:var(--text-3); margin-bottom:14px;}
   .sheet-actions{display:flex; flex-direction:column; gap:8px;}
+
+  /* --- Multi-select club/nation checklist (Clone destinations) --- */
+  .mcrow{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 8px; border-bottom:1px solid var(--border);
+    cursor:pointer;
+  }
+  .mcrow:last-child{border-bottom:none;}
+  .mcrow:active{background:rgba(255,255,255,0.04);}
+  .mcrow.checked{background:rgba(240,193,75,0.1); border-radius:8px;}
+  .mcrow .chk{
+    width:19px; height:19px; border-radius:5px; border:1.5px solid var(--border-strong);
+    flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:0.7rem; color:var(--bg-0); font-weight:800;
+  }
+  .mcrow.checked .chk{background:var(--gold); border-color:var(--gold);}
+  .mcrow .info{flex:1; min-width:0;}
+  .mcrow .info .nm{font-size:0.87rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mcrow .info .meta{font-size:0.72rem; color:var(--text-3);}
+  .selcount{font-size:0.78rem; color:var(--gold); margin-top:8px; min-height:1.1em;}
+
+  /* --- Option row (checkbox + label) --- */
+  .optrow{display:flex; align-items:flex-start; gap:9px; margin-top:12px; font-size:0.84rem; color:var(--text-2); line-height:1.4;}
+  .optrow input[type=checkbox]{width:18px; height:18px; margin:1px 0 0; flex:none;}
+
+  /* --- Squad bulk-select mode --- */
+  .prow .bulkchk{
+    width:20px; height:20px; border-radius:5px; border:1.5px solid var(--border-strong);
+    flex:none; display:none; align-items:center; justify-content:center;
+    font-size:0.72rem; color:var(--bg-0); font-weight:800;
+  }
+  .playerlist.bulkmode .prow .bulkchk{display:flex;}
+  .playerlist.bulkmode .prow.bchecked{background:rgba(240,193,75,0.1); border-radius:8px;}
+  .playerlist.bulkmode .prow.bchecked .bulkchk{background:var(--gold); border-color:var(--gold);}
+  #bulkBar{
+    display:none; align-items:center; gap:8px; margin-top:10px;
+    padding:10px; background:var(--bg-0); border:1px solid var(--border); border-radius:var(--radius-sm);
+  }
+  #bulkBar.show{display:flex;}
+  #bulkBar .cnt{flex:1; font-size:0.8rem; color:var(--text-2);}
+
+  .logrow .tag-clone .to{color:#a78bfa;}
+
+  /* --- Manager DNA sliders --- */
+  #mgrDnaGrid{max-height:420px; overflow-y:auto; margin-top:8px; -webkit-overflow-scrolling:touch;}
+  .dnarow{display:flex; align-items:center; gap:9px; padding:8px 2px; border-bottom:1px solid var(--border);}
+  .dnarow:last-child{border-bottom:none;}
+  .dnarow input[type=checkbox]{width:17px; height:17px; margin:0; flex:none;}
+  .dnarow .dnalabel{flex:0 0 100px; font-size:0.74rem; color:var(--text-2); line-height:1.2;}
+  .dnarow .dnaslider{flex:1; margin-top:0; accent-color:var(--gold); width:auto;}
+  .dnarow .dnaslider:disabled{opacity:0.3;}
+  .dnarow .dnaval{
+    flex:0 0 54px; text-align:right; font-family:'Courier New',monospace;
+    font-size:0.78rem; color:var(--gold); font-weight:700;
+    background:var(--bg-0); border:1px solid var(--border); border-radius:6px;
+    padding:5px 6px; margin-top:0;
+  }
+  .dnarow .dnaval:disabled{opacity:0.3;}
+  .dnarow .dnaval:focus{outline:none; border-color:var(--border-strong);}
 </style>
 </head>
 <body>
 
 <header>
   <h1>⚽ Transfer Tool <span class="badge">Local</span></h1>
-  <p>Move, add, edit, or release players directly in teams.json — nothing leaves your phone.</p>
+  <p>Move, add, edit, release, or clone players and whole squads directly in teams.json — nothing leaves your phone.</p>
 </header>
 
 <main>
@@ -300,6 +378,9 @@
     <button id="tabTransfer" class="active">🔁 Transfer</button>
     <button id="tabSquad">👥 Add / Release</button>
     <button id="tabFind">🔎 Find Player</button>
+    <button id="tabClone">🧬 Clone</button>
+    <button id="tabManager">🎯 Manager</button>
+    <button id="tabMerge">🔗 Merge</button>
   </div>
 
   <!-- ============ TRANSFER VIEW ============ -->
@@ -344,15 +425,29 @@
       <div class="club-picker" id="squadPicker"></div>
 
       <div id="squadPlayerSection" style="display:none;">
-        <button class="btn-gold" id="addPlayerBtn" style="margin-top:12px;">＋ Add Player</button>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="btn-gold" id="addPlayerBtn">＋ Add Player</button>
+          <button class="btn-ghost" id="bulkToggleBtn" type="button" style="flex:0 0 auto; width:auto; padding:12px 14px;">☑ Select</button>
+        </div>
         <label style="display:block; margin-top:12px;">Search player</label>
         <div class="searchwrap">
           <input type="text" id="squadSearch" placeholder="Type a name…" autocomplete="off">
           <button class="clear" id="squadClearBtn">✕</button>
         </div>
         <div class="playerlist" id="squadList"></div>
-        <div style="font-size:0.72rem; color:var(--text-3); margin-top:10px;">Tap a player to edit, release, or delete them.</div>
+        <div id="bulkBar">
+          <div class="cnt" id="bulkCount">0 selected</div>
+          <button class="btn-warn btn-sm" id="bulkReleaseBtn" type="button">Release</button>
+          <button class="btn-danger btn-sm" id="bulkDeleteBtn" type="button">Delete</button>
+        </div>
+        <div style="font-size:0.72rem; color:var(--text-3); margin-top:10px;">Tap a player to edit, release, or delete them — or use Select for bulk release/delete.</div>
       </div>
+    </section>
+
+    <section class="card" id="rolesCard" style="display:none;">
+      <h2>Match Roles <span class="hint">saved into teams.json</span></h2>
+      <div id="rolesPanel"></div>
+      <div style="font-size:0.72rem; color:var(--text-3); margin-top:10px;">These are this club's default set-piece takers and captain. Leave a role on "Auto" to let the match engine pick the best-suited player each game.</div>
     </section>
   </div>
 
@@ -365,6 +460,141 @@
         <button class="clear" id="findClearBtn">✕</button>
       </div>
       <div class="findresults" id="findResults"></div>
+    </section>
+  </div>
+
+  <!-- ============ CLONE VIEW (duplicate a player into other squads, or duplicate a whole team) ============ -->
+  <div id="cloneView" style="display:none;">
+    <section class="card" id="clonePlayerCard">
+      <h2>Clone Player <span class="hint">copy into other squads</span></h2>
+      <div style="font-size:0.78rem; color:var(--text-3); margin-top:-4px; margin-bottom:10px;">Insert a national-team player into any club(s), a club player into a nation, or duplicate them anywhere — the original stays put.</div>
+      <label>Search player to clone</label>
+      <div class="searchwrap">
+        <input type="text" id="cloneSearch" placeholder="Type at least 2 letters of a name…" autocomplete="off">
+        <button class="clear" id="cloneClearBtn">✕</button>
+      </div>
+      <div class="findresults" id="cloneSearchResults"></div>
+
+      <div id="cloneDestSection" style="display:none;">
+        <div class="selected-player" id="cloneSelectedPlayer" style="margin-top:14px;"></div>
+
+        <label style="display:block; margin-top:12px;">Clone into (pick one or more)</label>
+        <div class="club-picker" id="cloneDestPicker"></div>
+        <div class="selcount" id="cloneSelCount">No teams selected yet.</div>
+
+        <div class="optrow">
+          <input type="checkbox" id="cloneKeepId" checked>
+          <label for="cloneKeepId" style="text-transform:none; letter-spacing:normal;">Keep the same player ID on the clone (recommended — this is how dual-registered real players share one id across club &amp; country)</label>
+        </div>
+
+        <div class="optrow">
+          <input type="checkbox" id="cloneClearNum" checked>
+          <label for="cloneClearNum" style="text-transform:none; letter-spacing:normal;">Clear squad number on the clone(s) to avoid clashes</label>
+        </div>
+
+        <div class="fielderr" id="cloneErr"></div>
+        <button class="btn-gold" id="cloneBtn" style="margin-top:14px;" disabled>Clone Player</button>
+      </div>
+    </section>
+
+    <section class="card" id="cloneTeamCard">
+      <h2>Clone Whole Team <span class="hint">duplicate a squad</span></h2>
+      <div style="font-size:0.78rem; color:var(--text-3); margin-top:-4px; margin-bottom:10px;">Copy an entire roster into a brand-new team — handy for a "B" side, a rival, or a backup squad.</div>
+      <label>Source club or nation</label>
+      <div class="club-picker" id="cloneTeamPicker"></div>
+
+      <div id="cloneTeamDestSection" style="display:none;">
+        <label style="display:block; margin-top:12px;">New team name</label>
+        <input type="text" id="ctName" placeholder="e.g. Slovenia B" autocomplete="off">
+        <div class="formgrid" style="margin-top:10px;">
+          <div>
+            <label>Short code</label>
+            <input type="text" id="ctShort" maxlength="4" placeholder="e.g. SVB" autocomplete="off">
+          </div>
+          <div>
+            <label>Flag / emoji</label>
+            <input type="text" id="ctFlag" placeholder="🏳️" autocomplete="off">
+          </div>
+        </div>
+        <label style="display:block; margin-top:12px;">Add new team to</label>
+        <div class="filterchips" id="ctGroupChips">
+          <button data-g="club" class="active" type="button">Clubs</button>
+          <button data-g="national" type="button">National</button>
+        </div>
+        <div class="fielderr" id="cloneTeamErr"></div>
+        <button class="btn-gold" id="cloneTeamBtn" style="margin-top:14px;">Duplicate Team (<span id="ctPlayerCount">0</span> players)</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ MANAGER VIEW (edit manager, full DNA, copy elsewhere) ============ -->
+  <div id="managerView" style="display:none;">
+    <section class="card" id="managerPickCard">
+      <h2>Manager <span class="hint">pick a club or nation</span></h2>
+      <label>Club</label>
+      <div class="club-picker" id="managerPicker"></div>
+    </section>
+
+    <section class="card" id="managerFormCard" style="display:none;">
+      <h2>Edit Manager <span class="hint">saved into teams.json</span></h2>
+
+      <label>Name</label>
+      <input type="text" id="mgrName" placeholder="Manager name" autocomplete="off">
+
+      <div class="formgrid">
+        <div>
+          <label>Overall (OVR)</label>
+          <input type="number" id="mgrOvr" min="1" max="99">
+        </div>
+        <div>
+          <label>Formation</label>
+          <select id="mgrFormation"></select>
+        </div>
+        <div class="full">
+          <label>Playstyle</label>
+          <select id="mgrPlaystyle"></select>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:18px; gap:8px;">
+        <label style="margin:0;">Manager DNA <span class="hint">18 traits, 0–1</span></label>
+        <button class="btn-sm btn-ghost" id="mgrDnaResetBtn" type="button">Reset all to auto</button>
+      </div>
+      <div style="font-size:0.72rem; color:var(--text-3); margin-top:4px;">Toggle a trait on to hand-tune it — traits left off keep the engine's own deterministic per-manager value.</div>
+      <div id="mgrDnaGrid"></div>
+
+      <div class="fielderr" id="mgrErr"></div>
+      <button class="btn-gold" id="mgrSaveBtn" style="margin-top:14px;">Save Manager</button>
+    </section>
+
+    <section class="card" id="managerCopyCard" style="display:none;">
+      <h2>Copy Manager <span class="hint">apply this manager elsewhere</span></h2>
+      <div style="font-size:0.78rem; color:var(--text-3); margin-top:-4px; margin-bottom:10px;">Copy this manager's settings — including any hand-tuned DNA — onto one or more other clubs. Their current manager is replaced.</div>
+      <label>Copy into (pick one or more)</label>
+      <div class="club-picker" id="mgrCopyPicker"></div>
+      <div class="selcount" id="mgrCopySelCount">No teams selected yet.</div>
+      <button class="btn-gold" id="mgrCopyBtn" style="margin-top:14px;" disabled>Copy Manager</button>
+    </section>
+  </div>
+
+  <!-- ============ MERGE VIEW (fold two+ roster entries into one player id) ============ -->
+  <div id="mergeView" style="display:none;">
+    <section class="card" id="mergeSearchCard">
+      <h2>Merge Player IDs <span class="hint">e.g. same real player, club + country</span></h2>
+      <div style="font-size:0.78rem; color:var(--text-3); margin-top:-4px; margin-bottom:10px;">Search and tap two or more roster entries that are actually the same real player. The <b>first one you tap</b> is kept — every other selected entry gets rewritten to share its player id.</div>
+      <label>Search player</label>
+      <div class="searchwrap">
+        <input type="text" id="mergeSearch" placeholder="Type at least 2 letters of a name…" autocomplete="off">
+        <button class="clear" id="mergeClearBtn">✕</button>
+      </div>
+      <div class="findresults" id="mergeResults"></div>
+    </section>
+
+    <section class="card" id="mergeSelectedCard">
+      <h2>Merge set <span class="hint" id="mergeSelCount">0 selected</span></h2>
+      <div class="findresults" id="mergeSelectedList"><div class="empty-hint">Search above and tap players to add them to the merge set.</div></div>
+      <div class="fielderr" id="mergeErr"></div>
+      <button class="btn-gold" id="mergeBtn" style="margin-top:14px;" disabled>Merge Selected → Keep 1st Player's ID</button>
     </section>
   </div>
 
@@ -403,6 +633,7 @@
     <div class="sheet-meta" id="sheetPlayerMeta"></div>
     <div class="sheet-actions">
       <button class="btn-ghost" id="sheetEditBtn">✏️ Edit Player</button>
+      <button class="btn-ghost" id="sheetTransferBtn">🔁 Transfer Player</button>
       <button class="btn-warn" id="sheetReleaseBtn">⇄ Release to Free Agents</button>
       <button class="btn-danger" id="sheetDeleteBtn">🗑 Delete Permanently</button>
       <button class="btn-ghost" id="sheetCancelBtn">Cancel</button>
@@ -475,6 +706,10 @@
   let allClubs = [];         // flat list of {group:'club'|'national', idx, team} — idx is stable into data[group]
   let selectedPlayer = null; // {group, idx, player}  (transfer flow)
   let actionLog = [];        // unified log of every change this session — see logAction() for shape
+  let cloneSource = null;    // {club, player} — player currently staged in the Clone Player flow
+  let bulkMode = false;      // squad tab: multi-select mode for bulk release/delete
+  let bulkSelected = new Set(); // squad tab: ids currently checked in bulk mode
+  let mergeSelected = [];    // merge tab: [{group, idx, id, name, clubLabel}] in tap order — [0] is the id that survives
 
   const $ = (id) => document.getElementById(id);
   const FREE_AGENT_ID = 'free_agents';
@@ -633,7 +868,139 @@
     };
   }
 
-  let fromPicker, toPicker, squadPicker;
+  // =========================================================
+  // Multi-select club/nation checklist — used by Clone Player to pick
+  // any number of destination squads at once (e.g. drop a national-team
+  // player into several clubs in one go). sel is a Set of "group:idx".
+  // Unlike makeClubPicker, this never collapses to a summary strip —
+  // it always shows the search + checklist so more picks can be added.
+  // =========================================================
+  function makeMultiClubPicker(prefix, opts){
+    const root = $(prefix + 'Picker');
+    let sel = new Set();
+    let filterGroup = 'all';
+    let query = '';
+
+    function key(c){ return c.group + ':' + c.idx; }
+
+    function matches(){
+      let list = allClubs;
+      if (filterGroup !== 'all') list = list.filter(c => c.group === filterGroup);
+      const q = query.trim().toLowerCase();
+      if (q) {
+        list = list.filter(c =>
+          (c.team.name || '').toLowerCase().includes(q) ||
+          (c.team.short || '').toLowerCase().includes(q));
+      }
+      return list;
+    }
+
+    function render(){
+      root.innerHTML =
+        '<div class="filterchips">' +
+          '<button data-f="all" class="' + (filterGroup==='all'?'active':'') + '">All</button>' +
+          '<button data-f="club" class="' + (filterGroup==='club'?'active':'') + '">Clubs</button>' +
+          '<button data-f="national" class="' + (filterGroup==='national'?'active':'') + '">National</button>' +
+        '</div>' +
+        '<div class="searchwrap">' +
+          '<input type="text" id="' + prefix + 'ClubSearch" placeholder="Search club or nation…" autocomplete="off" value="' + escapeHtml(query) + '">' +
+          '<button class="clear" id="' + prefix + 'ClubClearBtn">✕</button>' +
+        '</div>' +
+        '<div class="clublist" id="' + prefix + 'ClubList"></div>';
+
+      root.querySelectorAll('.filterchips button').forEach(b => {
+        b.addEventListener('click', () => { filterGroup = b.getAttribute('data-f'); render(); });
+      });
+      const input = root.querySelector('#' + prefix + 'ClubSearch');
+      input.addEventListener('input', () => { query = input.value; renderList(); });
+      const clearBtn = root.querySelector('#' + prefix + 'ClubClearBtn');
+      clearBtn.style.display = query ? 'block' : 'none';
+      clearBtn.addEventListener('click', () => { query=''; input.value=''; input.focus(); renderList(); });
+
+      renderList();
+    }
+
+    function renderList(){
+      const listEl = root.querySelector('#' + prefix + 'ClubList');
+      const clearBtn = root.querySelector('#' + prefix + 'ClubClearBtn');
+      if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+      const list = matches();
+      if (!list.length) { listEl.innerHTML = '<div class="empty-hint">No teams match.</div>'; return; }
+      listEl.innerHTML = list.map(c => {
+        const k = key(c);
+        const isSel = sel.has(k);
+        return '<div class="mcrow' + (isSel ? ' checked' : '') + '" data-key="' + k + '">' +
+          '<span class="chk">' + (isSel ? '✓' : '') + '</span>' +
+          teamMark(c.team, 24) +
+          '<div class="info">' +
+            '<div class="nm">' + escapeHtml(c.team.name) + '</div>' +
+            '<div class="meta">' + (c.team.short || '') + ' · ' + (c.team.players || []).length + ' players</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      listEl.querySelectorAll('.mcrow').forEach(row => {
+        row.addEventListener('click', () => {
+          const k = row.getAttribute('data-key');
+          if (sel.has(k)) sel.delete(k); else sel.add(k);
+          renderList();
+          if (opts && opts.onChange) opts.onChange(getSel());
+        });
+      });
+    }
+
+    function getSel(){
+      return Array.from(sel).map(k => {
+        const i = k.indexOf(':');
+        const group = k.slice(0, i), idx = Number(k.slice(i + 1));
+        return allClubs.find(c => c.group === group && c.idx === idx);
+      }).filter(Boolean);
+    }
+
+    return {
+      get: getSel,
+      clear: () => { sel = new Set(); render(); },
+      refreshLabels: () => render()
+    };
+  }
+
+  let fromPicker, toPicker, squadPicker, cloneDestPicker, cloneTeamPicker, managerPicker, mgrCopyPicker;
+  let mgrDnaOverrides = {}; // trait -> value currently staged for the manager form (only toggled-on traits)
+
+  // ---------- Manager reference data ----------
+  // Mirrors ai/managerAI.js — kept in sync by hand since this tool only
+  // ever touches teams.json, not the engine bundle. If PLAYSTYLES,
+  // DNA_TRAITS, or FORMATIONS in the main app ever change, update these too.
+  const PLAYSTYLES = ['Long Ball', 'Possession', 'Long Ball Counter', 'Overload', 'Quick Counter', 'Out Wide'];
+  const DNA_TRAITS = [
+    { key: 'tempo', label: 'Tempo' },
+    { key: 'directness', label: 'Directness' },
+    { key: 'width', label: 'Width' },
+    { key: 'pressing', label: 'Pressing' },
+    { key: 'defensiveLine', label: 'Defensive Line' },
+    { key: 'compactness', label: 'Compactness' },
+    { key: 'risk', label: 'Risk' },
+    { key: 'verticality', label: 'Verticality' },
+    { key: 'positionalFreedom', label: 'Positional Freedom' },
+    { key: 'crossing', label: 'Crossing' },
+    { key: 'cutbacks', label: 'Cutbacks' },
+    { key: 'throughBalls', label: 'Through Balls' },
+    { key: 'switches', label: 'Switches' },
+    { key: 'overlaps', label: 'Overlaps' },
+    { key: 'counterpressing', label: 'Counterpressing' },
+    { key: 'blockDepth', label: 'Block Depth' },
+    { key: 'transitionSpeed', label: 'Transition Speed' },
+    { key: 'matchManagement', label: 'Match Management' }
+  ];
+  const FORMATION_LABELS = {
+    '4-3-3': '4-3-3', '4-4-2': '4-4-2', '4-2-3-1': '4-2-3-1', '3-5-2': '3-5-2',
+    '3-5-2-cm': '3-5-2 (Mid)', '4-5-1': '4-5-1', '3-4-3': '3-4-3', '5-3-2': '5-3-2',
+    '4-1-4-1': '4-1-4-1', '4-3-2-1': '4-3-2-1', '3-4-2-1': '3-4-2-1', '4-4-1-1': '4-4-1-1',
+    '5-4-1': '5-4-1', '4-1-2-1-2': '4-1-2-1-2 (Diamond)', '4-2-2-2': '4-2-2-2',
+    '3-1-4-2': '3-1-4-2', '4-1-3-2': '4-1-3-2', '4-3-3-f9': '4-3-3 (False 9)',
+    '4-3-3-cdm': '4-3-3 (Holding)', '4-3-3-cam': '4-3-3 (Attack)',
+    '4-2-3-1-narrow': '4-2-3-1 (Narrow)', '5-3-2-attack': '5-3-2 (Attack)',
+    '4-2-4': '4-2-4', '4-1-2-3-st': '4-1-2-3 (3 ST)'
+  };
 
   // ---------- Load ----------
   $('dropZone').addEventListener('click', () => $('fileInput').click());
@@ -746,18 +1113,39 @@
     return prefix + n;
   }
 
+  // Generates a collision-free team id (used when duplicating a whole squad).
+  function makeTeamId(name){
+    const raw = (name || 'team').toString().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const prefix = raw || 'team';
+    const used = new Set();
+    ['club','national'].forEach(g => (data[g] || []).forEach(t => { if (t.id != null) used.add(String(t.id)); }));
+    if (!used.has(prefix)) return prefix;
+    let n = 2;
+    while (used.has(prefix + n)) n++;
+    return prefix + n;
+  }
+
   // ---------- Tabs ----------
   function setTab(tab){
     $('tabTransfer').classList.toggle('active', tab === 'transfer');
     $('tabSquad').classList.toggle('active', tab === 'squad');
     $('tabFind').classList.toggle('active', tab === 'find');
+    $('tabClone').classList.toggle('active', tab === 'clone');
+    $('tabManager').classList.toggle('active', tab === 'manager');
+    $('tabMerge').classList.toggle('active', tab === 'merge');
     $('transferView').style.display = tab === 'transfer' ? '' : 'none';
     $('squadView').style.display = tab === 'squad' ? '' : 'none';
     $('findView').style.display = tab === 'find' ? '' : 'none';
+    $('cloneView').style.display = tab === 'clone' ? '' : 'none';
+    $('managerView').style.display = tab === 'manager' ? '' : 'none';
+    $('mergeView').style.display = tab === 'merge' ? '' : 'none';
   }
   $('tabTransfer').addEventListener('click', () => setTab('transfer'));
   $('tabSquad').addEventListener('click', () => setTab('squad'));
   $('tabFind').addEventListener('click', () => setTab('find'));
+  $('tabClone').addEventListener('click', () => setTab('clone'));
+  $('tabManager').addEventListener('click', () => setTab('manager'));
+  $('tabMerge').addEventListener('click', () => setTab('merge'));
 
   // ---------- UI transitions ----------
   function showTransferUI(){
@@ -767,6 +1155,11 @@
     fromPicker = makeClubPicker('from', { onChange: onFromClubChange });
     toPicker = makeClubPicker('to', { onChange: onToClubChange });
     squadPicker = makeClubPicker('squad', { onChange: onSquadClubChange });
+    cloneDestPicker = makeMultiClubPicker('cloneDest', { onChange: updateCloneButton });
+    cloneTeamPicker = makeClubPicker('cloneTeam', { onChange: onCloneTeamClubChange });
+    managerPicker = makeClubPicker('manager', { onChange: onManagerClubChange });
+    mgrCopyPicker = makeMultiClubPicker('mgrCopy', { onChange: updateMgrCopyButton });
+    populateManagerSelects();
 
     $('fromCard').style.display = '';
     $('toCard').style.display = 'none';
@@ -774,7 +1167,25 @@
     $('squadPlayerSection').style.display = 'none';
     fromPicker.set(null);
     squadPicker.set(null);
+    cloneTeamPicker.set(null);
+    managerPicker.set(null);
+    cloneSource = null;
+    mgrDnaOverrides = {};
+    bulkMode = false; bulkSelected = new Set();
+    $('cloneDestSection').style.display = 'none';
+    $('cloneTeamDestSection').style.display = 'none';
+    $('cloneSearchResults').innerHTML = '';
+    $('managerFormCard').style.display = 'none';
+    $('managerCopyCard').style.display = 'none';
     setTab('transfer');
+  }
+
+  function populateManagerSelects(){
+    $('mgrFormation').innerHTML = '<option value="">Auto (engine picks by style)</option>' +
+      Object.keys(FORMATION_LABELS).map(k =>
+        '<option value="' + k + '">' + escapeHtml(FORMATION_LABELS[k]) + '</option>').join('');
+    $('mgrPlaystyle').innerHTML = '<option value="">Auto (random, locked once assigned)</option>' +
+      PLAYSTYLES.map(s => '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>').join('');
   }
 
   function onFromClubChange(){
@@ -930,14 +1341,257 @@
   // ---------- Squad tab: roster list + add/edit/release/delete ----------
   function onSquadClubChange(){
     $('squadPlayerSection').style.display = '';
+    $('rolesCard').style.display = '';
+    bulkMode = false; bulkSelected = new Set();
+    $('bulkToggleBtn').textContent = '☑ Select';
+    $('bulkToggleBtn').classList.remove('btn-warn');
     renderSquadList();
+    renderRolesPanel();
+  }
+
+  // ---- Match Roles (captain / free kicks / penalty / corners) ----
+  // Persisted straight onto the team object as team.roles = { roleKey:
+  // playerId }, which lands in teams.json on download exactly like any
+  // other team field. The match engine (assignMatchRoles in
+  // engine/matchRoles.js) reads this as a default, and the Squad
+  // Builder's own per-lineup Match Roles panel can still override it for
+  // a specific saved lineup.
+  const ROLE_DEFS = [
+    { key: 'captain',      label: 'Captain' },
+    { key: 'shortFreeKick', label: 'Short Free Kick' },
+    { key: 'longFreeKick',  label: 'Long Free Kick' },
+    { key: 'penalty',      label: 'Penalty' },
+    { key: 'leftCorner',   label: 'Left Corner' },
+    { key: 'rightCorner',  label: 'Right Corner' }
+  ];
+
+  function renderRolesPanel(){
+    const c = clubBy(squadPicker.get());
+    const panel = $('rolesPanel');
+    if (!c) { panel.innerHTML = ''; return; }
+    const team = c.team;
+    const players = (team.players || []).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    const roles = team.roles || {};
+
+    panel.innerHTML = ROLE_DEFS.map(r => {
+      const opts = ['<option value="">Auto</option>'].concat(players.map(p =>
+        '<option value="' + escapeHtml(p.id) + '"' + (roles[r.key] === p.id ? ' selected' : '') + '>' +
+        escapeHtml(p.name) + (p.ovr != null ? ' (' + p.ovr + ')' : '') + '</option>'
+      ));
+      return '<label style="display:block; margin-top:10px;">' + r.label + '</label>' +
+        '<select data-role="' + r.key + '">' + opts.join('') + '</select>';
+    }).join('');
+
+    panel.querySelectorAll('select[data-role]').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const key = sel.getAttribute('data-role');
+        const val = sel.value;
+        const before = Object.assign({}, team.roles || {});
+        if (!team.roles) team.roles = {};
+        if (val) team.roles[key] = val; else delete team.roles[key];
+        if (!Object.keys(team.roles).length) delete team.roles;
+
+        logAction({
+          type: 'roles', name: (ROLE_DEFS.find(r => r.key === key) || {}).label || key,
+          label: team.short || team.name,
+          group: c.group, idx: c.idx, before
+        });
+        afterMutation();
+        setStatus('Updated match roles for ' + (team.short || team.name) + '.', 'ok');
+      });
+    });
+  }
+
+  // Any role still pointing at a player who's since left the club (sold,
+  // released, or deleted) is dropped automatically so teams.json never
+  // holds a dangling role reference.
+  function cleanupTeamRoles(team){
+    if (!team || !team.roles) return;
+    const ids = new Set((team.players || []).map(p => p.id));
+    let changed = false;
+    Object.keys(team.roles).forEach(key => {
+      if (!ids.has(team.roles[key])) { delete team.roles[key]; changed = true; }
+    });
+    if (changed && !Object.keys(team.roles).length) delete team.roles;
+  }
+
+  function cleanupAllTeamRoles(){
+    (allClubs || []).forEach(c => cleanupTeamRoles(c.team));
+  }
+
+  // ---------- Manager (edit + DNA + copy) ----------
+  function onManagerClubChange(){
+    const c = clubBy(managerPicker.get());
+    $('managerFormCard').style.display = c ? '' : 'none';
+    $('managerCopyCard').style.display = c ? '' : 'none';
+    if (!c) return;
+    loadManagerForm(c);
+    if (mgrCopyPicker) mgrCopyPicker.clear();
+    updateMgrCopyButton();
+  }
+
+  function loadManagerForm(c){
+    const mgr = c.team.manager || {};
+    $('mgrErr').textContent = '';
+    $('mgrName').value = mgr.name || '';
+    $('mgrOvr').value = mgr.ovr != null ? mgr.ovr : '';
+    $('mgrFormation').value = (mgr.formation && FORMATION_LABELS[mgr.formation]) ? mgr.formation : '';
+    $('mgrPlaystyle').value = PLAYSTYLES.includes(mgr.playstyle) ? mgr.playstyle : '';
+    mgrDnaOverrides = Object.assign({}, (mgr.dna && typeof mgr.dna === 'object') ? mgr.dna : {});
+    renderDnaGrid();
+  }
+
+  function clampDna(v){
+    if (typeof v !== 'number' || Number.isNaN(v)) return 0.5;
+    return Math.max(0, Math.min(1, v));
+  }
+
+  function renderDnaGrid(){
+    const grid = $('mgrDnaGrid');
+    grid.innerHTML = DNA_TRAITS.map(t => {
+      const has = Object.prototype.hasOwnProperty.call(mgrDnaOverrides, t.key);
+      const val = has ? mgrDnaOverrides[t.key] : 0.5;
+      return '<div class="dnarow" data-trait="' + t.key + '">' +
+        '<input type="checkbox" class="dnachk"' + (has ? ' checked' : '') + '>' +
+        '<div class="dnalabel">' + escapeHtml(t.label) + '</div>' +
+        '<input type="range" class="dnaslider" min="0" max="1" step="0.01" value="' + val + '"' + (has ? '' : ' disabled') + '>' +
+        '<input type="number" class="dnaval" inputmode="decimal" min="0" max="1" step="0.01" value="' + val.toFixed(2) + '"' + (has ? '' : ' disabled') + '>' +
+      '</div>';
+    }).join('');
+
+    grid.querySelectorAll('.dnarow').forEach(row => {
+      const trait = row.getAttribute('data-trait');
+      const chk = row.querySelector('.dnachk');
+      const slider = row.querySelector('.dnaslider');
+      const numInput = row.querySelector('.dnaval');
+
+      // Range and number box stay in sync either direction; pasting into
+      // either is blocked outright rather than sanitized, since a pasted
+      // chunk of text (or a huge/garbage number) was landing in the
+      // number box and throwing the slider to a nonsense position.
+      [slider, numInput].forEach(el => el.addEventListener('paste', (e) => e.preventDefault()));
+
+      chk.addEventListener('change', () => {
+        slider.disabled = !chk.checked;
+        numInput.disabled = !chk.checked;
+        if (chk.checked) {
+          const v = clampDna(Number(slider.value) || 0.5);
+          slider.value = v; numInput.value = v.toFixed(2);
+          mgrDnaOverrides[trait] = v;
+        } else {
+          delete mgrDnaOverrides[trait];
+        }
+      });
+
+      slider.addEventListener('input', () => {
+        const v = clampDna(Number(slider.value));
+        numInput.value = v.toFixed(2);
+        if (chk.checked) mgrDnaOverrides[trait] = v;
+      });
+
+      // Let the person type freely (including a bare "0." mid-edit)
+      // without clamping every keystroke; only clamp/format once they
+      // finish, on blur or Enter.
+      const commitTyped = () => {
+        const v = clampDna(parseFloat(numInput.value));
+        numInput.value = v.toFixed(2);
+        slider.value = v;
+        if (chk.checked) mgrDnaOverrides[trait] = v;
+      };
+      numInput.addEventListener('blur', commitTyped);
+      numInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { commitTyped(); numInput.blur(); }
+      });
+    });
+  }
+
+  $('mgrDnaResetBtn').addEventListener('click', () => {
+    mgrDnaOverrides = {};
+    renderDnaGrid();
+  });
+
+  $('mgrSaveBtn').addEventListener('click', () => {
+    const c = clubBy(managerPicker.get());
+    if (!c) return;
+    const name = $('mgrName').value.trim();
+    if (!name) { $('mgrErr').textContent = 'Manager name is required.'; return; }
+    $('mgrErr').textContent = '';
+
+    const before = c.team.manager ? JSON.parse(JSON.stringify(c.team.manager)) : null;
+    const ovrVal = $('mgrOvr').value === '' ? undefined : Number($('mgrOvr').value);
+    const formationVal = $('mgrFormation').value || undefined;
+    const playstyleVal = $('mgrPlaystyle').value || undefined;
+
+    // Rebuilt from scratch (rather than patched onto the old object) so a
+    // cleared field actually goes away, and any stale _dna/_proficiency
+    // cache is dropped — the engine regenerates both next load against
+    // whatever name/style/overrides are now set.
+    const mgr = { name: name };
+    if (ovrVal != null && !Number.isNaN(ovrVal)) mgr.ovr = ovrVal;
+    if (formationVal) mgr.formation = formationVal;
+    if (playstyleVal) mgr.playstyle = playstyleVal;
+    if (Object.keys(mgrDnaOverrides).length) mgr.dna = Object.assign({}, mgrDnaOverrides);
+
+    c.team.manager = mgr;
+
+    logAction({
+      type: 'editmanager', name: mgr.name, id: c.team.id,
+      group: c.group, idx: c.idx, label: c.team.short || c.team.name, before
+    });
+
+    afterMutation();
+    setStatus('Saved manager "' + mgr.name + '" for ' + (c.team.short || c.team.name) + '.', 'ok');
+  });
+
+  function updateMgrCopyButton(){
+    const dests = mgrCopyPicker ? mgrCopyPicker.get() : [];
+    $('mgrCopySelCount').textContent = dests.length
+      ? (dests.length + ' team' + (dests.length===1?'':'s') + ' selected')
+      : 'No teams selected yet.';
+    const c = clubBy(managerPicker.get());
+    $('mgrCopyBtn').disabled = !c || !c.team.manager || !dests.length;
+  }
+
+  $('mgrCopyBtn').addEventListener('click', () => {
+    const c = clubBy(managerPicker.get());
+    if (!c || !c.team.manager) return;
+    const dests = mgrCopyPicker.get().filter(d => !(d.group === c.group && d.idx === c.idx));
+    if (!dests.length) return;
+    const names = dests.map(d => d.team.short || d.team.name).join(', ');
+    openConfirm('Confirm copy manager',
+      'Copy <b>' + escapeHtml(c.team.manager.name || 'this manager') + '</b> (including DNA) onto <b>' + dests.length +
+      '</b> team' + (dests.length===1?'':'s') + ': ' + escapeHtml(names) + '? Their current manager will be replaced.',
+      () => doCopyManager(c, dests));
+  });
+
+  function doCopyManager(c, dests){
+    const src = JSON.parse(JSON.stringify(c.team.manager));
+    delete src._dna; delete src._dnaFor; delete src._proficiency; delete src._proficiencyFor;
+    const changed = [];
+    dests.forEach(dest => {
+      changed.push({ group: dest.group, idx: dest.idx, before: dest.team.manager ? JSON.parse(JSON.stringify(dest.team.manager)) : null });
+      dest.team.manager = JSON.parse(JSON.stringify(src));
+    });
+
+    logAction({
+      type: 'copymanager', name: src.name || 'Manager',
+      label: c.team.short || c.team.name,
+      destLabel: dests.map(d => d.team.short || d.team.name).join(', '),
+      changed
+    });
+
+    afterMutation();
+    setStatus('Copied manager to ' + dests.length + ' team' + (dests.length===1?'':'s') + '.', 'ok');
+    mgrCopyPicker.clear();
+    updateMgrCopyButton();
   }
 
   function renderSquadList(){
     const c = clubBy(squadPicker.get());
     const q = ($('squadSearch').value || '').trim().toLowerCase();
     const list = $('squadList');
-    if (!c) { list.innerHTML = ''; return; }
+    list.classList.toggle('bulkmode', bulkMode);
+    if (!c) { list.innerHTML = ''; updateBulkBar(); return; }
     let players = (c.team.players || []).slice();
     if (q) players = players.filter(p => (p.name||'').toLowerCase().includes(q));
     players.sort((a,b) => (b.ovr||0) - (a.ovr||0));
@@ -945,31 +1599,98 @@
 
     if (!players.length) {
       list.innerHTML = '<div class="empty-hint">No players match.</div>';
+      updateBulkBar();
       return;
     }
     list.innerHTML = players.map(p => {
-      return '<div class="prow" data-id="' + escapeHtml(p.id) + '">' +
+      const checked = bulkSelected.has(p.id);
+      return '<div class="prow' + (checked ? ' bchecked' : '') + '" data-id="' + escapeHtml(p.id) + '">' +
+        (bulkMode ? '<span class="bulkchk">' + (checked ? '✓' : '') + '</span>' : '') +
         '<div class="num">' + (p.num != null ? p.num : '—') + '</div>' +
         '<div class="info">' +
           '<div class="nm">' + escapeHtml(p.name) + '</div>' +
           '<div class="meta">' + (p.pos||[]).join('/') + '</div>' +
         '</div>' +
         '<div class="ovr">' + (p.ovr != null ? p.ovr : '—') + '</div>' +
-        '<div class="chev">›</div>' +
+        (bulkMode ? '' : '<div class="chev">›</div>') +
       '</div>';
     }).join('');
 
     Array.from(list.querySelectorAll('.prow')).forEach(row => {
       row.addEventListener('click', () => {
         const id = row.getAttribute('data-id');
+        if (bulkMode) {
+          if (bulkSelected.has(id)) bulkSelected.delete(id); else bulkSelected.add(id);
+          renderSquadList();
+          return;
+        }
         const p = (c.team.players || []).find(x => x.id === id);
         if (p) openActionSheet(c, p);
       });
     });
+    updateBulkBar();
   }
 
   $('squadSearch').addEventListener('input', renderSquadList);
   $('squadClearBtn').addEventListener('click', () => { $('squadSearch').value=''; renderSquadList(); });
+
+  // ---- Bulk select mode (multi release/delete) ----
+  function updateBulkBar(){
+    const bar = $('bulkBar');
+    bar.classList.toggle('show', bulkMode && bulkSelected.size > 0);
+    $('bulkCount').textContent = bulkSelected.size + ' selected';
+  }
+
+  $('bulkToggleBtn').addEventListener('click', () => {
+    bulkMode = !bulkMode;
+    bulkSelected = new Set();
+    $('bulkToggleBtn').textContent = bulkMode ? '✕ Cancel' : '☑ Select';
+    $('bulkToggleBtn').classList.toggle('btn-warn', bulkMode);
+    renderSquadList();
+  });
+
+  $('bulkReleaseBtn').addEventListener('click', () => {
+    const c = clubBy(squadPicker.get());
+    if (!c || !bulkSelected.size) return;
+    const fa = ensureFreeAgentTeam();
+    const n = bulkSelected.size;
+    openConfirm('Release ' + n + ' player' + (n===1?'':'s'),
+      'Release ' + n + ' selected player' + (n===1?'':'s') + ' from <b>' + escapeHtml(c.team.short || c.team.name) +
+      '</b> to <b>Free Agents</b>?',
+      () => {
+        const ids = Array.from(bulkSelected);
+        ids.forEach(id => {
+          const player = (data[c.group][c.idx].players || []).find(x => x.id === id);
+          if (player) doRelease(c, player, fa);
+        });
+        bulkMode = false; bulkSelected = new Set();
+        $('bulkToggleBtn').textContent = '☑ Select';
+        $('bulkToggleBtn').classList.remove('btn-warn');
+        renderSquadList();
+        setStatus('Released ' + ids.length + ' player(s) to Free Agents.', 'ok');
+      });
+  });
+
+  $('bulkDeleteBtn').addEventListener('click', () => {
+    const c = clubBy(squadPicker.get());
+    if (!c || !bulkSelected.size) return;
+    const n = bulkSelected.size;
+    openConfirm('Delete ' + n + ' player' + (n===1?'':'s'),
+      'Permanently delete ' + n + ' selected player' + (n===1?'':'s') + ' from <b>' + escapeHtml(c.team.short || c.team.name) +
+      '</b>? Each can still be undone individually this session.',
+      () => {
+        const ids = Array.from(bulkSelected);
+        ids.forEach(id => {
+          const player = (data[c.group][c.idx].players || []).find(x => x.id === id);
+          if (player) doDelete(c, player);
+        });
+        bulkMode = false; bulkSelected = new Set();
+        $('bulkToggleBtn').textContent = '☑ Select';
+        $('bulkToggleBtn').classList.remove('btn-warn');
+        renderSquadList();
+        setStatus('Deleted ' + ids.length + ' player(s).', 'ok');
+      });
+  });
 
   // ---- Player action sheet (Edit / Release / Delete) ----
   let sheetCtx = null; // { club, player }
@@ -987,6 +1708,19 @@
   $('sheetEditBtn').addEventListener('click', () => {
     const ctx = sheetCtx; closeActionSheet();
     openPlayerForm({ mode: 'edit', club: ctx.club, player: ctx.player });
+  });
+
+  // Jumps straight into the Transfer tab with this player already staged
+  // as the source — used from both the Squad list and Find Player search,
+  // so a player can be transferred the moment you find them.
+  $('sheetTransferBtn').addEventListener('click', () => {
+    const ctx = sheetCtx; closeActionSheet();
+    setTab('transfer');
+    fromPicker.set({ group: ctx.club.group, idx: ctx.club.idx });
+    onFromClubChange();
+    selectedPlayer = { group: ctx.club.group, idx: ctx.club.idx, player: ctx.player };
+    renderPlayerList();
+    showToStep();
   });
 
   $('sheetReleaseBtn').addEventListener('click', () => {
@@ -1207,24 +1941,377 @@
     });
   }
 
+  // ---------- Merge Player IDs (fold two+ roster entries into one id) ----------
+  // Same real player often exists as separate club + national-team roster
+  // entries with different ids (see findPlayerTeams()'s name-match fallback
+  // in the main app's data/playerDatabase.js) — this lets you collapse
+  // that permanently in the saved file by rewriting every selected entry
+  // after the first to share the first one's id.
+  $('mergeSearch').addEventListener('input', renderMergeResults);
+  $('mergeClearBtn').addEventListener('click', () => { $('mergeSearch').value=''; renderMergeResults(); });
+
+  function isMergeSelected(group, idx, id){
+    return mergeSelected.some(x => x.group === group && x.idx === idx && x.id === id);
+  }
+
+  function renderMergeResults(){
+    const q = ($('mergeSearch').value || '').trim().toLowerCase();
+    const clearBtn = $('mergeClearBtn');
+    clearBtn.style.display = q ? 'block' : 'none';
+    const box = $('mergeResults');
+    if (q.length < 2) { box.innerHTML = '<div class="empty-hint">Type at least 2 letters to search.</div>'; return; }
+
+    const hits = [];
+    allClubs.forEach(c => {
+      (c.team.players || []).forEach(p => {
+        if ((p.name || '').toLowerCase().includes(q)) hits.push({ club: c, player: p });
+      });
+    });
+    hits.sort((a, b) => (b.player.ovr||0) - (a.player.ovr||0));
+
+    if (!hits.length) { box.innerHTML = '<div class="empty-hint">No players match "' + escapeHtml($('mergeSearch').value) + '".</div>'; return; }
+
+    box.innerHTML = hits.slice(0, 60).map((h, i) => {
+      const sel = isMergeSelected(h.club.group, h.club.idx, h.player.id);
+      return '<div class="frow' + (sel ? ' selected' : '') + '" data-i="' + i + '">' +
+        teamMark(h.club.team, 22) +
+        '<div class="info">' +
+          '<div class="nm">' + escapeHtml(h.player.name) + '</div>' +
+          '<div class="meta">' + (h.player.pos||[]).join('/') + ' · ' + escapeHtml(h.club.team.short || h.club.team.name) + ' · id: ' + escapeHtml(h.player.id) + '</div>' +
+        '</div>' +
+        '<div class="ovr">' + (sel ? '✓' : (h.player.ovr != null ? h.player.ovr : '—')) + '</div>' +
+      '</div>';
+    }).join('');
+    if (hits.length > 60) box.innerHTML += '<div class="empty-hint">+' + (hits.length - 60) + ' more — refine your search.</div>';
+
+    box.querySelectorAll('.frow').forEach(row => {
+      row.addEventListener('click', () => {
+        const h = hits[Number(row.getAttribute('data-i'))];
+        toggleMergeSelect(h.club, h.player);
+      });
+    });
+  }
+
+  function toggleMergeSelect(club, player){
+    const i = mergeSelected.findIndex(x => x.group === club.group && x.idx === club.idx && x.id === player.id);
+    if (i !== -1) {
+      mergeSelected.splice(i, 1);
+    } else {
+      mergeSelected.push({
+        group: club.group, idx: club.idx, id: player.id, name: player.name,
+        clubLabel: club.team.short || club.team.name
+      });
+    }
+    renderMergeResults();
+    renderMergeSelectedList();
+    updateMergeButton();
+  }
+
+  function renderMergeSelectedList(){
+    const box = $('mergeSelectedList');
+    $('mergeSelCount').textContent = mergeSelected.length + ' selected';
+    if (!mergeSelected.length) {
+      box.innerHTML = '<div class="empty-hint">Search above and tap players to add them to the merge set.</div>';
+      return;
+    }
+    box.innerHTML = mergeSelected.map((s, i) => {
+      const arr = data[s.group] && data[s.group][s.idx] && data[s.group][s.idx].players;
+      const p = arr && arr.find(x => x.id === s.id);
+      const name = p ? p.name : s.name;
+      return '<div class="mrow">' +
+        '<span class="mrow-tag">' + (i === 0 ? 'Keep id' : 'Merge →') + '</span>' +
+        '<div class="info"><div class="nm">' + escapeHtml(name) + '</div>' +
+          '<div class="meta">' + escapeHtml(s.clubLabel) + ' · id: ' + escapeHtml(s.id) + '</div></div>' +
+        '<button class="btn-sm btn-ghost mrow-remove" data-i="' + i + '">✕</button>' +
+      '</div>';
+    }).join('');
+    box.querySelectorAll('.mrow-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mergeSelected.splice(Number(btn.getAttribute('data-i')), 1);
+        renderMergeResults();
+        renderMergeSelectedList();
+        updateMergeButton();
+      });
+    });
+  }
+
+  function updateMergeButton(){
+    const btn = $('mergeBtn');
+    const err = $('mergeErr');
+    btn.disabled = mergeSelected.length < 2;
+    err.textContent = mergeSelected.length === 1 ? 'Select at least one more player to merge.' : '';
+  }
+
+  $('mergeBtn').addEventListener('click', () => {
+    if (mergeSelected.length < 2) return;
+    const keep = mergeSelected[0];
+    const others = mergeSelected.slice(1);
+    openConfirm('Confirm merge',
+      'Merge <b>' + others.length + '</b> other roster ' + (others.length === 1 ? 'entry' : 'entries') +
+      ' into <b>' + escapeHtml(keep.name) + '</b>\'s id (<code>' + escapeHtml(keep.id) + '</code>)? ' +
+      'Every player below will share this id afterward.',
+      doMerge);
+  });
+
+  function doMerge(){
+    if (mergeSelected.length < 2) return;
+    const keep = mergeSelected[0];
+    const keepId = keep.id;
+    const changed = []; // {playerRef, oldId} — undo restores oldId directly on the object reference
+    const mergedNames = [];
+    mergeSelected.slice(1).forEach(s => {
+      const arr = data[s.group] && data[s.group][s.idx] && data[s.group][s.idx].players;
+      const p = arr && arr.find(x => x.id === s.id);
+      if (!p || p.id === keepId) return;
+      changed.push({ playerRef: p, oldId: p.id });
+      mergedNames.push(p.name);
+      p.id = keepId;
+    });
+    if (!changed.length) { setStatus('Nothing to merge — selected players not found.', 'err'); return; }
+    logAction({
+      type: 'merge',
+      name: keep.name,
+      keepId: keepId,
+      changed: changed,
+      label: mergedNames.join(', ')
+    });
+    setStatus('Merged ' + changed.length + ' player' + (changed.length === 1 ? '' : 's') + ' into id "' + keepId + '".', 'ok');
+    mergeSelected = [keep];
+    afterMutation();
+    renderMergeResults();
+    renderMergeSelectedList();
+    updateMergeButton();
+  }
+
+  // ---------- Clone Player (insert a copy into one or more other squads) ----------
+  $('cloneSearch').addEventListener('input', renderCloneSearchResults);
+  $('cloneClearBtn').addEventListener('click', () => { $('cloneSearch').value=''; renderCloneSearchResults(); });
+
+  function renderCloneSearchResults(){
+    const q = ($('cloneSearch').value || '').trim().toLowerCase();
+    const clearBtn = $('cloneClearBtn');
+    clearBtn.style.display = q ? 'block' : 'none';
+    const box = $('cloneSearchResults');
+    if (q.length < 2) { box.innerHTML = '<div class="empty-hint">Type at least 2 letters to search.</div>'; return; }
+
+    const hits = [];
+    allClubs.forEach(c => {
+      (c.team.players || []).forEach(p => {
+        if ((p.name || '').toLowerCase().includes(q)) hits.push({ club: c, player: p });
+      });
+    });
+    hits.sort((a, b) => (b.player.ovr||0) - (a.player.ovr||0));
+
+    if (!hits.length) { box.innerHTML = '<div class="empty-hint">No players match "' + escapeHtml($('cloneSearch').value) + '".</div>'; return; }
+
+    box.innerHTML = hits.slice(0, 60).map((h, i) => {
+      return '<div class="frow" data-i="' + i + '">' +
+        teamMark(h.club.team, 22) +
+        '<div class="info">' +
+          '<div class="nm">' + escapeHtml(h.player.name) + '</div>' +
+          '<div class="meta">' + (h.player.pos||[]).join('/') + ' · ' + escapeHtml(h.club.team.short || h.club.team.name) + '</div>' +
+        '</div>' +
+        '<div class="ovr">' + (h.player.ovr != null ? h.player.ovr : '—') + '</div>' +
+      '</div>';
+    }).join('');
+    if (hits.length > 60) box.innerHTML += '<div class="empty-hint">+' + (hits.length - 60) + ' more — refine your search.</div>';
+
+    box.querySelectorAll('.frow').forEach(row => {
+      row.addEventListener('click', () => {
+        const h = hits[Number(row.getAttribute('data-i'))];
+        selectCloneSource(h.club, h.player);
+      });
+    });
+  }
+
+  function selectCloneSource(club, player){
+    cloneSource = { club, player };
+    $('cloneDestSection').style.display = '';
+    $('cloneSelectedPlayer').innerHTML =
+      '<div class="num">' + (player.num != null ? player.num : '—') + '</div>' +
+      '<div class="info">' +
+        '<div class="nm">' + escapeHtml(player.name) + '</div>' +
+        '<div class="meta">' + (player.pos||[]).join('/') + ' · OVR ' + (player.ovr != null ? player.ovr : '—') +
+          ' · currently at ' + escapeHtml(club.team.short || club.team.name) + '</div>' +
+      '</div>';
+    cloneDestPicker.clear();
+    updateCloneButton();
+    $('cloneDestSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function updateCloneButton(){
+    const dests = cloneDestPicker ? cloneDestPicker.get() : [];
+    $('cloneSelCount').textContent = dests.length
+      ? (dests.length + ' team' + (dests.length===1?'':'s') + ' selected')
+      : 'No teams selected yet.';
+    $('cloneBtn').disabled = !cloneSource || !dests.length;
+  }
+
+  $('cloneBtn').addEventListener('click', () => {
+    if (!cloneSource) return;
+    const dests = cloneDestPicker.get();
+    if (!dests.length) return;
+    const clearNum = $('cloneClearNum').checked;
+    const keepId = $('cloneKeepId').checked;
+    const names = dests.map(d => d.team.short || d.team.name).join(', ');
+    openConfirm('Confirm clone',
+      'Clone <b>' + escapeHtml(cloneSource.player.name) + '</b> into <b>' + dests.length + '</b> team' +
+      (dests.length===1?'':'s') + ': ' + escapeHtml(names) + '? The original stays at ' +
+      escapeHtml(cloneSource.club.team.short || cloneSource.club.team.name) +
+      (keepId ? ' — the clone will share the same player id.' : ' — the clone will get a new id.'),
+      () => doClonePlayer(clearNum, keepId));
+  });
+
+  function doClonePlayer(clearNum, keepId){
+    const src = cloneSource.player;
+    const dests = cloneDestPicker.get();
+    const created = [];
+    let skipped = 0;
+
+    dests.forEach(dest => {
+      const destArr = data[dest.group][dest.idx].players;
+      // Keeping the id is how the main game already represents the same
+      // real player registered for both a club and a country (see
+      // repairDuplicatePlayerIds() in ui/matchUI.js) — their stats merge
+      // into one true record. Skip if that id is already on this exact
+      // roster so we never create a literal duplicate entry.
+      if (keepId && destArr.some(p => p.id === src.id)) { skipped++; return; }
+      const clone = JSON.parse(JSON.stringify(src));
+      clone.id = keepId ? src.id : makePlayerId(dest.team);
+      if (clearNum) {
+        delete clone.num;
+      } else if (clone.num != null && destArr.some(p => p.num === clone.num)) {
+        delete clone.num; // avoid a silent duplicate number in the destination squad
+      }
+      destArr.push(clone);
+      created.push({ group: dest.group, idx: dest.idx, id: clone.id });
+    });
+
+    if (!created.length) {
+      setStatus('Nothing cloned — ' + src.name + ' already has that id on every selected team.', 'err');
+      return;
+    }
+
+    logAction({
+      type: 'clone', name: src.name, id: src.id,
+      label: cloneSource.club.team.short || cloneSource.club.team.name,
+      destLabel: dests.map(d => d.team.short || d.team.name).join(', '),
+      created
+    });
+
+    afterMutation();
+    setStatus('Cloned ' + src.name + ' into ' + created.length + ' team' + (created.length===1?'':'s') +
+      (skipped ? ' (' + skipped + ' skipped — already had that id).' : '.'), 'ok');
+    cloneDestPicker.clear();
+    updateCloneButton();
+  }
+
+  // ---------- Clone Whole Team (duplicate an entire squad as a new team) ----------
+  function onCloneTeamClubChange(){
+    const c = clubBy(cloneTeamPicker.get());
+    $('cloneTeamErr').textContent = '';
+    $('cloneTeamDestSection').style.display = c ? '' : 'none';
+    if (!c) return;
+    $('ctName').value = c.team.name + ' B';
+    $('ctShort').value = (c.team.short || c.team.name.slice(0,3)).toString().toUpperCase().slice(0,4);
+    $('ctFlag').value = c.team.flag || '🏳️';
+    $('ctPlayerCount').textContent = (c.team.players || []).length;
+    $('ctGroupChips').querySelectorAll('button').forEach(b =>
+      b.classList.toggle('active', b.getAttribute('data-g') === c.group));
+  }
+
+  $('ctGroupChips').querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      $('ctGroupChips').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+    });
+  });
+
+  $('cloneTeamBtn').addEventListener('click', () => {
+    const src = clubBy(cloneTeamPicker.get());
+    const err = $('cloneTeamErr');
+    err.textContent = '';
+    if (!src) { err.textContent = 'Pick a source club or nation.'; return; }
+    const name = $('ctName').value.trim();
+    if (!name) { err.textContent = 'Enter a name for the new team.'; return; }
+    const targetGroup = $('ctGroupChips').querySelector('button.active').getAttribute('data-g');
+
+    openConfirm('Duplicate team',
+      'Create <b>' + escapeHtml(name) + '</b> in <b>' + (targetGroup==='club' ? 'Clubs' : 'National') +
+      '</b> with a full copy of ' + (src.team.players||[]).length + ' player(s) from <b>' +
+      escapeHtml(src.team.short || src.team.name) + '</b>?',
+      () => doCloneTeam(src, name, targetGroup));
+  });
+
+  function doCloneTeam(src, name, targetGroup){
+    const short = ($('ctShort').value || name.slice(0,3)).trim().toUpperCase().slice(0,4);
+    const flag = ($('ctFlag').value || src.team.flag || '🏳️').trim();
+
+    const newTeam = {
+      id: makeTeamId(name),
+      name, short, flag,
+      color: src.team.color, secondary: src.team.secondary,
+      players: []
+    };
+    if (src.team.manager) newTeam.manager = JSON.parse(JSON.stringify(src.team.manager));
+    if (targetGroup === 'club' && src.team.stadium) newTeam.stadium = src.team.stadium;
+
+    // Push the (empty) team first, then generate each cloned player's id —
+    // that way makePlayerId() sees prior siblings already in data and never
+    // hands out the same id twice within this new squad.
+    data[targetGroup].push(newTeam);
+    (src.team.players || []).forEach(p => {
+      const clone = JSON.parse(JSON.stringify(p));
+      clone.id = makePlayerId(newTeam);
+      newTeam.players.push(clone);
+    });
+
+    logAction({
+      type: 'cloneteam', name: newTeam.name, id: newTeam.id,
+      group: targetGroup, label: newTeam.short || newTeam.name,
+      srcLabel: src.team.short || src.team.name, teamId: newTeam.id
+    });
+
+    afterMutation();
+    setStatus('Created ' + newTeam.name + ' with ' + newTeam.players.length + ' player(s) copied from ' +
+      (src.team.short || src.team.name) + '.', 'ok');
+    cloneTeamPicker.set(null);
+    $('cloneTeamDestSection').style.display = 'none';
+  }
+
   // ---------- Unified action log + undo ----------
   function logAction(entry){ actionLog.push(entry); }
 
   function afterMutation(){
     buildClubIndex();
+    cleanupAllTeamRoles();
     if (fromPicker) fromPicker.refreshLabels();
     if (toPicker) toPicker.refreshLabels();
     if (squadPicker) squadPicker.refreshLabels();
+    if (cloneDestPicker) cloneDestPicker.refreshLabels();
+    if (cloneTeamPicker) cloneTeamPicker.refreshLabels();
+    if (managerPicker) managerPicker.refreshLabels();
+    if (mgrCopyPicker) mgrCopyPicker.refreshLabels();
+    if (squadPicker && squadPicker.get()) renderRolesPanel();
+    if (managerPicker && managerPicker.get()) {
+      const mc = clubBy(managerPicker.get());
+      if (mc) loadManagerForm(mc);
+    }
     renderLog();
     updateDlBar();
   }
 
   const LOG_META = {
-    transfer: { icon: '🔁', tag: 'tag-transfer', verb: (t) => escapeHtml(t.fromLabel) + ' → <span class="to">' + escapeHtml(t.toLabel) + '</span>' },
-    release:  { icon: '⇄', tag: 'tag-release',  verb: (t) => escapeHtml(t.fromLabel) + ' → <span class="to">' + escapeHtml(t.toLabel) + '</span>' },
-    add:      { icon: '＋', tag: 'tag-add',      verb: (t) => 'added to <span class="to">' + escapeHtml(t.label) + '</span>' },
-    delete:   { icon: '🗑', tag: 'tag-delete',   verb: (t) => 'deleted from <span class="to">' + escapeHtml(t.label) + '</span>' },
-    edit:     { icon: '✏️', tag: 'tag-edit',     verb: (t) => 'edited at <span class="to">' + escapeHtml(t.label) + '</span>' }
+    transfer:  { icon: '🔁', tag: 'tag-transfer', verb: (t) => escapeHtml(t.fromLabel) + ' → <span class="to">' + escapeHtml(t.toLabel) + '</span>' },
+    release:   { icon: '⇄', tag: 'tag-release',  verb: (t) => escapeHtml(t.fromLabel) + ' → <span class="to">' + escapeHtml(t.toLabel) + '</span>' },
+    add:       { icon: '＋', tag: 'tag-add',      verb: (t) => 'added to <span class="to">' + escapeHtml(t.label) + '</span>' },
+    delete:    { icon: '🗑', tag: 'tag-delete',   verb: (t) => 'deleted from <span class="to">' + escapeHtml(t.label) + '</span>' },
+    edit:      { icon: '✏️', tag: 'tag-edit',     verb: (t) => 'edited at <span class="to">' + escapeHtml(t.label) + '</span>' },
+    clone:     { icon: '🧬', tag: 'tag-clone',    verb: (t) => 'cloned into <span class="to">' + escapeHtml(t.destLabel) + '</span>' },
+    cloneteam: { icon: '🧬', tag: 'tag-clone',    verb: (t) => 'duplicated from <span class="to">' + escapeHtml(t.srcLabel) + '</span>' },
+    merge:     { icon: '🔗', tag: 'tag-merge',    verb: (t) => (t.changed.length) + ' merged into id <span class="to">' + escapeHtml(t.keepId) + '</span>' },
+    roles:     { icon: '🎽', tag: 'tag-edit',     verb: (t) => 'role updated for <span class="to">' + escapeHtml(t.label) + '</span>' },
+    editmanager: { icon: '🎯', tag: 'tag-edit',   verb: (t) => 'manager updated at <span class="to">' + escapeHtml(t.label) + '</span>' },
+    copymanager: { icon: '🎯', tag: 'tag-clone',  verb: (t) => 'manager copied to <span class="to">' + escapeHtml(t.destLabel) + '</span>' }
   };
 
   function renderLog(){
@@ -1269,12 +2356,59 @@
       if (i === -1) { setStatus('Could not undo — player already changed.', 'err'); return; }
       arr[i] = t.before;
       setStatus('Undid edit on ' + t.name + '.', 'ok');
+    } else if (t.type === 'clone') {
+      let missing = 0;
+      t.created.forEach(cr => {
+        const arr = data[cr.group][cr.idx].players;
+        const i = arr.findIndex(x => x.id === cr.id);
+        if (i !== -1) arr.splice(i, 1); else missing++;
+      });
+      setStatus(missing
+        ? 'Undid clone of ' + t.name + ' (some copies had already changed).'
+        : 'Undid clone of ' + t.name + ' — removed from ' + t.destLabel + '.', missing ? 'err' : 'ok');
+    } else if (t.type === 'cloneteam') {
+      const arr = data[t.group];
+      const i = arr.findIndex(x => x.id === t.teamId);
+      if (i === -1) { setStatus('Could not undo — team already changed.', 'err'); return; }
+      if (i !== arr.length - 1) {
+        setStatus('Can\'t undo — other teams were added since. Delete ' + t.label + ' manually if needed.', 'err');
+        return;
+      }
+      arr.splice(i, 1);
+      setStatus('Undid: removed duplicated team ' + t.name + '.', 'ok');
+    } else if (t.type === 'roles') {
+      const team = data[t.group][t.idx];
+      if (!team) { setStatus('Could not undo — club no longer found.', 'err'); return; }
+      if (Object.keys(t.before).length) team.roles = Object.assign({}, t.before);
+      else delete team.roles;
+      setStatus('Undid role change for ' + t.label + '.', 'ok');
+    } else if (t.type === 'merge') {
+      // Direct object references (not id lookups) — several merged
+      // entries can legitimately share t.keepId right now, so a
+      // find-by-id here couldn't reliably tell them apart.
+      t.changed.forEach(c => { c.playerRef.id = c.oldId; });
+      setStatus('Undid merge — restored ' + t.changed.length + ' player id' + (t.changed.length === 1 ? '' : 's') + '.', 'ok');
+      renderMergeResults();
+      renderMergeSelectedList();
+    } else if (t.type === 'editmanager') {
+      const team = data[t.group] && data[t.group][t.idx];
+      if (!team) { setStatus('Could not undo — club no longer found.', 'err'); return; }
+      if (t.before) team.manager = t.before; else delete team.manager;
+      setStatus('Undid manager change for ' + t.label + '.', 'ok');
+    } else if (t.type === 'copymanager') {
+      t.changed.forEach(ch => {
+        const team = data[ch.group] && data[ch.group][ch.idx];
+        if (!team) return;
+        if (ch.before) team.manager = ch.before; else delete team.manager;
+      });
+      setStatus('Undid manager copy to ' + t.destLabel + '.', 'ok');
     }
 
     actionLog.splice(logIdx, 1);
     afterMutation();
     renderPlayerList();
     renderSquadList();
+    renderRolesPanel();
   }
 
   function updateDlBar(){
@@ -1288,7 +2422,10 @@
   }
 
   $('downloadBtn').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    // Compact output (no whitespace) to match the format teams.json is
+    // now shipped in — same JSON.stringify(data) call teams.json itself
+    // was regenerated with, just without the indent/space args.
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1303,11 +2440,17 @@
   $('resetBtn').addEventListener('click', () => {
     if (actionLog.length && !confirm('Discard ' + actionLog.length + ' unsaved change(s) and start over?')) return;
     data = null; allClubs = []; selectedPlayer = null; actionLog = [];
+    cloneSource = null; bulkMode = false; bulkSelected = new Set();
     $('loadScreen').querySelector('.drop').textContent = 'Tap to choose your teams.json file (or drag & drop on desktop)';
     $('tabbar').style.display = 'none';
     $('fromCard').style.display = 'none';
     $('toCard').style.display = 'none';
     $('squadPlayerSection').style.display = 'none';
+    $('cloneDestSection').style.display = 'none';
+    $('cloneTeamDestSection').style.display = 'none';
+    $('managerFormCard').style.display = 'none';
+    $('managerCopyCard').style.display = 'none';
+    mgrDnaOverrides = {};
     $('logCard').style.display = 'none';
     updateDlBar();
     setStatus('');

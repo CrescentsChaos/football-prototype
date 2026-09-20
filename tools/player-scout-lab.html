@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Apex — Scout Lab</title>
+<style>
+  :root{
+    --bg-0:#05080f; --bg-1:#0a101c; --bg-2:#111a2b; --bg-3:#1a2740;
+    --gold:#f0c14b; --gold-dim:#c9a227; --gold-glow:rgba(240,193,75,0.35);
+    --blue:#3d8bfd; --green:#22c55e; --red:#ef4444; --orange:#f59e0b; --purple:#a78bfa; --cyan:#22d3ee;
+    --text:#f1f5f9; --text-2:#94a3b8; --text-3:#64748b;
+    --border:rgba(148,163,184,0.14); --border-strong:rgba(240,193,75,0.28);
+    --radius:14px; --radius-sm:9px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    min-height:100vh;
+    padding-bottom:110px;
+  }
+  header{
+    position:sticky; top:0; z-index:30;
+    background:rgba(5,8,15,0.94); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border-strong);
+    padding:14px 16px;
+  }
+  header h1{
+    margin:0; font-size:1.05rem; letter-spacing:0.3px;
+    display:flex; align-items:center; gap:8px;
+  }
+  header h1 .badge{
+    font-size:0.62rem; font-weight:700; letter-spacing:1px;
+    color:var(--bg-0); background:linear-gradient(135deg,var(--gold),var(--gold-dim));
+    padding:2px 7px; border-radius:6px; text-transform:uppercase;
+  }
+  header p{margin:4px 0 0; font-size:0.78rem; color:var(--text-2);}
+  main{max-width:1180px; margin:0 auto; padding:14px;}
+
+  .card{
+    background:linear-gradient(160deg, var(--bg-2), var(--bg-1));
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px;
+  }
+  .card h2{
+    margin:0 0 10px; font-size:0.9rem; color:var(--text-2);
+    text-transform:uppercase; letter-spacing:0.8px; font-weight:700;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .card h2 .hint{font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text-3); font-size:0.72rem;}
+
+  #loadScreen .drop, #attrLoadScreen .drop{
+    border:2px dashed var(--border-strong); border-radius:var(--radius);
+    padding:22px 16px; text-align:center; color:var(--text-2);
+    font-size:0.86rem; cursor:pointer;
+  }
+  #loadScreen .drop.drag, #attrLoadScreen .drop.drag{border-color:var(--gold); background:rgba(240,193,75,0.06);}
+  #fileInput, #attrFileInput{display:none;}
+
+  button, .btn{
+    font-family:inherit; font-size:0.86rem; font-weight:600;
+    border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    background:rgba(255,255,255,0.04); color:var(--text);
+    padding:10px 14px; cursor:pointer; display:inline-flex;
+    align-items:center; justify-content:center; gap:6px;
+    touch-action:manipulation;
+  }
+  button:active{transform:scale(0.98);}
+  .btn-gold{
+    color:var(--bg-0); background:linear-gradient(135deg,var(--gold),var(--gold-dim));
+    border-color:transparent;
+  }
+  .btn-block{width:100%;}
+  .btn-sm{padding:6px 10px; font-size:0.74rem;}
+  .btn-ghost{background:transparent;}
+  .status{margin-top:8px; font-size:0.78rem; min-height:1em;}
+  .status.ok{color:var(--green);} .status.err{color:var(--red);}
+
+  /* ===== filters ===== */
+  .filterRow{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;}
+  .filterRow input[type=text], .filterRow select{
+    font-family:inherit; font-size:0.84rem; background:var(--bg-3); color:var(--text);
+    border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 11px;
+  }
+  .filterRow input[type=text]{flex:1 1 160px; min-width:140px;}
+  .chipRow{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
+  .chip{
+    font-size:0.72rem; font-weight:700; letter-spacing:0.3px; padding:6px 11px;
+    border-radius:999px; border:1px solid var(--border); background:var(--bg-3);
+    color:var(--text-2); cursor:pointer; user-select:none;
+  }
+  .chip.active{background:linear-gradient(135deg,var(--gold),var(--gold-dim)); color:var(--bg-0); border-color:transparent;}
+  .toggleRow{display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-2); margin-bottom:2px;}
+  .toggleRow input{accent-color:var(--gold);}
+
+  /* ===== table ===== */
+  .tableWrap{overflow-x:auto; border-radius:var(--radius-sm); border:1px solid var(--border);}
+  table{border-collapse:collapse; width:100%; min-width:920px; font-size:0.8rem;}
+  thead th{
+    position:sticky; top:0; background:var(--bg-3); color:var(--text-2);
+    text-transform:uppercase; letter-spacing:0.4px; font-size:0.66rem; font-weight:700;
+    padding:9px 8px; text-align:left; white-space:nowrap; cursor:pointer; border-bottom:1px solid var(--border-strong);
+  }
+  thead th:hover{color:var(--gold);}
+  thead th.sorted{color:var(--gold);}
+  thead th .arrow{font-size:0.6rem; margin-left:3px; opacity:0.7;}
+  tbody td{padding:8px; border-bottom:1px solid var(--border); white-space:nowrap;}
+  tbody tr:hover{background:rgba(255,255,255,0.03);}
+  tbody td.nameCell{position:sticky; left:0; background:var(--bg-2); font-weight:600; z-index:1;}
+  tbody tr:hover td.nameCell{background:#16223a;}
+  .posTag{font-size:0.66rem; font-weight:700; padding:2px 6px; border-radius:5px; background:var(--bg-3); color:var(--text-2);}
+  .teamName{color:var(--text-2); font-size:0.74rem;}
+  .scoreBar{position:relative; width:64px; height:14px; background:var(--bg-3); border-radius:5px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:6px;}
+  .scoreBar > span{position:absolute; left:0; top:0; bottom:0; border-radius:5px;}
+  .scoreNum{font-variant-numeric:tabular-nums; font-weight:700; font-size:0.76rem;}
+  .qBadge{font-size:0.6rem; font-weight:700; padding:1px 5px; border-radius:4px;}
+  .qBadge.full{background:rgba(34,197,94,0.15); color:var(--green);}
+  .qBadge.basic{background:rgba(148,163,184,0.15); color:var(--text-3);}
+  .addBtn{
+    width:26px; height:26px; border-radius:7px; border:1px solid var(--border-strong);
+    background:rgba(255,255,255,0.04); color:var(--gold); font-weight:700; font-size:0.95rem;
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center; line-height:1;
+  }
+  .addBtn.added{background:linear-gradient(135deg,var(--gold),var(--gold-dim)); color:var(--bg-0); border-color:transparent;}
+  .emptyRow td{text-align:center; color:var(--text-3); padding:24px 8px;}
+  .pager{display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 8px; font-size:0.78rem; color:var(--text-2);}
+  .pager button{padding:7px 12px; font-size:0.78rem;}
+  .pager button:disabled{opacity:0.4; cursor:default;}
+
+  /* ===== compare tray ===== */
+  #tray{
+    position:fixed; left:0; right:0; bottom:0; z-index:40;
+    background:rgba(10,16,28,0.97); backdrop-filter:blur(10px);
+    border-top:1px solid var(--border-strong);
+    padding:10px 14px; display:none;
+  }
+  #tray.show{display:block;}
+  .trayInner{max-width:1180px; margin:0 auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .trayChips{display:flex; gap:6px; flex-wrap:wrap; flex:1;}
+  .trayChip{
+    display:flex; align-items:center; gap:6px; background:var(--bg-3); border:1px solid var(--border-strong);
+    border-radius:999px; padding:5px 6px 5px 12px; font-size:0.76rem; font-weight:600;
+  }
+  .trayChip button{
+    width:18px; height:18px; padding:0; border-radius:50%; border:none; background:rgba(255,255,255,0.08);
+    color:var(--text-2); font-size:0.7rem;
+  }
+
+  /* ===== compare modal ===== */
+  #compareModal{
+    position:fixed; inset:0; z-index:50; background:rgba(2,4,8,0.88); backdrop-filter:blur(4px);
+    display:none; overflow-y:auto; padding:14px;
+  }
+  #compareModal.show{display:block;}
+  .modalCard{max-width:1000px; margin:0 auto; background:linear-gradient(160deg, var(--bg-2), var(--bg-1)); border:1px solid var(--border-strong); border-radius:var(--radius); padding:18px;}
+  .modalHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .modalHead h2{margin:0; font-size:1rem;}
+  .closeBtn{width:32px; height:32px; border-radius:9px; border:1px solid var(--border-strong); background:rgba(255,255,255,0.04); color:var(--text); font-size:1rem; cursor:pointer;}
+  .legend{display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 4px; font-size:0.78rem;}
+  .legendItem{display:flex; align-items:center; gap:6px;}
+  .swatch{width:11px; height:11px; border-radius:3px; display:inline-block;}
+  .radarWrap{display:flex; justify-content:center; margin:6px 0 12px;}
+  .breakTable{width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:10px;}
+  .breakTable th, .breakTable td{padding:7px 8px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap;}
+  .breakTable th{color:var(--text-2); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.4px;}
+  .breakTable td.metricLabel{color:var(--text-2); font-weight:600;}
+  details.explain{margin-top:14px; border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px;}
+  details.explain summary{cursor:pointer; font-size:0.8rem; font-weight:700; color:var(--gold-dim);}
+  details.explain .explainBody{margin-top:10px; font-size:0.78rem; color:var(--text-2); line-height:1.55;}
+  details.explain .explainBody b{color:var(--text);}
+  details.explain .explainBody p{margin:0 0 9px;}
+
+  /* ===== simulator ===== */
+  .simCard{border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; margin-top:14px;}
+  .simCard h3{margin:0 0 8px; font-size:0.86rem; color:var(--text); display:flex; align-items:center; gap:8px;}
+  .simControls{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px;}
+  .simControls label{font-size:0.74rem; color:var(--text-2); display:flex; align-items:center; gap:6px;}
+  .simControls select{font-family:inherit; font-size:0.8rem; background:var(--bg-3); color:var(--text); border:1px solid var(--border); border-radius:var(--radius-sm); padding:7px 9px;}
+  .simNote{font-size:0.72rem; color:var(--text-3); margin-top:8px; line-height:1.5;}
+  .simRunning{font-size:0.8rem; color:var(--gold-dim);}
+
+  ::-webkit-scrollbar{height:8px; width:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(148,163,184,0.25); border-radius:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚽ Scout Lab <span class="badge">Apex</span></h1>
+  <p>Goal threat, foul proneness &amp; skill comparison — built from the live match engine's own formulas</p>
+</header>
+
+<main>
+
+  <!-- ============ Step 1: load teams.json ============ -->
+  <div class="card" id="loadScreen">
+    <h2>Load teams.json <span class="hint">required</span></h2>
+    <div class="drop" id="dropZone">📂 Drop <b>teams.json</b> here, or tap to choose a file</div>
+    <input type="file" id="fileInput" accept="application/json,.json">
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- ============ Step 2: load player-attributes.json ============ -->
+  <div class="card" id="attrLoadScreen" style="display:none;">
+    <h2>Load player-attributes.json <span class="hint">optional, unlocks full ratings</span></h2>
+    <p style="margin:0 0 10px; font-size:0.78rem; color:var(--text-2);">
+      Players with an expanded attribute sheet (Finishing, Aggression, Off-the-Ball Awareness, etc.) get precise,
+      formula-accurate ratings. Everyone else still gets a rough estimate from their basic ratings so the whole
+      squad is comparable.
+    </p>
+    <div class="drop" id="attrDropZone">📂 Drop <b>player-attributes.json</b> here, or tap to choose a file</div>
+    <input type="file" id="attrFileInput" accept="application/json,.json">
+    <div class="status" id="attrStatus"></div>
+    <button class="btn btn-block" id="skipAttrBtn" style="margin-top:10px;">Skip — use basic ratings for everyone</button>
+  </div>
+
+  <!-- ============ Main app ============ -->
+  <div id="appScreen" style="display:none;">
+
+    <div class="card">
+      <h2>Scout the field <span class="hint" id="countHint"></span></h2>
+      <div class="filterRow">
+        <input type="text" id="searchInput" placeholder="Search player name…">
+        <select id="teamSelect"><option value="">All teams</option></select>
+      </div>
+      <div class="chipRow" id="posChips"></div>
+      <div class="toggleRow">
+        <input type="checkbox" id="fullOnlyToggle"> <label for="fullOnlyToggle">Only players with a full attribute sheet</label>
+      </div>
+      <div class="toggleRow" style="margin-top:2px;">
+        <button class="btn btn-sm" id="exportCsvBtn">⬇ Export current view as CSV</button>
+        <button class="btn btn-sm btn-ghost" id="clearTrayBtn">Clear comparison tray</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="tableWrap">
+        <table id="playerTable">
+          <thead>
+            <tr>
+              <th data-key="name">Player</th>
+              <th data-key="team">Team</th>
+              <th data-key="pos">Pos</th>
+              <th data-key="ovr">OVR</th>
+              <th data-key="goalThreat">Goal Threat</th>
+              <th data-key="passing">Passing</th>
+              <th data-key="dribbling">Dribbling</th>
+              <th data-key="defending">Defending</th>
+              <th data-key="physical">Physical</th>
+              <th data-key="shotStopping">Shot-Stop</th>
+              <th data-key="discipline">Discipline</th>
+              <th data-key="quality">Data</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="pager" id="pager"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- ============ Compare tray ============ -->
+<div id="tray">
+  <div class="trayInner">
+    <div class="trayChips" id="trayChips"></div>
+    <button class="btn btn-gold" id="compareBtn">Compare →</button>
+  </div>
+</div>
+
+<!-- ============ Compare modal ============ -->
+<div id="compareModal">
+  <div class="modalCard">
+    <div class="modalHead">
+      <h2>Player Comparison</h2>
+      <button class="closeBtn" id="closeModalBtn">✕</button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="radarWrap" id="radarWrap"></div>
+    <div class="tableWrap">
+      <table class="breakTable" id="breakTable"></table>
+    </div>
+
+    <div class="simCard">
+      <h3>🎲 Season Simulator</h3>
+      <div class="simControls">
+        <label>Matches <select id="simMatches">
+          <option value="10">10 (quick check)</option>
+          <option value="38" selected>38 (full season)</option>
+          <option value="50">50 (league + cups)</option>
+        </select></label>
+        <label>Precision <select id="simTrials">
+          <option value="80">Fast (80 runs)</option>
+          <option value="300" selected>Standard (300 runs)</option>
+          <option value="800">Precise (800 runs)</option>
+        </select></label>
+        <button class="btn btn-gold btn-sm" id="runSimBtn">Run Simulation</button>
+        <span class="simRunning" id="simRunning" style="display:none;">Simulating…</span>
+      </div>
+      <div class="tableWrap" id="simResultsWrap" style="display:none;">
+        <table class="breakTable" id="simTable"></table>
+      </div>
+      <div class="simNote">
+        Actually simulates matches, not just a formula: for every simulated match each player takes a random
+        number of shots and fouls (drawn from a Poisson distribution scaled by their position and ratings), each
+        shot converts to a goal at a rate driven by their <b>Goal Threat</b>, and every foul runs through the same
+        yellow/straight-red logic as <code>engine/referee.js</code> (aggression-driven, escalating with repeat
+        fouls in a match). The season is replayed many times so you get a realistic mean and a 10th–90th percentile
+        range rather than one lucky/unlucky roll.
+      </div>
+    </div>
+
+    <details class="explain">
+      <summary>How these scores are calculated</summary>
+      <div class="explainBody">
+        <p><b>These aren't made up.</b> Every rating below is derived from the same formulas your match engine
+        actually runs during simulation (see <code>engine/shooting.js</code>, <code>engine/defending.js</code>,
+        <code>engine/goalkeeper.js</code>), not a separate guess. Attributes are curved the same way the engine
+        curves them — a jump from 80→90 in a stat matters a lot more than 50→60 — and the same skill/playstyle
+        bonuses the engine applies mid-match are applied here.</p>
+        <p><b>Goal Threat</b> — Finishing (primary), Off-the-Ball Awareness (getting into a shooting position),
+        Kicking Power, and Heading, plus bonuses for finishing-flavoured skills (Phenomenal Finishing, Acrobatic
+        Finishing, Blitz Curler…) and box-focused playstyles (Goal Poacher, Fox in the Box…).</p>
+        <p><b>Passing</b> — Low Pass, Lofted Pass, Ball Control and Off-the-Ball Awareness (reading where a pass
+        needs to go).</p>
+        <p><b>Dribbling</b> — Dribbling, Ball Control, Balance, Acceleration and Tight Possession.</p>
+        <p><b>Defending</b> — Tackling and Defensive Awareness (primary), Defensive Engagement and Aggression,
+        plus bonuses for tackling skills (Sliding Tackle, Interception, Man Marking…) and defensive playstyles
+        (Destroyer, Anchor Man…).</p>
+        <p><b>Physical</b> — Speed, Acceleration, Jumping and Physical Condition.</p>
+        <p><b>Shot-Stopping</b> — only meaningful for goalkeepers: GK Reflexes, GK Catching, GK Parrying, GK Reach
+        and GK Awareness. Outfield players are floored low here on purpose.</p>
+        <p><b>Discipline</b> (higher = more disciplined) is <b>100 − Foul Risk</b>, where Foul Risk comes straight
+        from the match engine's <code>foulProneness()</code> function: driven mainly by Aggression, offset by
+        Defensive Awareness, with a smaller push from Physical Condition. A player at 50 is exactly the engine's
+        neutral baseline (multiplier 1.0×); below 50 means the engine treats them as more likely to give away fouls
+        and pick up cards than average.</p>
+        <p><b>Data quality:</b> <span class="qBadge full">Full</span> means the player has a matching entry in
+        player-attributes.json and every score above is formula-accurate. <span class="qBadge basic">Basic</span>
+        means only teams.json's five headline ratings (ATT/DEF/PHY/PAC/TEC) were available, so the scores are a
+        reasonable estimate rather than the real engine calculation — load or fill in that player's attribute
+        sheet in the Attributes Editor tool for a precise read.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ============================================================
+  // Curve helpers — mirrors js/rng.js curvedStat() and the
+  // xattr()/hasSkill()/hasStyle() helpers used throughout engine/*.js
+  // ============================================================
+  function curvedStat(value, baseline, span, power){
+    baseline = baseline == null ? 70 : baseline;
+    span = span == null ? 29 : span;
+    power = power == null ? 1.6 : power;
+    if (!span) return 0;
+    let raw = (value - baseline) / span;
+    raw = Math.max(-1, Math.min(1, raw));
+    return Math.sign(raw) * Math.pow(Math.abs(raw), power);
+  }
+  function xattr(attrs, key, fallback){
+    const v = attrs && attrs[key];
+    return typeof v === 'number' ? v : fallback;
+  }
+  function hasTag(list, name){
+    if (!Array.isArray(list)) return false;
+    const target = String(name).toLowerCase().trim();
+    return list.some(s => String(s).toLowerCase().trim() === target);
+  }
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  // Weighted blend of curved sub-attributes -> 0..100 index (50 = baseline neutral)
+  function blend(attrs, parts, baseline, span){
+    let sum = 0, wsum = 0;
+    parts.forEach(([key, weight, fb]) => {
+      const v = xattr(attrs, key, fb != null ? fb : baseline);
+      sum += curvedStat(v, baseline, span, 1.6) * weight;
+      wsum += weight;
+    });
+    const idx = 50 + (sum / wsum) * 50;
+    return clamp(idx, 0, 100);
+  }
+
+  const GOAL_SKILLS = {'phenomenal finishing':6,'acrobatic finishing':4.5,'blitz curler':5,'low screamer':3,'first-time shot':2,'chip shot control':2,'long range shooting':2};
+  const GOAL_STYLES = {'fox in the box':4,'goal poacher':3,'inside forward':2.5,'hole player':2,'full-back finisher':1.5,'extra frontman':1.5};
+  const DEF_SKILLS  = {'long reach tackle':2.5,'shadow hunt':2.5,'interception':2.5,'sliding tackle':2,'man marking':2,'blocker':2,'track back':1.5};
+  const DEF_STYLES  = {'destroyer':4,'anchor man':3,'box-to-box':1.5,'build up':1.5};
+  const GK_SKILLS   = {'gk penalty saver':2.5,'acrobatic clearance':2.5,'gk directing defense':1.5};
+
+  function tagBonus(skills, styles, skillTable, styleTable, cap){
+    let b = 0;
+    Object.keys(skillTable).forEach(k => { if (hasTag(skills, k)) b += skillTable[k]; });
+    Object.keys(styleTable).forEach(k => { if (hasTag(styles, k)) b += styleTable[k]; });
+    return clamp(b, 0, cap);
+  }
+
+  // Engine's own foulProneness(), reproduced exactly (engine/defending.js)
+  function foulMultiplierExpanded(attrs){
+    const aggr = xattr(attrs, 'aggr', 65);
+    const defAwr = xattr(attrs, 'def_awr', 65);
+    const phyCon = xattr(attrs, 'phy_con', 78);
+    let v = 1 + Math.max(0, aggr - 65) / 90 + (65 - defAwr) / 130 + Math.max(0, phyCon - 78) / 170;
+    return clamp(v, 0.55, 1.5);
+  }
+  // Engine's fallback for players without an expanded sheet (same function, no-attrs branch)
+  function foulMultiplierBasic(def, phy){
+    let v = 1 + Math.max(0, (75 - (def || 70)) / 90) + Math.max(0, ((phy || 70) - 80) / 120);
+    return clamp(v, 0.55, 1.5);
+  }
+
+  function isGK(pos){ return Array.isArray(pos) && pos.includes('GK'); }
+
+  // ============================================================
+  // Core rating computation for one merged player record
+  // ============================================================
+  function computeRatings(p){
+    const attrs = p.expandedAttrs;
+    const full = !!attrs;
+    let goalThreat, passing, dribbling, defending, physical, shotStopping, foulRisk;
+
+    if (full){
+      goalThreat = blend(attrs, [['fin',0.5],['off_awr',0.2],['kick_pwr',0.15],['head',0.15]], 70, 29);
+      goalThreat = clamp(goalThreat + tagBonus(attrs.skills, attrs.playstyle, GOAL_SKILLS, GOAL_STYLES, 18), 0, 100);
+
+      passing = blend(attrs, [['low_pass',0.35],['lofted_pass',0.2],['ball_con',0.25],['off_awr',0.2]], 70, 29);
+
+      dribbling = blend(attrs, [['dribb',0.4],['ball_con',0.25],['bal',0.15],['accel',0.1],['tight_pos',0.1]], 70, 29);
+
+      defending = blend(attrs, [['tack',0.35],['def_awr',0.35],['def_eng',0.2],['aggr',0.1]], 70, 29);
+      defending = clamp(defending + tagBonus(attrs.skills, attrs.playstyle, DEF_SKILLS, DEF_STYLES, 15), 0, 100);
+
+      physical = blend(attrs, [['spd',0.3],['accel',0.25],['jmp',0.15],['phy_con',0.3]], 70, 29);
+
+      if (isGK(p.pos)){
+        shotStopping = blend(attrs, [['gk_reflex',0.25],['gk_catch',0.2],['gk_parry',0.2],['gk_reach',0.2],['gk_awr',0.15]], 75, 24);
+        shotStopping = clamp(shotStopping + tagBonus(attrs.skills, [], GK_SKILLS, {}, 8), 0, 100);
+      } else {
+        shotStopping = 12;
+      }
+
+      foulRisk = clamp((foulMultiplierExpanded(attrs) - 0.55) / (1.5 - 0.55) * 100, 0, 100);
+    } else {
+      const att = p.att != null ? p.att : 60, def = p.def != null ? p.def : 60,
+            phy = p.phy != null ? p.phy : 60, pac = p.pac != null ? p.pac : 60,
+            tec = p.tec != null ? p.tec : 60, ovr = p.ovr != null ? p.ovr : 60;
+      goalThreat = clamp(att * 0.65 + tec * 0.2 + pac * 0.15, 0, 100);
+      passing = clamp(tec * 0.55 + ovr * 0.3 + pac * 0.15, 0, 100);
+      dribbling = clamp(tec * 0.5 + pac * 0.35 + ovr * 0.15, 0, 100);
+      defending = clamp(def * 0.75 + phy * 0.25, 0, 100);
+      physical = clamp(pac * 0.55 + phy * 0.45, 0, 100);
+      shotStopping = isGK(p.pos) ? clamp(def * 0.7 + phy * 0.3, 0, 100) : 12;
+      foulRisk = clamp((foulMultiplierBasic(def, phy) - 0.55) / (1.5 - 0.55) * 100, 0, 100);
+    }
+
+    return {
+      goalThreat: Math.round(goalThreat),
+      passing: Math.round(passing),
+      dribbling: Math.round(dribbling),
+      defending: Math.round(defending),
+      physical: Math.round(physical),
+      shotStopping: Math.round(shotStopping),
+      foulRisk: Math.round(foulRisk),
+      discipline: Math.round(100 - foulRisk),
+      quality: full ? 'full' : 'basic'
+    };
+  }
+
+  function foulLabel(risk){
+    if (risk < 25) return 'Very disciplined';
+    if (risk < 45) return 'Disciplined';
+    if (risk < 60) return 'Average';
+    if (risk < 80) return 'Reckless';
+    return 'Card magnet';
+  }
+
+  // ============================================================
+  // Position grouping for filter chips
+  // ============================================================
+  const POS_GROUPS = {
+    GK: ['GK'],
+    DF: ['CB','RB','LB','RWB','LWB','SW'],
+    MF: ['CDM','CM','CAM','AM','AMF','RM','LM'],
+    FW: ['RW','LW','ST','CF','RF','SS']
+  };
+  function posGroup(posArr){
+    if (!Array.isArray(posArr) || !posArr.length) return 'MF';
+    const p = posArr[0];
+    for (const g in POS_GROUPS){ if (POS_GROUPS[g].includes(p)) return g; }
+    return 'MF';
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  const $ = id => document.getElementById(id);
+
+  // ============================================================
+  // State
+  // ============================================================
+  let teamsData = null;
+  let attrData = {};
+  let allPlayers = [];      // merged + rated
+  let compareSet = [];      // array of player ids
+  let sortKey = 'goalThreat';
+  let sortDir = -1;
+  let posFilter = 'ALL';
+  const PAGE_SIZE = 50;
+  let currentPage = 1;
+  let filteredCache = [];  // sorted+filtered rows for the current view (recomputed on filter/sort change)
+  let searchDebounce = null;
+
+  // ============================================================
+  // Step 1: load teams.json
+  // ============================================================
+  $('dropZone').addEventListener('click', () => $('fileInput').click());
+  $('fileInput').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) loadTeamsFile(f); });
+  ['dragover','dragenter'].forEach(ev => $('dropZone').addEventListener(ev, e => { e.preventDefault(); $('dropZone').classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => $('dropZone').addEventListener(ev, e => { e.preventDefault(); $('dropZone').classList.remove('drag'); }));
+  $('dropZone').addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) loadTeamsFile(f); });
+
+  function setStatus(id, msg, cls){ const el = $(id); el.textContent = msg; el.className = 'status ' + (cls || ''); }
+
+  function loadTeamsFile(file){
+    setStatus('status', 'Reading ' + file.name + '…');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed || (!Array.isArray(parsed.club) && !Array.isArray(parsed.national))){
+          setStatus('status', 'That doesn\'t look like teams.json — expected "club"/"national" arrays.', 'err');
+          return;
+        }
+        teamsData = parsed;
+        setStatus('status', 'Loaded teams.json.', 'ok');
+        $('dropZone').textContent = '✓ ' + file.name + ' loaded — tap to load a different file';
+        $('attrLoadScreen').style.display = '';
+      } catch (err){
+        setStatus('status', 'Could not parse JSON: ' + err.message, 'err');
+      }
+    };
+    reader.onerror = () => setStatus('status', 'Could not read file.', 'err');
+    reader.readAsText(file);
+  }
+
+  // ============================================================
+  // Step 2: load / skip player-attributes.json
+  // ============================================================
+  $('attrDropZone').addEventListener('click', () => $('attrFileInput').click());
+  $('attrFileInput').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) loadAttrFile(f); });
+  ['dragover','dragenter'].forEach(ev => $('attrDropZone').addEventListener(ev, e => { e.preventDefault(); $('attrDropZone').classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => $('attrDropZone').addEventListener(ev, e => { e.preventDefault(); $('attrDropZone').classList.remove('drag'); }));
+  $('attrDropZone').addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) loadAttrFile(f); });
+  $('skipAttrBtn').addEventListener('click', () => { attrData = {}; buildAndShow(); });
+
+  function loadAttrFile(file){
+    setStatus('attrStatus', 'Reading ' + file.name + '…');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)){
+          setStatus('attrStatus', 'That doesn\'t look like player-attributes.json — expected an object keyed by player id.', 'err');
+          return;
+        }
+        attrData = parsed;
+        setStatus('attrStatus', 'Loaded ' + Object.keys(attrData).length + ' full attribute sheet(s).', 'ok');
+        $('attrDropZone').textContent = '✓ ' + file.name + ' loaded — tap to load a different file';
+        buildAndShow();
+      } catch (err){
+        setStatus('attrStatus', 'Could not parse JSON: ' + err.message, 'err');
+      }
+    };
+    reader.onerror = () => setStatus('attrStatus', 'Could not read file.', 'err');
+    reader.readAsText(file);
+  }
+
+  // ============================================================
+  // Merge + rate + render
+  // ============================================================
+  function buildAndShow(){
+    allPlayers = [];
+    ['club','national'].forEach(group => {
+      (teamsData[group] || []).forEach(team => {
+        (team.players || []).forEach(p => {
+          if (!p || !p.id) return;
+          const merged = Object.assign({}, p, {
+            teamName: team.name, teamShort: team.short, group,
+            expandedAttrs: attrData[p.id] || null
+          });
+          const ratings = computeRatings(merged);
+          allPlayers.push(Object.assign(merged, ratings));
+        });
+      });
+    });
+
+    // team dropdown
+    const teamSel = $('teamSelect');
+    teamSel.innerHTML = '<option value="">All teams</option>';
+    const teams = [];
+    ['national','club'].forEach(group => {
+      (teamsData[group] || []).forEach(t => teams.push({ name: t.name, group }));
+    });
+    teams.sort((a,b) => a.name.localeCompare(b.name));
+    teams.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name; opt.textContent = t.name + (t.group === 'national' ? ' (National)' : ' (Club)');
+      teamSel.appendChild(opt);
+    });
+
+    $('loadScreen').style.display = 'none';
+    $('attrLoadScreen').style.display = 'none';
+    $('appScreen').style.display = '';
+    renderTable();
+  }
+
+  // ============================================================
+  // Filters + table
+  // ============================================================
+  const POS_CHIPS = ['ALL','GK','DF','MF','FW'];
+  const chipsEl = $('posChips');
+  POS_CHIPS.forEach(g => {
+    const c = document.createElement('div');
+    c.className = 'chip' + (g === 'ALL' ? ' active' : '');
+    c.textContent = g;
+    c.dataset.group = g;
+    c.addEventListener('click', () => {
+      posFilter = g;
+      currentPage = 1;
+      chipsEl.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x.dataset.group === g));
+      renderTable();
+    });
+    chipsEl.appendChild(c);
+  });
+
+  $('searchInput').addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => { currentPage = 1; renderTable(); }, 180);
+  });
+  $('teamSelect').addEventListener('change', () => { currentPage = 1; renderTable(); });
+  $('fullOnlyToggle').addEventListener('change', () => { currentPage = 1; renderTable(); });
+
+  document.querySelectorAll('#playerTable thead th[data-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = (key === 'name' || key === 'team' || key === 'pos' || key === 'quality') ? 1 : -1; }
+      currentPage = 1;
+      renderTable();
+    });
+  });
+
+  function getFiltered(){
+    const q = $('searchInput').value.trim().toLowerCase();
+    const teamName = $('teamSelect').value;
+    const fullOnly = $('fullOnlyToggle').checked;
+    return allPlayers.filter(p => {
+      if (posFilter !== 'ALL' && posGroup(p.pos) !== posFilter) return false;
+      if (teamName && p.teamName !== teamName) return false;
+      if (fullOnly && p.quality !== 'full') return false;
+      if (q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  function sortRows(rows){
+    return rows.slice().sort((a,b) => {
+      let va = a[sortKey], vb = b[sortKey];
+      if (sortKey === 'team') { va = a.teamName; vb = b.teamName; }
+      if (sortKey === 'pos') { va = (a.pos||[]).join(','); vb = (b.pos||[]).join(','); }
+      if (typeof va === 'string'){ va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (va < vb) return -1 * sortDir;
+      if (va > vb) return 1 * sortDir;
+      return 0;
+    });
+  }
+
+  function barColor(v, invert){
+    const val = invert ? 100 - v : v;
+    if (val >= 80) return 'var(--green)';
+    if (val >= 60) return 'var(--gold)';
+    if (val >= 40) return 'var(--orange)';
+    return 'var(--red)';
+  }
+
+  function scoreCell(v, invert){
+    const color = barColor(v, invert);
+    return '<span class="scoreBar"><span style="width:'+v+'%; background:'+color+';"></span></span><span class="scoreNum">'+v+'</span>';
+  }
+
+  // Full recompute: refilter + resort the whole pool, then render the current page.
+  // Only called on an actual filter/sort/search change — never on every keystroke/tray toggle.
+  function renderTable(){
+    document.querySelectorAll('#playerTable thead th[data-key]').forEach(th => {
+      th.classList.toggle('sorted', th.dataset.key === sortKey);
+      th.querySelector('.arrow') && th.querySelector('.arrow').remove();
+      if (th.dataset.key === sortKey){
+        const s = document.createElement('span'); s.className = 'arrow'; s.textContent = sortDir === 1 ? '▲' : '▼';
+        th.appendChild(s);
+      }
+    });
+    filteredCache = sortRows(getFiltered());
+    renderBody();
+  }
+
+  // Cheap re-render: just paints whichever page is current from the already-filtered/sorted
+  // cache. Used for pagination clicks and comparison-tray toggles so those stay instant even
+  // with thousands of players loaded.
+  function renderBody(){
+    const total = filteredCache.length;
+    $('countHint').textContent = total + ' of ' + allPlayers.length + ' players';
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const body = $('tableBody');
+    if (!total){
+      body.innerHTML = '<tr class="emptyRow"><td colspan="13">No players match these filters.</td></tr>';
+      renderPager(0, 1);
+      return;
+    }
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageRows = filteredCache.slice(start, start + PAGE_SIZE);
+
+    body.innerHTML = pageRows.map(p => {
+      const inTray = compareSet.includes(p.id);
+      return '<tr>' +
+        '<td class="nameCell">'+escapeHtml(p.name)+'</td>' +
+        '<td class="teamName">'+escapeHtml(p.teamName)+'</td>' +
+        '<td><span class="posTag">'+escapeHtml((p.pos||[]).join('/'))+'</span></td>' +
+        '<td>'+(p.ovr != null ? p.ovr : '—')+'</td>' +
+        '<td>'+scoreCell(p.goalThreat)+'</td>' +
+        '<td>'+scoreCell(p.passing)+'</td>' +
+        '<td>'+scoreCell(p.dribbling)+'</td>' +
+        '<td>'+scoreCell(p.defending)+'</td>' +
+        '<td>'+scoreCell(p.physical)+'</td>' +
+        '<td>'+(isGK(p.pos) ? scoreCell(p.shotStopping) : '<span style="color:var(--text-3);">—</span>')+'</td>' +
+        '<td>'+scoreCell(p.discipline)+'</td>' +
+        '<td><span class="qBadge '+p.quality+'">'+(p.quality === 'full' ? 'Full' : 'Basic')+'</span></td>' +
+        '<td><button class="addBtn'+(inTray?' added':'')+'" data-id="'+escapeHtml(p.id)+'" title="Add to comparison">'+(inTray?'✓':'+')+'</button></td>' +
+      '</tr>';
+    }).join('');
+
+    body.querySelectorAll('.addBtn').forEach(btn => {
+      btn.addEventListener('click', () => toggleCompare(btn.dataset.id));
+    });
+
+    renderPager(total, totalPages);
+  }
+
+  function renderPager(total, totalPages){
+    const pager = $('pager');
+    if (!total){ pager.innerHTML = ''; return; }
+    pager.innerHTML =
+      '<button id="pgFirst" '+(currentPage<=1?'disabled':'')+'>« First</button>' +
+      '<button id="pgPrev" '+(currentPage<=1?'disabled':'')+'>‹ Prev</button>' +
+      '<span>Page '+currentPage+' of '+totalPages+'</span>' +
+      '<button id="pgNext" '+(currentPage>=totalPages?'disabled':'')+'>Next ›</button>' +
+      '<button id="pgLast" '+(currentPage>=totalPages?'disabled':'')+'>Last »</button>';
+    $('pgFirst').addEventListener('click', () => { currentPage = 1; renderBody(); });
+    $('pgPrev').addEventListener('click', () => { currentPage--; renderBody(); });
+    $('pgNext').addEventListener('click', () => { currentPage++; renderBody(); });
+    $('pgLast').addEventListener('click', () => { currentPage = totalPages; renderBody(); });
+  }
+
+  // ============================================================
+  // Compare tray
+  // ============================================================
+  const MAX_COMPARE = 6;
+  function toggleCompare(id){
+    const i = compareSet.indexOf(id);
+    if (i >= 0){ compareSet.splice(i, 1); }
+    else {
+      if (compareSet.length >= MAX_COMPARE){ alert('You can compare up to ' + MAX_COMPARE + ' players at once.'); return; }
+      compareSet.push(id);
+    }
+    renderTray();
+    renderBody();
+  }
+  function renderTray(){
+    const tray = $('tray');
+    if (!compareSet.length){ tray.classList.remove('show'); return; }
+    tray.classList.add('show');
+    $('trayChips').innerHTML = compareSet.map(id => {
+      const p = allPlayers.find(x => x.id === id);
+      if (!p) return '';
+      return '<span class="trayChip">'+escapeHtml(p.name)+' <button data-id="'+escapeHtml(id)+'">✕</button></span>';
+    }).join('');
+    $('trayChips').querySelectorAll('button').forEach(b => b.addEventListener('click', () => toggleCompare(b.dataset.id)));
+  }
+  $('clearTrayBtn').addEventListener('click', () => { compareSet = []; renderTray(); renderBody(); });
+  $('compareBtn').addEventListener('click', openCompareModal);
+  $('closeModalBtn').addEventListener('click', () => $('compareModal').classList.remove('show'));
+  $('compareModal').addEventListener('click', e => { if (e.target.id === 'compareModal') $('compareModal').classList.remove('show'); });
+
+  // ============================================================
+  // CSV export
+  // ============================================================
+  $('exportCsvBtn').addEventListener('click', () => {
+    const rows = sortRows(getFiltered());
+    const header = ['Name','Team','Group','Position','OVR','GoalThreat','Passing','Dribbling','Defending','Physical','ShotStopping','FoulRisk','Discipline','DataQuality'];
+    const lines = [header.join(',')];
+    rows.forEach(p => {
+      lines.push([
+        p.name, p.teamName, p.group, (p.pos||[]).join('/'), p.ovr != null ? p.ovr : '',
+        p.goalThreat, p.passing, p.dribbling, p.defending, p.physical,
+        isGK(p.pos) ? p.shotStopping : '', p.foulRisk, p.discipline, p.quality
+      ].map(v => {
+        const s = String(v == null ? '' : v);
+        return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+      }).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'scout-lab-export.csv';
+    a.click();
+  });
+
+  // ============================================================
+  // Radar chart (pure SVG, no dependencies)
+  // ============================================================
+  const AXES = [
+    { key: 'goalThreat', label: 'Goal Threat' },
+    { key: 'passing', label: 'Passing' },
+    { key: 'dribbling', label: 'Dribbling' },
+    { key: 'defending', label: 'Defending' },
+    { key: 'physical', label: 'Physical' },
+    { key: 'shotStopping', label: 'Shot-Stop' },
+    { key: 'discipline', label: 'Discipline' }
+  ];
+  const PALETTE = ['#f0c14b','#3d8bfd','#22c55e','#ef4444','#a78bfa','#22d3ee'];
+
+  function buildRadarSvg(players){
+    const size = 340, cx = size/2, cy = size/2 + 6, r = 118;
+    const n = AXES.length;
+    const angleFor = i => -Math.PI/2 + i * (2*Math.PI/n);
+    const pointFor = (i, value) => {
+      const a = angleFor(i);
+      const rad = (value/100) * r;
+      return [cx + rad*Math.cos(a), cy + rad*Math.sin(a)];
+    };
+
+    let svg = '<svg viewBox="0 0 '+size+' '+size+'" width="340" height="340" xmlns="http://www.w3.org/2000/svg">';
+
+    // grid rings
+    [0.25,0.5,0.75,1].forEach(f => {
+      const pts = AXES.map((_,i) => pointFor(i, f*100).join(',')).join(' ');
+      svg += '<polygon points="'+pts+'" fill="none" stroke="rgba(148,163,184,0.18)" stroke-width="1"/>';
+    });
+    // axis lines + labels
+    AXES.forEach((ax,i) => {
+      const [x,y] = pointFor(i, 100);
+      svg += '<line x1="'+cx+'" y1="'+cy+'" x2="'+x+'" y2="'+y+'" stroke="rgba(148,163,184,0.18)" stroke-width="1"/>';
+      const [lx,ly] = pointFor(i, 122);
+      const anchor = Math.abs(Math.cos(angleFor(i))) < 0.25 ? 'middle' : (Math.cos(angleFor(i)) > 0 ? 'start' : 'end');
+      svg += '<text x="'+lx+'" y="'+ly+'" font-size="10.5" fill="#94a3b8" text-anchor="'+anchor+'" dominant-baseline="middle">'+escapeHtml(ax.label)+'</text>';
+    });
+
+    // player polygons
+    players.forEach((p, pi) => {
+      const color = PALETTE[pi % PALETTE.length];
+      const pts = AXES.map((ax,i) => pointFor(i, p[ax.key]).join(',')).join(' ');
+      svg += '<polygon points="'+pts+'" fill="'+color+'" fill-opacity="0.14" stroke="'+color+'" stroke-width="2"/>';
+      AXES.forEach((ax,i) => {
+        const [x,y] = pointFor(i, p[ax.key]);
+        svg += '<circle cx="'+x+'" cy="'+y+'" r="3" fill="'+color+'"/>';
+      });
+    });
+
+    svg += '</svg>';
+    return svg;
+  }
+
+  function openCompareModal(){
+    const players = compareSet.map(id => allPlayers.find(p => p.id === id)).filter(Boolean);
+    if (!players.length) return;
+
+    $('legend').innerHTML = players.map((p,i) => {
+      const color = PALETTE[i % PALETTE.length];
+      return '<span class="legendItem"><span class="swatch" style="background:'+color+';"></span>'+escapeHtml(p.name)+' <span style="color:var(--text-3);">('+escapeHtml(p.teamName)+')</span></span>';
+    }).join('');
+
+    $('radarWrap').innerHTML = buildRadarSvg(players);
+
+    const rowsDef = [
+      ['Position', p => (p.pos||[]).join('/')],
+      ['OVR', p => p.ovr != null ? p.ovr : '—'],
+      ['Goal Threat', p => p.goalThreat],
+      ['Passing', p => p.passing],
+      ['Dribbling', p => p.dribbling],
+      ['Defending', p => p.defending],
+      ['Physical', p => p.physical],
+      ['Shot-Stopping', p => isGK(p.pos) ? p.shotStopping : '—'],
+      ['Foul Risk', p => p.foulRisk + ' (' + foulLabel(p.foulRisk) + ')'],
+      ['Discipline', p => p.discipline],
+      ['Data', p => p.quality === 'full' ? 'Full attribute sheet' : 'Basic estimate']
+    ];
+    let html = '<thead><tr><th>Metric</th>' + players.map(p => '<th>'+escapeHtml(p.name)+'</th>').join('') + '</tr></thead><tbody>';
+    rowsDef.forEach(([label, fn]) => {
+      html += '<tr><td class="metricLabel">'+label+'</td>' + players.map(p => '<td>'+fn(p)+'</td>').join('') + '</tr>';
+    });
+    html += '</tbody>';
+    $('breakTable').innerHTML = html;
+
+    // reset any previous simulation output — this is a new set of players
+    $('simResultsWrap').style.display = 'none';
+    $('simTable').innerHTML = '';
+
+    $('compareModal').classList.add('show');
+  }
+
+  // ============================================================
+  // Season simulator — actually plays out random matches rather than
+  // just reporting a static formula. Shot/foul counts are drawn from a
+  // Poisson distribution each match; each shot converts on a Bernoulli
+  // trial at a rate driven by Goal Threat; every foul runs through the
+  // same escalating yellow/straight-red logic as engine/referee.js.
+  // ============================================================
+  const SIM_SHOTS_PER_MATCH  = { GK:0.02, DF:0.35, MF:1.1, FW:2.9 };
+  const SIM_ASSISTS_PER_MATCH= { GK:0.01, DF:0.12, MF:0.28, FW:0.22 };
+  const SIM_FOULS_PER_MATCH  = { GK:0.05, DF:1.5,  MF:1.25, FW:0.75 };
+
+  function poissonSample(lambda){
+    if (lambda <= 0) return 0;
+    const L = Math.exp(-lambda);
+    let k = 0, p = 1;
+    do { k++; p *= Math.random(); } while (p > L);
+    return k - 1;
+  }
+  function binomialSample(n, prob){
+    let count = 0;
+    for (let i = 0; i < n; i++) if (Math.random() < prob) count++;
+    return count;
+  }
+  function estimateAggr(p){
+    if (p.expandedAttrs) return xattr(p.expandedAttrs, 'aggr', 65);
+    // no expanded sheet: back a plausible aggression figure out of the foul-risk estimate
+    return clamp(40 + (p.foulRisk - 50) * 0.5, 15, 95);
+  }
+  function percentile(sortedArr, frac){
+    const idx = Math.round(frac * (sortedArr.length - 1));
+    return sortedArr[clamp(idx, 0, sortedArr.length - 1)];
+  }
+
+  function simulateSeason(p, matches, trials){
+    const grp = posGroup(p.pos);
+    const shotsLambda = SIM_SHOTS_PER_MATCH[grp] * (0.55 + (p.goalThreat/100) * 0.9);
+    const convRate = clamp(0.05 + (p.goalThreat/100) * 0.17, 0.02, 0.32);
+    const assistLambda = SIM_ASSISTS_PER_MATCH[grp] * (0.5 + (p.passing/100) * 1.0);
+    const foulLambda = SIM_FOULS_PER_MATCH[grp] * (0.55 + (p.foulRisk/100) * 0.9);
+    const aggr = estimateAggr(p);
+    const straightRedChance = 0.0013 * aggr;
+
+    const goalsArr = [], assistsArr = [], foulsArr = [], yellowsArr = [], redsArr = [];
+    let seasonsWithRed = 0;
+
+    for (let t = 0; t < trials; t++){
+      let seasonGoals = 0, seasonAssists = 0, seasonFouls = 0, seasonYellows = 0, seasonReds = 0;
+      for (let m = 0; m < matches; m++){
+        const shots = poissonSample(shotsLambda);
+        seasonGoals += binomialSample(shots, convRate);
+        seasonAssists += poissonSample(assistLambda);
+
+        const foulsThisMatch = poissonSample(foulLambda);
+        seasonFouls += foulsThisMatch;
+        let foulCount = 0, alreadyYellow = false, redThisMatch = false;
+        for (let f = 0; f < foulsThisMatch; f++){
+          if (redThisMatch) break;
+          foulCount++;
+          const yellowChance = Math.min(0.45, 0.04*aggr + (foulCount-1)*0.06 + (alreadyYellow?0.07:0) + (foulCount>=4?0.05:0));
+          const roll = Math.random();
+          if (roll < straightRedChance && !alreadyYellow){
+            seasonReds++; redThisMatch = true;
+          } else if (roll < straightRedChance + yellowChance){
+            if (alreadyYellow){ seasonReds++; redThisMatch = true; }
+            else { seasonYellows++; alreadyYellow = true; }
+          }
+        }
+      }
+      goalsArr.push(seasonGoals); assistsArr.push(seasonAssists); foulsArr.push(seasonFouls);
+      yellowsArr.push(seasonYellows); redsArr.push(seasonReds);
+      if (seasonReds > 0) seasonsWithRed++;
+    }
+
+    const mean = arr => arr.reduce((a,b)=>a+b,0) / arr.length;
+    const summarize = arr => {
+      const sorted = arr.slice().sort((a,b)=>a-b);
+      return { mean: mean(arr), p10: percentile(sorted, 0.1), p90: percentile(sorted, 0.9) };
+    };
+
+    return {
+      goals: summarize(goalsArr),
+      assists: summarize(assistsArr),
+      fouls: summarize(foulsArr),
+      yellows: summarize(yellowsArr),
+      reds: summarize(redsArr),
+      redProb: seasonsWithRed / trials
+    };
+  }
+
+  function fmtRange(s, decimals){
+    const d = decimals || 0;
+    return s.mean.toFixed(d) + ' <span style="color:var(--text-3);">(' + s.p10.toFixed(d) + '–' + s.p90.toFixed(d) + ')</span>';
+  }
+
+  $('runSimBtn').addEventListener('click', () => {
+    const players = compareSet.map(id => allPlayers.find(p => p.id === id)).filter(Boolean);
+    if (!players.length) return;
+    const matches = parseInt($('simMatches').value, 10);
+    const trials = parseInt($('simTrials').value, 10);
+
+    $('simRunning').style.display = '';
+    $('runSimBtn').disabled = true;
+    $('simResultsWrap').style.display = 'none';
+
+    // Let the "Simulating…" label paint before the (brief but blocking) run.
+    setTimeout(() => {
+      const results = players.map(p => simulateSeason(p, matches, trials));
+
+      const rowsDef = [
+        ['Goals / season', i => fmtRange(results[i].goals, 1)],
+        ['Assists / season', i => fmtRange(results[i].assists, 1)],
+        ['Fouls / season', i => fmtRange(results[i].fouls, 1)],
+        ['Yellow cards / season', i => fmtRange(results[i].yellows, 1)],
+        ['Red cards / season', i => fmtRange(results[i].reds, 2)],
+        ['Chance of a red this season', i => Math.round(results[i].redProb * 100) + '%']
+      ];
+      let html = '<thead><tr><th>Over ' + matches + ' matches</th>' + players.map(p => '<th>'+escapeHtml(p.name)+'</th>').join('') + '</tr></thead><tbody>';
+      rowsDef.forEach(([label, fn]) => {
+        html += '<tr><td class="metricLabel">'+label+'</td>' + players.map((p,i) => '<td>'+fn(i)+'</td>').join('') + '</tr>';
+      });
+      html += '</tbody>';
+      $('simTable').innerHTML = html;
+      $('simResultsWrap').style.display = '';
+      $('simRunning').style.display = 'none';
+      $('runSimBtn').disabled = false;
+    }, 30);
+  });
+
+})();
+</script>
+</body>
+</html>
