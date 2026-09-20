@@ -573,53 +573,65 @@
 /*@CHUNK:c0300:END*/
 
 /*@CHUNK:c0301:START*/
-  function findPlayerTeams(playerId) {
-    let national = null, club = null;
+  // O(1) indexed player team lookups with result memoization to avoid redundant
+  // name filtering and object allocations on repeated calls (e.g., in Ballon d'Or / leaderboards).
+  let _playerTeamIndexBuilt = false;
+  let _nationalById = {};
+  let _clubById = {};
+  let _playerByIdIdx = {};
+  let _nationalByName = {};
+  let _clubByName = {};
+  let _playerTeamsMemo = {};
+
+  function buildPlayerTeamIndexes() {
+    if (_playerTeamIndexBuilt) return;
+    _nationalById = {}; _clubById = {}; _playerByIdIdx = {};
+    _nationalByName = {}; _clubByName = {}; _playerTeamsMemo = {};
     (teamsData.national || []).forEach(t => {
-      if ((t.players || []).some(p => p.id === playerId)) national = t.name;
+      (t.players || []).forEach(p => {
+        _nationalById[p.id] = t.name;
+        (_nationalByName[p.name] || (_nationalByName[p.name] = [])).push({ team: t.name, pos: p.pos, id: p.id });
+      });
     });
     (teamsData.club || []).forEach(t => {
-      if ((t.players || []).some(p => p.id === playerId)) club = t.name;
-    });
-    // Same real player may exist as two separate roster entries (club + country)
-    // with different ids — fall back to a name match to link them. Because
-    // different, unrelated players CAN share an identical name, this fallback
-    // only accepts a match when it's unambiguous: exactly one other roster
-    // entry with that name, and its position overlaps the source player's
-    // position. Ambiguous name collisions are left blank rather than risking
-    // attributing one player's country/club to a different, same-named player.
-    if (!national || !club) {
-      let srcPlayer = null;
-      allTeams.forEach(t => {
-        const p = (t.players || []).find(x => x.id === playerId);
-        if (p) srcPlayer = p;
+      (t.players || []).forEach(p => {
+        _clubById[p.id] = t.name;
+        (_clubByName[p.name] || (_clubByName[p.name] = [])).push({ team: t.name, pos: p.pos, id: p.id });
       });
+    });
+    (allTeams || []).forEach(t => (t.players || []).forEach(p => { _playerByIdIdx[p.id] = p; }));
+    _playerTeamIndexBuilt = true;
+  }
+
+  function findPlayerTeams(playerId) {
+    if (_playerTeamsMemo[playerId]) return _playerTeamsMemo[playerId];
+    buildPlayerTeamIndexes();
+    let national = _nationalById[playerId] || null;
+    let club = _clubById[playerId] || null;
+    if (!national || !club) {
+      const srcPlayer = _playerByIdIdx[playerId];
       if (srcPlayer && srcPlayer.name) {
         const pname = srcPlayer.name;
         const srcPos = (srcPlayer.pos || [])[0];
-        const posMatches = (p) => !srcPos || !p.pos || !p.pos.length || p.pos.includes(srcPos);
+        const posMatches = (pos) => !srcPos || !pos || !pos.length || pos.includes(srcPos);
         if (!national) {
-          const matches = [];
-          (teamsData.national || []).forEach(t => {
-            (t.players || []).forEach(p => {
-              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
-            });
-          });
+          const matches = (_nationalByName[pname] || [])
+            .filter(c => c.id !== playerId && posMatches(c.pos))
+            .map(c => c.team);
           const uniqueTeams = [...new Set(matches)];
           if (uniqueTeams.length === 1) national = uniqueTeams[0];
         }
         if (!club) {
-          const matches = [];
-          (teamsData.club || []).forEach(t => {
-            (t.players || []).forEach(p => {
-              if (p.id !== playerId && p.name === pname && posMatches(p)) matches.push(t.name);
-            });
-          });
+          const matches = (_clubByName[pname] || [])
+            .filter(c => c.id !== playerId && posMatches(c.pos))
+            .map(c => c.team);
           const uniqueTeams = [...new Set(matches)];
           if (uniqueTeams.length === 1) club = uniqueTeams[0];
         }
       }
     }
-    return { national, club };
+    const res = { national, club };
+    _playerTeamsMemo[playerId] = res;
+    return res;
   }
 /*@CHUNK:c0301:END*/

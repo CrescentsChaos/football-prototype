@@ -57,6 +57,9 @@
   // Runs once per simulated minute for both sides — drains everyone
   // currently on the pitch. Floors out at 8 rather than 0 so an exhausted
   // player is a heavy substitution risk without ever going fully inert.
+  // Runs once per simulated minute for both sides — drains everyone
+  // currently on the pitch. Uses a Set for O(1) pitch player lookups and
+  // a single-pass aura check to avoid O(N^2) array scans on every tick.
   function updateFatigue() {
     const m = currentMatch;
     if (!m) return;
@@ -66,19 +69,44 @@
       const tac = (m.tactics && m.tactics[side]) || 'balanced';
       const onIds = side === 'home' ? m.homeOnPitch : m.awayOnPitch;
       const all = (team.squad && team.squad.all) || [];
-      // Captaincy: a captain on the pitch takes the edge off the whole
-      // team's fatigue, not just his own — real captains manage tempo and
-      // keep the squad's intensity honest through a long match.
-      const captainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy'));
-      onIds.forEach(id => {
-        const p = all.find(x => x.id === id);
-        if (!p) return;
+      if (!onIds || !onIds.length) return;
+
+      const onSet = new Set(onIds);
+      const onPitchPlayers = all.filter(x => onSet.has(x.id));
+
+      let captainOnPitch = false;
+      let leaderCaptainOnPitch = false;
+      let talismanOnPitch = false;
+
+      for (let i = 0; i < onPitchPlayers.length; i++) {
+        const x = onPitchPlayers[i];
+        const isCaptain = hasSkill(x, 'Captaincy');
+        if (isCaptain) {
+          captainOnPitch = true;
+          if (((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Leader')) {
+            leaderCaptainOnPitch = true;
+          }
+        }
+        if (((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Talisman')) {
+          talismanOnPitch = true;
+        }
+      }
+
+      const isLosing = side === 'home' ? m.home.score < m.away.score : m.away.score < m.home.score;
+
+      for (let i = 0; i < onPitchPlayers.length; i++) {
+        const p = onPitchPlayers[i];
+        const id = p.id;
         if (!fat[side][id]) fat[side][id] = { stamina: 100 };
         const rec = fat[side][id];
         let drain = fatigueDrainRate(p, tac);
         if (captainOnPitch) drain *= 0.93;
+        if (leaderCaptainOnPitch) drain *= 0.95;
+        if (talismanOnPitch) drain *= 0.97;
+        const personality = (p.expandedAttrs && p.expandedAttrs.personality) || [];
+        if (personality.includes('Determined') && isLosing && m.minute > 75) drain *= 0.91;
         rec.stamina = Math.max(8, rec.stamina - drain);
-      });
+      }
     });
   }
 /*@CHUNK:cfat05:END*/
