@@ -6,7 +6,11 @@
 /*@CHUNK:c0034:START*/
   function finishingEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'fin', 70) - 70) / 100) * 0.5;
+    // Curved rather than linear: the max contribution at a 99 Finishing
+    // rating is unchanged (still 0.145) but a merely-good 80 now gives up
+    // much more of that ceiling than a flat scale would, and a 90+ finisher
+    // pulls disproportionately closer to it — see curvedStat() in js/rng.js.
+    let edge = curvedStat(xattr(p, 'fin', 70), 70, 29, 1.6) * 0.145;
     if (hasSkill(p, 'Phenomenal Finishing')) edge += 0.06;
     if (hasSkill(p, 'First-time Shot')) edge += 0.02;
     if (hasSkill(p, 'Acrobatic Finishing')) edge += 0.045;
@@ -22,16 +26,63 @@
     if (hasSkill(p, 'Willpower') && m && m.playerMatchStats && m.playerMatchStats[p.id]) {
       edge += Math.min(0.08, (m.playerMatchStats[p.id].shots || 0) * 0.012);
     }
-    // Box-focused playstyles get a distinct finishing edge on top of raw
-    // finishing rating, so their identity shows up beyond the stat sheet.
-    if (hasStyle(p, 'Fox in the Box')) edge += 0.04;
-    if (hasStyle(p, 'Goal Poacher')) edge += 0.03;
-    if (hasStyle(p, 'Inside Forward')) edge += 0.025;
-    if (hasStyle(p, 'Hole Player')) edge += 0.02;
-    if (hasStyle(p, 'Full-back Finisher') || hasStyle(p, 'Extra Frontman')) edge += 0.015;
+    // Playstyle-driven finishing edge — data-driven via PLAYSTYLE_BEHAVIOR
+    // (engine/playstyleBehavior.js) so every tagged style contributes its
+    // own distinct edge here, not just a hand-picked subset.
+    edge += playstyleEdgeSum(p, 'finishingEdge');
+    // A tired finisher's touch/composure in front of goal is a little less
+    // reliable than when he's fresh.
+    edge *= staminaMultiplier(p);
     return edge;
   }
 /*@CHUNK:c0034:END*/
+
+/*@CHUNK:cblitz01:START*/
+  // Blitz Curler is a specific finishing identity, not just a flat bonus:
+  // a player with the skill only ever finishes with the trademark blitz
+  // curl strike (see pickGoalMethod below, which forces that outcome for
+  // them), so how good they are at it should come straight from the three
+  // attributes that actually make that finish work — the strike itself
+  // (Finishing), enough bend to beat the keeper (Curl), and enough pace on
+  // it that a strong hand isn't enough to keep it out (Kicking Power) —
+  // rather than from generic finishing/free-kick edges built around a much
+  // wider variety of finishes. Zero for anyone without the skill, so this
+  // has no effect on the wider shooting model.
+  function blitzCurlerEdge(p) {
+    if (!p || !p.expandedAttrs || !hasSkill(p, 'Blitz Curler')) return 0;
+    let edge = curvedStat(xattr(p, 'fin', 70), 70, 29, 1.6) * 0.09
+      + curvedStat(xattr(p, 'curl', 70), 70, 29, 1.6) * 0.09
+      + curvedStat(xattr(p, 'kick_pwr', 70), 70, 29, 1.6) * 0.05;
+    edge *= staminaMultiplier(p);
+    return edge;
+  }
+/*@CHUNK:cblitz01:END*/
+
+/*@CHUNK:cshoot01:START*/
+  // Off-the-ball positioning edge — separate from finishing itself. Off
+  // Awareness is specifically about getting into the right spot/angle to
+  // shoot from in the first place, so it nudges shot quality on every shot
+  // type (including headers, where good movement in the box matters just
+  // as much as jumping ability).
+  function positioningEdge(p) {
+    if (!p || !p.expandedAttrs) return 0;
+    return curvedStat(xattr(p, 'off_awr', 70), 70, 29, 1.6) * 0.0522 * staminaMultiplier(p) * conditionMultiplier(p);
+  }
+/*@CHUNK:cshoot01:END*/
+
+/*@CHUNK:cshoot02:START*/
+  // How hard the shot is actually struck, 0-1 — driven by Kicking Power.
+  // This is deliberately kept separate from shotQuality (placement/
+  // technique): a powerfully struck shot is genuinely harder for a keeper
+  // to keep out/hold onto even when it isn't perfectly placed, and it's
+  // what feeds the catch-vs-parry decision in resolveGkSave.
+  function shotPowerOf(p) {
+    if (!p) return 0.5;
+    const kp = xattr(p, 'kick_pwr', null);
+    const base = kp != null ? kp : ((p.att || 70) * 0.4 + (p.phy || 70) * 0.6);
+    return Math.max(0, Math.min(1, (base - 40) / 55));
+  }
+/*@CHUNK:cshoot02:END*/
 
 /*@CHUNK:c0035:START*/
   // Aerial ability, 0.05-0.98 — used both to weight who wins headed chances
@@ -46,14 +97,28 @@
   // a header at the other end.
   function aerialSkill(p, isDefensiveContext) {
     if (!p || !p.expandedAttrs) return 0.5;
-    let v = xattr(p, 'head', 60) / 100;
+    // Heading technique is only part of winning an aerial duel — Jump is
+    // what actually gets a player above his marker to reach the ball, and
+    // Physical Contact is what lets him hold his ground/box the opponent
+    // out to win the position in the first place. Blending all three (not
+    // just heading) is what separates a genuine aerial threat from a
+    // technically good header of a ball who can't out-jump anyone.
+    // Each raw rating is run through the curve before blending — a 95
+    // Heading rating stands out clearly from an 80, instead of the two
+    // being separated by only a flat, easy-to-miss fraction of a point.
+    let v = (curvedAttr(xattr(p, 'head', 60), 60, 39, 1.6) * 0.55
+      + curvedAttr(xattr(p, 'jmp', 60), 60, 39, 1.6) * 0.3
+      + curvedAttr(xattr(p, 'phy_con', 60), 60, 39, 1.6) * 0.15) / 100;
     if (hasSkill(p, 'Aerial Superiority') || hasSkill(p, 'Heading')) v += 0.12;
     if (hasSkill(p, 'Bullet Header')) v += 0.06;
     if (isDefensiveContext && hasSkill(p, 'Aerial Fort')) v += 0.08;
-    // A Target Man's whole game is built around winning the aerial duel;
-    // defensively-anchored styles also read the flight of a long ball well.
-    if (hasStyle(p, 'Target Man')) v += 0.1;
-    if (hasStyle(p, 'Anchor Man') || hasStyle(p, 'Destroyer')) v += 0.05;
+    // Playstyle-driven aerial edge — see PLAYSTYLE_BEHAVIOR
+    // (engine/playstyleBehavior.js): a Target Man's whole game is built
+    // around winning the aerial duel; defensively-anchored styles also
+    // read the flight of a long ball well.
+    v += playstyleEdgeSum(p, 'aerialEdge');
+    // A tired jumper gets up a little less sharply late in the match.
+    v *= staminaMultiplier(p) * conditionMultiplier(p);
     return Math.max(0.05, Math.min(0.98, v));
   }
 /*@CHUNK:c0036:END*/
@@ -66,10 +131,10 @@
 /*@CHUNK:c0040:START*/
   function penTakerEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'place_kick', 70) - 70) / 100) * 0.35;
+    let edge = curvedStat(xattr(p, 'place_kick', 70), 70, 29, 1.6) * 0.1015;
     if (hasSkill(p, 'Penalty Specialist')) edge += 0.08;
     if (hasSkill(p, 'Chip Shot Control')) edge += 0.02;
-    if (hasStyle(p, 'Fox in the Box') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
+    edge += playstyleEdgeSum(p, 'penEdge');
     return edge;
   }
 /*@CHUNK:c0040:END*/
@@ -81,14 +146,14 @@
 /*@CHUNK:c0043:START*/
   function fkTakerEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'curl', 70) - 70) / 200) + ((xattr(p, 'place_kick', 70) - 70) / 300);
+    let edge = curvedStat(xattr(p, 'curl', 70), 70, 29, 1.6) * 0.145
+      + curvedStat(xattr(p, 'place_kick', 70), 70, 29, 1.6) * 0.0967;
     if (hasSkill(p, 'Long Range Curler')) edge += 0.05;
     if (hasSkill(p, 'Knuckle Shot')) edge += 0.04;
     if (hasSkill(p, 'Dipping Shot')) edge += 0.03;
     if (hasSkill(p, 'Blitz Curler')) edge += 0.03;
     if (hasSkill(p, 'Outside Curler')) edge += 0.02;
-    if (hasStyle(p, 'Creative Playmaker') || hasStyle(p, 'Classic No. 10')) edge += 0.03;
-    if (hasStyle(p, 'Cross Specialist') || hasStyle(p, 'Orchestrator')) edge += 0.02;
+    edge += playstyleEdgeSum(p, 'fkEdge');
     return edge;
   }
 /*@CHUNK:c0043:END*/
@@ -100,15 +165,14 @@
 /*@CHUNK:c0045:START*/
   function dribbleSuccessEdge(p) {
     if (!p || !p.expandedAttrs) return 0;
-    let edge = ((xattr(p, 'dribb', 70) - 70) / 100) * 0.4;
+    let edge = curvedStat(xattr(p, 'dribb', 70), 70, 29, 1.6) * 0.116;
     const skillMoves = ['Chop Turn', 'Flip Flap', 'Double Touch', 'Marseille Turn', 'Scissors Feint', 'Sole Control', 'Sombrero', 'Cut Behind & Turn', 'Inside Bounce'];
     if (skillMoves.some((s) => hasSkill(p, s))) edge += 0.08;
     if (hasSkill(p, 'Momentum Dribbling')) edge += 0.03;
     if (hasSkill(p, 'Magnetic Feet')) edge += 0.03;
     if (hasSkill(p, 'Acceleration Burst')) edge += 0.02;
-    if (hasStyle(p, 'Prolific Winger') || hasStyle(p, 'Inside Forward')) edge += 0.04;
-    if (hasStyle(p, 'Roaming Flank') || hasStyle(p, 'Dummy Runner')) edge += 0.03;
-    if (hasStyle(p, 'Creative Playmaker')) edge += 0.02;
+    edge += playstyleEdgeSum(p, 'dribbleEdge');
+    edge *= staminaMultiplier(p) * conditionMultiplier(p);
     return edge;
   }
 /*@CHUNK:c0045:END*/
@@ -124,14 +188,27 @@
     if (!m || m.inPens) return;
     m.inPens = true;
     m.status = 'Penalties';
-    addEvent(m.minute, 'pen', '⚽ Penalty shootout!', null);
+    addEvent(m.minute, 'pen', `${emojiImg('penalty_goal', 'Penalty')} Penalty shootout!`, null);
     updateScoreboard();
 
     // Order the takers list so recognised penalty takers (strikers/wingers, then
     // attacking mids) step up before defenders/holding mids, same as real teams do.
-    const penOrderScore = (p) => (p.att || 0) + (PEN_TAKER_ROLE_WEIGHT[p.slot || (p.pos||[])[0]] || 0.4) * 12;
-    const homeTakers = (m.home.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
-    const awayTakers = (m.away.squad.starting || []).filter(p => !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b)-penOrderScore(a));
+    const penOrderScore = (p, side) => (p.att || 0) + (PEN_TAKER_ROLE_WEIGHT[p.slot || (p.pos||[])[0]] || 0.4) * 12
+      + (side.roles && side.roles.penalty && side.roles.penalty.id === p.id ? 40 : 0);
+    // Eligible takers are whoever is actually on the pitch at full time —
+    // squad.starting/squad.subs are the fixed pre-match lists and never
+    // change, so filtering only on those would let a player who was
+    // substituted off (or sent off) hours ago still step up to take a
+    // penalty, while a sub who's been on the pitch the whole shootout
+    // build-up gets ignored entirely. m.homeOnPitch/m.awayOnPitch is the
+    // live list of player ids currently out there (see trySubstitution in
+    // engine/tactics.js), so cross-reference against that instead.
+    const homeOnPitchIds = m.homeOnPitch || [];
+    const awayOnPitchIds = m.awayOnPitch || [];
+    const homePool = [...(m.home.squad.starting || []), ...(m.home.squad.subs || [])];
+    const awayPool = [...(m.away.squad.starting || []), ...(m.away.squad.subs || [])];
+    const homeTakers = homePool.filter(p => homeOnPitchIds.includes(p.id) && !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.home)-penOrderScore(a,m.home));
+    const awayTakers = awayPool.filter(p => awayOnPitchIds.includes(p.id) && !(p.pos||[]).includes('GK')).sort((a,b)=>penOrderScore(b,m.away)-penOrderScore(a,m.away));
 
     // Silent/bulk sims (quick-sim, tournament auto-play) still resolve instantly —
     // only a real, on-screen live match animates the shootout kick by kick.
@@ -182,14 +259,14 @@
     if (!takers.length) return;
     const taker = takers[kickIndex % takers.length];
     const oppSide = side === 'home' ? 'away' : 'home';
-    const gk = ((m[oppSide].squad && m[oppSide].squad.all) || []).find(p => (p.pos || [])[0] === 'GK');
+    const gk = activeGoalkeeper(oppSide);
     const out = pickPenOutcome(taker, gk);
     const teamShort = m[side].team.short;
     if (out.scored) {
       st[side === 'home' ? 'homePens' : 'awayPens']++;
-      addEvent(m.minute, 'pen', `⚽ ${taker.name} (${teamShort}) ${out.text} [${st.homePens}-${st.awayPens}]`, side);
+      addEvent(m.minute, 'pen', `${emojiImg('penalty_goal', 'Penalty scored')} ${taker.name} (${teamShort}) ${out.text} [${st.homePens}-${st.awayPens}]`, side);
     } else {
-      addEvent(m.minute, 'pen', `❌ ${taker.name} (${teamShort}) — ${out.text} [${st.homePens}-${st.awayPens}]`, side);
+      addEvent(m.minute, 'pen', `${emojiImg('penalty_miss_saved', 'Penalty missed')} ${taker.name} (${teamShort}) — ${out.text} [${st.homePens}-${st.awayPens}]`, side);
     }
   }
 /*@CHUNK:c0144:END*/
@@ -256,13 +333,41 @@
 
 /*@CHUNK:c0149:START*/
 
+  // ---- Own goals ----
+  // Genuinely rare — real football sees an own goal roughly once every
+  // several dozen matches, not every game — so every call site here rolls
+  // a very small probability and almost always returns false. `culprit`
+  // is the defending player whose action turned it into his own net;
+  // `desc` is a short clause describing how (deflection, header, etc.).
+  // Returns true (and fully resolves the goal) if the own goal happened,
+  // so the caller can bail out of its own normal resolution immediately.
+  function maybeOwnGoal(attackingSide, defendingSide, culprit, desc, chance) {
+    const m = currentMatch;
+    if (!m || !culprit) return false;
+    if (seededRandom() >= (chance != null ? chance : 0.01)) return false;
+    const attTeam = m[attackingSide], defTeam = m[defendingSide];
+    attTeam.score++;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[culprit.id]) m.playerMatchStats[culprit.id] = blankPlayerMatchStats(culprit);
+    // Recorded under its own leaderboard bucket (not 'goals') so it never
+    // inflates the defender's own scoring tally or a top-scorer list —
+    // same convention real stats sites use.
+    recordStat('ownGoals', culprit, defTeam.team);
+    // The goal list/timeline just wants a name to show — tagging it in
+    // the name itself means every existing renderer (timeline, match
+    // report, season history) shows it correctly with no further changes.
+    pushGoal(attackingSide, { id: culprit.id, name: culprit.name + ' (OG)', num: culprit.num }, m.minute, 'own goal');
+    addEvent(m.minute, 'goal', `${emojiImg('goal', 'Own goal')} Own goal! <span class="player">${culprit.name}</span> (${defTeam.team.short}) ${desc || 'turns it into his own net'}.`, attackingSide, true);
+    return true;
+  }
 /*@CHUNK:c0149:END*/
 
 /*@CHUNK:c0150:START*/
-  function maybeOffsideDisallow(side, scorer, minute, moment) {
+  function maybeOffsideDisallow(side, scorer, minute, moment, extra) {
     const m = currentMatch;
     if (!m) return false;
     moment = moment || 'openplay';
+    extra = extra || {};
     // Corners, penalties, and a direct free-kick effort are all exempt from
     // this recheck under the actual Laws of the Game — nobody can be ruled
     // offside receiving directly from a corner, and there's no separate
@@ -297,14 +402,35 @@
           }
         }
       }
-      // undo goal stat (best effort)
-      if (stats.goals && stats.goals[scorer.id]) stats.goals[scorer.id].count = Math.max(0, stats.goals[scorer.id].count - 1);
-      if (tournament && tournamentStats.goals && tournamentStats.goals[scorer.id]) {
-        tournamentStats.goals[scorer.id].count = Math.max(0, tournamentStats.goals[scorer.id].count - 1);
-      }
+      // Undo every leaderboard-facing stat this goal touched, in full —
+      // not just the two buckets ('stats' and, if a tournament is running,
+      // 'tournamentStats') the old code reached into by hand. recordStat()
+      // actually fans a goal out to up to four buckets (stats, careerStats,
+      // tournamentStats, currentSeasonComp.stats), so a hand-rolled partial
+      // undo left careerStats and the active season competition's own
+      // stats permanently overcounted — a disallowed goal that still shows
+      // up forever in a player's career and season totals even though the
+      // match's own boxscore correctly shows it reversed. recordStatCount's
+      // -1 goes through the exact same competitive/tournament/season
+      // conditionals recordStat used to credit it, so it can only touch a
+      // bucket that was actually incremented in the first place.
+      recordStatCount('goals', scorer, team.team, -1);
       if (m.playerMatchStats && m.playerMatchStats[scorer.id]) {
         m.playerMatchStats[scorer.id].goals = Math.max(0, (m.playerMatchStats[scorer.id].goals || 1) - 1);
       }
+      // The assist (if one was actually credited on this goal) and any
+      // Puskás nomination are just as much "goal that never happened" as
+      // the goal itself — previously neither was touched at all, so an
+      // assister's season/career assist count (and a Puskás contender
+      // tally) just kept the credit permanently regardless of the goal
+      // being overturned.
+      if (extra.assister) {
+        recordStatCount('assists', extra.assister, team.team, -1);
+        if (m.playerMatchStats && m.playerMatchStats[extra.assister.id]) {
+          m.playerMatchStats[extra.assister.id].assists = Math.max(0, (m.playerMatchStats[extra.assister.id].assists || 1) - 1);
+        }
+      }
+      if (extra.puskas) recordStatCount('puskas', scorer, team.team, -1);
       addEvent(minute, 'var', `VAR: Goal disallowed — <span class="player">${scorer.name}</span> was offside`, side);
       renderGoalTimeline();
       return true;
@@ -346,6 +472,25 @@
       { desc: 'rebound smashed home', xg: 0.42, puskas: false },
       { desc: 'toe-poke under the keeper', xg: 0.40, puskas: false }
     ];
+    // Blitz Curler is a real finishing identity, not just a flavor-pool
+    // nudge — but it shouldn't be the ONLY thing they ever score with
+    // either (a Blitz Curler striker still gets the occasional tap-in,
+    // header, rebound, etc.). So it heavily loads the dice toward the
+    // trademark blitz curl finish rather than forcing it every time, and
+    // how loaded those dice are scales with blitzCurlerEdge() (Finishing/
+    // Curl/Kicking Power) — the same attributes feeding shotQuality
+    // upstream in resolveShot() — so a genuinely elite blitz curler pulls
+    // it off much more often than one who merely has the skill tag.
+    if (hasSkill(shooter, 'Blitz Curler')) {
+      const blitzChance = Math.max(0.35, Math.min(0.8, 0.5 + blitzCurlerEdge(shooter) * 1.5));
+      if (seededRandom() < blitzChance) {
+        const blitz = methods.find(m => m.desc === 'blitz curler into the top corner');
+        const flavor = seededRandom() < 0.35 ? styleFlavor(shooter, GOAL_FLAVOR_SUFFIX) : null;
+        return flavor ? { ...blitz, desc: `${blitz.desc}, ${flavor}` } : blitz;
+      }
+      // Otherwise falls through to the normal pool below, same as any
+      // other player.
+    }
     const spectacular = methods.filter(m => m.puskas);
     const normal = methods.filter(m => !m.puskas);
     const tec = shooter.tec || 70;
@@ -516,7 +661,19 @@
     // shot-stopper with "GK Penalty Saver" genuinely saves more.
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
-    const scoreProb = Math.max(0.35, Math.min(0.95, 0.72 + penTakerEdge(taker) - penGkEdge(gk)));
+    // Ice-Cold/Bottler: composure under pressure at the spot, only when the
+    // moment actually carries stakes (same computeStakes gate as Big-Game/
+    // Fragile in resolveShot above) — a genuinely ice-cold penalty taker in
+    // a dead rubber reads no differently from anyone else.
+    const m0 = currentMatch;
+    const penStakes = m0 ? computeStakes(m0.home.team, m0.away.team, currentSeasonComp || tournament, m0.minute, m0.home.score - m0.away.score) : false;
+    let personalityEdge = 0;
+    if (penStakes) {
+      const personality = (taker.expandedAttrs && taker.expandedAttrs.personality) || [];
+      if (personality.includes('Ice-Cold')) personalityEdge += 0.09;
+      if (personality.includes('Bottler')) personalityEdge -= 0.12;
+    }
+    const scoreProb = Math.max(0.35, Math.min(0.95, 0.72 + penTakerEdge(taker) - penGkEdge(gk) + personalityEdge));
     if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
     return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
   }
@@ -541,10 +698,21 @@
     ];
     const scoredOnes = outcomes.filter(o => o.scored);
     const missedOnes = outcomes.filter(o => !o.scored);
+    // Ice-Cold/Bottler: same stakes-gated composure edge as the penalty
+    // version above, scaled down for the lower baseline conversion rate
+    // a direct free-kick carries.
+    const m0 = currentMatch;
+    const fkStakes = m0 ? computeStakes(m0.home.team, m0.away.team, currentSeasonComp || tournament, m0.minute, m0.home.score - m0.away.score) : false;
+    let personalityEdge = 0;
+    if (fkStakes) {
+      const personality = (taker.expandedAttrs && taker.expandedAttrs.personality) || [];
+      if (personality.includes('Ice-Cold')) personalityEdge += 0.05;
+      if (personality.includes('Bottler')) personalityEdge -= 0.07;
+    }
     // `boost` — a small edge for a quick restart caught the defence
     // unorganised (see resolveFreeKickRoutine in engine/setpieces.js);
     // defaults to 0 so every existing call site is unaffected.
-    const scoreProb = Math.max(0.06, Math.min(0.6, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4 + (boost || 0)));
+    const scoreProb = Math.max(0.06, Math.min(0.6, 0.22 + fkTakerEdge(taker) - gkReflexEdge(gk) * 0.4 + (boost || 0) + personalityEdge));
     if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
     return missedOnes[Math.floor(seededRandom() * missedOnes.length)];
   }
@@ -562,11 +730,37 @@
     // for the full explanation of why these needed to come down.
     openplay:    { baseOnTarget: 0.34, baseXg: 0.08, headerWeight: 0 },
     throughball: { baseOnTarget: 0.42, baseXg: 0.15, headerWeight: 0 },
-    cross:       { baseOnTarget: 0.37, baseXg: 0.11, headerWeight: 0.72 },
+    // headerWeight brought down from 0.72 — at that level nearly three
+    // quarters of every cross-type chance was being resolved purely on
+    // aerialSkill() (Heading/Jump/Phy Contact), sidelining a non-aerial
+    // striker's actual finishing/pace/movement on a huge share of his own
+    // team's chances. 0.45 still makes headers the more likely outcome of a
+    // cross (realistic), just not an near-total lock.
+    cross:       { baseOnTarget: 0.37, baseXg: 0.11, headerWeight: 0.45 },
+    // A cutback is a low pull-back across the face of goal to an arriving
+    // midfielder — never a header, and a cleaner strike than a generic
+    // open-play look since the defence is still turned/side-on.
+    cutback:     { baseOnTarget: 0.40, baseXg: 0.135, headerWeight: 0 },
     dribble:     { baseOnTarget: 0.40, baseXg: 0.13, headerWeight: 0 },
     longshot:    { baseOnTarget: 0.24, baseXg: 0.045, headerWeight: 0 },
     counter:     { baseOnTarget: 0.42, baseXg: 0.16, headerWeight: 0 }
   };
+
+  // A "big chance" is a genuinely clear-cut opportunity — read straight off
+  // this shot's own real shotQuality (see resolveShot below) rather than a
+  // guess reconstructed after the match from key passes/assists/shot counts.
+  // shotQuality in this model skews high (only chances that survive
+  // build-up make it to a shot at all — median is ~0.77), so the
+  // threshold sits well above the midpoint to keep "big chance" meaning
+  // the clear-cut minority of shots rather than most of them.
+  // Raised from 0.85: at that level, a genuinely elite finisher's shotQuality
+  // (which is capped at 0.98 and regularly sits in the low-to-mid 0.90s once
+  // finishingEdge/positioningEdge bonuses stack on top of already-high base
+  // attributes) cleared the bar on a large share of his shots, not just the
+  // clear-cut minority — producing seasons with well over a hundred "big
+  // chances" logged for a single elite player. 0.90 keeps the tag meaningful
+  // for that tier of player instead of nearly automatic.
+  const BIG_CHANCE_QUALITY = 0.90;
 
   // ===== GK phase (called once a shot is confirmed on target) =====
   // then folds straight back to Shots for a rebound, small % of the time.
@@ -580,17 +774,144 @@
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
     const profile = CHANCE_TYPE_PROFILE[chanceType] || CHANCE_TYPE_PROFILE.openplay;
     const isHeader = profile.headerWeight > 0 && seededRandom() < profile.headerWeight;
+    if (isHeader) {
+      bumpExtStat(shooter, 'aerialDuels', 1);
+      if (opts.marker) bumpExtStat(opts.marker, 'aerialDuels', 1);
+    }
 
     // ---- Shots phase: shot quality drawn straight from the shooter's own
     // finishing-relevant attributes and playstyle edges.
+    // Headers used to be scored purely off aerialSkill (Heading/Jump/Phy
+    // Contact) with zero regard for the shooter's actual finishing ability —
+    // so a genuinely elite finisher who isn't primarily an aerial target
+    // (weak Heading rating) got no credit at all for a header chance despite
+    // still being the one steering it goalward. finishingEdge() is folded in
+    // at half weight: heading ability still leads (this is still a header,
+    // not a normal shot), but a top-tier finisher's touch now meaningfully
+    // softens a poor Heading rating instead of being fully overridden by it.
     let shotQuality = isHeader
-      ? aerialSkill(shooter, false)
+      ? Math.max(0.05, Math.min(0.98, aerialSkill(shooter, false) * 0.8 + positioningEdge(shooter) + finishingEdge(shooter) * 0.5))
       : Math.max(0.05, Math.min(0.98,
-          ((shooter.att || 70) * 0.42 + (shooter.tec || 70) * 0.33 + (shooter.ovr || 75) * 0.15 + (shooter.pac || 70) * 0.10) / 100
+          // Every compact stat that feeds a shot runs through the curve
+          // before blending — applies to every shooter (expanded sheet or
+          // not) since att/tec/ovr/pac are the one thing every player has,
+          // so a genuinely elite finisher's rating stops reading as "a
+          // decent player plus a flat multiplier" and starts reading as a
+          // real tier above a merely-good one.
+          // `att` is itself derived from finishing/off-the-ball positioning/
+          // heading/placement/kicking-power (see deriveStatsFromAttributes in
+          // data/playerDatabase.js) — i.e. it IS the shooting-specific
+          // composite — so it now carries most of the weight here. `tec`
+          // (ball control/dribbling/passing/curl) is playmaking ability, not
+          // shooting ability, so it's down-weighted to a small nudge instead
+          // of being able to inflate shotQuality for a technical player who
+          // isn't actually a good finisher. The dedicated finishingEdge()/
+          // positioningEdge() skill-specific bonuses below are unchanged.
+          (curvedAttr(shooter.att || 70, 70) * 0.62 + curvedAttr(shooter.tec || 70, 70) * 0.10
+            + curvedAttr(shooter.ovr || 75, 75) * 0.18 + curvedAttr(shooter.pac || 70, 70) * 0.10) / 100 * conditionMultiplier(shooter)
           + finishingEdge(shooter)
+          + positioningEdge(shooter)
+          + blitzCurlerEdge(shooter)
           + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)
           + (chanceType === 'longshot' ? fkTakerEdge(shooter) * 0.6 : 0)));
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
+    // Personality tags (player-attributes.json "personality", optional —
+    // undefined for anyone without a hand-authored entry, so this is a
+    // no-op for the vast majority of players).
+    const personality = (shooter.expandedAttrs && shooter.expandedAttrs.personality) || [];
+    // Big-Game/Fragile only kick in when the moment actually carries
+    // stakes (derby / final / close-and-late).
+    const stakes = computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score);
+    // Every personality edge below used to be its own sequential
+    // `shotQuality *=` — fine for a single tag, but a player who legitimately
+    // holds several at once (Big-Game + Confidence Player + Finisher's
+    // Instinct + Talisman is a perfectly normal combination in a tight,
+    // late cup match) had those multipliers chain on top of each other
+    // (1.15 * 1.09 * 1.12 * 1.03 ≈ +45%) rather than simply add up. They're
+    // now collected as one combined relative edge and applied once, so five
+    // separate +15% tags add to +75%, not compound toward doubling.
+    //
+    // That combined edge is then applied as headroom — closing that share
+    // of the gap remaining to the quality cap/floor — instead of scaling
+    // shotQuality directly. A flat multiplier rewards an already-elite
+    // finisher (shotQuality already sitting close to the 0.98 ceiling) with
+    // a far bigger *absolute* jump than it gives a merely-good one, which is
+    // backwards from every curve elsewhere in this file and is what made
+    // Big-Game alone such an enormous swing for a team's best players —
+    // effectively a near-automatic finish in a big moment. Headroom scaling
+    // keeps the same "edge in a big moment" idea without a top-tier player
+    // basically guaranteeing the chance, and it naturally self-limits even
+    // when several bonuses stack.
+    let personalityEdge = 0;
+    if (stakes) {
+      if (personality.includes('Big-Game')) personalityEdge += 0.15;
+      if (personality.includes('Fragile')) personalityEdge -= 0.15;
+    }
+    // Confidence Player: composure builds while he's on a live scoring run
+    // this match and evaporates the moment an effort doesn't end in a goal
+    // (see the reset/bump at the miss/save/goal points below) — a genuine
+    // per-match momentum read, distinct from the season-long liveRating/
+    // condition system in form.js. Capped at 3 stacks so a hot streak is a
+    // meaningful edge without becoming a lock.
+    if (personality.includes('Confidence Player')) {
+      const momentum = Math.min(3, (m.personalityMomentum && m.personalityMomentum[shooter.id]) || 0);
+      if (momentum > 0) personalityEdge += momentum * 0.03;
+    }
+    // Finisher's Instinct: extra late-game shot-quality bump distinct from
+    // Big-Game's stakes gate above — fires purely off the clock, any
+    // scoreline, including a dead rubber Big-Game's derby/final/close-
+    // and-late gate would never trigger for.
+    if (personality.includes("Finisher's Instinct") && m.minute > 80) personalityEdge += 0.12;
+    // Talisman aura: teammates play with a touch more composure while
+    // he's out there with them — same aura pattern as the existing
+    // Captaincy fatigue/form hooks, just read locally here since it only
+    // touches shot quality.
+    const onIdsTalisman = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    if ((attTeam.squad.all || []).some(x => onIdsTalisman.includes(x.id) && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Talisman'))) {
+      personalityEdge += 0.03;
+    }
+    // Homebody: genuinely worse away from home, nothing to do with stakes.
+    if (personality.includes('Homebody') && attackingSide === 'away') personalityEdge -= 0.07;
+    // Belt-and-braces cap on the combined edge itself — even a player who
+    // somehow holds every stacking tag at once can't turn this into a
+    // guaranteed goal or a guaranteed miss.
+    personalityEdge = Math.max(-0.5, Math.min(0.5, personalityEdge));
+    if (personalityEdge > 0) shotQuality += (0.98 - shotQuality) * personalityEdge;
+    else if (personalityEdge < 0) shotQuality += (shotQuality - 0.05) * personalityEdge;
+    shotQuality = Math.max(0.05, Math.min(0.98, shotQuality));
+    // Genuinely clear-cut chance, read straight off this shot's own final
+    // quality — everything downstream that doesn't end in a goal marks it
+    // missed instead of converted.
+    const isBigChance = shotQuality >= BIG_CHANCE_QUALITY;
+    if (isBigChance) {
+      bumpExtStat(shooter, 'bigChances', 1);
+      // Big Chances Created credits the actual creator of a genuinely
+      // clear-cut opportunity — the same assistCandidate condition (a real
+      // pass, not the shooter setting himself up) that governs whether an
+      // eventual goal here earns an assist, not just any pass that led to
+      // any shot regardless of quality.
+      if (opts.assistCandidate) bumpExtStat(opts.assistCandidate, 'bigChancesCreated', 1);
+    }
+    // Expected Assists (xA): real-world xA is the sum of the xG of every
+    // shot a player's pass led to, tallied at the moment of the shot —
+    // not just the shots that actually went in. Previously this model only
+    // ever added to xa on the rare shot that both had an assistCandidate
+    // AND scored, so a player creating dozens of good chances a season that
+    // mostly got saved or blocked (the normal outcome, even for a big
+    // chance) ended up with an xa total barely above his actual assist
+    // count instead of well above it. Crediting it here, off this shot's own
+    // xG, keeps it linked to shot quality — a big chance contributes far
+    // more xa than a low-percentage effort — the same way it would from any
+    // other pass, on target or not.
+    if (opts.assistCandidate && opts.assistCandidate.id !== shooter.id) {
+      const shotXg = profile.baseXg + shotQuality * 0.3;
+      if (!m.playerMatchStats[opts.assistCandidate.id]) m.playerMatchStats[opts.assistCandidate.id] = blankPlayerMatchStats(opts.assistCandidate);
+      m.playerMatchStats[opts.assistCandidate.id].xa += shotXg;
+    }
+    // Kicking Power feeds the shot's raw power independently of placement —
+    // used below in the GK phase so a fiercely struck effort is genuinely
+    // harder to keep out/hold onto than a technically similar but softer one.
+    const shotPower = shotPowerOf(shooter);
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
 
@@ -599,18 +920,28 @@
     const blockSkill = blocker ? defensivePressure(blocker) / 100 : 0.6;
     const blockChance = Math.max(0.04, Math.min(0.28, 0.15 + blockSkill * 0.10 - shotQuality * 0.10));
     if (seededRandom() < blockChance) {
+      // Extremely rare: a blocking body gets the deflection badly wrong and
+      // loops it past his own keeper. Own goals stay a genuine rarity —
+      // this only fires for a sliver of blocked efforts, same real-world
+      // order of magnitude as own goals actually turning up in football.
+      if (blocker && maybeOwnGoal(attackingSide, defendingSide, blocker, 'deflects the blocked effort into his own net')) {
+        return;
+      }
       defTeam.stats.blocks = (defTeam.stats.blocks || 0) + 1;
       if (blocker) {
         if (!m.playerMatchStats[blocker.id]) m.playerMatchStats[blocker.id] = blankPlayerMatchStats(blocker);
         m.playerMatchStats[blocker.id].blocks = (m.playerMatchStats[blocker.id].blocks || 0) + 1;
       }
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.4;
+      if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
       if (blocker && seededRandom() < 0.4) {
         addEvent(m.minute, 'shot', `Attempt blocked. Blocked by <span class="player">${blocker.name}</span> (${defTeam.team.short}).`, defendingSide);
       } else {
         addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
       }
-      if (seededRandom() < 0.4) resolveCorner(attackingSide);
+      // A blocked effort loops behind for a corner far more often than
+      // the old flat 40% allowed.
+      if (seededRandom() < 0.55) resolveCorner(attackingSide);
       return;
     }
 
@@ -624,6 +955,11 @@
     const onTargetChance = Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
+      if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
+      if (personality.includes('Confidence Player')) {
+        if (!m.personalityMomentum) m.personalityMomentum = {};
+        m.personalityMomentum[shooter.id] = 0;
+      }
       addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
       // Note: through-ball offside is now judged spatially, up front, in
       // resolveChanceCreation() before the shot is ever attempted — see
@@ -634,30 +970,88 @@
 
     attTeam.stats.shotsOn++;
     // ===== GK phase =====
-    const gk = pickPlayer(defTeam, ['GK']);
-    const gkSkill = Math.max(0.05, Math.min(0.98, (gk ? ((gk.def || 70) * 0.5 + (gk.ovr || 75) * 0.3 + (gk.tec || 70) * 0.2) / 100 : 0.7) + gkReflexEdge(gk)));
-    const saveChance = Math.min(0.94, Math.max(0.34, 0.56 + gkSkill * 0.38 - shotQuality * 0.24 - (isHeader ? 0.03 : 0)));
-    if (seededRandom() < saveChance) {
+    // A close-range effort (open play at close quarters, a dribble past
+    // the last man, or a cross put away first-time) gives the keeper far
+    // less reaction time than a longshot or a header he's had time to
+    // set for — resolveGkSave() weights gk_reflex vs. gk_reach by exactly
+    // that context, so the two attributes actually mean different things
+    // in different situations instead of being interchangeable.
+    const gk = activeGoalkeeper(defendingSide);
+    // Post-shot xG faced: tallied live, per shot actually on target, from
+    // this exact shot's own real quality — the same read used for the
+    // shooter's own xg a few lines below — instead of shotsFaced times a
+    // random per-match factor.
+    if (gk) bumpExtStat(gk, 'psxg', +(profile.baseXg + shotQuality * 0.3).toFixed(3));
+    const closeRangeShot = !isHeader && (chanceType === 'dribble' || chanceType === 'openplay' || chanceType === 'counter' || chanceType === 'cutback');
+    const saveResult = resolveGkSave(gk, shooter, shotQuality, { isHeader, chanceType, shotPower, closeRange: closeRangeShot });
+    if (saveResult.saved) {
+      // A shot the keeper has to save was still a real, on-target chance —
+      // it needs to add to the shooter's xG just like a blocked or off-target
+      // effort does a few lines up. This was previously the one shot outcome
+      // that contributed nothing to xg at all, which meant the shots most
+      // likely to come from a genuine big chance (on target, therefore
+      // saveable) were exactly the ones missing from the season xG total —
+      // hence a big-chance-heavy, high-miss season reading as low-xG.
+      m.playerMatchStats[shooter.id].xg += profile.baseXg + shotQuality * 0.3;
+      if (personality.includes('Confidence Player')) {
+        if (!m.personalityMomentum) m.personalityMomentum = {};
+        m.personalityMomentum[shooter.id] = 0;
+      }
+      if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
       if (gk) {
         defTeam.stats.saves++;
         recordStat('saves', gk, defTeam.team);
         if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
         m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
-        addEvent(m.minute, 'save', pickSaveDesc(gk, shooter), attackingSide);
-        if (seededRandom() < 0.08) {
+        // A cross (or cutback) the keeper deals with is a real cross
+        // stopped — a clean take is a claim, anything else he keeps out
+        // is a punch, same distinction the save type already encodes.
+        if (chanceType === 'cross' || chanceType === 'cutback') {
+          bumpExtStat(gk, 'crossesStopped', 1);
+          if (saveResult.saveType === 'catch') bumpExtStat(gk, 'claims', 1);
+          else bumpExtStat(gk, 'punches', 1);
+        }
+        const desc = saveResult.saveType === 'catch' ? pickCatchDesc(gk, shooter) : pickSaveDesc(gk, shooter);
+        addEvent(m.minute, 'save', desc, attackingSide);
+        // Only a parry (not a clean catch) can leave a rebound behind, and
+        // how likely that rebound actually is comes straight from the
+        // keeper's own gk_parry rating via saveResult.reboundDanger.
+        let reboundTaken = false;
+        if (saveResult.saveType === 'parry' && seededRandom() < saveResult.reboundDanger) {
           const reboundShooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, shooter.id);
           if (reboundShooter) {
+            reboundTaken = true;
             attTeam.stats.shots++;
             addEvent(m.minute, 'shot', `The rebound falls to <span class="player">${reboundShooter.name}</span>!`, attackingSide);
             resolveShot(attackingSide, defendingSide, reboundShooter, 'openplay', { qualityBonus: 0.16, onTargetBonus: 0.1 });
           }
+        }
+        // A keeper who can't hold it (parry or punch) with no shot following
+        // very often turns it behind for a corner — the most common way a
+        // save leads to a set piece in real matches.
+        if (!reboundTaken && saveResult.saveType !== 'catch' && seededRandom() < 0.3) {
+          resolveCorner(attackingSide);
         }
       }
       return;
     }
 
     // GOAL
+    if (isBigChance && opts.marker) {
+      // A genuinely well-drilled defender concedes fewer of his big
+      // chances as outright errors than a shaky one — defensivePressure()
+      // is the same real skill read used to decide the marker in the
+      // first place, so the error rate scales with how good he actually
+      // is, not a flat per-position guess.
+      const markerQuality = Math.max(0, Math.min(1.3, defensivePressure(opts.marker) / 100));
+      const errorChance = Math.max(0.06, Math.min(0.4, 0.34 - markerQuality * 0.2));
+      if (seededRandom() < errorChance) bumpExtStat(opts.marker, 'defensiveErrors', 1);
+    }
     attTeam.score++;
+    if (personality.includes('Confidence Player')) {
+      if (!m.personalityMomentum) m.personalityMomentum = {};
+      m.personalityMomentum[shooter.id] = (m.personalityMomentum[shooter.id] || 0) + 1;
+    }
     const method = isHeader ? { desc: 'towering header', xg: 0.3, puskas: false } : pickGoalMethod(shooter);
     recordStat('goals', shooter, attTeam.team);
     if (method.puskas) recordStat('puskas', shooter, attTeam.team);
@@ -665,16 +1059,24 @@
     m.playerMatchStats[shooter.id].goals++;
     m.playerMatchStats[shooter.id].xg += (profile.baseXg + shotQuality * 0.3);
     const assister = opts.assistCandidate;
+    let assistCredited = null;
     if (assister && assister.id !== shooter.id && seededRandom() < 0.7) {
       recordStat('assists', assister, attTeam.team);
       if (!m.playerMatchStats[assister.id]) m.playerMatchStats[assister.id] = blankPlayerMatchStats(assister);
       m.playerMatchStats[assister.id].assists++;
-      m.playerMatchStats[assister.id].xa += 0.3 + seededRandom() * 0.4;
+      assistCredited = assister;
+      // xa for this shot was already credited above at shot-resolution time
+      // (see the expected-assists block earlier in this function), so it's
+      // not added again here — only the actual assist counter is.
       addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}. Assisted by <span class="player">${assister.name}</span>.`, attackingSide, true);
     } else {
       addEvent(m.minute, 'goal', `Goal! <span class="player">${shooter.name}</span> (${attTeam.team.short}) — ${method.desc}.`, attackingSide, true);
     }
-    maybeOffsideDisallow(attackingSide, shooter, m.minute);
+    // maybeOffsideDisallow needs to know exactly what this goal credited
+    // (assist recipient, Puskás nomination) so a later disallowal can undo
+    // precisely those things — see the note on that function for why the
+    // old "undo goal stat (best effort)" comment was the actual bug.
+    maybeOffsideDisallow(attackingSide, shooter, m.minute, undefined, { assister: assistCredited, puskas: !!method.puskas });
   }
 /*@CHUNK:c0211:END*/
 
@@ -734,24 +1136,81 @@
     if (!zonal && (routine === 'nearpost' || routine === 'crowd')) chance *= 0.82;
     const blocker = pickPlayerCustomWeighted(defTeam, ['CB', 'CDM'], (p) => aerialSkill(p, true) * 2);
     if (blocker && aerialSkill(blocker, true) > 0.68) chance *= 0.85;
+    // Set-Piece Specialist: a genuine composure edge on corners, same trait
+    // that boosts free-kick conversion in resolveFreeKickRoutine (engine/
+    // setpieces.js) — always on, no stakes gate.
+    if (((attTeam.roles && attTeam.roles.cornerAttackers) || []).some(p => ((p.expandedAttrs && p.expandedAttrs.personality) || []).includes('Set-Piece Specialist'))) {
+      chance *= 1.08;
+    }
+
+    // The most realistic own-goal source in the whole engine — a crowded
+    // box, bodies flying at a cross under pressure, someone gets the
+    // header/clearance badly wrong off his own man. Still a small
+    // fraction of corners, same as real football.
+    if (blocker && maybeOwnGoal(attackingSide, defendingSide, blocker, `turns ${ROUTINE_LABEL[routine] || 'the corner'} into his own net under pressure`, 0.007)) {
+      return;
+    }
 
     if (seededRandom() >= chance) return;
-    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2);
+    // The designated corner-box attackers (Heading/Jump/Physical Contact
+    // formula) are the players actually stationed in the danger areas for
+    // this routine — they're more likely to be the one who gets on the
+    // end of it, not guaranteed, since a corner is still a scramble.
+    const scorer = pickPlayerCustomWeighted(attTeam, targetRoles, (p) => aerialSkill(p, false) * 2 * aerialTargetBoost(attTeam, p.id));
     if (!scorer) return;
     attTeam.stats.shots++;
+    if (!m.playerMatchStats) m.playerMatchStats = {};
+    if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
+    m.playerMatchStats[scorer.id].shots++;
+    // Getting on the end of the delivery only earns a shot on goal — it
+    // still has to beat the keeper, the same as any other header in the
+    // box. Previously this routine credited the goal the instant `chance`
+    // succeeded, with no goalkeeper involvement anywhere in the pipeline.
+    const gk = activeGoalkeeper(defendingSide);
+    const shotQuality = Math.max(0.05, Math.min(0.98, aerialSkill(scorer, false)));
+    if (gk) bumpExtStat(gk, 'psxg', +(0.24 + shotQuality * 0.18).toFixed(3));
+    const saveResult = resolveGkSave(gk, scorer, shotQuality, { isHeader: true, closeRange: routine === 'nearpost' || routine === 'crowd', chanceType: 'cross' });
+    m.playerMatchStats[scorer.id].xg += 0.24 + seededRandom() * 0.18;
+    if (saveResult.saved) {
+      attTeam.stats.shotsOn++;
+      if (gk) {
+        defTeam.stats.saves++;
+        recordStat('saves', gk, defTeam.team);
+        if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
+        m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
+        addEvent(m.minute, 'save', `🧤 ${ROUTINE_LABEL[routine]} met by <span class="player">${scorer.name}</span> — ${saveResult.saveType === 'catch' ? pickCatchDesc(gk, scorer) : pickSaveDesc(gk, scorer)}`, attackingSide);
+      } else {
+        addEvent(m.minute, 'miss', `${ROUTINE_LABEL[routine]} met by <span class="player">${scorer.name}</span> but it drifts off target`, attackingSide);
+      }
+      return;
+    }
     attTeam.stats.shotsOn++;
     attTeam.score++;
     recordStat('goals', scorer, attTeam.team);
-    if (!m.playerMatchStats) m.playerMatchStats = {};
-    if (!m.playerMatchStats[scorer.id]) m.playerMatchStats[scorer.id] = blankPlayerMatchStats(scorer);
     m.playerMatchStats[scorer.id].goals++;
-    m.playerMatchStats[scorer.id].xg += 0.24 + seededRandom() * 0.18;
-    const corTaker = pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
+    // Out-swinging/far-post-style deliveries are taken from the side that
+    // suits the right-footed/left-footed swing; in-swinging/near-post-style
+    // ones from the other. Falls back to the generic pick if the
+    // designated taker isn't on the pitch or is the scorer themselves.
+    const onPitchIds = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
+    const preferredCornerTaker = attTeam.roles && ((routine === 'outswinger' || routine === 'farpost' || routine === 'edge') ? attTeam.roles.rightCorner : attTeam.roles.leftCorner);
+    const corTaker = (preferredCornerTaker && preferredCornerTaker.id !== scorer.id && onPitchIds.includes(preferredCornerTaker.id))
+      ? preferredCornerTaker
+      : pickPlayer(attTeam, ['CM', 'CAM', 'RW', 'LW', 'RB', 'LB'], scorer.id);
     if (corTaker && seededRandom() < 0.65) {
       recordStat('assists', corTaker, attTeam.team);
       if (!m.playerMatchStats[corTaker.id]) m.playerMatchStats[corTaker.id] = blankPlayerMatchStats(corTaker);
       m.playerMatchStats[corTaker.id].assists++;
       m.playerMatchStats[corTaker.id].xa += 0.2 + seededRandom() * 0.3;
+      // A converted corner routine is, by definition, a clear-cut chance
+      // for whoever got on the end of it — same "genuinely big chance"
+      // standard resolveShot() applies to open play — so the delivery
+      // that created it should count toward the taker's Big Chances
+      // Created the same way an open-play assist does. Previously this
+      // path credited the assist but never the chance behind it, which
+      // is how a player could rack up several corner/set-piece assists
+      // a season and still show 0 Big Chances Created.
+      bumpExtStat(corTaker, 'bigChancesCreated', 1);
     }
     pushGoal(attackingSide, scorer, m.minute, GOAL_DESC[routine] || 'header from corner');
     addEvent(m.minute, 'goal', `Corner converted (${ROUTINE_LABEL[routine]}). <span class="player">${scorer.name}</span> (${scorer.num || ''}) heads home`, attackingSide, true);

@@ -41,14 +41,28 @@
     if (slot === 'GK') return 0.12;
     const line = POS_LINE[slot] || 'MID';
     const roleLoad = WIDE_SLOTS.has(slot) ? 1.25 : line === 'MID' ? 1.15 : line === 'FWD' ? 1.05 : 0.85;
-    const phyFactor = Math.max(0.65, Math.min(1.35, (100 - (p.phy || 70)) / 45));
+    // Stamina is the specific attribute for how long a player holds his
+    // physical performance before tiring, so it now drives the drain rate
+    // directly instead of disappearing into the generic `phy` blend (which
+    // also mixes in jump/balance/aggression that have nothing to do with
+    // endurance). Physical Contact is a much smaller secondary factor —
+    // a robust frame shrugs off the wear of knocks/duels a little better,
+    // but it's not a substitute for genuine engine.
+    const stam = xattr(p, 'stam', p.phy || 70);
+    const phyCon = xattr(p, 'phy_con', p.phy || 70);
+    const stamFactor = Math.max(0.62, Math.min(1.42, (100 - stam) / 42));
+    const phyConFactor = Math.max(0.93, Math.min(1.07, 0.93 + (100 - phyCon) / 300));
     const tacFactor = tac === 'press' ? 1.35 : tac === 'attack' ? 1.15 : tac === 'defend' ? 0.8 : 1.0;
-    let rate = 0.62 * roleLoad * phyFactor * tacFactor;
+    let rate = 0.62 * roleLoad * stamFactor * phyConFactor * tacFactor;
     // Fighting Spirit and Track Back both describe a player who holds his
     // intensity/work-rate up under fatigue and pressure — modeled as a
     // genuinely slower stamina drain rather than just a late-game stat bump.
     if (hasSkill(p, 'Fighting Spirit')) rate *= 0.85;
     if (hasSkill(p, 'Track Back')) rate *= 0.94;
+    // Iron Man: genuinely slower fatigue regardless of the stam rating
+    // already baked into stamFactor above — a personality-level read, not
+    // a stat substitute.
+    if (((p.expandedAttrs && p.expandedAttrs.personality) || []).includes('Iron Man')) rate *= 0.88;
     return rate;
   }
 /*@CHUNK:cfat04:END*/
@@ -70,6 +84,19 @@
       // team's fatigue, not just his own — real captains manage tempo and
       // keep the squad's intensity honest through a long match.
       const captainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy'));
+      // Leader: deepens the existing Captaincy aura above rather than being
+      // a new standalone check — requires the actual Captaincy skill too,
+      // same captain-on-pitch lookup, just also carrying the Leader tag.
+      const leaderCaptainOnPitch = all.some(x => onIds.includes(x.id) && hasSkill(x, 'Captaincy')
+        && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Leader'));
+      // Talisman: same aura pattern as Captaincy above, but on its own —
+      // no skill prerequisite, just the personality tag and being on the
+      // pitch. See engine/shooting.js for the matching shot-quality aura.
+      const talismanOnPitch = all.some(x => onIds.includes(x.id) && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Talisman'));
+      // Personality tags (player-attributes.json "personality", optional —
+      // undefined for anyone without a hand-authored entry, so this is a
+      // no-op for the vast majority of players).
+      const isLosing = side === 'home' ? m.home.score < m.away.score : m.away.score < m.home.score;
       onIds.forEach(id => {
         const p = all.find(x => x.id === id);
         if (!p) return;
@@ -77,6 +104,14 @@
         const rec = fat[side][id];
         let drain = fatigueDrainRate(p, tac);
         if (captainOnPitch) drain *= 0.93;
+        if (leaderCaptainOnPitch) drain *= 0.95;
+        if (talismanOnPitch) drain *= 0.97;
+        // A Determined player digs in and keeps his work rate up when his
+        // side is chasing the game late on — modeled the same way as
+        // Fighting Spirit/Track Back above, as a genuinely slower drain
+        // rather than a late-game stat bump.
+        const personality = (p.expandedAttrs && p.expandedAttrs.personality) || [];
+        if (personality.includes('Determined') && isLosing && m.minute > 75) drain *= 0.91;
         rec.stamina = Math.max(8, rec.stamina - drain);
       });
     });
@@ -107,3 +142,38 @@
     return total / onIds.length;
   }
 /*@CHUNK:cfat07:END*/
+
+/*@CHUNK:cfat08:START*/
+  // Which side a given player is actually on this match — every ability
+  // read below (passing, carrying, defending, aerials) needs this to look
+  // up that player's live stamina, and none of them otherwise know which
+  // squad they belong to.
+  function playerMatchSide(p) {
+    const m = currentMatch;
+    if (!m || !p) return null;
+    if (m.home && m.home.squad && (m.home.squad.all || []).some((x) => x.id === p.id)) return 'home';
+    if (m.away && m.away.squad && (m.away.squad.all || []).some((x) => x.id === p.id)) return 'away';
+    return null;
+  }
+/*@CHUNK:cfat08:END*/
+
+/*@CHUNK:cfat09:START*/
+  // The single hook that makes stamina matter *during* the 90 minutes,
+  // not just as a trigger for substitutions after the fact. Every major
+  // in-match ability read (passing/carrying/defending/aerial duels) now
+  // runs its raw attribute number through this multiplier — a player
+  // sitting comfortably above ~70 stamina performs at full sharpness,
+  // and it tails off smoothly down to a real (but not crippling) ~16%
+  // dip once they're running on empty. This is what makes a genuinely
+  // high `stam` rating pay off for a full match instead of only ever
+  // showing up as a slightly later substitution.
+  function staminaMultiplier(p) {
+    const m = currentMatch;
+    if (!m || !p) return 1;
+    const side = playerMatchSide(p);
+    if (!side) return 1;
+    const stamina = getStamina(m, side, p.id);
+    if (stamina >= 70) return 1;
+    return Math.max(0.84, 1 - (70 - stamina) * 0.0026);
+  }
+/*@CHUNK:cfat09:END*/
