@@ -225,6 +225,97 @@
   },
   {
     "id": "csp01",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "csp02",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:onPitchOutfield"
+  },
+  {
+    "id": "csp02b",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:normalizedLine,naturalChannelOf"
+  },
+  {
+    "id": "csp02c",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:toSharedFrame,sidePitchLayout,playerPitchPos,toPitchPoint,ballPointForZone,setBallZone"
+  },
+  {
+    "id": "csp03",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:teamLineAdvancements"
+  },
+  {
+    "id": "csp04",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:defensiveLineHeight"
+  },
+  {
+    "id": "csp05",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:lineCompactness"
+  },
+  {
+    "id": "csp06",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:markingDistance"
+  },
+  {
+    "id": "csp06b",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:pointToSegmentDistance,passingLaneOpen"
+  },
+  {
+    "id": "csp06c",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:coverShadow"
+  },
+  {
+    "id": "csp07",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:localOverload"
+  },
+  {
+    "id": "csp08",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:halfSpaceOf"
+  },
+  {
+    "id": "csp09",
+    "file": "engine/spatialModel.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:chanceSpaceBonus"
+  },
+  {
+    "id": "csp01",
     "file": "engine/setpieces.js",
     "start": -1,
     "end": -1,
@@ -504,6 +595,27 @@
     "label": "func:managerAffinityBonus"
   },
   {
+    "id": "cpsb01",
+    "file": "engine/playstyleBehavior.js",
+    "start": -1,
+    "end": -1,
+    "label": "table:PLAYSTYLE_BEHAVIOR"
+  },
+  {
+    "id": "cpsb02",
+    "file": "engine/playstyleBehavior.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:playstyleTagsOf,playstyleActionMult,playstyleEdgeSum"
+  },
+  {
+    "id": "ctrans01",
+    "file": "ai/transferAI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:transferWillingnessMult"
+  },
+  {
     "id": "c0028",
     "file": "data/playerDatabase.js",
     "start": 669,
@@ -516,6 +628,13 @@
     "start": 676,
     "end": 714,
     "label": "func:applyExpandedPlayerAttributes"
+  },
+  {
+    "id": "c0029b",
+    "file": "data/playerDatabase.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:assignPlaystylesToRegularPlayers,POSITION_PLAYSTYLE_POOL"
   },
   {
     "id": "c0030",
@@ -663,6 +782,13 @@
     "start": -1,
     "end": -1,
     "label": "func:resolveGkSave"
+  },
+  {
+    "id": "cgk07",
+    "file": "engine/goalkeeper.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:gkShotStoppingRating"
   },
   {
     "id": "c0042",
@@ -1043,6 +1169,13 @@
     "label": "func:trophyMark"
   },
   {
+    "id": "cchamp01",
+    "file": "ui/playerUI.js",
+    "start": 1266,
+    "end": 1266,
+    "label": "func:championBannerHTML"
+  },
+  {
     "id": "c0089",
     "file": "ui/playerUI.js",
     "start": 1266,
@@ -1321,6 +1454,20 @@
     "start": 1678,
     "end": 1678,
     "label": "gap"
+  },
+  {
+    "id": "cstakes01",
+    "file": "engine/matchEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:computeStakes"
+  },
+  {
+    "id": "cslowstart01",
+    "file": "engine/matchEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:slowStarterMultiplier"
   },
   {
     "id": "c0128",
@@ -1615,6 +1762,20 @@
     "start": 2151,
     "end": 2153,
     "label": "func:blankPlayerMatchStats"
+  },
+  {
+    "id": "cx900b",
+    "file": "engine/matchEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:bumpExtStat"
+  },
+  {
+    "id": "cx900c",
+    "file": "engine/matchEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:activeGoalkeeper"
   },
   {
     "id": "cx901",
@@ -2240,6 +2401,20 @@
     "label": "gap"
   },
   {
+    "id": "c0238b",
+    "file": "engine/tactics.js",
+    "start": -1,
+    "end": -1,
+    "label": "gap"
+  },
+  {
+    "id": "c0238c",
+    "file": "engine/tactics.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:handleGoalkeeperSentOff"
+  },
+  {
     "id": "c0239",
     "file": "engine/tactics.js",
     "start": 3811,
@@ -2371,6 +2546,13 @@
     "start": -1,
     "end": -1,
     "label": "func:pickInjuryDef"
+  },
+  {
+    "id": "cinj02",
+    "file": "engine/injuries.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:positionGroupDistance"
   },
   {
     "id": "c0257",
@@ -2525,6 +2707,13 @@
     "start": 4631,
     "end": 4637,
     "label": "func:liveRatingBadge"
+  },
+  {
+    "id": "c0277b",
+    "file": "ui/matchUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:dotRatingBadge,dotStatBadges"
   },
   {
     "id": "c0278",
@@ -2706,7 +2895,14 @@
     "file": "data/playerDatabase.js",
     "start": 4869,
     "end": 4917,
-    "label": "func:findPlayerTeams"
+    "label": "func:buildPlayerTeamIndexes"
+  },
+  {
+    "id": "c0301b",
+    "file": "data/playerDatabase.js",
+    "start": 758,
+    "end": 794,
+    "label": "func:findPlayerTeams:cached"
   },
   {
     "id": "c0302",
@@ -2800,6 +2996,13 @@
     "label": "gap"
   },
   {
+    "id": "c0314b",
+    "file": "simulation/seasonEngine.js",
+    "start": 0,
+    "end": 0,
+    "label": "func:careerTrophyValue"
+  },
+  {
     "id": "c0315",
     "file": "simulation/seasonEngine.js",
     "start": 4997,
@@ -2812,6 +3015,27 @@
     "start": 5040,
     "end": 5048,
     "label": "func:computeBallonRanking"
+  },
+  {
+    "id": "c0315c",
+    "file": "simulation/seasonEngine.js",
+    "start": 0,
+    "end": 0,
+    "label": "func:computeGerdMullerRanking"
+  },
+  {
+    "id": "c0315d",
+    "file": "simulation/seasonEngine.js",
+    "start": 0,
+    "end": 0,
+    "label": "func:computeYashinRanking"
+  },
+  {
+    "id": "c0315e",
+    "file": "simulation/seasonEngine.js",
+    "start": 0,
+    "end": 0,
+    "label": "func:computeGoldenGloveRanking"
   },
   {
     "id": "c0316",
@@ -3080,6 +3304,13 @@
     "label": "gap"
   },
   {
+    "id": "c0351b",
+    "file": "ui/seasonUI.js",
+    "start": 0,
+    "end": 0,
+    "label": "func:getTournamentLeagueOptions"
+  },
+  {
     "id": "c0352",
     "file": "ui/seasonUI.js",
     "start": 5454,
@@ -3148,6 +3379,13 @@
     "start": 5554,
     "end": 5580,
     "label": "func:startWorldCupTournament"
+  },
+  {
+    "id": "cwc01",
+    "file": "simulation/worldEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:nationalQualifying+worldCup"
   },
   {
     "id": "c0362",
@@ -3941,6 +4179,13 @@
     "label": "func:searchTournamentTeams"
   },
   {
+    "id": "c0463b",
+    "file": "ui/teamUI.js",
+    "start": 0,
+    "end": 0,
+    "label": "func:sortTournamentTeams,filterTournamentTeamsLeague,filterTournamentTeamsRating"
+  },
+  {
     "id": "c0464",
     "file": "ui/matchUI.js",
     "start": 7053,
@@ -4039,10 +4284,24 @@
     "label": "gap"
   },
   {
-    "id": "c0477",
+    "id": "c0476b",
     "file": "ui/playerUI.js",
     "start": 7156,
     "end": 7163,
+    "label": "func:playerWonTrophies"
+  },
+  {
+    "id": "c0476c",
+    "file": "ui/playerUI.js",
+    "start": 7164,
+    "end": 7176,
+    "label": "func:groupPlayerTrophies"
+  },
+  {
+    "id": "c0477",
+    "file": "ui/playerUI.js",
+    "start": 7177,
+    "end": 7184,
     "label": "func:playerTrophyCabinetHTML"
   },
   {
@@ -4312,6 +4571,13 @@
     "label": "func:buildDoubleRoundRobinRounds"
   },
   {
+    "id": "ccup01",
+    "file": "simulation/seasonEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:domesticCups (isCupKey/resolveSeasonComp/buildCupCompetition)"
+  },
+  {
     "id": "c0514",
     "file": "simulation/seasonEngine.js",
     "start": 7725,
@@ -4508,6 +4774,13 @@
     "label": "func:simulateLeagueRound"
   },
   {
+    "id": "ccup03",
+    "file": "simulation/seasonEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:simulateCupRound/simulateAllCupsDueNow/simulateAllCupRoundsNow"
+  },
+  {
     "id": "c0542",
     "file": "simulation/seasonEngine.js",
     "start": 7905,
@@ -4550,6 +4823,13 @@
     "label": "func:computeSeasonWeek"
   },
   {
+    "id": "cmonth01",
+    "file": "simulation/seasonEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:computeSeasonMonth"
+  },
+  {
     "id": "c0547b",
     "file": "simulation/seasonEngine.js",
     "start": 41727,
@@ -4590,6 +4870,13 @@
     "start": 7991,
     "end": 8007,
     "label": "func:advanceSeasonRoundIfComplete"
+  },
+  {
+    "id": "ccup02",
+    "file": "simulation/seasonEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:crownCupRoundIfComplete"
   },
   {
     "id": "c0550",
@@ -4695,6 +4982,13 @@
     "start": 8142,
     "end": 8158,
     "label": "func:resetSeason"
+  },
+  {
+    "id": "cdev01",
+    "file": "simulation/developmentEngine.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:developmentRateMult,mentorDevelopmentBonus,isYoungProdigy"
   },
   {
     "id": "c0564",
@@ -5026,6 +5320,13 @@
     "label": "players-tab"
   },
   {
+    "id": "cp009b",
+    "file": "ui/playersUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "players-tab"
+  },
+  {
     "id": "cp010",
     "file": "ui/playersUI.js",
     "start": -1,
@@ -5129,6 +5430,27 @@
     "start": -1,
     "end": -1,
     "label": "players-tab"
+  },
+  {
+    "id": "cp021c",
+    "file": "ui/playersUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "players-tab"
+  },
+  {
+    "id": "cp021b",
+    "file": "ui/playersUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:renderPlayerRatingFormChartHTML,drawPlayerRatingFormChart"
+  },
+  {
+    "id": "cp021d",
+    "file": "ui/playersUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:renderPlayerContributionChartHTML,drawPlayerContributionChart"
   },
   {
     "id": "cp022",

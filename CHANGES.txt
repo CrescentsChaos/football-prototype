@@ -1,0 +1,89 @@
+Changed files (drop into your football-game folder, overwriting existing ones):
+
+REALISM PASS - set pieces, discipline, offsides, crosses
+- engine/referee.js -> new simulateRoutineFouls(): per-minute, per-side ordinary
+    mid-pitch fouls (fouler weighted by position x foulProneness, fouled player by
+    dribbling/pace; pressing and weaker sides foul more, chasing sides late on).
+    ~6.7 -> ~22 fouls a match. Card odds recalibrated (yellow base 0.04 -> 0.105 x
+    aggression, second-yellow leniency, straight-red slope 0.0013 -> 0.0006):
+    ~0.76 -> ~3.3 yellows, reds ~0.11 -> ~0.18. Routine fouls only sometimes reach
+    the live feed. ~5% of them open a free-kick routine.
+- engine/matchEngine.js -> calls simulateRoutineFouls() each minute.
+- engine/shooting.js -> corners now also come from parried/punched saves with no
+    rebound (30%), and blocked shots (40% -> 55%).
+- engine/passing.js -> crosses counted for wide players/full-backs (CROSS_PER_PASS),
+    ~6 -> ~33 a match; 20% of them are cleared for a corner; 20% of recycled
+    final-third moves end in a corner; background balls in behind are judged by the
+    existing offside model (~0.4 -> ~3.3 offsides); base pass-completion rates
+    eased ~3.5 points (89% -> 86%).
+    Corners overall: ~1.4 -> ~10.5 a match.
+- engine/offside.js -> checkLiveOffside() takes an optional quietMarginal flag so the
+    background runs don't spam "tight call" lines.
+- engine/goalkeeper.js -> save base 0.62 -> 0.66. The extra set pieces pushed goals to
+    ~3.3 a match; this brings it back to ~2.95 (same 500-800 match pairings).
+- dist/app.js -> rebuilt bundle (node build.js). No manifest change.
+
+Benchmark (800 matches, same pairings): goals 3.07 -> 2.93, shots 24.2 -> 25.8,
+H/D/A 46.6/24.6/28.8 -> 43.4/24.0/32.6 (within sampling noise of the earlier runs).
+Known: penalties remain ~0.14 a match (real ~0.3) - not changed.
+Harnesses: spatial 49/49, squadbuilder, qualifiers-congestion pass. roles,
+end-season and league-tournament harnesses fail identically on the original upload.
+
+---- previous delivery ----
+Changed files (drop into your football-game folder, overwriting existing ones):
+
+- engine/spatialModel.js -> shared pitch geometry.
+    * New chunk csp02c: toSharedFrame() puts both teams on one 0-100 x 0-100
+      pitch (home untouched; away rotated x' = 100-x, y' = 100-y).
+      sidePitchLayout()/playerPitchPos() give every on-pitch player an {x, y}
+      on that pitch. Players are dealt into formation slot INDEXES the way
+      the pitch view does it, so the two CBs / CMs / STs no longer collapse
+      onto the first one's coordinates (slots.indexOf() would), and a
+      hand-built squad.customCoords shape is honoured.
+    * ballPointForZone()/setBallZone(): the ball's {x, y} (m.ballPos),
+      resolved from third + channel (centre of the zone in the possessing
+      side's frame, then mirrored for away). m.ballZone keeps its old shape.
+    * markingDistance() is now true Euclidean distance (sideways gap
+      included) instead of the vertical-gap approximation; the floor of 2
+      is gone, the 30 fallback for a missing player stays.
+    * New passingLaneOpen(from, to, defenders[, laneRadius]) built on
+      pointToSegmentDistance() (segment-to-point, clamped to the ends).
+      Default lane radius 4. Accepts players or {x, y} points.
+    * New coverShadow(defender, ball[, bodyRadius]) -> angle in RADIANS,
+      2*asin(r/d), PI when on top of the ball. Default body radius 1.
+      Ball omitted = live m.ballPos.
+    passingLaneOpen() and coverShadow() are not called by the engine yet.
+
+- engine/possession.js -> the three m.ballZone writes now go through
+                         setBallZone(), which also sets m.ballPos.
+- engine/transitions.js -> same for the fast-break write and the turnover
+                         write. On a turnover the zone label is written from
+                         the winner's side, but ballPos is resolved from the
+                         ATTACKER's zone so the ball stays where it was lost.
+- engine/defending.js -> defensivePressure()'s distance multiplier
+                         recalibrated from 1.3 - dist/50 to 1.39 - dist/64.
+                         The old constants were tuned for the vertical-only
+                         distance; with true Euclidean distance the average
+                         is ~34 instead of ~24.5, which on its own pushed
+                         goals/match from ~2.8 to ~3.35. The new mapping
+                         keeps the average multiplier (and the share of
+                         fully-tight / fully-loose markers) unchanged.
+- manifest.json       -> new chunks csp02c, csp06b, csp06c.
+- test/spatial-harness.js -> NEW. 49 checks: frame mirroring, slot layout,
+                         ball position, Euclidean distance, lane/shadow
+                         geometry, and a 12-match run verifying every
+                         ball write the real pipeline makes.
+- dist/app.js         -> rebuilt bundle (node build.js).
+
+Balance check (same seeds/pairings, 700 matches): shots/match 24.5 vs 24.5,
+shots-on 8.7 vs 8.4, goals/match 3.07 vs 2.90. A residual of roughly +5%
+goals remains after recalibration (it showed in three separate runs); if you
+want it closer, the knob is the 1.39 in defending.js.
+
+Known quirk (not changed): marker selection matches channel LABELS (an
+attacker's ATT_L is marked by the defender's LB), which is the opposite
+flank once the away side is rotated. Average marking distance is ~40 on the
+L/R channels vs ~27 in the centre partly because of that.
+
+Existing harnesses: squadbuilder-harness passes. roles-harness fails
+identically on the original upload (penalty-taker icon count) - unrelated.

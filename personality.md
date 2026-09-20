@@ -18,10 +18,19 @@ an existing tag's pattern (noted below).
 **Big-Game** *(pre-existing)*
 Shot quality boosted in high-stakes moments (derby, final, close-and-late).
 `shooting.js` → `resolveShot`. Gated by `stakes` (`computeStakes`).
+Applied as headroom (closes a share of the gap to the shot-quality cap)
+rather than a flat multiplier, and combined additively with every other
+shot-quality personality edge below before being applied once — see the
+note at the top of that block in `resolveShot` for why. This keeps an
+already-elite finisher's Big-Game bump proportionate instead of an
+outsized swing, and stops several stacked traits (Big-Game + Confidence
+Player + Finisher's Instinct + Talisman, say) compounding into something
+far bigger than any one of them was tuned for.
 
 **Fragile** *(pre-existing)*
 The mirror of Big-Game — shot quality reduced under the same stakes gate.
-`shooting.js` → `resolveShot`. Gated by `stakes`.
+`shooting.js` → `resolveShot`. Gated by `stakes`. Same combined/headroom
+handling as Big-Game, just pulling toward the floor instead of the cap.
 
 **Ice-Cold**
 Penalty and free-kick conversion boosted. Scoped to set-piece finishing
