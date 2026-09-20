@@ -14,8 +14,18 @@
 /*@CHUNK:c0307:END*/
 
 /*@CHUNK:c0308:START*/
-  function pushTeamTrophy(name, teamName, type, extra) {
-    const t = Object.assign({ name, team: teamName, type, date: Date.now() }, extra || {});
+  // `teamObj` is the actual winning team (not just its name) so we can pull
+  // its full squad's player ids into `playerIds` — that's what lets every
+  // squad member's Trophy Cabinet show this team trophy (World Cup,
+  // Champions League, league titles, cups) as their own, not just the
+  // team's. Accepts a bare string too (falls back to no playerIds) so any
+  // caller that genuinely only has a name doesn't break.
+  function pushTeamTrophy(name, teamObj, type, extra) {
+    const teamName = (teamObj && teamObj.name) || (typeof teamObj === 'string' ? teamObj : '');
+    const playerIds = (teamObj && Array.isArray(teamObj.players))
+      ? teamObj.players.map(p => p.id).filter(Boolean)
+      : [];
+    const t = Object.assign({ name, team: teamName, playerIds, type, date: Date.now() }, extra || {});
     trophies.push(t);
     saveTrophiesToStorage();
     return t;
@@ -25,7 +35,7 @@
 /*@CHUNK:c0309:START*/
   function pushIndividualTrophy(awardName, playerObj, type, extra) {
     if (!playerObj || !playerObj.name) return null;
-    const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, type, date: Date.now() }, extra || {});
+    const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, playerId: playerObj.id || null, type, date: Date.now() }, extra || {});
     trophies.push(t);
     saveTrophiesToStorage();
     return t;
@@ -62,7 +72,8 @@
     const map = [
       ['goldenBoot', 'Golden Boot'], ['goldenBall', 'Golden Ball'], ['goldenGlove', 'Golden Glove'],
       ['goldenClean', 'Clean Sheet King'], ['topAssists', 'Top Assists'], ['mostMotm', 'Most MOTM'],
-      ['bestAvgRating', 'Best Avg Rating']
+      ['bestAvgRating', 'Best Avg Rating'], ['puskas', 'Puskás Award'], ['gerdMuller', 'Gerd Müller Award'],
+      ['yashin', 'Yashin Trophy'], ['ballonDor', "Ballon d'Or"]
     ];
     map.forEach(([key, awardName]) => {
       if (awardsObj[key]) pushIndividualTrophy(awardName, awardsObj[key], type, extra);
@@ -78,6 +89,55 @@
   // (global `stats`, a competition's `comp.stats`, etc).
   const BALLON_MIN_APPS = 3;
 /*@CHUNK:c0314:END*/
+
+/*@CHUNK:c0314b:START*/
+  // Real-world trophy prestige, used to weigh a player's career trophy case
+  // in the Ballon d'Or scoring below. A World Cup should move the needle far
+  // more than a domestic cup — this is what separates "won a trophy" from
+  // "won THE trophy" the way the real award does.
+  const TROPHY_VALUE = {
+    'World Cup': 10,
+    'European Championship': 8,
+    'Copa América': 7,
+    'Champions League': 7,
+    'Nations League': 4,
+    'Africa Cup of Nations': 4,
+    'AFC Asian Cup': 4,
+    'CONCACAF Gold Cup': 3,
+    'Premier League': 3, 'La Liga': 3, 'Serie A': 3, 'Bundesliga': 3, 'Ligue 1': 3,
+    'FA Cup': 1.5, 'Copa del Rey': 1.5, 'DFB-Pokal': 1.5, 'Coppa Italia': 1.5, 'Coupe de France': 1.5,
+    'EFL Cup': 1, 'Supercopa de España': 1, 'DFL-Supercup': 1, 'Supercoppa Italiana': 1,
+    'FA Community Shield': 0.6, 'Trophée des Champions': 0.6
+  };
+  const TROPHY_VALUE_DEFAULT = 2; // unrecognized team trophy name (e.g. a custom league/cup) — treat as a mid-tier domestic honor
+  const INDIVIDUAL_AWARD_VALUE = { "Ballon d'Or": 2.5, 'Golden Ball': 1.8 };
+  const INDIVIDUAL_AWARD_VALUE_DEFAULT = 0.7;
+  const CAREER_TROPHY_CAP = 30; // so one long, decorated career can't swamp current-season form entirely
+
+  // Sums a player's permanent trophy case (career-wide, not just this
+  // season/tournament — real Ballon d'Or voting weighs pedigree) into a
+  // single points value: team trophies count only when won with the
+  // player's current club/country (the best proxy available for "won it
+  // themselves" rather than a teammate's medal), weighted by how
+  // prestigious that competition actually is; past individual awards add a
+  // smaller amount on top, with the Ballon d'Or/Golden Ball itself worth
+  // the most since winning it before is the single strongest pedigree signal.
+  function careerTrophyValue(playerName, aff) {
+    let pts = 0;
+    (trophies || []).forEach(t => {
+      if (t.player === playerName) {
+        pts += INDIVIDUAL_AWARD_VALUE[t.name] != null ? INDIVIDUAL_AWARD_VALUE[t.name] : INDIVIDUAL_AWARD_VALUE_DEFAULT;
+        return;
+      }
+      if (t.team && !t.manager) {
+        if ((aff.club && t.team === aff.club) || (aff.national && t.team === aff.national)) {
+          pts += TROPHY_VALUE[t.name] != null ? TROPHY_VALUE[t.name] : TROPHY_VALUE_DEFAULT;
+        }
+      }
+    });
+    return Math.round(Math.min(pts, CAREER_TROPHY_CAP) * 10) / 10;
+  }
+/*@CHUNK:c0314b:END*/
 
 /*@CHUNK:c0315:START*/
 
@@ -180,22 +240,13 @@
       });
     });
 
-    // ---- Trophies (team success this season/tournament + individual pedigree) ----
+    // ---- Trophies (real-world Ballon d'Or weighting: what you've actually ----
+    // ---- won, and how prestigious it was, carried across the player's ----
+    // ---- whole career trophy case — not just a flat "won something" flag) ----
     Object.values(scores).forEach(e => {
       const aff = findPlayerTeams(e.id) || {};
-      let trophyPts = 0;
-      if (season && Array.isArray(season.leagues)) {
-        season.leagues.forEach(lg => { if (lg.champion && aff.club === lg.champion.name) trophyPts += 3; });
-        if (season.ucl && season.ucl.champion && aff.club === season.ucl.champion.name) trophyPts += 5;
-      }
-      if (tournament && tournament.champion) {
-        if (tournament.type === 'worldcup' && aff.national === tournament.champion.name) trophyPts += 6;
-        if (tournament.type === 'ucl' && aff.club === tournament.champion.name) trophyPts += 5;
-      }
-      const pastIndividual = (trophies || []).filter(t => t.player === e.name).length;
-      trophyPts += Math.min(pastIndividual, 5) * 0.4;
-      e.pts += trophyPts;
-      e.trophyPts = Math.round(trophyPts * 10) / 10;
+      e.trophyPts = careerTrophyValue(e.name, aff);
+      e.pts += e.trophyPts;
     });
 
     // ---- Consistency (steady quality across recent appearances, not one hot streak) ----
@@ -244,34 +295,123 @@
   }
 /*@CHUNK:c0315b:END*/
 
+/*@CHUNK:c0315c:START*/
+  // Gerd Müller Award (best pure striker) and Yashin Trophy (best
+  // goalkeeper) ranking algorithms — kept in one place so the interactive
+  // Awards tab and the automatic season/tournament-end archiving always
+  // agree on the winner, same pattern as computeBallonRanking above.
+  function computeGerdMullerRanking(statsSource) {
+    const src = statsSource || stats;
+    const scores = {};
+    Object.values(src.goals || {}).forEach(p => {
+      scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: p.count, assists: 0, pts: p.count * 5 };
+    });
+    Object.values(src.assists || {}).forEach(p => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: 0, assists: 0, pts: 0 };
+      scores[p.id].assists = p.count;
+      scores[p.id].pts += p.count * 0.8;
+    });
+    Object.values(scores).forEach(s => {
+      let isST = false;
+      for (const t of allTeams) {
+        const pl = (t.players || []).find(x => x.id === s.id);
+        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
+      }
+      if (isST) s.pts += 2;
+    });
+    return Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals);
+  }
+/*@CHUNK:c0315c:END*/
+
+/*@CHUNK:c0315d:START*/
+  function computeYashinRanking(statsSource) {
+    const src = statsSource || stats;
+    const scores = {};
+    Object.values(src.saves || {}).forEach(p => {
+      scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: p.count, clean: 0, pts: p.count * 1.2 };
+    });
+    Object.values(src.cleanSheets || {}).forEach(p => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: 0, clean: 0, pts: 0 };
+      scores[p.id].clean = p.count;
+      scores[p.id].pts += p.count * 4;
+    });
+    Object.values(src.motm || {}).forEach(p => { if (scores[p.id]) scores[p.id].pts += p.count * 3; });
+    Object.values(src.ratings || {}).forEach(p => { if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.3; });
+    return Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts);
+  }
+/*@CHUNK:c0315d:END*/
+
+/*@CHUNK:c0315e:START*/
+  // Golden Glove: real-world criteria is shot-stopping quality across the
+  // whole run, not just a raw save count — a busy keeper facing shot after
+  // shot shouldn't automatically out-rank one who's actually keeping the
+  // door shut. Clean sheets are weighted heavily (the headline stat for
+  // this award), saves count on top as a shot-stopping factor — same
+  // saves/clean-sheet weighting as the Yashin Trophy above, so the two
+  // goalkeeper honors agree on what "quality" means and only diverge
+  // because Yashin also folds in MOTM/rating for a more holistic picture.
+  function computeGoldenGloveRanking(statsSource) {
+    const src = statsSource || stats;
+    const scores = {};
+    Object.values(src.saves || {}).forEach(p => {
+      scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: p.count, clean: 0, count: p.count, pts: p.count * 1.2 };
+    });
+    Object.values(src.cleanSheets || {}).forEach(p => {
+      if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: 0, clean: 0, count: 0, pts: 0 };
+      scores[p.id].clean = p.count;
+      scores[p.id].pts += p.count * 4;
+    });
+    return Object.values(scores)
+      .filter(p => p.saves > 0 || p.clean > 0)
+      .sort((a,b) => b.pts - a.pts || b.clean - a.clean || b.saves - a.saves);
+  }
+/*@CHUNK:c0315e:END*/
+
 /*@CHUNK:c0316:START*/
 
-  // Snapshots the current global leaderboard leaders (Golden Boot, Ballon
-  // d'Or, Golden Glove/Yashin, Top Assists, Most MOTM) into the trophy case
-  // as individual awards for the season that just ended, then wipes `stats`
-  // and `tournamentStats` so the new season's leaderboard & Awards tab start
-  // from zero. Team trophies (league/UCL winners) are left untouched — the
-  // trophy case is a permanent record, only the live leaderboard resets.
+  // Snapshots the current global leaderboard leaders (Ballon d'Or, Top
+  // Assists, Most MOTM, Clean Sheet King, Puskás Award, Gerd Müller Award,
+  // Yashin Trophy) into the trophy case as individual awards for the season
+  // that just ended, then wipes `stats` and `tournamentStats` so the new
+  // season's leaderboard & Awards tab start from zero. Team trophies
+  // (league/UCL winners) are left untouched — the trophy case is a
+  // permanent record, only the live leaderboard resets.
+  // Golden Boot/Golden Glove are deliberately NOT handed out here — Gerd
+  // Müller Award and Yashin Trophy already cover "best striker"/"best
+  // goalkeeper" for the global archive with a more holistic ranking than a
+  // raw goals/saves count, so a separate global Golden Boot/Golden Glove
+  // would just be a redundant duplicate. Golden Boot/Golden Glove still
+  // exist as their own thing at the per-competition level (Premier League,
+  // Champions League, a standalone Tournament, etc. — see
+  // recordIndividualAwardsFromAwardsObject() above), which is unaffected.
 /*@CHUNK:c0316:END*/
 
 /*@CHUNK:c0317:START*/
-  function archiveAndResetGlobalAwards(year) {
-    const extra = { category: 'season-global', year };
-    const type = 'Season Y' + year + ' (Global)';
+  function archiveAndResetGlobalAwards(year, category) {
+    category = category || 'season-global';
+    const extra = { category, year };
+    const type = (category === 'standalone-global' ? 'Awards Round ' + year : 'Season Y' + year) + ' (Global)';
     const topOf = (key) => Object.values(stats[key] || {}).sort((a,b) => b.count - a.count)[0] || null;
-    pushIndividualTrophy('Golden Boot', topOf('goals'), type, extra);
     pushIndividualTrophy('Top Assists', topOf('assists'), type, extra);
     pushIndividualTrophy('Most MOTM', topOf('motm'), type, extra);
-    pushIndividualTrophy('Golden Glove', topOf('saves'), type, extra);
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
+    pushIndividualTrophy('Puskás Award', topOf('puskas'), type, extra);
+    pushIndividualTrophy('Gerd Müller Award', computeGerdMullerRanking(stats)[0] || null, type, extra);
+    pushIndividualTrophy('Yashin Trophy', computeYashinRanking(stats)[0] || null, type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
-    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, bigGames: {} };
+    // Only the season-scoped `stats` leaderboard bucket resets here — it's
+    // what feeds each new season's Ballon d'Or/Gerd Müller/Yashin race from
+    // zero. `careerStats` (a player's lifetime totals, shown on the Players
+    // tab / player profile) is a completely separate, never-reset bucket —
+    // see its declaration in js/state.js — so ending a season no longer
+    // wipes a player's career goals/assists/apps/etc.
+    stats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, cards: {}, motm: {}, puskas: {}, ratings: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     // Only clear tournamentStats if there's no standalone Tournament (World
     // Cup/UCL, separate from the Season Calendar) currently in progress —
     // otherwise this would wipe that tournament's own live leaderboard mid-run.
     if (!tournament || tournament.champion) {
-      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
+      tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
     }
     saveStats();
   }
@@ -334,6 +474,149 @@
   }
 /*@CHUNK:c0323:END*/
 
+/*@CHUNK:c0323b:START*/
+
+  // ========== SAVE-SIZE COMPACTION HELPERS ==========
+  // A league table row, a fixture report, a Season/Tournament state tree —
+  // all of these embed full team objects (id, name, colors, stadium, and
+  // the ENTIRE squad with every player's every attribute) by reference in
+  // memory. That's free at runtime (just a pointer), but JSON.stringify
+  // has no concept of "I've already written this object" — every place a
+  // team is referenced gets the whole squad serialized again from scratch.
+  // A single 20-team league table alone was writing out 20 full squads.
+  //
+  // teamRefReplacer/teamRefReviver are passed straight to JSON.stringify /
+  // JSON.parse's second argument — they run automatically at every nesting
+  // depth, so they compact every team reference throughout `season` /
+  // `tournament` (table rows, fixtures, brackets, groups, ...) without
+  // needing to touch each place that builds those structures individually.
+  // Detection is unambiguous: only a real entry from allTeams has a
+  // `players` array, so nothing else can accidentally match.
+  // A match report's home/away side is a much smaller shape than a full
+  // team object (no `players` array — see teamRefReplacer above), but it
+  // still repeats the same id/name/short/flag/logo on every single played
+  // fixture's report (and a table-format tournament persists one report
+  // per matchday-fixture). Detected by id+name+score co-occurring, since
+  // that combination only shows up on a report's home/away side.
+  function isReportTeamSide(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && typeof v.name === 'string' &&
+      Object.prototype.hasOwnProperty.call(v, 'score') && !Array.isArray(v.players));
+  }
+  function isStrippedReportTeamSide(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && !('name' in v) &&
+      Object.prototype.hasOwnProperty.call(v, 'score'));
+  }
+
+  // Goal/card/assist/save entries inside a report carry a player's name
+  // AND id side by side (see pushGoal()/buildLightMatchReport() in
+  // engine/matchEngine.js) — the id alone is enough to look the name back
+  // up via findPlayerAndTeam(). Keyed off id+player(string)+num(number)
+  // together, since that specific trio only occurs on these entries.
+  function isNamedPlayerRef(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && typeof v.player === 'string' && typeof v.num === 'number');
+  }
+  function isStrippedPlayerRef(v) {
+    return !!(v && typeof v === 'object' && typeof v.id === 'string' && !('player' in v) && typeof v.num === 'number');
+  }
+  function playerNameById(id) {
+    const found = findPlayerAndTeam(id);
+    return (found && found.player && found.player.name) || '';
+  }
+
+  function teamRefReplacer(key, value) {
+    if (value && typeof value === 'object' && typeof value.id === 'string' && Array.isArray(value.players)) {
+      return { $team: value.id };
+    }
+    if (isReportTeamSide(value)) {
+      const stripped = Object.assign({}, value);
+      delete stripped.name; delete stripped.short; delete stripped.flag; delete stripped.logo;
+      return stripped;
+    }
+    if (isNamedPlayerRef(value)) {
+      const stripped = Object.assign({}, value);
+      delete stripped.player;
+      return stripped;
+    }
+    return value;
+  }
+
+  function teamRefReviver(key, value) {
+    if (value && typeof value === 'object' && typeof value.$team === 'string') {
+      return getTeam(value.$team) || value;
+    }
+    if (isStrippedReportTeamSide(value)) {
+      const t = getTeam(value.id);
+      if (t) return Object.assign({ name: t.name, short: t.short, flag: t.flag, logo: t.logo }, value);
+      return value;
+    }
+    if (isStrippedPlayerRef(value)) {
+      return Object.assign({ player: playerNameById(value.id) }, value);
+    }
+    return value;
+  }
+
+  // Stat "buckets" (apexSimStats / apexTournamentStats — see
+  // ui/statisticsUI.js) are keyed by player id already, but every entry
+  // was ALSO carrying that same player's id/name/team/teamId/national/club
+  // as duplicated strings — all of it re-derivable from the id that's
+  // already the object key, via findPlayerAndTeam()/findPlayerTeams(). Only
+  // the actual counted numbers (count/sum/avg/recent) can't be recomputed,
+  // so those are all that get persisted; compactStatsBook() strips the
+  // rest before saving/exporting, and hydrateStatsBook() rebuilds the full
+  // shape ui/statisticsUI.js's leaderboards/awards code expects, using
+  // current player-database lookups, right after a save is loaded back in.
+  function compactStatsBook(book) {
+    const out = {};
+    Object.keys(book || {}).forEach(cat => {
+      const entries = book[cat] || {};
+      const compactCat = {};
+      Object.keys(entries).forEach(pid => {
+        const e = entries[pid];
+        if (!e) return;
+        const c = { count: e.count || 0 };
+        if (typeof e.sum === 'number') c.sum = e.sum;
+        if (typeof e.avg === 'number') c.avg = e.avg;
+        if (Array.isArray(e.recent) && e.recent.length) c.recent = e.recent;
+        compactCat[pid] = c;
+      });
+      out[cat] = compactCat;
+    });
+    return out;
+  }
+
+  function hydrateStatsBook(book) {
+    const out = {};
+    Object.keys(book || {}).forEach(cat => {
+      const entries = book[cat] || {};
+      const hydratedCat = {};
+      Object.keys(entries).forEach(pid => {
+        const e = entries[pid];
+        if (!e) return;
+        const found = findPlayerAndTeam(pid);
+        const player = found && found.player;
+        const team = found && found.team;
+        const aff = findPlayerTeams(pid);
+        const h = {
+          id: pid,
+          name: player ? player.name : pid,
+          team: team ? team.name : '',
+          teamId: team ? team.id : '',
+          count: e.count || 0,
+          national: aff.national,
+          club: aff.club
+        };
+        if (typeof e.sum === 'number') h.sum = e.sum;
+        if (typeof e.avg === 'number') h.avg = e.avg;
+        if (e.recent) h.recent = e.recent;
+        hydratedCat[pid] = h;
+      });
+      out[cat] = hydratedCat;
+    });
+    return out;
+  }
+
+/*@CHUNK:c0323b:END*/
+
 /*@CHUNK:c0324:START*/
 
 /*@CHUNK:c0324:END*/
@@ -342,12 +625,15 @@
   function saveStats() {
     let ok = true;
     try {
-      ok = safeSetItem('apexSimStats', JSON.stringify(stats)) && ok;
+      ok = safeSetItem('apexSimStats', JSON.stringify(compactStatsBook(stats))) && ok;
+      ok = safeSetItem('apexCareerStats', JSON.stringify(compactStatsBook(careerStats))) && ok;
       ok = safeSetItem('apexInjuryBook', JSON.stringify(injuryBook)) && ok;
+      ok = safeSetItem('apexInjuryLog', JSON.stringify(injuryLog)) && ok;
       ok = safeSetItem('apexSuspensionBook', JSON.stringify(suspensionBook)) && ok;
       ok = safeSetItem('apexMatchDay', String(globalMatchDay)) && ok;
       ok = safeSetItem('apexPlayerMatchLog', JSON.stringify(playerMatchLog)) && ok;
       ok = safeSetItem('apexTeamMatchLog', JSON.stringify(teamMatchLog)) && ok;
+      ok = safeSetItem('apexStandaloneAwardsRound', String(standaloneAwardsRound)) && ok;
     } catch(e) { ok = false; }
     return ok;
   }
@@ -357,12 +643,27 @@
   function loadStats() {
     try {
       const s = localStorage.getItem('apexSimStats');
-      if (s) stats = JSON.parse(s);
+      if (s) stats = hydrateStatsBook(JSON.parse(s));
       if (!stats.ratings) stats.ratings = {};
+      const cs = localStorage.getItem('apexCareerStats');
+      if (cs) {
+        careerStats = hydrateStatsBook(JSON.parse(cs));
+      } else {
+        // Older save with no careerStats record yet — seed it from whatever
+        // is in the current (season-scoped) `stats` bucket so an existing
+        // save doesn't appear to lose everything accrued so far. This can
+        // only recover the current season's tally, not prior seasons that
+        // were already wiped before this fix — there's no data left to
+        // recover those from.
+        careerStats = hydrateStatsBook(compactStatsBook(stats));
+      }
+      if (!careerStats.ratings) careerStats.ratings = {};
       const t = localStorage.getItem('apexTrophies');
       if (t) trophies = JSON.parse(t);
       const ib = localStorage.getItem('apexInjuryBook');
       if (ib) injuryBook = JSON.parse(ib);
+      const il = localStorage.getItem('apexInjuryLog');
+      if (il) injuryLog = JSON.parse(il);
       const sb = localStorage.getItem('apexSuspensionBook');
       if (sb) suspensionBook = JSON.parse(sb);
       const md = localStorage.getItem('apexMatchDay');
@@ -371,6 +672,8 @@
       if (pml) playerMatchLog = JSON.parse(pml);
       const tml = localStorage.getItem('apexTeamMatchLog');
       if (tml) teamMatchLog = JSON.parse(tml);
+      const sar = localStorage.getItem('apexStandaloneAwardsRound');
+      if (sar) standaloneAwardsRound = parseInt(sar, 10) || 0;
     } catch(e) {}
   }
 /*@CHUNK:c0326:END*/
@@ -390,14 +693,20 @@
   function persistAll() {
     let ok = true;
     try {
-      if (season) ok = safeSetItem('apexSeason', JSON.stringify(season)) && ok;
+      if (season) ok = safeSetItem('apexSeason', JSON.stringify(season, teamRefReplacer)) && ok;
       else localStorage.removeItem('apexSeason');
-      if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament)) && ok;
+      if (worldCup) ok = safeSetItem('apexWorldCup', JSON.stringify(worldCup, teamRefReplacer)) && ok;
+      else localStorage.removeItem('apexWorldCup');
+      if (qualifiers) ok = safeSetItem('apexQualifiers', JSON.stringify(qualifiers, teamRefReplacer)) && ok;
+      else localStorage.removeItem('apexQualifiers');
+      if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament, teamRefReplacer)) && ok;
       else localStorage.removeItem('apexTournament');
       ok = safeSetItem('apexTournamentType', tournamentType) && ok;
-      ok = safeSetItem('apexTournamentStats', JSON.stringify(tournamentStats)) && ok;
+      ok = safeSetItem('apexTournamentStats', JSON.stringify(compactStatsBook(tournamentStats))) && ok;
       ok = safeSetItem('apexSeasonActiveTab', seasonActiveTab) && ok;
       ok = safeSetItem('apexSeasonActiveSubTab', seasonActiveSubTab) && ok;
+      if (careerTeamId) ok = safeSetItem('apexCareerTeamId', careerTeamId) && ok;
+      else localStorage.removeItem('apexCareerTeamId');
       ok = persistPlayerForms() && ok;
       const activeTab = document.querySelector('.nav-tab.active');
       if (activeTab && activeTab.dataset.view) safeSetItem('apexActiveView', activeTab.dataset.view);
@@ -414,11 +723,19 @@
   function loadPersistedGameState() {
     try {
       const s = localStorage.getItem('apexSeason');
-      if (s) season = JSON.parse(s);
+      if (s) season = JSON.parse(s, teamRefReviver);
     } catch (e) { season = null; }
     try {
+      const wc = localStorage.getItem('apexWorldCup');
+      if (wc) worldCup = JSON.parse(wc, teamRefReviver);
+    } catch (e) { worldCup = null; }
+    try {
+      const q = localStorage.getItem('apexQualifiers');
+      if (q) qualifiers = JSON.parse(q, teamRefReviver);
+    } catch (e) { qualifiers = null; }
+    try {
       const t = localStorage.getItem('apexTournament');
-      if (t) tournament = JSON.parse(t);
+      if (t) tournament = JSON.parse(t, teamRefReviver);
     } catch (e) { tournament = null; }
     try {
       const tt = localStorage.getItem('apexTournamentType');
@@ -426,13 +743,32 @@
     } catch (e) {}
     try {
       const ts = localStorage.getItem('apexTournamentStats');
-      if (ts) tournamentStats = JSON.parse(ts);
+      if (ts) tournamentStats = hydrateStatsBook(JSON.parse(ts));
     } catch (e) {}
     try {
       const sat = localStorage.getItem('apexSeasonActiveTab');
       if (sat) seasonActiveTab = sat;
       const sst = localStorage.getItem('apexSeasonActiveSubTab');
       if (sst) seasonActiveSubTab = sst;
+    } catch (e) {}
+    try {
+      const ct = localStorage.getItem('apexCareerTeamId');
+      if (ct) careerTeamId = ct;
+    } catch (e) {}
+    try {
+      // Restore the in-progress Tournament setup team selection (e.g. 36 of
+      // 48 eligible teams manually picked) so a hard refresh doesn't lose
+      // it — tourSelectedTeamIdsType lets selectTournamentFormat() (see
+      // ui/seasonUI.js) tell this is the SAME format as before and leave
+      // the selection alone, instead of resetting to "everyone selected".
+      const tst = localStorage.getItem('apexTourSelectedTeams');
+      if (tst) {
+        const parsed = JSON.parse(tst);
+        if (parsed && Array.isArray(parsed.ids)) {
+          tourSelectedTeamIds = new Set(parsed.ids);
+          tourSelectedTeamIdsType = parsed.type || null;
+        }
+      }
     } catch (e) {}
   }
 /*@CHUNK:c0330:END*/
@@ -458,10 +794,13 @@
     if (desc) desc.textContent = cfg.desc;
     const select = document.getElementById('tour-format-select');
     if (select) select.value = tournamentType;
+    applyTournamentBranding(tournament.competition || tournamentType);
     try {
+      const bracketCard = document.getElementById('tour-bracket-card');
+      if (bracketCard) bracketCard.style.display = (tournament.format === 'table') ? 'none' : '';
       if (tournament.format === 'league') { renderUCLLeague(); renderUCLFixtures(); }
       else { renderGroups(); }
-      renderBracket();
+      if (tournament.format !== 'table') renderBracket();
       if (tournament.champion) renderTournamentPodium();
       renderTournamentLeaderboard();
     } catch (e) {}
@@ -493,7 +832,20 @@
 
 /*@CHUNK:c0336:START*/
   function setupAutoSave() {
-    setInterval(persistAll, 4000);
+    // Was firing a full JSON.stringify(season)/JSON.stringify(tournament) —
+    // both of which can be sizeable once several leagues' squads, fixtures
+    // and match reports are loaded — every 4 seconds unconditionally, which
+    // showed up as a periodic stutter unrelated to anything the person was
+    // actually doing. Almost every mutating action already calls persistAll()
+    // directly (see the many call sites elsewhere in this file), so this
+    // timer is only a safety net: it can run far less often, and it skips
+    // the work entirely when the tab isn't visible or there's nothing to
+    // save, instead of paying the stringify cost every tick regardless.
+    setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      if (!season && !tournament) return;
+      persistAll();
+    }, 15000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistAll(); });
     window.addEventListener('beforeunload', persistAll);
     window.addEventListener('pagehide', persistAll);
@@ -508,6 +860,33 @@
   // it exists purely so the person can get an explicit, visible confirmation
   // that their progress is safely written to this browser's storage right now.
 /*@CHUNK:c0337:END*/
+
+/*@CHUNK:c0337b:START*/
+  // Save/Export/Import live inside a small dropdown off a single header
+  // icon (see #save-menu in index.html) rather than sitting on screen as
+  // three permanent buttons. forceState lets callers explicitly open/close
+  // (used to close the menu after picking an action, and by the outside-
+  // click/Escape handlers below) instead of just toggling blindly.
+  let _saveMenuListenerAttached = false;
+  function toggleSaveMenu(forceState) {
+    const menu = document.getElementById('save-menu');
+    const toggleBtn = document.getElementById('save-menu-toggle');
+    if (!menu) return;
+    const shouldOpen = forceState != null ? forceState : !menu.classList.contains('open');
+    menu.classList.toggle('open', shouldOpen);
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    if (!_saveMenuListenerAttached) {
+      _saveMenuListenerAttached = true;
+      document.addEventListener('click', (e) => {
+        const m = document.getElementById('save-menu');
+        if (m && m.classList.contains('open') && !m.contains(e.target)) toggleSaveMenu(false);
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') toggleSaveMenu(false);
+      });
+    }
+  }
+/*@CHUNK:c0337b:END*/
 
 /*@CHUNK:c0338:START*/
   function manualSave() {
@@ -529,6 +908,7 @@
     // failure, so only toast the happy path here to avoid two conflicting
     // messages.
     if (ok) toast('Progress saved');
+    toggleSaveMenu(false);
   }
 /*@CHUNK:c0338:END*/
 
@@ -570,17 +950,19 @@
     // so these always reflect the exact current point — not a possibly
     // stale localStorage copy.
     try {
-      if (season) data.apexSeason = JSON.stringify(season);
+      if (season) data.apexSeason = JSON.stringify(season, teamRefReplacer);
       else delete data.apexSeason;
-      if (tournament) data.apexTournament = JSON.stringify(tournament);
+      if (tournament) data.apexTournament = JSON.stringify(tournament, teamRefReplacer);
       else delete data.apexTournament;
       data.apexTournamentType = tournamentType;
-      data.apexTournamentStats = JSON.stringify(tournamentStats);
+      data.apexTournamentStats = JSON.stringify(compactStatsBook(tournamentStats));
       data.apexSeasonActiveTab = seasonActiveTab;
       data.apexSeasonActiveSubTab = seasonActiveSubTab;
-      data.apexSimStats = JSON.stringify(stats);
+      data.apexSimStats = JSON.stringify(compactStatsBook(stats));
+      data.apexCareerStats = JSON.stringify(compactStatsBook(careerStats));
       data.apexTrophies = JSON.stringify(trophies);
       data.apexInjuryBook = JSON.stringify(injuryBook);
+      data.apexInjuryLog = JSON.stringify(injuryLog);
       data.apexSuspensionBook = JSON.stringify(suspensionBook);
       data.apexMatchDay = String(globalMatchDay);
       data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
@@ -597,6 +979,7 @@
 
 /*@CHUNK:c0342:START*/
   function exportSave() {
+    toggleSaveMenu(false);
     try {
       // Best-effort: also try to flush to localStorage so autosave/reload
       // stay in sync. If this fails (e.g. storage is full), the export
@@ -641,6 +1024,7 @@
   function triggerImportSave() {
     const input = document.getElementById('import-save-input');
     if (input) { input.value = ''; input.click(); }
+    toggleSaveMenu(false);
   }
 /*@CHUNK:c0344:END*/
 
@@ -819,6 +1203,17 @@
 /*@CHUNK:c0512:END*/
 
 /*@CHUNK:c0513:START*/
+  // Single-leg version of buildDoubleRoundRobinRounds — used for the
+  // national-team qualifying groups, which (like real qualifying groups)
+  // only play each other once, not home-and-away.
+  function buildSingleRoundRobinRounds(teams) {
+    const ids = teams.map(t => t.id);
+    if (ids.length < 2) return [];
+    return circleMethodRounds(ids).map(pairs => pairs.map(([home, away]) => ({
+      home, away, played: false, homeScore: null, awayScore: null, report: null
+    })));
+  }
+
   function buildDoubleRoundRobinRounds(teams) {
     const ids = teams.map(t => t.id);
     if (ids.length < 2) return [];
@@ -829,6 +1224,44 @@
     })));
   }
 /*@CHUNK:c0513:END*/
+
+/*@CHUNK:ccup01:START*/
+  // ---------- Domestic cups (season.cups[leagueKey]) ----------
+  // A cup key is namespaced 'cup_<leagueKey>' (e.g. 'cup_epl') wherever it
+  // needs to sit alongside league/UCL compKeys — the season object keeps
+  // domestic leagues, the UCL and cups in three separate dicts, but several
+  // shared code paths (simSeasonFixture, seasonCompCanPlayNow…) take a
+  // single string key, so the 'cup_' prefix disambiguates which dict to
+  // resolve against without colliding with a league's own key.
+  function isCupKey(key) { return typeof key === 'string' && key.indexOf('cup_') === 0; }
+  function cupKeyName(key) { return key.slice(4); }
+  function resolveSeasonComp(key) {
+    if (!season) return null;
+    if (key === 'ucl') return season.ucl;
+    if (isCupKey(key)) return season.cups && season.cups[cupKeyName(key)];
+    return season.leagues && season.leagues[key];
+  }
+
+  // Builds a fresh single-elimination cup from a league's club pool —
+  // shuffled, then trimmed down to the nearest power of 2 (so e.g. a
+  // 20-club league's cup starts from a clean Round of 16) exactly like the
+  // Tournament tab's own knockout formats already do. Reuses
+  // buildKnockoutFromWinners for the actual Round 1 pairing.
+  function buildCupCompetition(name, teams) {
+    let ts = shuffleArray([...teams]);
+    while (ts.length >= 4 && (ts.length & (ts.length - 1))) ts.pop();
+    if (ts.length < 2) return null;
+    return {
+      name, teams: ts,
+      rounds: [buildKnockoutFromWinners(ts).fixtures],
+      currentRound: 0,
+      roundName: getRoundName(ts.length),
+      champion: null,
+      finished: false,
+      stats: blankCompStats()
+    };
+  }
+/*@CHUNK:ccup01:END*/
 
 /*@CHUNK:c0514:START*/
 
@@ -912,6 +1345,13 @@
   function simulateRoundFixtures(round, opts, onResult) {
     (round || []).forEach(fx => {
       if (fx.played) return;
+      // Career Mode: the person's own club never gets auto-simmed by a bulk
+      // "Simulate Matchday"/"Simulate Round" pass — its fixture is left
+      // unplayed here so it can only be resolved by actually playing it
+      // live (see playSeasonFixture/playLeagueTournamentFixture). Callers
+      // that shouldn't hold a fixture back this way (the UCL/cup knockout
+      // bracket calls) simply don't pass skipCareer.
+      if (opts && opts.skipCareer && careerTeamId && (fx.home === careerTeamId || fx.away === careerTeamId)) return;
       const homeTeam = getTeam(fx.home), awayTeam = getTeam(fx.away);
       if (!homeTeam || !awayTeam) { fx.played = true; return; }
       const result = simQuickMatch(homeTeam, awayTeam, { countForLeaderboard: true, allowET: !!opts.allowET, allowPens: !!opts.allowPens });
@@ -1044,9 +1484,16 @@
       stats: blankCompStats()
     };
 
-    season = { year: 1, week: 0, daySlot: 0, leagues, ucl };
+    const cups = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const c = buildCupCompetition(SEASON_CUP_NAMES[def.key] || (def.name + ' Cup'), leagueTeams[def.key]);
+      if (c) cups[def.key] = c;
+    });
+
+    season = { year: 1, week: 0, daySlot: 0, leagues, ucl, cups };
     seasonActiveTab = 'epl';
     seasonActiveSubTab = 'table';
+    ensureNationalCycleForSeason(1);
     renderSeasonDashboard();
     const setup = document.getElementById('season-setup');
     const dash = document.getElementById('season-dashboard');
@@ -1068,7 +1515,7 @@
     if (comp.champion) {
       const year = season ? season.year : 1;
       const extra = { category: 'season', year };
-      pushTeamTrophy(comp.name, comp.champion.name, 'League (Y' + year + ')', extra);
+      pushTeamTrophy(comp.name, comp.champion, 'League (Y' + year + ')', extra);
       pushManagerAward(comp.name + ' Manager of the Season', comp.champion, 'League (Y' + year + ')', extra);
       recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
     }
@@ -1085,14 +1532,76 @@
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); return; }
     if (!comp.stats) comp.stats = blankCompStats();
     currentSeasonComp = comp;
-    simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+    const round = comp.rounds[comp.currentRound];
+    simulateRoundFixtures(round, { allowET: false, allowPens: false, skipCareer: true }, (fx, h, a, result) => {
       applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
     });
     currentSeasonComp = null;
+    // Career Mode: hold this round here if the person's own fixture is still
+    // pending — advanceSeasonRoundIfComplete() takes over and moves the
+    // round forward for real once they've actually played it.
+    if (!round.every(f => f.played)) return;
     comp.currentRound++;
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); }
   }
 /*@CHUNK:c0541:END*/
+
+/*@CHUNK:ccup03:START*/
+  // Simulates one round of a single domestic cup (a whole round at once,
+  // same as the league/UCL "Simulate Matchday" flow) — used by
+  // simulateSeasonWeek/simulateSeasonToEnd/endSeasonNow whenever the
+  // congestion cycle is on its Cup day.
+  function simulateCupRound(compKey, comp) {
+    if (!comp || comp.finished) return;
+    const round = comp.rounds[comp.currentRound];
+    if (!round || !round.length || round.every(f => f.played)) return;
+    if (!comp.stats) comp.stats = blankCompStats();
+    currentSeasonComp = comp;
+    simulateRoundFixtures(round, { allowET: true, allowPens: true, skipCareer: true }, (fx, h, a, result) => {
+      fx.winnerId = winnerOfResult(h, a, result).id;
+    });
+    currentSeasonComp = null;
+    advanceSeasonRoundIfComplete(comp, compKey);
+  }
+
+  // Simulates every domestic cup's currently-due round in one pass —
+  // returns true if any cup actually had something to play, so callers
+  // (simulateSeasonToEnd/endSeasonNow) know whether progress was made.
+  function simulateAllCupsDueNow() {
+    if (!season || !season.cups) return false;
+    if (currentCongestionSlot().comp !== 'Cup') return false;
+    let played = false;
+    Object.keys(season.cups).forEach(k => {
+      const comp = season.cups[k];
+      if (!comp || comp.finished) return;
+      const round = comp.rounds[comp.currentRound];
+      if (round && round.length && !round.every(f => f.played)) {
+        simulateCupRound('cup_' + k, comp);
+        played = true;
+      }
+    });
+    return played;
+  }
+
+  // Unconditional version for the two bulk "fast-forward" flows
+  // (simulateSeasonToEnd/endSeasonNow), which — like the domestic
+  // leagues/UCL there — deliberately skip past the day-by-day congestion
+  // cadence rather than waiting for the Cup slot to come around.
+  function simulateAllCupRoundsNow() {
+    if (!season || !season.cups) return false;
+    let played = false;
+    Object.keys(season.cups).forEach(k => {
+      const comp = season.cups[k];
+      if (!comp || comp.finished) return;
+      const round = comp.rounds[comp.currentRound];
+      if (round && round.length && !round.every(f => f.played)) {
+        simulateCupRound('cup_' + k, comp);
+        played = true;
+      }
+    });
+    return played;
+  }
+/*@CHUNK:ccup03:END*/
 
 /*@CHUNK:c0542:START*/
 
@@ -1127,10 +1636,13 @@
     if (comp.stage === 'league') {
       if (comp.currentRound >= comp.rounds.length) { comp.stage = 'transition'; }
       else {
-        simulateRoundFixtures(comp.rounds[comp.currentRound], { allowET: false, allowPens: false }, (fx, h, a, result) => {
+        const round = comp.rounds[comp.currentRound];
+        simulateRoundFixtures(round, { allowET: false, allowPens: false, skipCareer: true }, (fx, h, a, result) => {
           applyResultToTable(comp.table, fx.home, fx.away, result.home, result.away);
         });
-        comp.currentRound++;
+        // Career Mode: hold here if the person's own UCL league-phase
+        // fixture is still pending (same pattern as simulateLeagueRound).
+        if (round.every(f => f.played)) comp.currentRound++;
       }
       if (comp.currentRound >= comp.rounds.length) buildUCLBracketFromLeagueTable(comp);
     } else if (comp.stage === 'qf') {
@@ -1160,7 +1672,7 @@
       if (champ) {
         const year = season ? season.year : 1;
         const extra = { category: 'season', year };
-        pushTeamTrophy('Champions League', champ.name, 'Season (Y' + year + ')', extra);
+        pushTeamTrophy('Champions League', champ, 'Season (Y' + year + ')', extra);
         pushManagerAward('Champions League Winning Manager', champ, 'Season (Y' + year + ')', extra);
         recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), 'Champions League (Y' + year + ')', extra);
       }
@@ -1207,6 +1719,22 @@
     return Math.min(...active.map(({ comp }) => comp.currentRound));
   }
 /*@CHUNK:c0547:END*/
+
+/*@CHUNK:cmonth01:START*/
+  // Derives a real-world-feeling "Month" label (August → May, a 10-month
+  // top-flight calendar) purely from how far the slowest domestic league
+  // has progressed through its own fixture list — no separate calendar
+  // clock is simulated, so this always stays in sync with the Matchday
+  // counter above with zero extra bookkeeping.
+  function computeSeasonMonth(s) {
+    s = s || season;
+    if (!s || !s.leagues) return FOOTBALL_MONTHS[0];
+    const totalRounds = Math.max(1, ...SEASON_LEAGUE_DEFS.map(def => (s.leagues[def.key] && s.leagues[def.key].rounds.length) || 1));
+    const week = typeof s.week === 'number' ? s.week : 0;
+    const idx = Math.max(0, Math.min(FOOTBALL_MONTHS.length - 1, Math.floor((week / totalRounds) * FOOTBALL_MONTHS.length)));
+    return FOOTBALL_MONTHS[idx];
+  }
+/*@CHUNK:cmonth01:END*/
 
 /*@CHUNK:c0547b:START*/
 
@@ -1256,6 +1784,10 @@
     if (key === 'ucl' && comp.stage !== 'league') return true;
     const slot = currentCongestionSlot();
     if (!seasonKeysForCongestionComp(slot.comp).includes(key)) return false;
+    // A domestic cup's own "round" cadence has nothing to do with the
+    // league/UCL Matchday number (a 16-team cup only has 4 rounds all
+    // season) — it just needs to be its slot in the congestion cycle.
+    if (isCupKey(key)) return true;
     return comp.currentRound <= computeSeasonWeek(season);
   }
 
@@ -1266,8 +1798,10 @@
     const slot = currentCongestionSlot();
     const eligible = seasonKeysForCongestionComp(slot.comp);
     if (!eligible.includes(compKey)) {
-      return "It's " + slot.day + " — " + slot.comp + " fixtures only today. Simulate today's matches first to move on.";
+      const label = slot.comp === 'International' ? 'International Break' : slot.comp;
+      return "It's " + slot.day + " — " + label + " fixtures only today. Simulate today's matches first to move on.";
     }
+    if (isCupKey(compKey)) return "Today's cup fixtures aren't ready yet — simulate today's other matches first.";
     const due = seasonMatchesDue();
     return 'Matchday ' + (computeSeasonWeek(season) + 1) + " isn't finished yet — " +
       due.length + (due.length === 1 ? ' match is' : ' matches are') + ' still due elsewhere first';
@@ -1297,6 +1831,56 @@
     });
     return due;
   }
+
+  // ========== CAREER MODE HELPERS ==========
+  // Finds the career club's own fixture for the CURRENT matchday, if any —
+  // i.e. exactly the fixture that a bulk "Simulate Matchday" pass just held
+  // back (see the skipCareer guard in simulateRoundFixtures above). Checked
+  // across the domestic leagues, the UCL league phase, and — on a Cup day —
+  // the domestic cups, mirroring the same eligibility rules
+  // seasonCompCanPlayNow/simulateSeasonWeek use so the person is only ever
+  // offered the fixture that's actually due right now.
+  function findCareerFixtureDue() {
+    if (!season || !careerTeamId) return null;
+    const targetIdx = computeSeasonWeek(season);
+    const slot = currentCongestionSlot();
+    const eligibleKeys = new Set(seasonKeysForCongestionComp(slot.comp));
+    let found = null;
+    seasonCompEntries().forEach(({ key, comp }) => {
+      if (found || !comp || comp.finished) return;
+      const isUclKnockout = key === 'ucl' && comp.stage !== 'league';
+      if (isUclKnockout) return; // knockout ties aren't covered by career-mode live play yet
+      if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+      if (!eligibleKeys.has(key)) return;
+      const round = comp.rounds && comp.rounds[comp.currentRound];
+      if (!round) return;
+      const idx = round.findIndex(f => !f.played && (f.home === careerTeamId || f.away === careerTeamId));
+      if (idx !== -1) found = { compKey: key, idx, comp };
+    });
+    if (!found && slot.comp === 'Cup' && season.cups) {
+      Object.keys(season.cups).forEach(k => {
+        if (found) return;
+        const comp = season.cups[k];
+        if (!comp || comp.finished) return;
+        const round = comp.rounds && comp.rounds[comp.currentRound];
+        if (!round) return;
+        const idx = round.findIndex(f => !f.played && (f.home === careerTeamId || f.away === careerTeamId));
+        if (idx !== -1) found = { compKey: 'cup_' + k, idx, comp };
+      });
+    }
+    return found;
+  }
+
+  // Sets/clears the person's Career Mode club. Exposed on the App object so
+  // both the Season Setup screen and Tournament setup can drive the same
+  // single shared "which club am I managing" concept.
+  function setCareerTeam(teamId) {
+    careerTeamId = teamId || null;
+    persistAll();
+    try { renderSeasonSetup(); } catch (e) {}
+    try { if (season) renderSeasonDashboard(); } catch (e) {}
+  }
+  function clearCareerTeam() { setCareerTeam(null); }
 /*@CHUNK:c0547e:END*/
 
 /*@CHUNK:c0548:START*/
@@ -1312,6 +1896,12 @@
     if (!comp || !comp.rounds) return;
     const round = comp.rounds[comp.currentRound];
     if (!round || !round.length || !round.every(f => f.played)) return;
+    if (isCupKey(compKey)) {
+      crownCupRoundIfComplete(comp, compKey);
+      if (season) advanceCongestionSlotIfComplete();
+      finalizeSeasonIfComplete();
+      return;
+    }
     comp.currentRound++;
     if (compKey === 'ucl') {
       if (comp.currentRound >= comp.rounds.length) buildUCLBracketFromLeagueTable(comp);
@@ -1327,6 +1917,36 @@
   }
 /*@CHUNK:c0549:END*/
 
+/*@CHUNK:ccup02:START*/
+  // A cup round's fixtures just finished — work out the round's winners
+  // (either every winnerId already recorded by the "step" bulk simulator,
+  // or derived here from the score for the individual/live play paths) and
+  // either crown the champion (one team left) or pair up the next round.
+  function crownCupRoundIfComplete(comp, compKey) {
+    const round = comp.rounds[comp.currentRound];
+    const winners = round.map(f => {
+      if (f.winnerId) return getTeam(f.winnerId);
+      const home = getTeam(f.home), away = getTeam(f.away);
+      return winnerOfResult(home, away, { home: f.homeScore, away: f.awayScore, pens: f.pens });
+    }).filter(Boolean);
+    comp.currentRound++;
+    if (winners.length <= 1) {
+      comp.champion = winners[0] || null;
+      comp.finished = true;
+      if (comp.champion) {
+        const year = season ? season.year : 1;
+        const extra = { category: 'season', year };
+        pushTeamTrophy(comp.name, comp.champion, 'Cup (Y' + year + ')', extra);
+        pushManagerAward(comp.name + ' Winning Manager', comp.champion, 'Cup (Y' + year + ')', extra);
+        recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
+      }
+    } else {
+      comp.rounds.push(buildKnockoutFromWinners(winners).fixtures);
+      comp.roundName = getRoundName(winners.length);
+    }
+  }
+/*@CHUNK:ccup02:END*/
+
 /*@CHUNK:c0550:START*/
 
   // Simulates a single fixture from the current matchday instantly (no live
@@ -1336,7 +1956,7 @@
 /*@CHUNK:c0551:START*/
   function simSeasonFixture(compKey, idx) {
     if (!season) return;
-    const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+    const comp = resolveSeasonComp(compKey);
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
       toast(seasonBlockedFixtureMessage(compKey));
@@ -1347,15 +1967,17 @@
     if (!f || f.played) return;
     const home = getTeam(f.home), away = getTeam(f.away);
     if (!home || !away) { f.played = true; return; }
+    const cup = isCupKey(compKey);
     showLoading('Simulating match…');
     setTimeout(function() {
       try {
         if (!comp.stats) comp.stats = blankCompStats();
         currentSeasonComp = comp;
-        const result = simQuickMatch(home, away, { countForLeaderboard: true, allowET: false, allowPens: false });
+        const result = simQuickMatch(home, away, { countForLeaderboard: true, allowET: cup, allowPens: cup });
         currentSeasonComp = null;
         f.played = true; f.homeScore = result.home; f.awayScore = result.away; f.report = result.report; f.pens = result.pens;
-        applyResultToTable(comp.table, f.home, f.away, result.home, result.away);
+        if (cup) f.winnerId = winnerOfResult(home, away, result).id;
+        else applyResultToTable(comp.table, f.home, f.away, result.home, result.away);
         advanceSeasonRoundIfComplete(comp, compKey);
         renderSeasonDashboard();
         persistAll();
@@ -1374,7 +1996,7 @@
 /*@CHUNK:c0553:START*/
   function playSeasonFixture(compKey, idx) {
     if (!season) return;
-    const comp = compKey === 'ucl' ? season.ucl : season.leagues[compKey];
+    const comp = resolveSeasonComp(compKey);
     if (!comp || comp.finished) return;
     if (!seasonCompCanPlayNow(compKey, comp)) {
       toast(seasonBlockedFixtureMessage(compKey));
@@ -1397,21 +2019,28 @@
     const awaySel = document.getElementById('away-team');
     if (homeSel) homeSel.value = home.id;
     if (awaySel) awaySel.value = away.id;
+    // Career Mode: the person's own club keeps its real formation/custom XI
+    // (whatever they set up in the squad builder) instead of getting a
+    // random one like every AI-vs-AI fixture — only the OPPONENT still gets
+    // randomized, same as before.
+    const isCareerHome = careerTeamId && home.id === careerTeamId;
+    const isCareerAway = careerTeamId && away.id === careerTeamId;
     const formKeys = Object.keys(FORMATIONS);
-    const hf = formKeys[Math.floor(seededRandom() * formKeys.length)];
-    const af = formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const hf = isCareerHome ? pickTeamFormation(home) : formKeys[Math.floor(seededRandom() * formKeys.length)];
+    const af = isCareerAway ? pickTeamFormation(away) : formKeys[Math.floor(seededRandom() * formKeys.length)];
     const hForm = document.getElementById('home-formation');
     const aForm = document.getElementById('away-formation');
     if (hForm) hForm.value = hf;
     if (aForm) aForm.value = af;
-    // Clear custom lineups so random formation applies
-    customLineups.home = null;
-    customLineups.away = null;
+    // Clear custom lineups so random formation applies — but never for the
+    // career club's own side, so their squad-builder XI survives into kickoff.
+    if (!isCareerHome) customLineups.home = null;
+    if (!isCareerAway) customLineups.away = null;
     updateTeamPreview('home'); updateTeamPreview('away');
     if (!comp.stats) comp.stats = blankCompStats();
     currentSeasonComp = comp;
     startMatch();
-    toast((comp.name || 'Season') + ' — live · formations randomized');
+    toast((isCareerHome || isCareerAway) ? 'Your match — take control!' : ((comp.name || 'Season') + ' — live · formations randomized'));
   }
 /*@CHUNK:c0553:END*/
 
@@ -1422,7 +2051,8 @@
 /*@CHUNK:c0555:START*/
   function seasonIsComplete() {
     if (!season) return true;
-    return SEASON_LEAGUE_DEFS.every(def => season.leagues[def.key].finished) && season.ucl.finished;
+    const cupsDone = !season.cups || Object.keys(season.cups).every(k => season.cups[k].finished);
+    return SEASON_LEAGUE_DEFS.every(def => season.leagues[def.key].finished) && season.ucl.finished && cupsDone;
   }
 /*@CHUNK:c0555:END*/
 
@@ -1451,6 +2081,7 @@
         if (!eligibleKeys.has(key)) return; // not today's competition
         if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
       });
+      simulateAllCupsDueNow();
       season.week = computeSeasonWeek(season);
       advanceCongestionSlotIfComplete();
       finalizeSeasonIfComplete();
@@ -1468,6 +2099,12 @@
 /*@CHUNK:c0559:START*/
   function simulateSeasonToEnd() {
     if (!season) return;
+    // Career Mode: a full skip-to-the-end doesn't make sense once the person
+    // is manually playing their own club's matches — it would either have to
+    // silently auto-sim every one of "their" games too, or stall forever
+    // waiting on a match nobody's there to play. Simplest and most honest
+    // is to just block it and point them at their own fixture instead.
+    if (careerTeamId) { toast('Career Mode: play your own matches first — "Simulate to End" is disabled while managing a club.'); return; }
     // Rough denominator for the progress bar: the most matchdays any single
     // still-active competition has left. Not exact (competitions advance at
     // different rates and some weeks skip a competition entirely), but a
@@ -1497,6 +2134,7 @@
           if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
           playedSomething = true;
         });
+        if (simulateAllCupRoundsNow()) playedSomething = true;
         season.week = computeSeasonWeek(season);
         safety++;
         updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
@@ -1542,13 +2180,19 @@
     const leagueFixtures = generateUCLLeagueFixtures(uclTeams, matchesPerTeam);
     const uclRounds = [];
     for (let r = 1; r <= matchesPerTeam; r++) uclRounds.push(leagueFixtures.filter(f => f.round === r));
+    const cups = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const c = buildCupCompetition(SEASON_CUP_NAMES[def.key] || (def.name + ' Cup'), leagues[def.key].teams);
+      if (c) cups[def.key] = c;
+    });
     season = {
-      year, week: 0, daySlot: 0, leagues,
+      year, week: 0, daySlot: 0, leagues, cups,
       ucl: { key: 'ucl', name: 'Champions League', teams: uclTeams, table: uclTeams.map(blankSeasonRow),
         rounds: uclRounds, currentRound: 0, matchesPerTeam, stage: 'league', bracketSize: null,
         knockout: { qf: null, sf: null, final: null }, champion: null, finished: false,
         stats: blankCompStats() }
     };
+    ensureNationalCycleForSeason(year);
     renderSeasonDashboard();
     toast('Year ' + year + ' kicks off!');
     persistAll();
@@ -1557,7 +2201,114 @@
 
 /*@CHUNK:c0562:START*/
 
+  // Snapshots the season that just finished — its champions (from
+  // `trophies`, category 'season', team-only entries) and its global
+  // individual awards (category 'season-global', pushed a moment earlier
+  // by archiveAndResetGlobalAwards) — into one small object the Extras tab
+  // "End Season" announcement can render. Reads back out of the permanent
+  // trophy case rather than the live season/stats objects, since by the
+  // time this is called startNewSeasonYear() may already have replaced
+  // `season` and the global leaderboard has already been wiped.
+  function buildSeasonEndSummary(year) {
+    const champions = trophies.filter(t => t.category === 'season' && t.year === year && !t.player && !t.manager);
+    const globalAwards = trophies.filter(t => t.category === 'season-global' && t.year === year);
+    return { year, champions, globalAwards, standalone: false };
+  }
+
+  // Same shape as buildSeasonEndSummary(), for a standalone "End Season"
+  // press with no Season Calendar running — there are no league/cup
+  // champions to report (champions: []), just the archived global awards.
+  function buildStandaloneAwardsSummary(round) {
+    const globalAwards = trophies.filter(t => t.category === 'standalone-global' && t.year === round);
+    return { year: round, champions: [], globalAwards, standalone: true };
+  }
+
+  // Manual "End Season" action (Extras tab) — a one-click way to hand out
+  // and archive awards (Ballon d'Or, Puskás Award, Gerd Müller Award, etc.) right
+  // now instead of waiting for a season to run its course. This used to
+  // require an active Season Calendar run (it would silently no-op
+  // otherwise) — it no longer does: with no season running it still
+  // archives/resets the global leaderboard and announces the awards
+  // immediately, it just has no league/cup champions to crown since no
+  // season is in progress. With a season running, it additionally finishes
+  // every fixture still outstanding across the 5 domestic leagues +
+  // Champions League (same core loop as simulateSeasonToEnd), crowning each
+  // competition's champion as it completes, and kicks off the next season
+  // year.
+  async function endSeasonNow() {
+    let summary = null;
+    await withLoadingProgress('Ending season…', async function() {
+      if (season) {
+        const estimatedWeeks = Math.max(1, ...seasonCompEntries()
+          .map(({ comp }) => (comp && !comp.finished) ? Math.max(0, comp.rounds.length - comp.currentRound) : 0));
+        let safety = 0;
+        const startTime = Date.now();
+        while (!seasonIsComplete() && safety < 1000) {
+          const targetIdx = computeSeasonWeek(season);
+          let playedSomething = false;
+          seasonCompEntries().forEach(({ key, comp }) => {
+            if (!comp || comp.finished) return;
+            if (key === 'ucl' && comp.stage !== 'league') { simulateUCLStep(comp); playedSomething = true; return; }
+            if (seasonCompDoneWithMatchday(key, comp, targetIdx)) return;
+            if (key === 'ucl') simulateUCLStep(comp); else simulateLeagueRound(comp);
+            playedSomething = true;
+          });
+          if (simulateAllCupRoundsNow()) playedSomething = true;
+          season.week = computeSeasonWeek(season);
+          safety++;
+          updateLoadingProgress(Math.min(safety, estimatedWeeks), estimatedWeeks, startTime);
+          await simTick();
+          if (!playedSomething) break;
+        }
+        advanceCongestionSlotIfComplete();
+        finalizeSeasonIfComplete();
+
+        const finishedYear = season.year;
+        summary = buildSeasonEndSummary(finishedYear);
+        startNewSeasonYear();
+        renderSeasonDashboard();
+      } else {
+        // No Season Calendar running — still hand out and archive this
+        // cycle's global awards immediately, tagged with their own
+        // standalone round counter (independent of any season's year) so
+        // History can still group them sensibly.
+        standaloneAwardsRound = (standaloneAwardsRound || 0) + 1;
+        archiveAndResetGlobalAwards(standaloneAwardsRound, 'standalone-global');
+        summary = buildStandaloneAwardsSummary(standaloneAwardsRound);
+      }
+      persistAll();
+      saveStats();
+    });
+    return summary;
+  }
 /*@CHUNK:c0562:END*/
+
+/*@CHUNK:c0562b:START*/
+  // Extras-tab entry point: confirms with the person (wording adapts to
+  // whether there's actually anything left to force through, or whether no
+  // season is running at all), runs endSeasonNow(), then renders the
+  // resulting summary card and toasts a short confirmation. Kept separate
+  // from endSeasonNow() itself so other callers (e.g. a future keyboard
+  // shortcut or automated test) can invoke the underlying action without
+  // the confirm()/DOM-render coupling.
+  async function endSeasonAndAnnounce() {
+    const hasSeason = !!season;
+    const already = hasSeason && seasonIsComplete();
+    const msg = !hasSeason
+      ? 'Hand out and archive this cycle\'s awards (Ballon d\'Or, Puskás Award, Gerd Müller Award, etc.) now, and reset the leaderboard? No Season Calendar is running, so no league/cup champions will be crowned.'
+      : already
+        ? 'End Season Y' + season.year + ' now? This hands out the season\'s awards, resets the leaderboard, and kicks off Season Y' + (season.year + 1) + '.'
+        : 'End Season Y' + season.year + ' now? Any fixtures still outstanding will be simulated to their conclusion, this season\'s champions crowned, awards handed out, and the leaderboard reset for Season Y' + (season.year + 1) + '.';
+    if (!confirm(msg)) return;
+    const summary = await endSeasonNow();
+    if (summary) {
+      renderSeasonEndAnnouncement(summary);
+      toast(summary.standalone
+        ? 'Awards Round ' + summary.year + ' complete — awards archived and leaderboard reset!'
+        : 'Season Y' + summary.year + ' complete — awards archived, Season Y' + (summary.year + 1) + ' underway!');
+    }
+  }
+/*@CHUNK:c0562b:END*/
 
 /*@CHUNK:c0563:START*/
   function resetSeason() {

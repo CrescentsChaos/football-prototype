@@ -4,7 +4,11 @@
 
 /*@CHUNK:c0359:START*/
   function startTournament() {
-    const selected = [...document.querySelectorAll('#tournament-teams input:checked')].map(cb => getTeam(cb.value)).filter(Boolean);
+    // Use the persistent selection set (tourSelectedTeamIds), not a DOM
+    // query — a search filter can currently be hiding some checked teams'
+    // checkboxes entirely, and reading the DOM here would silently drop
+    // them from the tournament instead of just from the visible list.
+    const selected = [...tourSelectedTeamIds].map(id => getTeam(id)).filter(Boolean);
     const cfg = TOURNAMENT_FORMATS[tournamentType] || TOURNAMENT_FORMATS.worldcup;
     // Straight-knockout formats (domestic cups, Super Cups) only need a
     // power-of-2 field as small as 2 (a one-off Super Cup match); every
@@ -12,10 +16,29 @@
     const minTeams = cfg.engine === 'knockout' ? 2 : 4;
     if (selected.length < minTeams) { toast('Select at least ' + minTeams + ' teams'); return; }
 
-    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, bigGames: {} };
+    applyTournamentBranding(tournamentType);
+    tournamentStats = { goals: {}, assists: {}, saves: {}, cleanSheets: {}, yellows: {}, reds: {}, motm: {}, ratings: {}, puskas: {}, interceptions: {}, tackles: {}, blocks: {}, chancesCreated: {}, bigChancesMissed: {}, xg: {}, xa: {}, bigGames: {}, minutes: {} };
+    // Wipe the player/team match logs for the new tournament. These logs
+    // exist to show recent form (last 10, capped at 30) for whatever's
+    // currently being played — carrying entries over from a finished
+    // tournament/season into the next one just eats save space for
+    // history nobody's looking at anymore (this is what was filling up
+    // browser storage after playing through Premier League + a chunk of
+    // La Liga back to back). Clearing here, then persisting immediately,
+    // makes sure the old entries actually leave localStorage/the save
+    // file rather than just being orphaned in memory until autosave.
+    playerMatchLog = {};
+    teamMatchLog = {};
+    saveStats();
     // Clear previous tournament UI
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    // The domestic-league (table) format hides the Knockout Bracket card
+    // entirely (there is no bracket) — restore it here before every new
+    // tournament starts, so a leftover hide from a previous league season
+    // doesn't carry over into a cup/groups/UCL tournament.
+    const bracketCard = document.getElementById('tour-bracket-card');
+    if (bracketCard) bracketCard.style.display = '';
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
 
@@ -23,6 +46,8 @@
       startUCLTournament(selected);
     } else if (cfg.engine === 'knockout') {
       startKnockoutTournament(selected);
+    } else if (cfg.engine === 'table') {
+      startLeagueTournament(selected);
     } else {
       startWorldCupTournament(selected);
     }
@@ -44,18 +69,23 @@
 /*@CHUNK:c0363:START*/
   function startUCLTournament(selected) {
     let teams = shuffleArray([...selected]);
-    // Prefer 36; if fewer, use largest even count >= 8 (scale format)
-    if (teams.length >= 36) teams = teams.slice(0, 36);
+    // Champions League can be scaled past the real-world 36-club league
+    // phase via the Tournament Size picker (36/72/144 — see
+    // SCALABLE_TOURNAMENT_SIZES in ui/seasonUI.js); prefer that target, or
+    // the largest even count >= 8 if fewer teams were selected (scale
+    // format).
+    const maxTeams = (tournamentType === 'ucl' && tournamentSize) ? tournamentSize : 36;
+    if (teams.length >= maxTeams) teams = teams.slice(0, maxTeams);
     else if (teams.length % 2 === 1) teams = teams.slice(0, teams.length - 1);
     const cfg = TOURNAMENT_FORMATS[tournamentType] || {};
     const compName = cfg.name || 'Champions League';
-    if (teams.length < 8) { toast(compName + ' needs at least 8 clubs (36 ideal)'); return; }
+    if (teams.length < 8) { toast(compName + ' needs at least 8 clubs (' + maxTeams + ' ideal)'); return; }
 
     const league = teams.map(t => ({
       team: t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
     }));
 
-    const matchesPerTeam = teams.length >= 36 ? 8 : Math.min(8, teams.length - 1);
+    const matchesPerTeam = teams.length >= maxTeams ? 8 : Math.min(8, teams.length - 1);
     const fixtures = generateUCLLeagueFixtures(teams, matchesPerTeam);
 
     tournament = {
@@ -209,6 +239,13 @@
 /*@CHUNK:c0381:START*/
   function simSingleFixture(idx) {
     if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
+    withLoading('Simulating match…', function() {
+      _simSingleFixtureWork(idx);
+    });
+  }
+
+  function _simSingleFixtureWork(idx) {
+    if (!tournament || !tournament.fixtures[idx] || tournament.fixtures[idx].played) return;
     const f = tournament.fixtures[idx];
     const home = getTeam(f.home), away = getTeam(f.away);
     const result = simQuickMatch(home, away);
@@ -301,6 +338,10 @@
 /*@CHUNK:c0387:START*/
   function _simTournamentRoundWork() {
     if (!tournament) return;
+    if (tournament.format === 'table') {
+      simLeagueTournamentRound();
+      return;
+    }
     if (tournament.format === 'league' || tournament.stage === 'league') {
       const unplayed = (tournament.fixtures || []).filter(f => !f.played);
       if (!unplayed.length) { advanceUCLFromLeague(); return; }
@@ -312,7 +353,14 @@
       return;
     }
     if (tournament.stage === 'playoff') {
-      tournament.playoff.forEach((p, i) => { if (!p.played) simPlayoffTie(i); });
+      // Same fix as the bulk "Simulate All" loop above: call the actual
+      // simulation work directly rather than simPlayoffTie(), which defers
+      // the real work behind requestAnimationFrame/setTimeout and would
+      // otherwise still be pending when withLoading() (the caller of this
+      // whole function) hides the loading overlay and calls finishUCLPlayoffs()/
+      // renders the bracket — the same race that could truncate or blank
+      // out the Round of 16/Quarter-finals on "Simulate All".
+      tournament.playoff.forEach((p, i) => { if (!p.played) _simPlayoffTieWork(i); });
       return;
     }
     if (tournament.stage === 'groups') {
@@ -391,6 +439,12 @@
     const startTime = Date.now();
     let done = 0;
 
+    // ========== Domestic league (table) format ==========
+    if (tournament.format === 'table') {
+      await simAllLeagueTournament(updateLoading, updateLoadingProgress, startTime);
+      return;
+    }
+
     // ========== UCL / League format ==========
     if (tournament.format === 'league' || tournament.type === 'ucl') {
       const unplayedFixtures = (tournament.fixtures || []).filter(f => !f.played);
@@ -420,11 +474,39 @@
       if (tournament.playoff && tournament.playoff.length) {
         for (let i = 0; i < tournament.playoff.length; i++) {
           if (!tournament.playoff[i].played) {
-            try { simPlayoffTie(i); } catch (e) { console.warn(e); }
+            // Call the actual simulation work directly, NOT simPlayoffTie()
+            // — that one wraps it in withLoading(), which defers the real
+            // work behind two requestAnimationFrame calls plus a 50ms
+            // setTimeout (so a single manual click gets to paint its
+            // spinner first) and returns before any of that has actually
+            // run. Calling it un-awaited here just fired off 8+ overlapping
+            // deferred simulations that raced each other, the "Simulating
+            // knockout rounds…" step right below, and even the overlay
+            // being hidden once withLoadingProgress() (the caller of this
+            // whole function) resolved — which is exactly why R16/QF
+            // results were sometimes still showing "-", why the round of
+            // 16 could end up truncated straight to a Quarter-finals bracket
+            // (finishUCLPlayoffs() below reading still-null p.winner values
+            // and buildUCLKnockoutFromTeams() rounding the resulting
+            // under-16 team count down to the next power of 2), and why the
+            // knockout stage kept visibly simulating after the loading
+            // screen had already gone away. _simPlayoffTieWork() is the
+            // same low-level function withLoading() eventually calls, just
+            // run synchronously in lockstep with this loop — identical to
+            // how the knockout-round loop further below already correctly
+            // calls simTwoLegTie()/simSingleFinal() directly rather than
+            // any UI-wrapped equivalent.
+            try { _simPlayoffTieWork(i); } catch (e) { console.warn(e); }
             done++; updateLoadingProgress(done, total, startTime); await simTick();
           }
         }
-        if (tournament.stage === 'playoff' || tournament.playoff.every(p => p.played)) {
+        // _simPlayoffTieWork() above already calls finishUCLPlayoffs()
+        // itself the moment the last tie finishes (advancing tournament.stage
+        // to 'knockout'), so this only needs to cover the case where every
+        // playoff tie was already played BEFORE this bulk sim even started
+        // (stage never got the chance to advance) — checking stage alone
+        // avoids redundantly rebuilding the R16 bracket a second time.
+        if (tournament.stage === 'playoff') {
           try { finishUCLPlayoffs(); } catch (e) { console.warn(e); }
         }
       }
@@ -559,6 +641,7 @@
         m.report = result.report;
         if (result.pens) {
           m.penalties = true;
+          m.pens = result.pens;
           m.winner = result.pens.home > result.pens.away ? m.home : m.away;
         } else if (result.home > result.away) m.winner = m.home;
         else if (result.away > result.home) m.winner = m.away;
@@ -749,6 +832,13 @@
 /*@CHUNK:c0400:START*/
   function simPlayoffTie(idx) {
     if (!tournament || !tournament.playoff[idx] || tournament.playoff[idx].played) return;
+    withLoading('Simulating match…', function() {
+      _simPlayoffTieWork(idx);
+    });
+  }
+
+  function _simPlayoffTieWork(idx) {
+    if (!tournament || !tournament.playoff[idx] || tournament.playoff[idx].played) return;
     const p = tournament.playoff[idx];
     // Leg 1: away team (lower seed) at home vs higher seed
     const leg1Home = p.away, leg1Away = p.home;
@@ -764,7 +854,7 @@
     else if (p.aggAway > p.aggHome) p.winner = p.away;
     else {
       // Pens already may have decided leg2 if scores level after 90 — if still level use pens flag or random
-      if (r2.pens) p.winner = r2.pens.home > r2.pens.away ? p.home : p.away;
+      if (r2.pens) { p.winner = r2.pens.home > r2.pens.away ? p.home : p.away; p.pens = r2.pens; }
       else p.winner = seededRandom() < 0.5 ? p.home : p.away;
       p.penalties = true;
     }
@@ -854,19 +944,33 @@
     // Leg 1 at away stadium (away hosts)
     const r1 = simQuickMatch(m.away, m.home, { allowET: false, allowPens: false });
     m.leg1 = { played: true, homeScore: r1.home, awayScore: r1.away, report: r1.report };
-    // Leg 2 at home stadium
-    const r2 = simQuickMatch(m.home, m.away, { allowET: true, allowPens: true });
+    // Leg 2 at home stadium. aggHomeStart/aggAwayStart tell the match engine
+    // what each side is already carrying over from leg 1, so it can decide
+    // to go to extra time/penalties based on the AGGREGATE scoreline —
+    // exactly like real two-legged UEFA ties — rather than only when leg 2
+    // itself happens to finish level (a tie can easily be level on
+    // aggregate, e.g. 2-0 then 0-2, while leg 2 alone finishes decisively).
+    const r2 = simQuickMatch(m.home, m.away, {
+      allowET: true, allowPens: true,
+      aggHomeStart: r1.away, aggAwayStart: r1.home
+    });
     m.leg2 = { played: true, homeScore: r2.home, awayScore: r2.away, report: r2.report };
     m.aggHome = r1.away + r2.home;
     m.aggAway = r1.home + r2.away;
     m.homeScore = m.aggHome;
     m.awayScore = m.aggAway;
-    if (m.aggHome > m.aggAway) m.winner = m.home;
-    else if (m.aggAway > m.aggHome) m.winner = m.away;
-    else {
-      if (r2.pens) m.winner = r2.pens.home > r2.pens.away ? m.home : m.away;
-      else m.winner = seededRandom() < 0.5 ? m.home : m.away;
+    // r2.pens is now populated whenever the AGGREGATE was level after leg 2
+    // (see the aggHomeStart/aggAwayStart-aware checks in engine/
+    // matchEngine.js), so it's always trustworthy here — no more coin-flip
+    // fallback needed for a tie that's genuinely level on aggregate.
+    if (r2.pens) {
+      m.winner = r2.pens.home > r2.pens.away ? m.home : m.away;
+      m.pens = r2.pens;
       m.penalties = true;
+    } else if (m.aggHome > m.aggAway) {
+      m.winner = m.home;
+    } else {
+      m.winner = m.away;
     }
     m.played = true;
     m.report = r2.report;
@@ -887,6 +991,7 @@
     m.twoLeg = false;
     if (result.pens) {
       m.penalties = true;
+      m.pens = result.pens;
       m.winner = result.pens.home > result.pens.away ? m.home : m.away;
     } else if (result.home === result.away) {
       m.penalties = true;
@@ -969,13 +1074,27 @@
       if (sorted[1]) qualifiers.push({ team: sorted[1].team, group: gi, rank: 2 });
       if (sorted[2]) thirdPlaces.push({ row: sorted[2], group: gi });
     });
-    // FIFA-style: if we have 8+ groups, bring in the best third-place teams
-    // to fill the bracket out to a power of two (e.g. 8 groups → 16 direct
-    // qualifiers + 8 best thirds = 32).
-    if (tournament.groups.length >= 8 && thirdPlaces.length) {
-      thirdPlaces.sort((a, b) => b.row.pts - a.row.pts || (b.row.gf - b.row.ga) - (a.row.gf - a.row.ga) || b.row.gf - a.row.gf);
-      const need = 32 - qualifiers.length;
+    // FIFA/UEFA/CAF/AFC-style: bring in the best third-place teams whenever
+    // the direct qualifiers (2 per group) don't already form a clean
+    // power-of-two bracket. The target is simply the next power of two at or
+    // above the direct-qualifier count:
+    //   - Euro/AFCON/Asian Cup (6 groups → 12 direct) → target 16, so the
+    //     4 best third-placed teams join the group winners/runners-up for a
+    //     Round of 16.
+    //   - Copa América / a 4-group Nations League split (4 groups → 8
+    //     direct) → target is already 8, so no third-placed teams are
+    //     needed and the bracket goes straight to the quarter-finals.
+    //   - World Cup (12 groups → 24 direct) → target 32, so the 8 best
+    //     thirds join for a Round of 32 (matches the real 2026 format).
+    //   - An 8-group split → 16 direct is already a power of two, so no
+    //     thirds are added, straight to the Round of 16.
+    if (thirdPlaces.length) {
+      const direct = qualifiers.length;
+      let target = 1;
+      while (target < direct) target *= 2;
+      const need = target - direct;
       if (need > 0) {
+        thirdPlaces.sort((a, b) => b.row.pts - a.row.pts || (b.row.gf - b.row.ga) - (a.row.gf - a.row.ga) || b.row.gf - a.row.gf);
         thirdPlaces.slice(0, need).forEach(t => qualifiers.push({ team: t.row.team, group: t.group, rank: 3 }));
       }
     }
@@ -1070,6 +1189,7 @@
       m.report = result.report;
       if (result.pens) {
         m.penalties = true;
+        m.pens = result.pens;
         m.winner = result.pens.home > result.pens.away ? m.home : m.away;
       } else if (result.home === result.away) {
         m.penalties = true;
@@ -1097,26 +1217,50 @@
 /*@CHUNK:c0421:END*/
 
 /*@CHUNK:c0422:START*/
-  // World Cup only: when the Semi-finals round has just finished, build and
-  // instantly simulate a "3rd Place Play-off" between the two semi-final
-  // losers, and slot it into the bracket before the Final gets created.
-  function maybeCreateThirdPlacePlayoff(finishedRound) {
-    if (!tournament || tournament.type !== 'worldcup') return;
-    if (!finishedRound || finishedRound.name !== 'Semi-finals') return;
-    if (tournament.knockout.some(r => r.name === '3rd Place Play-off')) return;
+  // Groups-format competitions only (World Cup, Nations League, Euros, Copa
+  // América, AFCON, Asian Cup, Gold Cup — every format that goes group stage
+  // → knockout; Champions League's league-phase knockout and the straight
+  // domestic-cup knockouts never have a 3rd place play-off): when the
+  // Semi-finals round has just finished, build a "3rd Place Play-off"
+  // fixture between the two semi-final losers and slot it into the bracket
+  // alongside the Final. Left unplayed here — same as every other knockout
+  // match, it's up to the user to simulate it (Live or Instant) from the
+  // bracket view. Callers that DO want it resolved immediately as part of a
+  // bulk "simulate everything" action can call simThirdPlacePlayoffNow()
+  // right after this.
+  function createThirdPlacePlayoffFixture(finishedRound) {
+    if (!tournament || tournament.format !== 'groups') return null;
+    if (!finishedRound || finishedRound.name !== 'Semi-finals') return null;
+    if (tournament.knockout.some(r => r.name === '3rd Place Play-off')) return null;
     const losers = finishedRound.matches.map(m => {
       if (!m.winner) return null;
       return m.winner.id === m.home.id ? m.away : m.home;
     }).filter(Boolean);
-    if (losers.length < 2) return;
-    const result = simQuickMatch(losers[0], losers[1], { allowET: true, allowPens: true, countForLeaderboard: true });
+    if (losers.length < 2) return null;
     const match = {
       home: losers[0], away: losers[1],
-      homeScore: result.home, awayScore: result.away,
-      played: true, report: result.report, penalties: false, winner: null
+      homeScore: null, awayScore: null, winner: null, played: false, penalties: false
     };
+    tournament.knockout.push({ name: '3rd Place Play-off', matches: [match] });
+    return match;
+  }
+
+  // Instantly resolves an unplayed 3rd Place Play-off match — used only by
+  // bulk auto-sim flows (Simulate Round / Simulate All) that are already
+  // resolving every other unplayed match without individual user
+  // interaction; a single-match Live/Instant sim never calls this, so
+  // completing a semi-final there always leaves the 3rd place match for the
+  // user to trigger themselves, same as the Final.
+  function simThirdPlacePlayoffNow(match) {
+    if (!match || match.played) return;
+    const result = simQuickMatch(match.home, match.away, { allowET: true, allowPens: true, countForLeaderboard: true });
+    match.homeScore = result.home;
+    match.awayScore = result.away;
+    match.played = true;
+    match.report = result.report;
     if (result.pens) {
       match.penalties = true;
+      match.pens = result.pens;
       match.winner = result.pens.home > result.pens.away ? match.home : match.away;
     } else if (result.home === result.away) {
       match.penalties = true;
@@ -1124,7 +1268,28 @@
     } else {
       match.winner = result.home > result.away ? match.home : match.away;
     }
-    tournament.knockout.push({ name: '3rd Place Play-off', matches: [match] });
+  }
+
+  // Convenience wrapper for the bulk-sim call sites: create the fixture (if
+  // due) and resolve it immediately, preserving their previous "fully
+  // automatic" behavior.
+  function maybeCreateThirdPlacePlayoff(finishedRound) {
+    const match = createThirdPlacePlayoffFixture(finishedRound);
+    if (match) simThirdPlacePlayoffNow(match);
+  }
+
+  // Writes the real 3rd Place Play-off result into tournament.thirdPlace/
+  // fourthPlace. Called both from setChampion() (bulk-sim path, where the
+  // playoff is always already played by the time the Final concludes) and
+  // from afterKnockoutMatchPlayed() (single-match Live/Instant path, where
+  // the user can play the Final and the 3rd Place Play-off in either
+  // order) — so however the two fixtures get played, tournament.thirdPlace/
+  // fourthPlace always end up reflecting the actual playoff result, not a
+  // semi-final-loser guess that never gets corrected.
+  function updateThirdPlaceFromPlayoff(match) {
+    if (!match || !match.played) return;
+    tournament.thirdPlace = match.winner || null;
+    tournament.fourthPlace = match.winner ? (match.winner.id === match.home.id ? match.away : match.home) : null;
   }
 
   function createNextKnockoutRound(winners, finishedRound) {
@@ -1168,12 +1333,14 @@
       tournament.runnersUp = (fm.winner && fm.winner.id === fm.home.id) ? fm.away : fm.home;
     }
     // Third place: use the actual 3rd Place Play-off result when it exists
-    // (World Cup mode), otherwise fall back to the semi-final losers.
+    // (World Cup mode), otherwise fall back to the semi-final losers (an
+    // interim guess for when the Final finished before the playoff was
+    // played — see updateThirdPlaceFromPlayoff(), which overwrites this
+    // with the real result the moment that match is actually played,
+    // whichever order the user tackles the two fixtures in).
     const thirdPlaceRound = (tournament.knockout || []).find(r => r.name === '3rd Place Play-off');
     if (thirdPlaceRound && thirdPlaceRound.matches && thirdPlaceRound.matches[0] && thirdPlaceRound.matches[0].played) {
-      const tm = thirdPlaceRound.matches[0];
-      tournament.thirdPlace = tm.winner || null;
-      tournament.fourthPlace = tm.winner ? (tm.winner.id === tm.home.id ? tm.away : tm.home) : null;
+      updateThirdPlaceFromPlayoff(thirdPlaceRound.matches[0]);
     } else {
       const sf = (tournament.knockout || []).find(r => r.name === 'Semi-finals');
       if (sf && sf.matches && sf.matches.length >= 2) {
@@ -1185,11 +1352,15 @@
         tournament.fourthPlace = losers[1] || null;
       }
     }
-    assignTournamentAwards();
     const tName = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
     const runExtra = { category: 'tournament', run: tournament._runId || Date.now() };
-    pushTeamTrophy(tName, team.name, 'Tournament', runExtra);
+    // Record the team trophy (and manager award) BEFORE computing this
+    // tournament's individual awards — the Ballon d'Or / Gerd Müller /
+    // Yashin scoring below reads the permanent trophy case for career
+    // pedigree, so the cup just won here needs to already be in it.
+    pushTeamTrophy(tName, team, 'Tournament', runExtra);
     pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
+    assignTournamentAwards();
     recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(team, 20) + ' ' + team.name;
@@ -1204,37 +1375,124 @@
 /*@CHUNK:c0431:END*/
 
 /*@CHUNK:c0432:START*/
+  // Counts how many matches a given team has actually played so far in the
+  // current standalone Tournament, across whichever structures apply to its
+  // format — a full round-robin table (domestic league tournament), a
+  // league-phase table (Champions League format) and/or a group table
+  // (World Cup format) — plus every knockout-stage round layered on top
+  // (straight cup knockouts, World Cup knockout, Champions League knockout
+  // playoff + bracket). Used below to gauge what share of the team's
+  // matches a given player actually featured in, for Golden Ball eligibility.
+  function tournamentTeamMatchesPlayed(teamId) {
+    if (!tournament || !teamId) return 0;
+    let total = 0;
+    if (tournament.table && tournament.table.length) {
+      const row = tournament.table.find(r => r.team && r.team.id === teamId);
+      return row ? (row.played || 0) : 0;
+    }
+    if (tournament.league && tournament.league.length) {
+      const row = tournament.league.find(r => r.team && r.team.id === teamId);
+      if (row) total += row.played || 0;
+    }
+    if (tournament.groups && tournament.groups.length) {
+      tournament.groups.forEach(g => {
+        const row = (g.teams || []).find(t => t.team && t.team.id === teamId);
+        if (row) total += row.played || 0;
+      });
+    }
+    (tournament.knockout || []).forEach(round => {
+      (round.matches || []).forEach(m => {
+        if (!m.played) return;
+        if ((m.home && m.home.id === teamId) || (m.away && m.away.id === teamId)) total++;
+      });
+    });
+    return total;
+  }
+
+  // Golden Ball ranking for a standalone Tournament. Unlike the Ballon d'Or
+  // (which weighs goals/assists/trophies/consistency holistically off the
+  // player's whole body of work), the tournament Golden Ball is now a
+  // simpler, stricter test of reliability rather than a hot streak of goal
+  // contributions:
+  //  - eligibility requires having appeared in at least 90% of the player's
+  //    own team's matches in this tournament — a super-sub with a couple of
+  //    huge cameos can no longer out-rank the players who started nearly
+  //    every game;
+  //  - among those eligible, the winner is simply whoever has the highest
+  //    average match rating — goals/assists no longer contribute at all;
+  //  - ties (and, deliberately, very close calls) favor a player from the
+  //    tournament-winning team, then whoever made more appearances.
+  function computeTournamentGoldenBallRanking() {
+    if (!tournament) return [];
+    const championId = tournament.champion ? tournament.champion.id : null;
+    return Object.values(tournamentStats.ratings || {})
+      .filter(p => (p.count || 0) > 0)
+      .map(p => {
+        const teamMatches = tournamentTeamMatchesPlayed(p.teamId);
+        return Object.assign({}, p, {
+          teamMatches,
+          appPct: teamMatches > 0 ? (p.count || 0) / teamMatches : 0
+        });
+      })
+      .filter(p => p.appPct >= 0.9)
+      .sort((a, b) => {
+        if (b.avg !== a.avg) return b.avg - a.avg;
+        const aChamp = championId && a.teamId === championId ? 1 : 0;
+        const bChamp = championId && b.teamId === championId ? 1 : 0;
+        if (bChamp !== aChamp) return bChamp - aChamp;
+        return (b.count || 0) - (a.count || 0);
+      });
+  }
+
   function assignTournamentAwards() {
     if (!tournament) return;
     const top = (key) => Object.values(tournamentStats[key] || {}).sort((a,b) => b.count - a.count);
     const goals = top('goals');
-    const assists = top('assists');
-    const saves = top('saves');
     const motm = top('motm');
-    const cleanSheets = top('cleanSheets');
-    const puskas = top('puskas');
     const ratingsAny = Object.values(tournamentStats.ratings || {})
       .filter(x => (x.count || 0) > 0)
       .sort((a,b) => b.avg - a.avg || b.count - a.count);
 
-    // Golden Ball: the same holistic "best player" scoring as the Ballon
-    // d'Or (domestic/continental/international context, trophies, consistency,
-    // big-game performances) run against this tournament's own stat bucket —
-    // not just G+A and average rating, so a quiet-but-consistent passer can't
-    // out-rank a genuine standout, and a genuine standout still needs more
-    // than one big night to top a player who was excellent throughout.
-    const goldenScores = computeContextualPlayerScores(tournamentStats, 3);
-    Object.values(goldenScores).forEach(e => { e.count = Math.round(e.pts); });
-    const goldenBallData = Object.values(goldenScores)
-      .filter(e => e.pts > 0 && (e.apps >= 3 || e.goals + e.assists + e.motm >= 3))
-      .sort((a,b) => b.pts - a.pts || b.apps - a.apps);
+    // Golden Ball: 90%-of-team's-matches appearance requirement + highest
+    // average rating, preferring the tournament-winning team's players — see
+    // computeTournamentGoldenBallRanking() above. Falls back to any-rated
+    // player / a repeat MOTM only in the unlikely case nobody clears the
+    // 90% appearance bar (e.g. a very short tournament).
+    const goldenBallRanking = computeTournamentGoldenBallRanking();
 
+    // Ballon d'Or, Gerd Müller Award and Yashin Trophy are deliberately NOT
+    // computed or awarded here. All three are season-wide honors in real
+    // life, not single-tournament ones, so none of them should be handed
+    // out just for winning one standalone Tournament (World Cup / Champions
+    // League run) — they're only ever computed and archived once, off the
+    // global `stats` bucket (the player's whole body of work so far), when
+    // a season actually ends: either automatically
+    // (finalizeSeasonIfComplete) or via the "End Season" button
+    // (endSeasonNow), both in seasonEngine.js. Leaving no `ballonDor`,
+    // `gerdMuller` or `yashin` key on this awards object means
+    // recordIndividualAwardsFromAwardsObject() below won't push any of
+    // those three as a premature extra trophy into the case for this one
+    // tournament.
+
+    // Golden Boot, Golden Ball and Golden Glove are the three genuine
+    // single-tournament individual awards real competitions (World Cup,
+    // Euros, Champions League) actually hand out — those stay.
+    //
+    // Top Assists, Most MOTM, Clean Sheet King and the Puskás Award are NOT
+    // standalone-tournament honors in real life — same reasoning as the
+    // Ballon d'Or/Gerd Müller/Yashin exclusion above (Puskás is FIFA's own
+    // annual/season award; "most assists"/"most MOTM"/"most clean sheets"
+    // across a whole season are seasonEngine.js's job via assignCompAwards(),
+    // not something a single World Cup/Champions League run should be
+    // handing out its own trophy for). Leaving these four keys off means
+    // recordIndividualAwardsFromAwardsObject() won't push any of them into
+    // the trophy case for a standalone tournament, and the Tournament
+    // Awards screen won't display a "winner" for something that was never
+    // a real award to begin with.
     tournament.awards = {
       goldenBoot: goals[0] || null,
-      goldenBall: goldenBallData[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
-      goldenGlove: saves[0] || null,
-      topAssists: assists[0] || null,
-      mostMotm: motm[0] || null
+      goldenBall: goldenBallRanking[0] || ratingsAny[0] || (motm[0] && (motm[0].count >= 2) ? motm[0] : null) || null,
+      goldenGlove: computeGoldenGloveRanking(tournamentStats)[0] || null
     };
   }
 /*@CHUNK:c0432:END*/
@@ -1332,6 +1590,27 @@
       renderTournamentLeaderboard();
       return;
     }
+    // The 3rd Place Play-off is a side fixture, not a bracket-advancing
+    // round — it has just one match, so without this check the generic
+    // "winners.length === 1" branch below would wrongly crown its winner
+    // tournament champion. Its result only feeds tournament.thirdPlace/
+    // fourthPlace — normally read by setChampion() once the real Final
+    // finishes, but the user is free to play the Final first (both
+    // fixtures appear together as soon as the semis finish), so this
+    // always writes the real result here too. Without it, a playoff played
+    // after the Final was silently discarded — setChampion() had already
+    // locked in a semi-final-loser guess and, once tournament.champion is
+    // set, never runs again to pick up the actual result.
+    if (current.name === '3rd Place Play-off') {
+      updateThirdPlaceFromPlayoff(current.matches[0]);
+      if (tournament.champion) {
+        renderTournamentPodium();
+        persistAll();
+      }
+      renderBracket();
+      renderTournamentLeaderboard();
+      return;
+    }
     const winners = current.matches.map(m => m.winner).filter(Boolean);
     if (winners.length === 1) {
       setChampion(winners[0]);
@@ -1348,7 +1627,10 @@
     let list = winners.slice();
     if (list.length % 2 === 1) list.pop();
     const nextIsFinal = list.length === 2;
-    maybeCreateThirdPlacePlayoff(current);
+    // Single-match progression (one Live/Instant sim at a time): only
+    // create the 3rd Place Play-off fixture, don't simulate it — the user
+    // simulates it themselves from the bracket like any other match.
+    createThirdPlacePlayoffFixture(current);
     const nextMatches = [];
     for (let i = 0; i < list.length; i += 2) {
       if (tournament.type === 'ucl' && !nextIsFinal) {
@@ -1390,12 +1672,14 @@
     if (setup) setup.style.display = 'block';
     if (live) live.style.display = 'none';
     const btn = document.getElementById('btn-sim-round');
-    if (btn) btn.textContent = 'Simulate Round';
+    if (btn) { btn.textContent = 'Simulate Round'; btn.disabled = false; }
     // Clear the previous tournament's UI (bracket, podium, groups, fixtures) —
     // this does NOT touch the persistent `trophies` record, so past champions
     // still show up in the Trophy Room afterward.
     const clearIds = ['tour-stats-preview', 'tour-awards', 'tour-podium', 'bracket', 'groups-container', 'fixture-list'];
     clearIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const bracketCard = document.getElementById('tour-bracket-card');
+    if (bracketCard) bracketCard.style.display = '';
     const st = document.getElementById('tour-stage-title');
     if (st) st.textContent = 'Starting…';
     persistAll();
