@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Apex — Player Attributes Editor v2</title>
+<title>Apex — Player Attributes Editor v3</title>
 <style>
   :root{
     --bg-0:#05080f; --bg-1:#0a101c; --bg-2:#111a2b; --bg-3:#1a2740;
@@ -249,8 +249,8 @@
 <body>
 
 <header>
-  <h1>🧬 Attribute Editor <span class="badge">v2</span></h1>
-  <p>Search a player from teams.json and build/edit their expanded sheet in player-attributes.json. Now with Form, Personality, and a copy-from-player starting point.</p>
+  <h1>🧬 Attribute Editor <span class="badge">v3</span></h1>
+  <p>Search a player from teams.json and build/edit their expanded sheet in player-attributes.json. Now with Form, Personality, a copy-from-player starting point, and editable id/position — so sheets whose id has no match in teams.json still show up and can be linked to a real player.</p>
 </header>
 
 <main>
@@ -287,6 +287,7 @@
       <button data-f="all" class="active">All</button>
       <button data-f="expanded">Has sheet</button>
       <button data-f="plain">No sheet yet</button>
+      <button data-f="unlinked">Unlinked</button>
     </div>
     <select id="posFilterSelect">
       <option value="">All positions</option>
@@ -314,6 +315,7 @@
         <div class="meta" id="editorMeta"></div>
         <div class="id-pill" id="editorId"></div>
         <div id="editorSheetStatus"></div>
+        <div class="fieldhint" id="orphanWarning" style="display:none; color:var(--orange); margin-top:6px;"></div>
         <div class="toolbar-row">
           <button class="btn-ghost btn-sm" id="copyFromBtn" style="width:auto;">📋 Copy from another player</button>
         </div>
@@ -323,7 +325,19 @@
     <div class="statline" id="statSummary"></div>
 
     <h3>Basic</h3>
-    <div class="formgrid cols3">
+    <div class="formgrid">
+      <div class="full">
+        <label>Player ID</label>
+        <input type="text" id="aPlayerId" placeholder="e.g. rma18_1" autocomplete="off">
+        <div class="fieldhint" id="idHint"></div>
+      </div>
+      <div class="full">
+        <label>Position(s)</label>
+        <input type="text" id="aPos" placeholder="e.g. CB, RB" autocomplete="off">
+        <div class="fieldhint">Comma-separated position codes (GK, CB, RB, LB, CDM, CM, CAM, RW, LW, ST, etc). Controls whether the Goalkeeping section shows.</div>
+      </div>
+    </div>
+    <div class="formgrid cols3" style="margin-top:10px;">
       <div><label>Age</label><input type="number" id="aAge" min="14" max="50"></div>
       <div><label>Height (cm)</label><input type="number" id="aHeight" min="140" max="230"></div>
       <div><label>Squad #</label><input type="number" id="aNum" min="1" max="99"></div>
@@ -442,8 +456,9 @@
 
   let teamsData = null;      // parsed teams.json — the source of truth for who players are
   let attrData = {};         // parsed/edited player-attributes.json — { playerId: {sheet} }
-  let allPlayers = [];       // flat list of { id, name, pos, num, ovr, club:{name,short,flag,logo} }
-  let actionLog = [];        // { type:'save'|'delete', id, name, before(optional) }
+  let teamsPlayers = [];     // flat list built only from teams.json: { id, name, pos, num, ovr, club:{name,short,flag,logo} }
+  let allPlayers = [];       // teamsPlayers + any player-attributes.json sheets whose id has no match in teams.json ("unlinked")
+  let actionLog = [];        // { type:'save'|'delete', id, oldId(optional, save only), name, before(optional) }
   let currentPlayer = null;  // the allPlayers entry currently loaded into the editor
   let hadExistingSheet = false;
   let skillTagsState = [];
@@ -577,6 +592,44 @@
 
   function isGK(pos){ return (pos && pos[0]) === 'GK'; }
 
+  // Position is now editable in the form, so GK-section visibility has to
+  // react live to the Position input rather than being fixed at editor-open.
+  function currentPosCodes(){
+    const raw = ($('aPos').value || '').split(',').map(s => s.trim()).filter(Boolean);
+    return raw.length ? raw : (currentPlayer ? currentPlayer.pos : []);
+  }
+  function refreshGKVisibility(){
+    const showGK = isGK(currentPosCodes());
+    $('gkHeading').classList.toggle('show', showGK);
+    $('grpGK').classList.toggle('show', showGK);
+  }
+  $('aPos').addEventListener('input', refreshGKVisibility);
+
+  // Live feedback on the Player ID field: whether it collides with another
+  // sheet, and whether it matches (or will now match) a teams.json player.
+  function refreshIdHint(){
+    const idVal = ($('aPlayerId').value || '').trim();
+    const hint = $('idHint');
+    if (!idVal) { hint.textContent = 'Required — this is the key the sheet is saved under.'; hint.style.color = 'var(--orange)'; return; }
+    const isSelf = currentPlayer && idVal === currentPlayer.id;
+    if (!isSelf && attrData[idVal]) {
+      hint.textContent = '⚠ Another sheet already uses this id — saving is blocked until it\'s freed up or you pick a different id.';
+      hint.style.color = 'var(--orange)';
+      return;
+    }
+    const inTeams = teamsPlayers.some(p => p.id === idVal);
+    if (inTeams) {
+      hint.textContent = (isSelf && !(currentPlayer && currentPlayer.unlinked))
+        ? 'Matches this player in teams.json.'
+        : 'Matches a player in teams.json — saving will attach this sheet to them.';
+      hint.style.color = '';
+    } else {
+      hint.textContent = '⚠ No player with this id in the loaded teams.json — the sheet will stay unlinked until the id matches one.';
+      hint.style.color = 'var(--orange)';
+    }
+  }
+  $('aPlayerId').addEventListener('input', refreshIdHint);
+
   function buildFieldGrid(containerId, fields){
     $(containerId).innerHTML = fields.map(([key, label]) =>
       '<div><label class="fieldname">' + escapeHtml(label) + '</label><input type="number" min="1" max="99" data-attr="' + key + '" id="a_' + key + '"></div>'
@@ -709,14 +762,29 @@
   }
 
   function buildPlayerIndex(){
-    allPlayers = [];
+    teamsPlayers = [];
     ['club','national'].forEach(group => {
       (teamsData[group] || []).forEach(team => {
         (team.players || []).forEach(p => {
-          allPlayers.push({ id: p.id, name: p.name, pos: p.pos || [], num: p.num, ovr: p.ovr, club: team });
+          teamsPlayers.push({ id: p.id, name: p.name, pos: p.pos || [], num: p.num, ovr: p.ovr, club: team });
         });
       });
     });
+    refreshAllPlayers();
+  }
+
+  // A sheet in player-attributes.json whose id doesn't match any teams.json
+  // player would otherwise be invisible to this tool. Instead we surface it
+  // as a searchable, editable pseudo-player built from its own sheet data,
+  // so it can be found and either fixed up or given a real player id.
+  const UNLINKED_CLUB = { name: 'Unlinked sheet', short: '—', flag: '🧩' };
+  function refreshAllPlayers(){
+    const knownIds = new Set(teamsPlayers.map(p => p.id));
+    const unlinked = Object.keys(attrData).filter(id => !knownIds.has(id)).map(id => {
+      const s = attrData[id] || {};
+      return { id, name: s.name || id, pos: s.pos || [], num: s.num, ovr: null, club: UNLINKED_CLUB, unlinked: true };
+    });
+    allPlayers = teamsPlayers.concat(unlinked);
   }
 
   // ================= Load / skip player-attributes.json =================
@@ -725,7 +793,7 @@
   ['dragover','dragenter'].forEach(ev => $('attrDropZone').addEventListener(ev, (e) => { e.preventDefault(); $('attrDropZone').classList.add('drag'); }));
   ['dragleave','drop'].forEach(ev => $('attrDropZone').addEventListener(ev, (e) => { e.preventDefault(); $('attrDropZone').classList.remove('drag'); }));
   $('attrDropZone').addEventListener('drop', (e) => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) loadAttrFile(f); });
-  $('skipAttrBtn').addEventListener('click', () => { attrData = {}; revealSearch('Starting with an empty player-attributes.json.'); });
+  $('skipAttrBtn').addEventListener('click', () => { attrData = {}; refreshAllPlayers(); revealSearch('Starting with an empty player-attributes.json.'); });
 
   function loadAttrFile(file){
     setStatus('attrStatus', 'Reading ' + file.name + '…');
@@ -738,8 +806,11 @@
           return;
         }
         attrData = parsed;
+        refreshAllPlayers();
         $('attrDropZone').textContent = '✓ ' + Object.keys(attrData).length + ' existing sheets loaded — tap to load a different file';
-        revealSearch('Loaded ' + Object.keys(attrData).length + ' existing expanded sheet(s).');
+        const unlinkedCount = allPlayers.length - teamsPlayers.length;
+        revealSearch('Loaded ' + Object.keys(attrData).length + ' existing expanded sheet(s)' +
+          (unlinkedCount ? ' — ' + unlinkedCount + ' don\'t match a teams.json player id (see the "Unlinked" filter).' : '.'));
       } catch (err) {
         setStatus('attrStatus', 'Could not parse JSON: ' + err.message, 'err');
       }
@@ -770,6 +841,7 @@
   function matchesFilters(p, q, posFilterVal){
     if (searchFilter === 'expanded' && !attrData[p.id]) return false;
     if (searchFilter === 'plain' && attrData[p.id]) return false;
+    if (searchFilter === 'unlinked' && !p.unlinked) return false;
     if (posFilterVal && posLine(p.pos) !== posFilterVal) return false;
     if (q) {
       const hay = (p.name||'').toLowerCase() + ' ' + (p.id||'').toLowerCase() + ' ' +
@@ -808,7 +880,8 @@
       return '<div class="frow' + (currentPlayer && currentPlayer.id === p.id ? ' active-entry' : '') + '" data-i="' + i + '" title="' + escapeHtml(frowTitle(p, has)) + '">' +
         teamMark(p.club, 22) +
         '<div class="info">' +
-          '<div class="nm">' + escapeHtml(p.name) + (has ? '<span class="expanded-badge">Sheet</span>' : '') + '</div>' +
+          '<div class="nm">' + escapeHtml(p.name) + (has ? '<span class="expanded-badge">Sheet</span>' : '') +
+            (p.unlinked ? '<span class="expanded-badge" style="background:linear-gradient(135deg,var(--orange),#c2790a);">Unlinked</span>' : '') + '</div>' +
           '<div class="meta">' + (p.pos||[]).join('/') + ' · ' + escapeHtml(p.club.short || p.club.name) + ' · ' + escapeHtml(p.id) + '</div>' +
         '</div>' +
         '<div class="ovr">' + (p.ovr != null ? p.ovr : '—') + '</div>' +
@@ -849,6 +922,14 @@
       ? '<span class="sheet-status existing">★ editing existing expanded sheet</span>'
       : '<span class="sheet-status new">＋ creating a new expanded sheet</span>';
     $('editorDeleteBtn').style.display = existing ? '' : 'none';
+    $('orphanWarning').style.display = player.unlinked ? '' : 'none';
+    if (player.unlinked) {
+      $('orphanWarning').textContent = '⚠ This sheet\'s id has no match in the loaded teams.json. Change Player ID below to a real teams.json id to link it to that player, or leave it as-is if that\'s intentional.';
+    }
+
+    $('aPlayerId').value = player.id;
+    $('aPos').value = (existing && existing.pos && existing.pos.length ? existing.pos : (player.pos || [])).join(', ');
+    refreshIdHint();
 
     $('aAge').value = existing && existing.age != null ? existing.age : '';
     $('aHeight').value = existing && existing.height_cm != null ? existing.height_cm : '';
@@ -865,9 +946,7 @@
       });
     });
 
-    const showGK = isGK(player.pos);
-    $('gkHeading').classList.toggle('show', showGK);
-    $('grpGK').classList.toggle('show', showGK);
+    refreshGKVisibility();
 
     renderPlaystyleChips();
     renderSkillTags();
@@ -885,7 +964,15 @@
 
   $('editorSaveBtn').addEventListener('click', () => {
     if (!currentPlayer) return;
-    const before = attrData[currentPlayer.id] ? JSON.parse(JSON.stringify(attrData[currentPlayer.id])) : null;
+    const oldId = currentPlayer.id;
+    const newId = ($('aPlayerId').value || '').trim();
+    if (!newId) { setStatus('editorStatus', 'Player ID can\'t be empty.', 'err'); return; }
+    if (newId !== oldId && attrData[newId]) {
+      setStatus('editorStatus', 'Another sheet already uses id "' + newId + '" — remove it first or pick a different id.', 'err');
+      return;
+    }
+
+    const before = attrData[oldId] ? JSON.parse(JSON.stringify(attrData[oldId])) : null;
 
     // Start from a copy of whatever sheet already existed (empty object for a
     // brand-new sheet) rather than building from scratch. This is the fix for
@@ -898,7 +985,8 @@
     const sheet = before ? JSON.parse(JSON.stringify(before)) : {};
 
     sheet.name = currentPlayer.name;
-    sheet.pos = currentPlayer.pos.slice();
+    const posInput = ($('aPos').value || '').split(',').map(s => s.trim()).filter(Boolean);
+    sheet.pos = posInput.length ? posInput : currentPlayer.pos.slice();
 
     setOrDelete(sheet, 'num', numOrUndef('aNum'));
     setOrDelete(sheet, 'age', numOrUndef('aAge'));
@@ -918,12 +1006,30 @@
     sheet.skills = skillTagsState.slice();
     sheet.personality = personalityState.slice();
 
-    attrData[currentPlayer.id] = sheet;
-    actionLog.push({ type: 'save', id: currentPlayer.id, name: currentPlayer.name, before, wasNew: !before });
+    if (newId !== oldId) delete attrData[oldId];
+    attrData[newId] = sheet;
+    actionLog.push({ type: 'save', id: newId, oldId: oldId, name: currentPlayer.name, before, wasNew: !before });
 
-    setStatus('editorStatus', 'Saved ' + currentPlayer.name + '\'s expanded sheet.', 'ok');
     afterMutation();
     renderFindResults();
+
+    // Re-derive currentPlayer from the refreshed list so club/ovr/unlinked
+    // reflect reality — e.g. renaming onto a real teams.json id "links" the
+    // sheet and it stops showing as unlinked from here on.
+    currentPlayer = allPlayers.find(p => p.id === newId) ||
+      { id: newId, name: sheet.name, pos: sheet.pos.slice(), num: sheet.num, ovr: null, club: UNLINKED_CLUB, unlinked: true };
+
+    $('editorId').textContent = currentPlayer.id;
+    $('editorDeleteBtn').style.display = '';
+    $('editorSheetStatus').innerHTML = '<span class="sheet-status existing">★ editing existing expanded sheet</span>';
+    $('orphanWarning').style.display = currentPlayer.unlinked ? '' : 'none';
+    if (currentPlayer.unlinked) {
+      $('orphanWarning').textContent = '⚠ This sheet\'s id has no match in the loaded teams.json. Change Player ID below to a real teams.json id to link it to that player, or leave it as-is if that\'s intentional.';
+    }
+    refreshIdHint();
+
+    setStatus('editorStatus', 'Saved ' + currentPlayer.name + '\'s expanded sheet' +
+      (newId !== oldId ? ' — now filed under id "' + newId + '".' : '.'), 'ok');
   });
 
   function numOrUndef(id){
@@ -1025,6 +1131,7 @@
 
   // ================= Session log + undo =================
   function afterMutation(){
+    refreshAllPlayers();
     renderLog();
     updateDlBar();
   }
@@ -1038,8 +1145,10 @@
     $('logCard').style.display = actionLog.length ? '' : 'none';
     const rows = actionLog.map((t, i) => {
       const meta = LOG_META[t.type];
+      const idNote = (t.type === 'save' && t.oldId && t.oldId !== t.id)
+        ? ' <span class="legacy-flag">(id ' + escapeHtml(t.oldId) + ' → ' + escapeHtml(t.id) + ')</span>' : '';
       return '<div class="logrow"><span class="icon">' + meta.icon + '</span><b>' + escapeHtml(t.name) + '</b> ' +
-        meta.label(t) + '<button class="undo" data-i="' + i + '">Undo</button></div>';
+        meta.label(t) + idNote + '<button class="undo" data-i="' + i + '">Undo</button></div>';
     });
     $('log').innerHTML = rows.slice().reverse().join('');
     $('log').querySelectorAll('.undo').forEach(btn => {
@@ -1051,14 +1160,21 @@
     const t = actionLog[logIdx];
     if (!t) return;
     if (t.type === 'save') {
-      if (t.before) attrData[t.id] = t.before; else delete attrData[t.id];
+      delete attrData[t.id];
+      const restoreId = t.oldId || t.id;
+      if (t.before) attrData[restoreId] = t.before;
     } else if (t.type === 'delete') {
       attrData[t.id] = t.before;
     }
     actionLog.splice(logIdx, 1);
     afterMutation();
     renderFindResults();
-    if (currentPlayer && currentPlayer.id === t.id) openEditor(currentPlayer);
+    const reopenId = currentPlayer && (currentPlayer.id === t.id || (t.oldId && currentPlayer.id === t.oldId))
+      ? (t.oldId || t.id) : null;
+    if (reopenId) {
+      const p = allPlayers.find(x => x.id === reopenId);
+      if (p) openEditor(p);
+    }
   }
 
   function updateDlBar(){
@@ -1088,7 +1204,7 @@
 
   $('resetBtn').addEventListener('click', () => {
     if (actionLog.length && !confirm('Discard ' + actionLog.length + ' unsaved change(s) and start over?')) return;
-    teamsData = null; attrData = {}; allPlayers = []; actionLog = []; currentPlayer = null;
+    teamsData = null; attrData = {}; teamsPlayers = []; allPlayers = []; actionLog = []; currentPlayer = null;
     $('dropZone').textContent = 'Tap to choose your teams.json file (or drag & drop on desktop)';
     $('attrDropZone').textContent = 'Tap to choose your existing player-attributes.json (or drag & drop — skip to start empty)';
     $('attrLoadScreen').style.display = 'none';
