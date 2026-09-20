@@ -4061,12 +4061,12 @@ var App = (() => {
     // a bit hot versus the ~33% real-world benchmark noted below — this
     // small bump brings scoring back toward that line without undoing the
     // shot-volume fix itself.
-    // Nudged 0.62 -> 0.66: with corners, cleared-cross corners and routine
+    // Nudged 0.62 -> 0.655: with corners, cleared-cross corners and routine
     // free-kick openings now generating realistic set-piece volume (see
     // engine/passing.js / referee.js), overall conversion had drifted to
     // ~36% of shots on target — this brings it back toward the ~33% line.
     const saveChance = Math.min(0.94, Math.max(0.28,
-      0.66 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
+      0.655 + gkSkill * 0.38 - shotQuality * 0.22 - shotPower * 0.06 - (isHeader ? 0.03 : 0)));
     if (seededRandom() >= saveChance) return { saved: false };
 
     // A save happened — decide whether it's a clean catch or a parry (and,
@@ -7401,9 +7401,14 @@ var App = (() => {
     // normal and isn't penalized.
     const conceded = ps.goalsConceded || 0;
     if (isGK) {
-      r += Math.min(saves * 0.35, 2.4);
-      if (saves >= 4) r += 0.25;
-      if (saves >= 7) r += 0.35;
+      // Save credit eased (was saves*0.35 capped at 2.4, +0.25 at 4, +0.35 at 7; now 0.28/2.0, +0.2 at 5, +0.3 at 8):
+      // a keeper on a busy side needs no more than a routine number of stops
+      // to sit near the top of the rating table, which made keepers over-
+      // represent MOTM / Ballon d'Or lists on volume alone. Goals conceded
+      // and the clean-sheet bonus below still carry most of the weight.
+      r += Math.min(saves * 0.28, 2.0);
+      if (saves >= 5) r += 0.2;
+      if (saves >= 8) r += 0.3;
       if (ps.cleanSheet) r += 0.6;
       if (goals > 0) r += 1.5;
       r += Math.min(passes * 0.01, 0.25);
@@ -8753,7 +8758,11 @@ var App = (() => {
     // was producing far more goals — and far fewer clean sheets — than a
     // real match. Defensive quality now also weighs more heavily against
     // the shot getting on target in the first place.
-    const onTargetChance = Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
+    // 0.95 scale: extra corner/set-piece volume had pushed shots on target to
+    // ~9.5 a match (real top-flight ~8.5-9), which is what inflated keeper save
+    // counts. Trimming the on-target share (the rest go wide/over) cuts the
+    // saves keepers face without touching total shot volume.
+    const onTargetChance = 0.95 * Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
       if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
@@ -10096,12 +10105,15 @@ var App = (() => {
       } else if (rare < 0.8) {
         const gk = pickPlayer(defTeam, ['GK']);
         if (gk) {
-          defTeam.stats.saves++;
-          recordStat('saves', gk, defTeam.team);
+          // A sweeper-keeper cutting out a through ball isn't a shot saved:
+          // no shot was faced, so it must not add to the save total (it was
+          // adding ~0.9 phantom saves a match, on top of every real shot-stop,
+          // and feeding keeper ratings / Ballon d'Or / Yashin points). Logged as
+          // a claim instead, which is what it is.
           if (!m.playerMatchStats) m.playerMatchStats = {};
           if (!m.playerMatchStats[gk.id]) m.playerMatchStats[gk.id] = blankPlayerMatchStats(gk);
-          m.playerMatchStats[gk.id].saves = (m.playerMatchStats[gk.id].saves || 0) + 1;
-          addEvent(m.minute, 'save', `<span class="player">${gk.name}</span> rushes off the line to smother a through ball`, defSide);
+          m.playerMatchStats[gk.id].claims = (m.playerMatchStats[gk.id].claims || 0) + 1;
+          addEvent(m.minute, 'whistle', `<span class="player">${gk.name}</span> rushes off the line to smother a through ball`, defSide);
         }
       } else {
         addEvent(m.minute, 'whistle', `The crowd sense a goal — noise levels rise as ${attTeam.team.short} advance`, null);
@@ -12754,7 +12766,12 @@ var App = (() => {
     Object.values(src.goals || {}).forEach(p => { const e = ensure(p); e.goals = p.count; e.pts += p.count * 3.2; });
     Object.values(src.assists || {}).forEach(p => { const e = ensure(p); e.assists = p.count; e.pts += p.count * 2.1; });
     Object.values(src.motm || {}).forEach(p => { const e = ensure(p); e.motm = p.count; e.pts += p.count * 3.6; });
-    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.3; });
+    // Saves were worth 0.3 each: at ~5 a game a busy keeper banked ~57 pts a
+    // league season from volume alone — the same as a ~18-goal striker — before
+    // clean sheets or ratings, so keepers kept winning the Ballon d'Or. Real
+    // voting almost never rewards a keeper for stops; the dedicated Yashin
+    // Trophy (below) is where saves count.
+    Object.values(src.saves || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 0.1; });
     Object.values(src.cleanSheets || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.6; });
     Object.values(src.puskas || {}).forEach(p => { const e = ensure(p); e.pts += p.count * 1.2; });
     Object.values(scores).forEach(e => {
