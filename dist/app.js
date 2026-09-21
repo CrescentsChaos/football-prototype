@@ -4841,7 +4841,30 @@ var App = (() => {
     });
   }
 
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
+  let _teamByIdMap = null;
+  let _lastAllTeamsRef = null;
+  let _lastAllTeamsLen = -1;
+
+  // getTeam(id) is called ~165+ times across match engine, simulation, awards, and UI.
+  // Replacing O(N) array search with O(1) Map cache dramatically speeds up team lookups.
+  function getTeam(id) {
+    if (!id) return undefined;
+    const currentLen = allTeams ? allTeams.length : 0;
+    if (!_teamByIdMap || _lastAllTeamsRef !== allTeams || _lastAllTeamsLen !== currentLen) {
+      _teamByIdMap = new Map();
+      if (Array.isArray(allTeams)) {
+        for (let i = 0; i < allTeams.length; i++) {
+          const t = allTeams[i];
+          if (t && t.id) {
+            _teamByIdMap.set(t.id, t);
+          }
+        }
+      }
+      _lastAllTeamsRef = allTeams;
+      _lastAllTeamsLen = currentLen;
+    }
+    return _teamByIdMap.get(id);
+  }
 
   // Every match is played at the home team's stadium. Falls back to Wembley
   // Stadium whenever a team in teams.json doesn't define its own "stadium".
