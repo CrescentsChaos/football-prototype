@@ -950,8 +950,12 @@
   let _nationalByName = {};
   let _clubByName = {};
 
+  // Result memoization map for findPlayerTeams to prevent redundant filtering and allocations
+  let _playerTeamsMemo = Object.create(null);
+
   function buildPlayerTeamIndexes() {
     if (_playerTeamIndexBuilt) return;
+    _playerTeamsMemo = Object.create(null);
     _nationalById = {}; _clubById = {}; _playerByIdIdx = {};
     _nationalByName = {}; _clubByName = {};
     (teamsData.national || []).forEach(t => {
@@ -973,6 +977,7 @@
 
 /*@CHUNK:c0301b:START*/
   function findPlayerTeams(playerId) {
+    if (_playerTeamsMemo[playerId]) return _playerTeamsMemo[playerId];
     buildPlayerTeamIndexes();
     let national = _nationalById[playerId] || null;
     let club = _clubById[playerId] || null;
@@ -1005,6 +1010,8 @@
         }
       }
     }
-    return { national, club };
+    const res = { national, club };
+    _playerTeamsMemo[playerId] = res;
+    return res;
   }
 /*@CHUNK:c0301b:END*/
