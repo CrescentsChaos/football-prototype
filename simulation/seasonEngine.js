@@ -312,12 +312,10 @@
       scores[p.id].pts += p.count * 0.8;
     });
     Object.values(scores).forEach(s => {
-      let isST = false;
-      for (const t of allTeams) {
-        const pl = (t.players || []).find(x => x.id === s.id);
-        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
-      }
-      if (isST) s.pts += 2;
+      // O(1) player lookup via cached index instead of O(N * T * P) nested loop over all teams/rosters
+      const found = findPlayerAndTeam(s.id);
+      const pl = found ? found.player : null;
+      if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) s.pts += 2;
     });
     return Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals);
   }
