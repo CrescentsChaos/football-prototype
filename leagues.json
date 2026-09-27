@@ -487,7 +487,14 @@
     "Romania",
     "Slovakia",
     "Ukraine",
-    "Slovenia"
+    "Slovenia",
+    "Serbia",
+    "Greece ",
+    "Ireland",
+    "Armenia ",
+    "Montenegro",
+    "Latvia",
+    "Cyprus"
   ],
   "Euros": [
     "Netherlands",
@@ -588,7 +595,8 @@
     "Malaysia",
     "Thailand",
     "Kyrgyzstan",
-    "Oman"
+    "Oman",
+    "Malaysia"
   ],
   "Gold Cup": [
     "United States",
