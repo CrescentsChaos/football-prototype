@@ -1,7 +1,187 @@
 {
   "_comment": "Injury type definitions used by engine/injuries.js (picking a random injury when a player goes down) and the Hospital tab (ui/hospitalUI.js). Optional — the app ships with an embedded fallback copy of this list in js/state.js, so editing this file works without a rebuild, same as leagues.json/managers.json/trophies.json.",
   "version": 1,
-  "injuries": [
+  "injuries": [{
+    "id": "laceration",
+    "name": "Cut / Laceration",
+    "bodyPart": "Head",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 1,
+    "description": "A deep cut or laceration, often to the head or face, requiring stitches or bandaging.",
+    "causes": [
+      "suffered a deep cut to the head following a clash of heads",
+      "needed stitches after taking a stray elbow to the brow",
+      "was bandaged up and withdrawn following a sharp collision"
+    ]
+  },
+  {
+    "id": "illness",
+    "name": "Viral Illness",
+    "bodyPart": "General",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 1,
+    "description": "A sudden bout of flu, fever, or stomach bug rendering the player unfit to compete.",
+    "causes": [
+      "was ruled out of the matchday squad due to a sudden fever",
+      "was sent home from training with a severe stomach bug",
+      "was left out of the team after falling ill overnight"
+    ]
+  },
+  {
+    "id": "hand_fracture",
+    "name": "Fractured Hand/Finger",
+    "bodyPart": "Hand",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 3,
+    "description": "A break or dislocation in the hand or finger bones, common when breaking falls or making saves.",
+    "causes": [
+      "dislocated his finger while diving to make a save",
+      "fractured his hand after taking the full force of a point-blank shot",
+      "landed heavily on an outstretched hand and damaged his finger"
+    ]
+  },{
+    "id": "turf_toe",
+    "name": "Turf Toe",
+    "bodyPart": "Foot",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 3,
+    "description": "A sprain of the main joint of the big toe from hyperextension, common on hard surfaces.",
+    "causes": [
+      "hyperextended his big toe while pushing off to sprint",
+      "was left hobbling after his toe bent back awkwardly on the turf",
+      "needed treatment after jamming his big toe into the ground"
+    ]
+  },
+  {
+    "id": "dehydration_exhaustion",
+    "name": "Heat Exhaustion / Dehydration",
+    "bodyPart": "General",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 1,
+    "description": "Severe fatigue, dizziness, or weakness brought on by fluid loss in hot match conditions.",
+    "causes": [
+      "collapsed to his knees from exhaustion late in the second half",
+      "was taken off feeling dizzy and dehydrated on a sweltering afternoon",
+      "signalled to the bench after suffering severe fatigue"
+    ]
+  },
+  {
+    "id": "eye_contusion",
+    "name": "Eye Contusion",
+    "bodyPart": "Face",
+    "severity": "Minor",
+    "minMatches": 1,
+    "maxMatches": 2,
+    "description": "Swelling or vision obstruction caused by a direct blow around the eye orbit.",
+    "causes": [
+      "took a stray finger to the eye during a corner kick battle",
+      "was withdrawn with a swelling eye after a collision",
+      "struggled with impaired vision after taking a ball to the face"
+    ]
+  },
+  {
+    "id": "metacarpal_fracture",
+    "name": "Fractured Metacarpal",
+    "bodyPart": "Hand",
+    "severity": "Moderate",
+    "minMatches": 2,
+    "maxMatches": 5,
+    "description": "A break in one of the hand bones, often requiring a protective cast or splint.",
+    "causes": [
+      "fractured a bone in his hand while breaking a heavy fall",
+      "was caught on the hand by a heavy boot going for a loose ball",
+      "suffered a hand fracture after a hard collision with the hoardings"
+    ]
+  },
+  {
+    "id": "rotator_cuff_strain",
+    "name": "Rotator Cuff Strain",
+    "bodyPart": "Shoulder",
+    "severity": "Moderate",
+    "minMatches": 2,
+    "maxMatches": 4,
+    "description": "A strain of the shoulder stability muscles, frequent in goalkeepers and long-throw specialists.",
+    "causes": [
+      "felt a sharp pain in his shoulder after making a diving save",
+      "strained his shoulder muscle executing a long throw-in",
+      "was substituted holding his shoulder after over-extending"
+    ]
+  },
+  {
+    "id": "quadriceps_tendonitis",
+    "name": "Quadriceps Tendonitis",
+    "bodyPart": "Thigh",
+    "severity": "Moderate",
+    "minMatches": 2,
+    "maxMatches": 4,
+    "description": "Inflammation of the tendon connecting the quad muscle to the kneecap.",
+    "causes": [
+      "felt a twinge above his kneecap after unleashing a powerful volley",
+      "was taken off after persistent front knee soreness limited his kicking",
+      "pulled up holding his upper knee following a goal-kick attempt"
+    ]
+  },
+  {
+    "id": "herniated_disc",
+    "name": "Herniated Disc",
+    "bodyPart": "Back",
+    "severity": "Major",
+    "minMatches": 6,
+    "maxMatches": 12,
+    "description": "A spinal disc issue causing nerve compression and severe lower back/leg pain.",
+    "causes": [
+      "went down in severe discomfort holding his lower back after a jump",
+      "was forced off as shooting back pain flared up during a sprint",
+      "suffered a severe back spasm and nerve compression after landing"
+    ]
+  },
+  {
+    "id": "broken_jaw",
+    "name": "Mandibular Fracture",
+    "bodyPart": "Face",
+    "severity": "Major",
+    "minMatches": 6,
+    "maxMatches": 10,
+    "description": "A fracture of the jawbone, usually resulting from high-impact clashes.",
+    "causes": [
+      "took a devastating boot to the jaw in a low-heading challenge",
+      "suffered a heavy clash of heads and went off with a jaw injury",
+      "was hit by a stray elbow and needed immediate medical attention for his jaw"
+    ]
+  },
+  {
+    "id": "it_band_syndrome",
+    "name": "IT Band Friction Syndrome",
+    "bodyPart": "Knee",
+    "severity": "Moderate",
+    "minMatches": 2,
+    "maxMatches": 4,
+    "description": "An overuse injury causing sharp pain on the outside of the knee joint due to repetitive running.",
+    "causes": [
+      "was forced off after persistent lateral knee pain flared up",
+      "pulled up during a long run holding the outer side of his knee",
+      "was substituted as an overuse knee strain limited his mobility"
+    ]
+  },
+  {
+    "id": "osteitis_pubis",
+    "name": "Osteitis Pubis",
+    "bodyPart": "Groin",
+    "severity": "Major",
+    "minMatches": 6,
+    "maxMatches": 12,
+    "description": "A non-infectious inflammation of the pubic symphysis causing severe, chronic groin and pelvic pain.",
+    "causes": [
+      "was withdrawn after chronic pelvic inflammation severely limited his movement",
+      "hobbled off as a persistent pubic bone strain flared up on a clearance",
+      "was replaced after struggling with severe, recurring lower abdominal tightness"
+    ]
+  },
     {
       "id": "cramp",
       "name": "Muscle Cramp",
