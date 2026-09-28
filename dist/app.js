@@ -3040,7 +3040,10 @@ var App = (() => {
     'Deep-Lying Forward':   ['before laying it off and continuing the move', 'and drops deep again looking for the next pass'],
     'Orchestrator':         ['before recycling it and resetting the attack', 'and slows the tempo back down'],
     'Offensive Full-back':  ['before overlapping down the line', 'and gets to the byline looking for a cutback'],
-    'Full-back Finisher':   ['before arriving late into the box himself', 'and keeps running into a scoring position']
+    'Full-back Finisher':   ['before arriving late into the box himself', 'and keeps running into a scoring position'],
+    'Target Man':           ['before laying it off first time to a runner', 'and shields it, waiting for support to arrive'],
+    'Extra Frontman':       ['before driving on into the box himself', 'and keeps the run going beyond the last defender'],
+    'Attack Outlet':        ['and sprints clear before the defence can get back', 'before releasing it early rather than take another touch']
   };
   // Through-ball / defence-splitting pass flavor by the passer's playstyle.
   const THROUGH_BALL_FLAVOR = {
@@ -3048,21 +3051,33 @@ var App = (() => {
     'Classic No. 10':       ['waits, then slides a perfectly weighted ball through the lines'],
     'Orchestrator':         ['dictates the tempo before releasing a pass through the channel'],
     'Deep-Lying Forward':   ['drops deep to collect, then spins a first-time pass in behind'],
-    'Dummy Runner':         ['drags a marker away before slipping the ball into the space he vacated']
+    'Dummy Runner':         ['drags a marker away before slipping the ball into the space he vacated'],
+    'Hole Player':          ['times his own run into the box before threading it through at the last moment'],
+    'Pass Disruptor':       ['wins the ball back and immediately releases a pass through the middle before the press can reset']
   };
   // Tackle-and-win flavor by the defender's playstyle.
   const TACKLE_FLAVOR = {
     'Destroyer':            ['throws himself into a crunching challenge and comes away with the ball'],
     'Anchor Man':           ['reads the danger early and snuffs it out with a perfectly timed tackle'],
     'Box-to-Box':           ['recovers back at full sprint to make a vital tackle on the edge of the box'],
-    'Build Up':             ['steps in calmly to win the ball back before it becomes a problem']
+    'Build Up':             ['steps in calmly to win the ball back before it becomes a problem'],
+    'Pass Disruptor':       ['reads the pass a fraction early and slides in to win it before it ever gets there'],
+    'Front Line Pressure':  ['hunts the ball down high up the pitch and wins it clean off the first touch'],
+    'Shadow Marker':        ['stays glued to his man all game and wins the ball cleanly off him'],
+    'Covering Role':        ['drops off just in time to make the covering tackle and snuff out the danger'],
+    'High Line Master':     ['steps out from the line together with his defence and times the tackle perfectly'],
+    'Defensive Full-back':  ['tracks his runner all the way back and wins the ball cleanly']
   };
   // Interception flavor by the defender's playstyle.
   const INTERCEPTION_FLAVOR = {
     'Destroyer':            ['pounces to intercept, snapping into the passing lane'],
     'Anchor Man':           ['reads the pass superbly and steps in front of his man to intercept'],
     'Orchestrator':         ['anticipates the pass and cuts it out before it develops'],
-    'Build Up':             ['calmly intercepts and immediately looks to start a move of his own']
+    'Build Up':             ['calmly intercepts and immediately looks to start a move of his own'],
+    'Pass Disruptor':       ['reads the passing lane before the ball is even played and cuts it out'],
+    'Covering Role':        ['drops off the back line to sweep up the danger before it ever arrives'],
+    'High Line Master':     ['steps up in unison with the rest of the line and cuts the pass out'],
+    'Defensive Full-back':  ['tracks back diligently and reads the danger to cut it out']
   };
   // "Keeps possession ticking over" flavor by the on-ball player's playstyle.
   const POSSESSION_FLAVOR = {
@@ -3070,7 +3085,10 @@ var App = (() => {
     'Classic No. 10':       ['pulls the strings from a pocket of space'],
     'Creative Playmaker':   ['probes for an opening, constantly on the move to stay available'],
     'Build Up':             ['brings the ball out from the back under no real pressure'],
-    'Deep-Lying Forward':   ['drops off the front line to link the play']
+    'Deep-Lying Forward':   ['drops off the front line to link the play'],
+    'Anchor Man':           ['shields the ball in front of the back line, in no rush to release it'],
+    'Pass Disruptor':       ['wins it back and keeps things simple, moving the ball on without any risk'],
+    'Covering Role':        ['tidies things up from deep before playing it safely forward']
   };
   // Off-the-ball movement flavor for a missed big chance, describing *how*
   // the player got into the position in the first place.
@@ -3079,7 +3097,11 @@ var App = (() => {
     'Fox in the Box':       ['reacts quickest to a loose ball in the six-yard box'],
     'Hole Player':          ['arrives late and unmarked at the back post'],
     'Dummy Runner':         ["ghosts into the space a decoy run opened up"],
-    'Inside Forward':       ['cuts in from the flank onto his favoured foot']
+    'Inside Forward':       ['cuts in from the flank onto his favoured foot'],
+    'Target Man':           ['climbs above his marker to meet the delivery'],
+    'Full-back Finisher':   ['arrives completely unmarked from deep to get on the end of it'],
+    'Attack Outlet':        ['breaks early off the last defender\u2019s shoulder to get in behind'],
+    'Extra Frontman':       ['gets forward from the back to join the attack']
   };
   // Extra descriptive clause appended to a goal's method text based on the
   // scorer's playstyle, so the same "tap-in" reads differently for a Fox in
@@ -3092,7 +3114,11 @@ var App = (() => {
     'Inside Forward':       ['cutting in from the flank onto his stronger foot'],
     'Full-back Finisher':   ['arriving from deep, well beyond his usual position'],
     'Extra Frontman':       ['pushing forward from the back to get on the end of it'],
-    'Deep-Lying Forward':   ['picking up the pieces after dropping deep to link play']
+    'Deep-Lying Forward':   ['picking up the pieces after dropping deep to link play'],
+    'Box-to-Box':           ['completing a box-to-box surge the length of the pitch'],
+    'Attack Outlet':        ['breaking clear off the shoulder of the last defender'],
+    'Orchestrator':         ['stepping up from deep to add his name to the scoresheet'],
+    'Front Line Pressure':  ['forcing the error high up the pitch before finishing it himself']
   };
 
   // Derives the 5 gameplay stats from a player-attributes.json entry.
@@ -3537,136 +3563,234 @@ var App = (() => {
   // multipliers multiply together, edges sum), then playstyleActionMult()
   // clamps the compound multiplier to a sane [0.25, 2.5] range so a player
   // with several overlapping tags doesn't spiral into an absurd weight.
-  const PLAYSTYLE_BEHAVIOR = {
+const PLAYSTYLE_BEHAVIOR = {
+    // ===== Design note: the defensive-minded styles below (Destroyer,
+    // Anchor Man, Pass Disruptor, Front Line Pressure, High Line Master,
+    // Covering Role, Shadow Marker, Defensive Full-back) all read as
+    // "aggressive/active defender" at a glance, but they sit at different
+    // points on the same "diver vs reader" axis: defChance is the flat
+    // edge toward WINNING A TACKLE by actively engaging (defActionEdge()
+    // in engine/defending.js), interceptBias skews toward reading and
+    // cutting out a pass BEFORE a tackle is even needed. A high-defChance/
+    // low-interceptBias style throws himself into the ball; a low-
+    // defChance/high-interceptBias style anticipates it. No two styles
+    // below land on the same point of that axis.
+
+    // ---------------- Strikers / second strikers ----------------
     'Goal Poacher': {
-      actions: { shoot: 1.35, hold: 1.25, dribble: 0.7, carry: 0.7 },
-      finishingEdge: 0.03
+      actions: { shoot: 1.4, hold: 1.3, dribble: 0.6, carry: 0.6 },
+      finishingEdge: 0.035
     },
     'Fox in the Box': {
-      actions: { shoot: 1.4, hold: 1.3, dribble: 0.6, carry: 0.6, cross: 0.8 },
-      finishingEdge: 0.04,
-      aerialEdge: 0.02
+      // Sharper box specialist than Goal Poacher: even less interested in
+      // dribbling/carrying his way there, and — unlike a Goal Poacher, who
+      // is purely a runner in behind — genuinely dangerous in the air on
+      // scraps inside the six-yard box.
+      actions: { shoot: 1.45, hold: 1.35, dribble: 0.55, carry: 0.55, cross: 0.7 },
+      finishingEdge: 0.045,
+      aerialEdge: 0.03
     },
     'Target Man': {
-      actions: { hold: 1.4, dribble: 0.6, pass: 1.1 },
-      aerialEdge: 0.1,
+      // Barely dribbles/carries at all, actively avoids crossing (he's the
+      // aerial TARGET, not the delivery man), and the bulk of his aerial
+      // edge dwarfs every other forward style.
+      actions: { hold: 1.5, dribble: 0.5, carry: 0.6, pass: 1.15, cross: 0.6 },
+      aerialEdge: 0.12,
       finishingEdge: 0.01
     },
     'Deep-Lying Forward': {
-      actions: { pass: 1.3, throughball: 1.6, hold: 1.1, shoot: 0.9 }
+      // The deepest-dropping forward style: heavy pass/throughball lean,
+      // genuinely reluctant to shoot himself, some carry to bring it
+      // forward out of deep areas rather than hold it up on the spot
+      // (that's Target Man's job).
+      actions: { pass: 1.35, throughball: 1.7, hold: 1.15, shoot: 0.75, carry: 0.9 }
     },
     'Dummy Runner': {
-      actions: { carry: 0.85, dribble: 1.05, hold: 0.8, shoot: 1.1 },
-      dribbleEdge: 0.03,
-      finishingEdge: 0.015
+      // His whole game happens off the ball dragging markers away, so once
+      // he DOES get it he doesn't linger on it (low hold) — he's already
+      // planning the next decoy run.
+      actions: { carry: 0.85, dribble: 1.0, hold: 0.6, shoot: 1.05, cross: 0.85 },
+      dribbleEdge: 0.02,
+      finishingEdge: 0.01
     },
     'Creative Playmaker': {
-      actions: { throughball: 1.6, dribble: 1.15, pass: 1.1 },
-      dribbleEdge: 0.02
+      actions: { throughball: 1.65, dribble: 1.2, pass: 1.15, carry: 1.05 },
+      dribbleEdge: 0.025
     },
     'Hole Player': {
-      actions: { pass: 1.1, throughball: 1.15, hold: 1.0, shoot: 1.15 },
-      finishingEdge: 0.02
+      // Re-anchored away from Deep-Lying Forward's passing identity toward
+      // what the description actually says — late, aggressive box runs —
+      // so it now leans shoot/carry instead of doubling Deep-Lying
+      // Forward's pass/throughball profile.
+      actions: { shoot: 1.3, throughball: 1.2, pass: 0.95, hold: 0.85, carry: 1.05 },
+      finishingEdge: 0.03
     },
     'Classic No. 10': {
-      actions: { pass: 1.2, throughball: 1.6, cross: 0.9 },
+      // Deliberately the most touchline-averse creative style (heaviest
+      // cross penalty of the three central playmakers) — he "stays
+      // relatively central" by description, where Creative Playmaker and
+      // Orchestrator both roam more freely.
+      actions: { pass: 1.25, throughball: 1.65, cross: 0.75, dribble: 0.85 },
       penEdge: 0.03,
       fkEdge: 0.03
     },
+
+    // ---------------- Wide attackers ----------------
     'Prolific Winger': {
-      actions: { cross: 1.5, dribble: 1.2 },
-      dribbleEdge: 0.04
+      actions: { cross: 1.55, dribble: 1.25, carry: 1.1 },
+      dribbleEdge: 0.045
     },
     'Cross Specialist': {
-      actions: { cross: 1.6, dribble: 0.9 },
-      fkEdge: 0.02
+      // Glued to the touchline far more than a Prolific Winger — this is a
+      // pure delivery specialist, not a dribbler who also crosses, so
+      // cross is pushed well past Prolific Winger's and dribble/carry are
+      // both cut back to make room for it.
+      actions: { cross: 1.75, dribble: 0.75, carry: 0.85 },
+      fkEdge: 0.025
     },
     'Roaming Flank': {
-      actions: { carry: 1.15, throughball: 1.1, cross: 1.1 },
-      dribbleEdge: 0.03
+      // The one wide style that genuinely drifts inside — the ONLY wide
+      // attacker here whose cross weight sits below 1 (i.e. below a
+      // neutral baseline), balanced instead toward carrying/through balls
+      // like a converted central creator.
+      actions: { carry: 1.25, throughball: 1.2, cross: 0.95, pass: 1.1, dribble: 1.05 },
+      dribbleEdge: 0.02
     },
     'Inside Forward': {
-      actions: { dribble: 1.6, shoot: 1.2, cross: 0.7 },
-      finishingEdge: 0.025,
-      dribbleEdge: 0.04
+      actions: { dribble: 1.7, shoot: 1.25, cross: 0.55, carry: 1.1 },
+      finishingEdge: 0.03,
+      dribbleEdge: 0.045
     },
+
+    // ---------------- Central/box-to-box midfield ----------------
     'Box-to-Box': {
-      actions: { carry: 1.3, dribble: 1.15, backpass: 0.85, hold: 0.85 },
-      defChance: 0.005
+      actions: { carry: 1.35, dribble: 1.2, backpass: 0.8, hold: 0.8, pass: 1.05 },
+      defChance: 0.006
     },
     'Destroyer': {
-      actions: { backpass: 1.2, pass: 1.2, dribble: 0.6, throughball: 0.6, shoot: 0.6 },
-      defChance: 0.012,
-      interceptBias: 0.05,
+      // "Diver" end of the axis — high defChance, the lowest
+      // interceptBias of any defensive style. Unlike Anchor Man he isn't
+      // afraid to carry the ball a few yards himself once he's actually
+      // won it back, reflecting a genuinely more front-foot ball-winner.
+      actions: { backpass: 1.1, pass: 1.15, dribble: 0.7, carry: 0.8, throughball: 0.6, shoot: 0.6 },
+      defChance: 0.016,
+      interceptBias: 0.03,
       aerialEdge: 0.05
     },
     'Anchor Man': {
-      actions: { backpass: 1.2, pass: 1.2, dribble: 0.6, throughball: 0.6, shoot: 0.6 },
-      defChance: 0.008,
-      interceptBias: 0.1,
-      aerialEdge: 0.05
+      // "Reader" end of the axis, opposite Destroyer — the lowest
+      // defChance of any defensive style (he screens rather than dives in)
+      // paired with the highest interceptBias, and by far the safest,
+      // simplest distribution of any midfield style (heavy backpass/pass,
+      // almost no dribble/carry risk).
+      actions: { backpass: 1.3, pass: 1.25, dribble: 0.5, carry: 0.55, throughball: 0.55, shoot: 0.5 },
+      defChance: 0.005,
+      interceptBias: 0.13,
+      aerialEdge: 0.06
     },
     'Orchestrator': {
-      actions: { pass: 1.25, switch: 1.25, dribble: 0.8, throughball: 1.3 },
+      actions: { pass: 1.3, switch: 1.3, dribble: 0.75, throughball: 1.35, carry: 0.85 },
       fkEdge: 0.02
     },
     'Build Up': {
-      actions: { pass: 1.25, switch: 1.25, dribble: 0.8 },
-      defChance: 0.005
+      actions: { pass: 1.3, switch: 1.2, dribble: 0.85, carry: 0.95, backpass: 1.05 },
+      defChance: 0.006
     },
     'Extra Frontman': {
-      actions: { carry: 1.2, cross: 1.2 },
-      finishingEdge: 0.015
+      // The one advanced-CB style with any real attacking edge at all
+      // (finishingEdge) — a small defChance is kept so he still reads as a
+      // defender who joins the attack, not a repurposed forward.
+      actions: { carry: 1.25, cross: 1.15, shoot: 1.05, pass: 0.95 },
+      finishingEdge: 0.02,
+      defChance: 0.004
     },
+
+    // ---------------- Full-backs ----------------
     'Offensive Full-back': {
-      actions: { carry: 1.2, cross: 1.2 }
+      actions: { carry: 1.25, cross: 1.25, pass: 1.0 }
     },
     'Defensive Full-back': {
-      actions: { backpass: 1.15, pass: 1.1, cross: 0.8, carry: 0.85, dribble: 0.8 },
-      defChance: 0.006,
-      interceptBias: 0.04
+      actions: { backpass: 1.2, pass: 1.15, cross: 0.7, carry: 0.75, dribble: 0.7 },
+      defChance: 0.008,
+      interceptBias: 0.05
     },
     'Full-back Finisher': {
-      actions: { carry: 1.2, cross: 1.2, shoot: 1.1 },
-      finishingEdge: 0.015
+      // Split from Offensive Full-back by genuine end product (finishingEdge)
+      // plus a sharper shoot weight — arrives to finish the move himself,
+      // not just to deliver from deep.
+      actions: { carry: 1.25, cross: 1.15, shoot: 1.2, pass: 0.9 },
+      finishingEdge: 0.02
     },
+
+    // ---------------- Goalkeepers ----------------
     'Offensive Goalkeeper': {
-      gkPositioningEdge: 0.02,
-      gkReflexEdge: -0.01
+      gkPositioningEdge: 0.028,
+      gkReflexEdge: -0.015
     },
     'Defensive Goalkeeper': {
-      gkReflexEdge: 0.02,
-      gkPositioningEdge: -0.01
+      gkReflexEdge: 0.028,
+      gkPositioningEdge: -0.015
     },
+
+    // ---------------- Pressing / counter-attack archetypes ----------------
     'Pass Disruptor': {
-      actions: { backpass: 1.15, pass: 1.15, dribble: 0.65, throughball: 0.55, shoot: 0.6 },
+      // Purest "reader" of the whole table — the single highest
+      // interceptBias here and one of the lowest defChances, matching the
+      // description ("reads the game to intercept before a tackle is even
+      // needed"). Once he wins it, a sharp switch/pass bias gets it moving
+      // forward quickly rather than holding onto it.
+      actions: { backpass: 1.1, pass: 1.2, switch: 1.1, dribble: 0.7, throughball: 0.5, shoot: 0.55 },
+      defChance: 0.004,
+      interceptBias: 0.15
+    },
+    'Front Line Pressure': {
+      // A committed "diver" like Destroyer/Shadow Marker but applied from
+      // an attacking position (his defChance is the second-highest in the
+      // table) — and unlike the deeper diving styles he still carries a
+      // striker's shoot weight and a touch of aerial edge, since he's
+      // hunting the ball high up, not screening in front of a back four.
+      actions: { shoot: 1.1, hold: 0.8, carry: 1.0, pass: 0.95, dribble: 0.95 },
+      defChance: 0.022,
+      interceptBias: 0.01,
+      aerialEdge: 0.02
+    },
+    'Attack Outlet': {
+      // The least patient attacking style on the ball — hold and carry
+      // both sit at their lowest point among forward-leaning styles,
+      // reflecting an out-ball who releases the ball (or shoots) the
+      // instant it arrives rather than setting up a chance himself.
+      actions: { shoot: 1.2, hold: 0.65, carry: 0.7, dribble: 0.7, pass: 0.85 },
+      finishingEdge: 0.025
+    },
+    'High Line Master': {
+      // Organizes the back line rather than purely screening it — a more
+      // even reader/diver balance than Anchor Man or Covering Role, with
+      // real aerial edge for winning the ball in the air that a deep
+      // sweeper (Covering Role) doesn't need as often.
+      actions: { backpass: 1.05, pass: 1.15, switch: 1.1, dribble: 0.75, throughball: 0.6, shoot: 0.55 },
+      defChance: 0.007,
+      interceptBias: 0.06,
+      aerialEdge: 0.06
+    },
+    'Covering Role': {
+      // The deepest, most reactive "reader" of the defensive group —
+      // higher interceptBias than High Line Master, lower defChance than
+      // Anchor Man, and the lowest attacking-action weights of any
+      // defensive midfield/CB style (he very rarely commits to a dribble,
+      // through ball or shot from back there).
+      actions: { backpass: 1.2, pass: 1.15, dribble: 0.55, throughball: 0.55, shoot: 0.5, carry: 0.7 },
       defChance: 0.006,
       interceptBias: 0.12
     },
-    'Front Line Pressure': {
-      actions: { shoot: 1.05, hold: 0.85, carry: 0.95, pass: 1.0 },
-      defChance: 0.018,
-      interceptBias: 0.02
-    },
-    'Attack Outlet': {
-      actions: { shoot: 1.15, hold: 0.75, carry: 0.8, dribble: 0.8 },
-      finishingEdge: 0.02
-    },
-    'High Line Master': {
-      actions: { backpass: 1.1, pass: 1.15, dribble: 0.7, throughball: 0.6, shoot: 0.6 },
-      defChance: 0.01,
-      interceptBias: 0.07,
-      aerialEdge: 0.04
-    },
-    'Covering Role': {
-      actions: { backpass: 1.15, pass: 1.15, dribble: 0.65, throughball: 0.6, shoot: 0.6 },
-      defChance: 0.009,
-      interceptBias: 0.09
-    },
     'Shadow Marker': {
-      actions: { backpass: 1.15, pass: 1.1, dribble: 0.65, throughball: 0.55, shoot: 0.6 },
-      defChance: 0.011,
-      interceptBias: 0.1
+      // Opposite pole from Covering Role/Pass Disruptor despite the
+      // similar defensive-midfield profile — a genuine "diver" who
+      // commits to the physical tackle on his marked man rather than
+      // reading passing lanes, with the second-lowest interceptBias in
+      // the table (only Front Line Pressure's is lower).
+      actions: { backpass: 1.05, pass: 1.05, dribble: 0.6, throughball: 0.5, shoot: 0.55, carry: 0.65 },
+      defChance: 0.017,
+      interceptBias: 0.02
     }
   };
   // Every individual playstyle tag a player currently carries (see
@@ -8451,39 +8575,159 @@ var App = (() => {
     const third = parts[0], ch = parts[1];
     const central = ch === 'C';
     let mult = 1;
+    // Every style below gets its own branch — no two styles share a
+    // positioning "personality" anymore, even ones that used to be grouped
+    // together as functionally interchangeable (Goal Poacher vs Fox in the
+    // Box, Destroyer vs Anchor Man, Prolific Winger vs Cross Specialist vs
+    // Roaming Flank, etc. all now read distinctly on the pitch).
     styles.forEach((s) => {
-      if (s === 'Goal Poacher' || s === 'Fox in the Box') {
-        if (third === 'ATT' && central) mult *= 1.5;
-        else if (third === 'MID') mult *= 0.55;
-        else if (third === 'DEF') mult *= 0.25;
-      } else if (s === 'Deep-Lying Forward' || s === 'Hole Player') {
-        if (third === 'MID' && central) mult *= 1.4;
-        else if (third === 'ATT' && central) mult *= 0.9;
+      if (s === 'Goal Poacher') {
+        // Pure in-behind runner: the sharpest ATT-central spike of any
+        // forward style, but drops off hardest into midfield and defence —
+        // he simply isn't found there.
+        if (third === 'ATT' && central) mult *= 1.55;
+        else if (third === 'MID') mult *= 0.5;
+        else if (third === 'DEF') mult *= 0.2;
+      } else if (s === 'Fox in the Box') {
+        // Similar unwillingness to drop deep, but slightly less locked to
+        // dead-central (he also works the near-post/far-post areas) —
+        // marginally softer ATT spike than Goal Poacher, marginally less
+        // punishing in midfield.
+        if (third === 'ATT') mult *= central ? 1.45 : 1.15;
+        else if (third === 'MID') mult *= 0.6;
+        else if (third === 'DEF') mult *= 0.3;
+      } else if (s === 'Deep-Lying Forward') {
+        // Genuinely drops into midfield to collect the ball — the biggest
+        // MID-central spike of the two "drop deep" forward styles, with a
+        // real (not just mild) discount on staying central up front.
+        if (third === 'MID' && central) mult *= 1.45;
+        else if (third === 'ATT' && central) mult *= 0.8;
+      } else if (s === 'Hole Player') {
+        // The mirror image of Deep-Lying Forward: mostly found arriving
+        // late into the box (ATT-central), only occasionally dropping to
+        // link play — the reverse of that style's MID/ATT balance.
+        if (third === 'ATT' && central) mult *= 1.35;
+        else if (third === 'MID' && central) mult *= 1.05;
       } else if (s === 'Target Man') {
         if (third === 'ATT' && central) mult *= 1.3;
         if (!central) mult *= 0.75;
-      } else if (s === 'Dummy Runner' || s === 'Extra Frontman') {
+      } else if (s === 'Dummy Runner') {
+        // Makes decoy runs specifically INTO the attacking third to drag a
+        // marker away — no special central/wide preference, since the
+        // whole point is to run into whichever space the marker follows.
         if (third === 'ATT') mult *= 1.25;
-      } else if (s === 'Creative Playmaker' || s === 'Classic No. 10' || s === 'Orchestrator') {
-        if (central && third !== 'DEF') mult *= 1.35;
-        else if (!central) mult *= 0.8;
-      } else if (s === 'Prolific Winger' || s === 'Cross Specialist' || s === 'Roaming Flank') {
+      } else if (s === 'Extra Frontman') {
+        // Shares Dummy Runner's "found further forward than his slot
+        // implies" idea, but as an advanced CB rather than a forward — so
+        // his ATT spike also carries a real DEF discount, since he's
+        // specifically out of his defensive position when it happens.
+        if (third === 'ATT') mult *= 1.3;
+        else if (third === 'DEF') mult *= 0.85;
+      } else if (s === 'Creative Playmaker') {
+        // Roams to find pockets of space wherever the game needs him — the
+        // mildest wide penalty of the three central creators, since he's
+        // still willing to drift into a half-space to receive.
+        if (central && third !== 'DEF') mult *= 1.3;
+        else if (!central) mult *= 0.85;
+      } else if (s === 'Classic No. 10') {
+        // "Stays relatively central" by description — the strongest
+        // central lock and the harshest wide penalty of the three creators.
+        if (central && third !== 'DEF') mult *= 1.4;
+        else if (!central) mult *= 0.7;
+      } else if (s === 'Orchestrator') {
+        // Controls tempo from DEEPER areas specifically — his central
+        // spike is biggest in midfield, not the final third, unlike
+        // Classic No. 10/Creative Playmaker who both peak further forward.
+        if (third === 'MID' && central) mult *= 1.4;
+        else if (third === 'ATT' && central) mult *= 1.05;
+        else if (!central) mult *= 0.75;
+      } else if (s === 'Prolific Winger') {
         if (!central) mult *= 1.35;
         else mult *= 0.7;
+      } else if (s === 'Cross Specialist') {
+        // Even more touchline-bound than a Prolific Winger — "positions
+        // himself wide" is his entire identity, so the wide spike is
+        // sharper and the central penalty is harsher.
+        if (!central) mult *= 1.5;
+        else mult *= 0.55;
+      } else if (s === 'Roaming Flank') {
+        // The one wide style that genuinely leaves the touchline — wide
+        // and central positions both get a mild, roughly even boost
+        // instead of the strong wide-vs-central split every other winger
+        // style has, reflecting a player found all across the width.
+        mult *= central ? 1.1 : 1.15;
       } else if (s === 'Inside Forward') {
         if (central && third !== 'DEF') mult *= 1.35;
       } else if (s === 'Box-to-Box') {
         if (third === 'DEF' || third === 'ATT') mult *= 1.2;
-      } else if (s === 'Destroyer' || s === 'Anchor Man') {
-        if (third === 'ATT') mult *= 0.35;
-        else if (third === 'DEF' || (third === 'MID' && central)) mult *= 1.25;
+      } else if (s === 'Destroyer') {
+        // The more front-foot "diver" — happy to roam across a wider
+        // midfield strip hunting the ball, not just screen centrally in
+        // front of the back four the way Anchor Man does.
+        if (third === 'ATT') mult *= 0.45;
+        else if (third === 'MID') mult *= 1.3;
+        else if (third === 'DEF') mult *= 1.05;
+      } else if (s === 'Anchor Man') {
+        // The deeper, more disciplined "reader" — glued to DEF/central-MID
+        // screening duty far more strictly than Destroyer, and almost
+        // never found forward at all.
+        if (third === 'ATT') mult *= 0.25;
+        else if (third === 'DEF' || (third === 'MID' && central)) mult *= 1.3;
+        else if (third === 'MID') mult *= 0.9;
       } else if (s === 'Build Up') {
         if (third === 'DEF') mult *= 1.15;
-      } else if (s === 'Offensive Full-back' || s === 'Full-back Finisher') {
+      } else if (s === 'Offensive Full-back') {
         if (!central && third !== 'DEF') mult *= 1.4;
+      } else if (s === 'Full-back Finisher') {
+        // Shares Offensive Full-back's touchline bias further back, but
+        // specifically arrives centrally into the box late — the only
+        // full-back style with any ATT-central spike at all.
+        if (!central && third !== 'DEF') mult *= 1.3;
+        if (third === 'ATT' && central) mult *= 1.3;
       } else if (s === 'Defensive Full-back') {
         if (third === 'DEF') mult *= 1.25;
         else if (third === 'ATT') mult *= 0.6;
+      } else if (s === 'Pass Disruptor') {
+        // Screens centrally in midfield like Anchor Man, but reads passing
+        // lanes across the width rather than staying glued to the middle —
+        // no wide penalty, unlike the purely central defensive styles.
+        if (third === 'MID') mult *= 1.3;
+        else if (third === 'DEF') mult *= 1.1;
+        else if (third === 'ATT') mult *= 0.3;
+      } else if (s === 'Front Line Pressure') {
+        // Leads the press from the FRONT — the only defensive-minded style
+        // that's actually found further up the pitch more often, the
+        // opposite spatial signature from every screening/covering style.
+        if (third === 'ATT') mult *= 1.3;
+        else if (third === 'DEF') mult *= 0.6;
+      } else if (s === 'Attack Outlet') {
+        // Stays high as an out-ball for the counter regardless of channel —
+        // a flatter, permanently-advanced spread rather than Dummy
+        // Runner's "runs into whichever space opens up" pattern.
+        if (third === 'ATT') mult *= 1.35;
+        else if (third === 'DEF') mult *= 0.5;
+      } else if (s === 'High Line Master') {
+        // Steps up WITH the defensive line — strongly DEF-anchored, with
+        // real midfield presence when the line pushes up, but essentially
+        // never found forward (he's organizing the back line, not joining
+        // the attack).
+        if (third === 'DEF') mult *= 1.3;
+        else if (third === 'MID' && central) mult *= 1.1;
+        else if (third === 'ATT') mult *= 0.2;
+      } else if (s === 'Covering Role') {
+        // The deepest sweeper of the group — an even sharper DEF spike
+        // than High Line Master (he's the one actually dropping off to
+        // cover the space behind, not organizing a high line), with
+        // almost no presence further forward at all.
+        if (third === 'DEF') mult *= 1.4;
+        else if (third === 'MID' && central) mult *= 0.95;
+        else if (third === 'ATT') mult *= 0.15;
+      } else if (s === 'Shadow Marker') {
+        // Tracks a single opponent man-for-man rather than holding a zone —
+        // a flatter multiplier across DEF/MID regardless of channel (he
+        // goes wherever his man goes), with only a mild forward discount.
+        if (third === 'DEF' || third === 'MID') mult *= 1.2;
+        else if (third === 'ATT') mult *= 0.7;
       }
     });
     return Math.max(0.15, Math.min(2.2, mult));
@@ -8881,7 +9125,16 @@ var App = (() => {
         if (!m.personalityMomentum) m.personalityMomentum = {};
         m.personalityMomentum[shooter.id] = 0;
       }
-      addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
+      // A genuinely big chance going begging is worth describing *how* the
+      // shooter got into that position in the first place — a Target Man
+      // climbing above his marker reads differently from a Full-back
+      // Finisher arriving unmarked from deep — instead of every big-chance
+      // miss reading exactly like a routine one (BIG_CHANCE_FLAVOR,
+      // data/playerDatabase.js).
+      const bigChanceFlavor = isBigChance ? styleFlavor(shooter, BIG_CHANCE_FLAVOR) : null;
+      addEvent(m.minute, 'miss', bigChanceFlavor
+        ? `Big chance! <span class="player">${shooter.name}</span> (${attTeam.team.short}) ${bigChanceFlavor}, but can't make it count.`
+        : sofascoreMiss(shooter, attTeam.team), attackingSide);
       // Note: through-ball offside is now judged spatially, up front, in
       // resolveChanceCreation() before the shot is ever attempted — see
       // checkLiveOffside() in engine/offside.js — so there's no separate
@@ -9952,8 +10205,16 @@ var App = (() => {
 
       if (decision.action === 'backpass') {
         // Plays it safe and recycles — the move fizzles out this minute
-        // rather than being forced forward into a bad situation.
-        addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> plays it back — no risks taken`, attackingSide);
+        // rather than being forced forward into a bad situation. A
+        // playstyle-flavored line (POSSESSION_FLAVOR, data/playerDatabase.js)
+        // takes over when the carrier has one, so an Anchor Man shielding
+        // the ball in front of his back line reads differently from an
+        // Orchestrator patiently resetting the tempo, rather than both
+        // producing the same generic "no risks taken" line.
+        const possessionFlavor = styleFlavor(carrier, POSSESSION_FLAVOR);
+        addEvent(m.minute, 'pass', possessionFlavor
+          ? `<span class="player">${carrier.name}</span> ${possessionFlavor}`
+          : `<span class="player">${carrier.name}</span> plays it back — no risks taken`, attackingSide);
         return;
       }
 
