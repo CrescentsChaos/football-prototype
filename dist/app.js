@@ -971,6 +971,36 @@ var App = (() => {
       home: rollSquadConditions(m.home.squad),
       away: rollSquadConditions(m.away.squad)
     };
+    // Team-wide "on the day" factor — see rollTeamDayFactor() below for why
+    // this exists alongside the per-player condition rolls above.
+    m.teamDayFactor = {
+      home: rollTeamDayFactor(),
+      away: rollTeamDayFactor()
+    };
+  }
+
+  // Per-player condition above is rolled independently for all ~18 squad
+  // members, so across a full 90 minutes the good and bad individual days
+  // mostly average back out to "normal" for the team as a whole — real
+  // football isn't like that: a whole side can click as a unit or be
+  // collectively second-best on a given afternoon (a game plan that works
+  // or doesn't, a crowd that lifts or silences a team, a slow start the
+  // XI never shakes), independent of any one player's own form. This rolls
+  // ONE shared value per side, ONCE at kickoff, so it survives the full
+  // match instead of washing out minute to minute the way independent
+  // per-event randomness does — it's the difference between "some players
+  // had a rough game" and "the team had a rough day". Summing three
+  // draws instead of taking one gives a bell-shaped spread (most days sit
+  // close to a team's real level; a true shock performance is rare, not
+  // routine), and TEAM_DAY_FACTOR_SWING keeps the tails from ever
+  // overwhelming genuine squad quality. Consumed by calcTeamStrength()
+  // in engine/matchEngine.js, so it feeds attack, defence and every
+  // downstream read (chance creation, shot quality, tactics, offside
+  // line, etc.) consistently for the whole 90 minutes.
+  const TEAM_DAY_FACTOR_SWING = 8;
+  function rollTeamDayFactor() {
+    const raw = (seededRandom() + seededRandom() + seededRandom() - 1.5) / 1.5; // ~bell-shaped, -1..1
+    return raw * TEAM_DAY_FACTOR_SWING;
   }
   // Live lookup of a player's rolled condition for the match currently
   // in progress. Falls back to "Normal" (neutral) outside of a match, or
@@ -10369,12 +10399,19 @@ var App = (() => {
     // from the outfield att/def numbers above (see gkShotStoppingRating()
     // in engine/goalkeeper.js).
     const gk = activeGoalkeeper(isHome ? 'home' : 'away');
+    // This side's team-wide "on the day" factor (engine/form.js,
+    // rollTeamDayFactor) — one shared value rolled once at kickoff and
+    // applied here, the single choke point every consumer of team
+    // strength reads through, so a team that's clicking (or flat) that
+    // day plays that way consistently across the whole match rather than
+    // it washing out minute to minute.
+    const dayFactor = (currentMatch.teamDayFactor && currentMatch.teamDayFactor[isHome ? 'home' : 'away']) || 0;
     return {
       // Manager overall now carries real weight: a top tactician visibly lifts
       // both ends of the pitch, a poor one visibly drags them down.
-      att: weightedAvg('att', posAttWeight, 70) + (mgr - 75) * 0.18 + pmods.attBonus + homeBoostAtt + attShape,
-      def: weightedAvg('def', posDefWeight, 70) + (mgr - 75) * 0.16 + pmods.defBonus + homeBoostDef + defShape,
-      tec: avg('tec', 70) + midShape,
+      att: weightedAvg('att', posAttWeight, 70) + (mgr - 75) * 0.18 + pmods.attBonus + homeBoostAtt + attShape + dayFactor,
+      def: weightedAvg('def', posDefWeight, 70) + (mgr - 75) * 0.16 + pmods.defBonus + homeBoostDef + defShape + dayFactor,
+      tec: avg('tec', 70) + midShape + dayFactor * 0.4,
       ovr: avg('ovr', 75),
       phy: avg('phy', 70),
       pac: avg('pac', 70),
