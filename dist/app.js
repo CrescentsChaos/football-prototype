@@ -2626,14 +2626,14 @@ var App = (() => {
   // whose expanded attribute sheet actually lists a personality array;
   // most players simply have none.
   const PERSONALITY_DESCRIPTIONS = {
-    'Big-Game':             'Raises his own shot quality in high-stakes moments — derbies, finals, close games late on.',
-    'Fragile':              'The mirror of Big-Game — shot quality drops under those same high-stakes moments.',
+    'Big-Game':             'Steps up in high-stakes moments — derbies, finals, close games late on: takes the chance more often, trusts the composed placed finish, and finishes it better.',
+    'Fragile':              'The mirror of Big-Game — under those same high-stakes moments he shies away from the shot, snatches at it when it comes, and finishes it worse.',
     'Ice-Cold':             'A cool head from the penalty spot and on free-kicks when the stakes are up.',
     'Bottler':              'The mirror of Ice-Cold — penalty and free-kick conversion suffers when the stakes are up.',
     'Big Occasion Flop':    'Passing accuracy drops specifically in high-stakes moments.',
     'Big Occasion Riser':   'Match rating ceiling rises in cup and knockout fixtures.',
-    'Confidence Player':    'Grows in composure while on a scoring run this match, resetting the moment a chance goes begging.',
-    "Finisher's Instinct":  'An extra edge on shot quality late in a match, whatever the scoreline.',
+    'Confidence Player':    'Grows in composure while on a scoring run this match — wants the ball more and tries bolder finishes — resetting the moment a chance goes begging.',
+    "Finisher's Instinct":  'Late in a match, whatever the scoreline, he hunts the ball in the box, pounces on close-range chances and finishes them better.',
     'Homebody':             'Less effective in front of goal, in passing, and in dribbling away from home.',
     'Set-Piece Specialist': 'A composure boost at corners and free-kicks, at all times.',
     'Volatile':             'More likely to commit a foul himself.',
@@ -2655,6 +2655,15 @@ var App = (() => {
     'Loyal':                'Lower willingness to push for a move away from his current club.',
     'Journeyman':           'The mirror of Loyal — higher willingness to move clubs.',
     'Mentor':               'Speeds up the development of younger teammates who share his position group.',
+    'Long Ball Expert':     'Plays a lot more of his passing long and lofted — reaches for the switch and the diagonal — and completes them better against a press.',
+    'Early Crosser':        'Crosses more often, and from deeper: on the flank he will whip the ball in early rather than work it into the final third first.',
+    'Playmaker':            'Looks to create rather than finish: leans toward the through ball and the key pass, and is a less likely finisher of the move himself.',
+    'Incisive Run':         'Drives straight at goal: carries the ball forward more, is the runner a through ball or cutback finds, and is harder to stop through midfield.',
+    'Mazing Run':           'A twisting, close-control dribbler: takes on more defenders and is at his best against heavy pressure, at the cost of holding the ball less.',
+    'Trickster':            'Loves to take a man on and try the unexpected — more dribbles and chips — and draws extra fouls from the defenders he beats.',
+    'Speeding Bullet':      'Pace is his weapon: carries into space more, gets in behind on through balls and counters, and is hardest to stop when there is room to run.',
+    'Ball-carrying':        'Prefers to drive forward with the ball at his feet rather than pass it, and is a little more secure doing so.',
+    'Aggressive':           'Throws himself into challenges: a little more success on the tackle, and a higher foul rate.',
     'Prodigy':              'Faster development while young, at the cost of more volatile in-match form during those years.'
   };
 
@@ -3832,6 +3841,609 @@ const PLAYSTYLE_BEHAVIOR = {
     }
     return sum;
   }
+
+  // ===== Player identity =======================================================
+  // Turns a player's raw stat profile, playstyle tag(s) and personality tag(s)
+  // into things he actually DOES on the pitch, instead of only nudging a number:
+  //
+  //   * Shot technique  - every non-header shot is taken with a concrete
+  //     technique (placed / driven / curled / chip / first-time / poach). Which
+  //     one he reaches for is drawn from his own attributes (Curl, Kicking
+  //     Power, Off Awareness, Ball Control...), skills, playstyle and
+  //     personality; each technique trades accuracy, power, block risk and the
+  //     goalkeeper trait that beats it differently. The goal/miss commentary is
+  //     now a description of the technique that really happened.
+  //   * Pass identity   - Low Pass vs Lofted Pass (plus curl, skills, tags) set
+  //     how much of a player's passing is ground vs lofted, how often he
+  //     crosses, and how ambitious his distribution is. In the possession
+  //     pipeline a ground pass is judged on Low Pass/Ball Control and a lofted
+  //     one on Lofted Pass/Curl - and the receiver of a lofted ball is judged in
+  //     the air, not on the ground.
+  //   * Chance identity - who ends up on the end of a through ball, cross or
+  //     cutback depends on playstyle (Goal Poacher vs Target Man vs Hole Player)
+  //     and traits, not only on position.
+  //   * Ball-carrying   - dribble (take-on) ability and carry (drive) ability
+  //     read different attributes; several personalities change how a player
+  //     goes about it.
+  //   * Personality as behaviour - Big-Game/Fragile/Confidence Player/Finisher's
+  //     Instinct now change how often a player takes responsibility and which
+  //     technique he trusts, on top of a (smaller) quality edge. Tags that used
+  //     to be inert (Long Ball Expert, Early Crosser, Playmaker, Incisive Run,
+  //     Mazing Run, Trickster, Speeding Bullet, Ball-carrying, Aggressive)
+  //     now have hooks.
+  //
+  // Every function here returns a neutral value (1 / 0) for a player with no
+  // relevant tags, and the compact att/tec/pac/phy card is used as a fallback
+  // where a player has no authored attribute sheet, so nothing is a hard
+  // dependency on player-attributes.json.
+  function idClamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function idStochRound(x) { const f = Math.floor(x); return f + (seededRandom() < (x - f) ? 1 : 0); }
+
+  function personalityOf(p) { return (p && p.expandedAttrs && p.expandedAttrs.personality) || []; }
+  function hasTrait(p, tag) { return personalityOf(p).indexOf(tag) !== -1; }
+
+  // Raw 0-99 attribute read: the authored sheet if the player has one,
+  // otherwise derived from the compact card so regular players still flow
+  // through the same code (and differ by playstyle tag instead).
+  function idAttr(p, key) {
+    const v = xattr(p, key, null);
+    if (v != null) return v;
+    if (!p) return 70;
+    const att = p.att || 70, tec = p.tec || 70, pac = p.pac || 70, phy = p.phy || 70;
+    switch (key) {
+      case 'fin': case 'off_awr': return att;
+      case 'kick_pwr': return att * 0.5 + phy * 0.5;
+      case 'curl': case 'ball_con': case 'tight_pos': case 'low_pass': case 'lofted_pass': case 'dribb': return tec;
+      case 'place_kick': return att * 0.5 + tec * 0.5;
+      case 'bal': return pac * 0.5 + phy * 0.5;
+      case 'accel': case 'spd': return pac;
+      case 'phy_con': case 'jmp': return phy;
+      case 'head': return phy * 0.6 + att * 0.4;
+      default: return 70;
+    }
+  }
+  function idCurved(p, key) { return curvedAttr(idAttr(p, key), 70) / 100; }
+  function idMix(p, weights) {
+    let s = 0, t = 0;
+    for (const k in weights) { s += idCurved(p, k) * weights[k]; t += weights[k]; }
+    return t ? s / t : 0.7;
+  }
+  // Product of a per-playstyle multiplier field across every tag a player has.
+  function idStyleMult(p, table, field) {
+    const tags = playstyleTagsOf(p);
+    let m = 1;
+    for (let i = 0; i < tags.length; i++) {
+      const e = table[tags[i]];
+      if (e && typeof e[field] === 'number') m *= e[field];
+    }
+    return m;
+  }
+  function idStyleSum(p, table, field) {
+    const tags = playstyleTagsOf(p);
+    let s = 0;
+    for (let i = 0; i < tags.length; i++) {
+      const e = table[tags[i]];
+      if (e && typeof e[field] === 'number') s += e[field];
+    }
+    return s;
+  }
+
+  // Match-state reads used by the behavioural personality hooks.
+  function idStakes() {
+    const m = currentMatch;
+    if (!m) return false;
+    return computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score);
+  }
+  function idMomentum(p) {
+    const m = currentMatch;
+    return Math.min(3, (m && m.personalityMomentum && p && m.personalityMomentum[p.id]) || 0);
+  }
+  function idMinute() { const m = currentMatch; return m ? (m.minute || 0) : 0; }
+  // ----- Pass identity ---------------------------------------------------------
+  // lean  : multiplier on how much of his passing is lofted (1 = the average
+  //         player in his position). Driven by Lofted Pass minus Low Pass.
+  // cross : multiplier on how often he whips the ball into the box.
+  // amb   : how ambitious/risky his distribution is (-0.2 .. +0.35). Ambitious
+  //         passers reach for through balls and complete fewer passes.
+  const PASS_STYLE_IDENTITY = {
+    'Cross Specialist':      { lean: 1.35, cross: 1.6 },
+    'Prolific Winger':       { lean: 1.05, cross: 1.2 },
+    'Inside Forward':        { lean: 0.85, cross: 0.7, amb: 0.04 },
+    'Roaming Flank':         { lean: 0.8,  cross: 0.7, amb: 0.03 },
+    'Orchestrator':          { lean: 1.2,  amb: 0.08 },
+    'Creative Playmaker':    { lean: 0.85, amb: 0.16 },
+    'Classic No. 10':        { lean: 0.8,  cross: 0.6, amb: 0.12 },
+    'Deep-Lying Forward':    { lean: 0.85, amb: 0.06 },
+    'Target Man':            { lean: 0.9,  cross: 0.5 },
+    'Build Up':              { lean: 0.8,  amb: -0.02 },
+    'Anchor Man':            { lean: 0.8,  amb: -0.12 },
+    'Destroyer':             { lean: 0.9,  amb: -0.08 },
+    'Pass Disruptor':        { lean: 0.85, amb: -0.06 },
+    'Offensive Full-back':   { lean: 1.1,  cross: 1.3, amb: 0.02 },
+    'Defensive Full-back':   { lean: 1.0,  cross: 0.6, amb: -0.08 },
+    'Full-back Finisher':    { lean: 0.9 },
+    'Extra Frontman':        { amb: 0.05 },
+    'Box-to-Box':            { amb: 0.03 },
+    'Offensive Goalkeeper':  { lean: 0.75, amb: 0.02 },
+    'Defensive Goalkeeper':  { lean: 1.3,  amb: -0.05 }
+  };
+
+  const idPassCache = new WeakMap();
+  function passIdentity(p) {
+    if (!p) return { lean: 1, cross: 1, amb: 0 };
+    const ea = p.expandedAttrs;
+    const hit = idPassCache.get(p);
+    if (hit && hit.ea === ea && hit.tec === p.tec) return hit.v;
+    const low = idAttr(p, 'low_pass'), lof = idAttr(p, 'lofted_pass'), curl = idAttr(p, 'curl');
+    // +2.6: across the authored sheets Lofted Pass sits ~2.6 below Low Pass on
+    // average, so an average passer lands on a lean of 1.
+    let lean = 1 + (lof - low + 2.6) * 0.06;
+    let cross = 1 + ((lof * 0.6 + curl * 0.4) - 80) * 0.010; // 80 = mean of the authored sheets
+    let amb = ((p.tec || 70) - 82) * 0.004; // 82 = mean tec of the authored sheets
+    if (ea) {
+      if (hasSkill(p, 'Low Lofted Pass')) lean *= 1.12;
+      if (hasSkill(p, 'Pinpoint Crossing') || hasSkill(p, 'Edged Crossing')) cross *= 1.2;
+      if (hasSkill(p, 'Through Passing')) amb += 0.05;
+      if (hasSkill(p, 'Visionary Pass')) amb += 0.05;
+      if (hasSkill(p, 'Phenomenal Pass')) amb += 0.04;
+      if (hasSkill(p, 'No Look Pass')) amb += 0.02;
+      if (hasTrait(p, 'Long Ball Expert')) { lean *= 1.5; amb += 0.03; }
+      if (hasTrait(p, 'Early Crosser')) cross *= 1.4;
+      if (hasTrait(p, 'Playmaker')) amb += 0.10;
+      if (hasTrait(p, 'Team Player')) amb += 0.02;
+    }
+    lean *= idStyleMult(p, PASS_STYLE_IDENTITY, 'lean');
+    cross *= idStyleMult(p, PASS_STYLE_IDENTITY, 'cross');
+    amb += idStyleSum(p, PASS_STYLE_IDENTITY, 'amb');
+    const v = { lean: idClamp(lean, 0.45, 2.0), cross: idClamp(cross, 0.4, 2.2), amb: idClamp(amb, -0.2, 0.35) };
+    idPassCache.set(p, { ea: ea, tec: p.tec, v: v });
+    return v;
+  }
+
+  // Which kind of pass this transition is: a switch is always lofted;
+  // otherwise it's drawn from the passer's own ground/lofted lean, with more
+  // long balls late in the move (direct) and over a high press.
+  function pickPassType(p, action, fromThird, defTac) {
+    if (action === 'switch') return 'lofted';
+    const slot = (p && (p.slot || (p.pos || [])[0])) || 'CM';
+    const base = LOFTED_PASS_SHARE[slot] != null ? LOFTED_PASS_SHARE[slot] : 0.22;
+    let share = base * passIdentity(p).lean * (fromThird === 'DEF' ? 0.85 : 1.1);
+    if (defTac === 'press') share *= 1.15;
+    return seededRandom() < idClamp(share, 0.03, 0.8) ? 'lofted' : 'ground';
+  }
+
+  // Ability for one specific pass type. The blended passingAbility() keeps all
+  // the skill bonuses / stakes / stamina it already had; the type-specific
+  // reads (Low Pass + Ball Control + Tight Possession vs Lofted Pass + Curl)
+  // pull it toward whichever kind of ball this actually is.
+  function typedPassAbility(p, type) {
+    const blend = passingAbility(p);
+    const g = groundPassingAbility(p), a = aerialPassingAbility(p);
+    return blend + 0.9 * ((type === 'lofted' ? a : g) - (g + a) / 2);
+  }
+  // ----- Ball-carrying identity --------------------------------------------------
+  // A take-on (dribble) is beating a man with close control; a carry is driving
+  // into space with pace and strength. The blended carryingAbility() lumps both
+  // together; this re-weights it toward the one actually being attempted so a
+  // quick winger with poor close control and a slow ball-playing dribbler stop
+  // reading as the same player.
+  function typedCarryAbility(p, action) {
+    const base = carryingAbility(p);
+    const ea = p && p.expandedAttrs;
+    if (!ea || typeof ea.dribb !== 'number' || typeof ea.spd !== 'number') return base;
+    const blend = curvedAttr((ea.dribb + (ea.ball_con || 70) + (ea.bal || 70) + ea.spd + (ea.phy_con || 70)) / 5, 70);
+    const typeRaw = action === 'dribble'
+      ? (ea.dribb + (ea.ball_con || 70) + (ea.bal || 70) + (ea.tight_pos || 70)) / 4
+      : (ea.spd + (ea.accel || ea.spd) + (ea.bal || 70) + (ea.phy_con || 70)) / 4;
+    const ratio = idClamp(curvedAttr(typeRaw, 70) / Math.max(40, blend), 0.86, 1.14);
+    return base * ratio;
+  }
+
+  // Personality-driven adjustment to the chance a carry/dribble comes off.
+  function carryIdentityBonus(p, action, runPressure, fromThird) {
+    if (!p || !p.expandedAttrs) return 0;
+    let b = 0;
+    if (hasTrait(p, 'Mazing Run') && action === 'dribble') b += runPressure > 65 ? 0.05 : -0.005;
+    if (hasTrait(p, 'Trickster') && action === 'dribble') b += 0.03;
+    if (hasTrait(p, 'Speeding Bullet') && action === 'carry') b += runPressure < 62 ? 0.035 : 0.01;
+    if (hasTrait(p, 'Incisive Run') && fromThird === 'MID') b += 0.025;
+    if (hasTrait(p, 'Ball-carrying') && action === 'carry') b += 0.02;
+    return b;
+  }
+  // ----- Shot technique ------------------------------------------------------------
+  // attrs   : the attributes that make this technique work (weights).
+  // ctx     : relative likelihood of the technique per chance type.
+  // q       : how strongly a player's *specialisation* in it (technique fit
+  //           minus his plain Finishing) moves shot quality - so two players
+  //           with the same Finishing but different Curl / Kicking Power / Off
+  //           Awareness genuinely shoot differently.
+  // onTarget/power/block : flat modifiers to the shot itself.
+  // gk      : which goalkeeper trait is the one that beats it (reflex, reach,
+  //           positioning) - read by resolveGkSave().
+  const SHOT_TECHNIQUES = {
+    placed: {
+      label: 'placed finish',
+      attrs: { fin: 0.45, place_kick: 0.25, ball_con: 0.15, off_awr: 0.15 },
+      ctx: { openplay: 0.34, throughball: 0.40, cutback: 0.44, dribble: 0.32, counter: 0.38, longshot: 0.05, cross: 0.10 },
+      q: 1.0, onTarget: 0.035, power: -0.12, block: 0.0, gk: 'reach'
+    },
+    driven: {
+      label: 'driven strike',
+      attrs: { kick_pwr: 0.5, fin: 0.3, bal: 0.1, phy_con: 0.1 },
+      ctx: { openplay: 0.26, throughball: 0.16, cutback: 0.18, dribble: 0.20, counter: 0.22, longshot: 0.34, cross: 0.12 },
+      q: 1.0, onTarget: -0.025, power: 0.20, block: 0.01, gk: 'reflex'
+    },
+    curled: {
+      label: 'curled effort',
+      attrs: { curl: 0.5, fin: 0.25, place_kick: 0.25 },
+      ctx: { openplay: 0.14, throughball: 0.06, cutback: 0.08, dribble: 0.24, counter: 0.10, longshot: 0.32 },
+      q: 1.0, onTarget: 0.0, power: -0.04, block: -0.02, gk: 'reach'
+    },
+    chip: {
+      label: 'chip',
+      attrs: { fin: 0.40, ball_con: 0.30, tight_pos: 0.15, place_kick: 0.15 },
+      ctx: { throughball: 0.09, counter: 0.09, dribble: 0.07, openplay: 0.025, cutback: 0.02, longshot: 0.02 },
+      q: 1.0, onTarget: -0.01, power: -0.30, block: -0.03, gk: 'position'
+    },
+    firsttime: {
+      label: 'first-time strike',
+      attrs: { fin: 0.35, ball_con: 0.20, off_awr: 0.20, bal: 0.15, accel: 0.10 },
+      ctx: { cross: 0.50, cutback: 0.26, openplay: 0.16, throughball: 0.08, counter: 0.06, dribble: 0.02, longshot: 0.04 },
+      q: 1.0, onTarget: -0.03, power: 0.04, block: -0.06, gk: 'reflex'
+    },
+    poach: {
+      label: 'close-range poach',
+      attrs: { off_awr: 0.50, fin: 0.30, accel: 0.10, bal: 0.10 },
+      ctx: { cross: 0.30, cutback: 0.28, throughball: 0.16, openplay: 0.12, counter: 0.10, dribble: 0.04 },
+      q: 1.0, onTarget: 0.02, power: -0.05, block: -0.02, gk: 'reflex'
+    }
+  };
+  // A shot that drops to a player off a keeper's parry is scrappy, close-range
+  // work - it isn't drawn from the open-play table.
+  const REBOUND_TECH_CTX = { poach: 0.50, firsttime: 0.30, driven: 0.15, placed: 0.05 };
+
+  // playstyle -> relative preference for each technique.
+  const STYLE_SHOT_TECH = {
+    'Goal Poacher':       { poach: 1.6, firsttime: 1.25, placed: 1.1, chip: 0.8, curled: 0.6, driven: 0.9 },
+    'Fox in the Box':     { poach: 1.9, firsttime: 1.3, driven: 0.9, curled: 0.5, chip: 0.7 },
+    'Target Man':         { driven: 1.3, poach: 1.2, curled: 0.5, chip: 0.5 },
+    'Deep-Lying Forward': { placed: 1.15, curled: 1.2, chip: 1.1, poach: 0.7 },
+    'Dummy Runner':       { placed: 1.1, poach: 1.1 },
+    'Creative Playmaker': { curled: 1.35, placed: 1.15, chip: 1.2, poach: 0.7, driven: 0.8 },
+    'Hole Player':        { firsttime: 1.35, poach: 1.2, driven: 1.1, curled: 0.9 },
+    'Classic No. 10':     { curled: 1.3, placed: 1.2, chip: 1.15, driven: 0.9, poach: 0.7 },
+    'Prolific Winger':    { curled: 1.5, placed: 1.1, poach: 0.8, driven: 0.9 },
+    'Cross Specialist':   { curled: 1.15, driven: 1.1, poach: 0.6 },
+    'Roaming Flank':      { curled: 1.2, driven: 1.1 },
+    'Inside Forward':     { curled: 1.6, placed: 1.15, poach: 0.8 },
+    'Box-to-Box':         { driven: 1.35, firsttime: 1.15, curled: 0.85 },
+    'Destroyer':          { driven: 1.4, placed: 0.8, curled: 0.8 },
+    'Anchor Man':         { driven: 1.4, placed: 0.8, curled: 0.8 },
+    'Orchestrator':       { curled: 1.2, placed: 1.1 },
+    'Extra Frontman':     { firsttime: 1.3, driven: 1.2, poach: 1.2 },
+    'Offensive Full-back':{ driven: 1.25, curled: 1.1 },
+    'Full-back Finisher': { firsttime: 1.3, poach: 1.3, driven: 1.1 },
+    'Attack Outlet':      { placed: 1.15, chip: 1.2 }
+  };
+
+  // Skills that push a player toward (or away from) a technique.
+  function idSkillTechMult(p, id, chanceType) {
+    if (!p || !p.expandedAttrs) return 1;
+    let m = 1;
+    const far = chanceType === 'longshot';
+    if (id === 'curled') {
+      if (hasSkill(p, 'Long-Range Curler') || hasSkill(p, 'Long Range Curler')) m *= far ? 1.6 : 1.25;
+      if (hasSkill(p, 'Outside Curler')) m *= 1.3;
+      if (hasSkill(p, 'Blitz Curler')) m *= 3;
+    }
+    if (id === 'driven') {
+      if (hasSkill(p, 'Long Range Shooting')) m *= far ? 1.5 : 1.1;
+      if (hasSkill(p, 'Low Screamer')) m *= 1.6;
+      if (hasSkill(p, 'Rising Shot') || hasSkill(p, 'Dipping Shot') || hasSkill(p, 'Knuckle Shot')) m *= 1.3;
+    }
+    if (id === 'chip' && hasSkill(p, 'Chip Shot Control')) m *= 2.5;
+    if (id === 'firsttime') {
+      if (hasSkill(p, 'First-time Shot')) m *= 1.6;
+      if (hasSkill(p, 'Acrobatic Finishing')) m *= 1.3;
+      if (hasSkill(p, 'Snap Strike')) m *= 1.4;
+    }
+    if (id === 'placed' && hasSkill(p, 'Phenomenal Finishing')) m *= 1.2;
+    return m;
+  }
+
+  // Personality -> technique preference. This is where a temperament turns
+  // into a way of shooting: a Fragile forward snatches at chances under
+  // pressure, an Ice-Cold one picks his spot, a Showboat tries the chip.
+  function idPersonalityTechMult(p, id, stakes, momentum) {
+    const per = personalityOf(p);
+    if (!per.length) return 1;
+    let m = 1;
+    if (per.indexOf('Showboat') !== -1) { if (id === 'chip') m *= 1.8; else if (id === 'curled') m *= 1.15; else if (id === 'driven') m *= 0.9; else if (id === 'poach') m *= 0.8; }
+    if (per.indexOf('Trickster') !== -1) { if (id === 'chip') m *= 1.3; else if (id === 'curled') m *= 1.1; }
+    if (per.indexOf('Selfish') !== -1 && (id === 'driven' || id === 'curled')) m *= 1.15;
+    if (per.indexOf('Calm') !== -1 && id === 'placed') m *= 1.1;
+    if (per.indexOf('Volatile') !== -1 && (id === 'driven' || id === 'firsttime')) m *= 1.1;
+    if (per.indexOf('Set-Piece Specialist') !== -1 && id === 'curled') m *= 1.15;
+    if (stakes) {
+      if (per.indexOf('Ice-Cold') !== -1) { if (id === 'placed') m *= 1.35; else if (id === 'driven') m *= 0.85; }
+      if (per.indexOf('Big-Game') !== -1) { if (id === 'placed') m *= 1.2; else if (id === 'chip') m *= 0.8; }
+      if (per.indexOf('Fragile') !== -1) {
+        if (id === 'firsttime') m *= 1.35; else if (id === 'driven') m *= 1.25;
+        else if (id === 'placed') m *= 0.75; else if (id === 'chip') m *= 0.7;
+      }
+    }
+    if (momentum > 0 && per.indexOf('Confidence Player') !== -1) {
+      if (id === 'chip') m *= 1 + 0.25 * momentum;
+      else if (id === 'curled') m *= 1 + 0.15 * momentum;
+    }
+    if (per.indexOf("Finisher's Instinct") !== -1 && idMinute() > 80) {
+      if (id === 'poach') m *= 1.3; else if (id === 'placed') m *= 1.15;
+    }
+    return m;
+  }
+
+  // Specialisation: how much better (or worse) the player is at this technique
+  // than his plain Finishing - the part Finishing alone can't tell you.
+  function shotTechSpec(p, id) {
+    const t = SHOT_TECHNIQUES[id];
+    return idMix(p, t.attrs) - idCurved(p, 'fin');
+  }
+
+  const SHOT_TECH_SPEC_K = 5;      // how sharply specialisation skews technique choice
+  const SHOT_TECH_Q_SCALE = 0.30;  // spec -> shot-quality
+  const SHOT_TECH_Q_CAP = 0.06;
+  // Zero-point shift so the population average of the technique quality edge
+  // sits at ~0 after players lean toward their best technique (re-tuned with
+  // test/identity-harness.js).
+  const SHOT_TECH_Q_OFFSET = 0.0;
+
+  // Lofted-vs-ground balance in the possession pipeline (tuned with
+  // test/identity-harness.js so team-level pass completion and shot volume
+  // stay where the earlier balance passes put them).
+  const LOFTED_PASS_ACC_DELTA = -0.03;
+  const LOFTED_RECEIVE_OFFSET = 14;
+
+  // Picks the technique for one (non-header) shot. Returns { id, spec }.
+  function pickShotTechnique(shooter, chanceType, opts) {
+    opts = opts || {};
+    const stakes = idStakes();
+    const momentum = idMomentum(shooter);
+    const ids = Object.keys(SHOT_TECHNIQUES);
+    const weights = [];
+    let total = 0;
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const t = SHOT_TECHNIQUES[id];
+      const base = opts.rebound ? REBOUND_TECH_CTX[id] : t.ctx[chanceType];
+      if (!base) { weights.push(0); continue; }
+      const spec = shotTechSpec(shooter, id);
+      let w = base * Math.exp(SHOT_TECH_SPEC_K * spec)
+        * idStyleMult(shooter, STYLE_SHOT_TECH, id)
+        * idSkillTechMult(shooter, id, chanceType)
+        * idPersonalityTechMult(shooter, id, stakes, momentum);
+      w = Math.max(0.0005, w);
+      weights.push(w);
+      total += w;
+    }
+    if (!(total > 0)) return { id: 'placed', spec: 0 };
+    let r = seededRandom() * total;
+    for (let i = 0; i < ids.length; i++) {
+      r -= weights[i];
+      if (r <= 0 && weights[i] > 0) return { id: ids[i], spec: shotTechSpec(shooter, ids[i]) };
+    }
+    return { id: 'placed', spec: 0 };
+  }
+
+  // Everything a chosen technique changes about the shot.
+  function shotTechniqueEffects(tech) {
+    const t = SHOT_TECHNIQUES[tech.id];
+    return {
+      q: idClamp(tech.spec * SHOT_TECH_Q_SCALE * t.q + SHOT_TECH_Q_OFFSET, -SHOT_TECH_Q_CAP, SHOT_TECH_Q_CAP),
+      onTarget: t.onTarget + idClamp(tech.spec * 0.10, -0.03, 0.03),
+      power: t.power,
+      block: t.block,
+      gk: t.gk
+    };
+  }
+  // ----- Goal / miss descriptions from the technique actually used -----------------
+  const TECH_GOAL_METHODS = {
+    placed: [
+      { d: 'side-footed placement into the far corner', xg: 0.36 },
+      { d: 'calm side-foot finish into the corner', xg: 0.36 },
+      { d: 'low finish across the keeper', xg: 0.38 },
+      { d: 'rolls it into the bottom corner', xg: 0.37 }
+    ],
+    driven: [
+      { d: 'powerful strike into the roof of the net', xg: 0.33 },
+      { d: 'low driven finish across the keeper', xg: 0.38 },
+      { d: 'thumps it past the keeper', xg: 0.32 }
+    ],
+    curled: [
+      { d: 'curled finish into the far corner', xg: 0.24 },
+      { d: 'bends it around the keeper into the corner', xg: 0.24 },
+      { d: 'inch-perfect curled finish', xg: 0.22 }
+    ],
+    chip: [
+      { d: 'chip over the advancing keeper', xg: 0.20 },
+      { d: 'dinks it over the keeper', xg: 0.20 }
+    ],
+    firsttime: [
+      { d: 'first-time finish', xg: 0.22 },
+      { d: 'sweeps it home first time', xg: 0.22 },
+      { d: 'first-time volley on the half-turn', xg: 0.18 }
+    ],
+    poach: [
+      { d: 'tap-in from close range', xg: 0.58 },
+      { d: "poacher's finish at the far post", xg: 0.48 },
+      { d: 'toe-poke under the keeper', xg: 0.40 },
+      { d: 'gets a foot to it at the near post', xg: 0.46 }
+    ]
+  };
+  const REBOUND_GOAL_METHODS = [
+    { d: 'rebound smashed home', xg: 0.42 },
+    { d: 'pounces on the rebound', xg: 0.44 }
+  ];
+  const HEADER_GOAL_METHODS = [
+    { d: 'towering header', xg: 0.30 },
+    { d: 'glancing near-post header', xg: 0.28 },
+    { d: 'powerful header into the corner', xg: 0.30 }
+  ];
+
+  function idPick(arr) { return arr[Math.floor(seededRandom() * arr.length)]; }
+
+  // Goal description for a header or a technique-driven shot.
+  function techniqueGoalMethod(shooter, tech, chanceType, isHeader, rebound) {
+    if (isHeader) {
+      if (hasSkill(shooter, 'Bullet Header') && seededRandom() < 0.4) return { desc: 'bullet header that flies past the keeper', xg: 0.28, puskas: false };
+      const h = idPick(HEADER_GOAL_METHODS);
+      return { desc: h.d, xg: h.xg, puskas: false };
+    }
+    const far = chanceType === 'longshot';
+    const id = tech ? tech.id : 'placed';
+    // Skill-signature finishes, only when the technique they belong to was used.
+    if (id === 'curled' && hasSkill(shooter, 'Blitz Curler')) {
+      const blitzChance = Math.max(0.35, Math.min(0.8, 0.5 + blitzCurlerEdge(shooter) * 1.5));
+      if (seededRandom() < blitzChance) return { desc: 'blitz curler into the top corner', xg: 0.15, puskas: true };
+    }
+    if (id === 'driven' && (far || chanceType === 'openplay')) {
+      if (hasSkill(shooter, 'Low Screamer') && seededRandom() < 0.5) return { desc: 'low screamer into the bottom corner', xg: 0.16, puskas: true };
+      if (hasSkill(shooter, 'Rising Shot') && seededRandom() < 0.4) return { desc: 'rising drive that flies into the roof of the net', xg: 0.13, puskas: true };
+      if (hasSkill(shooter, 'Dipping Shot') && seededRandom() < 0.4) return { desc: 'dipping shot from outside the box', xg: 0.14, puskas: true };
+      if (hasSkill(shooter, 'Knuckle Shot') && seededRandom() < 0.4) return { desc: 'knuckleball strike that swerves late', xg: 0.12, puskas: true };
+    }
+    if (id === 'firsttime' && hasSkill(shooter, 'Acrobatic Finishing') && seededRandom() < 0.18) {
+      return seededRandom() < 0.5
+        ? { desc: 'overhead kick', xg: 0.10, puskas: true }
+        : { desc: 'bicycle kick', xg: 0.09, puskas: true };
+    }
+    if (id === 'driven') {
+      const foot = (shooter.expandedAttrs && shooter.expandedAttrs.preferred_foot) || null;
+      if (foot && seededRandom() < 0.35) return { desc: foot === 'Left' ? 'left-footed drive' : 'powerful right-footed strike', xg: 0.32, puskas: far };
+    }
+    if (rebound && (id === 'poach' || id === 'firsttime')) {
+      const rb = idPick(REBOUND_GOAL_METHODS);
+      return { desc: rb.d, xg: rb.xg, puskas: false };
+    }
+    if (chanceType === 'dribble' && id === 'curled' && seededRandom() < 0.4) return { desc: 'cut inside and arrowed shot near post', xg: 0.24, puskas: false };
+    if (chanceType === 'counter' && id !== 'poach' && seededRandom() < 0.12) return { desc: 'solo run from halfway, then cool finish', xg: 0.19, puskas: true };
+    const pool = TECH_GOAL_METHODS[id] || TECH_GOAL_METHODS.placed;
+    const pick = idPick(pool);
+    // Long-range curled/driven strikes and chips are the Puskas-type goals.
+    const puskas = id === 'chip' || (far && (id === 'curled' || id === 'driven'));
+    return { desc: pick.d, xg: pick.xg, puskas: puskas };
+  }
+
+  // A miss description consistent with the technique (or null to fall back to
+  // the generic pool).
+  function techniqueMissDesc(tech, chanceType, foot) {
+    if (!tech) return null;
+    const far = chanceType === 'longshot';
+    switch (tech.id) {
+      case 'curled': return far ? foot + ' curler from outside the box drifts just wide' : foot + ' curled effort bends past the far post';
+      case 'driven': return far ? foot + ' drive from distance flies over the bar' : foot + ' strike is thumped over the bar';
+      case 'chip': return 'chip is cut out by the keeper\'s recovery and drops over the bar';
+      case 'firsttime': return 'first-time ' + foot + ' effort is scuffed wide';
+      case 'poach': return foot + ' poke from close range is dragged wide';
+      case 'placed': return foot + ' placement just misses the far corner';
+      default: return null;
+    }
+  }
+  // ----- Who gets the chance --------------------------------------------------------
+  // playstyle -> relative share of each chance type that ends with him shooting.
+  const STYLE_CHANCE_SHARE = {
+    'Goal Poacher':       { throughball: 1.35, counter: 1.3, openplay: 1.15, cross: 1.05, cutback: 1.05 },
+    'Fox in the Box':     { cross: 1.35, cutback: 1.3, openplay: 1.1, throughball: 0.95 },
+    'Target Man':         { cross: 1.6, openplay: 0.85, throughball: 0.55, cutback: 0.75, counter: 0.7 },
+    'Deep-Lying Forward': { throughball: 0.7, openplay: 0.85, cross: 0.75, cutback: 0.9, counter: 0.9 },
+    'Dummy Runner':       { throughball: 0.8, openplay: 0.85, cross: 0.85, cutback: 0.9 },
+    'Hole Player':        { cutback: 1.4, throughball: 1.15, openplay: 1.15, cross: 0.9 },
+    'Creative Playmaker': { openplay: 0.8, throughball: 0.8, cutback: 1.0, cross: 0.8 },
+    'Classic No. 10':     { openplay: 0.9, cutback: 1.05, cross: 0.7, throughball: 0.85 },
+    'Prolific Winger':    { openplay: 1.1, throughball: 1.05, cutback: 1.0, cross: 0.85 },
+    'Roaming Flank':      { cutback: 1.15, openplay: 1.05 },
+    'Inside Forward':     { openplay: 1.2, throughball: 1.1, cutback: 1.1, cross: 0.85 },
+    'Box-to-Box':         { cutback: 1.25, openplay: 0.95, cross: 0.95 },
+    'Full-back Finisher': { cutback: 1.5, cross: 1.3, openplay: 1.2, throughball: 1.0 },
+    'Extra Frontman':     { cross: 1.25, cutback: 1.2 }
+  };
+
+  // Extra selection weight for a player being the one on the end of a chance of
+  // this type. Multiplied into the existing role/quality weighting, so it only
+  // redistributes chances between players in the same pool.
+  function chanceIdentityWeight(p, chanceType) {
+    if (!p) return 1;
+    let w = idStyleMult(p, STYLE_CHANCE_SHARE, chanceType);
+    // Runners: a through ball or counter finds the one who gets in behind.
+    if (chanceType === 'throughball' || chanceType === 'counter') {
+      const runner = idMix(p, { off_awr: 0.4, accel: 0.3, spd: 0.3 }) * 100 / 70;
+      w *= Math.pow(Math.max(0.5, runner), 1.2);
+    } else if (chanceType === 'cutback') {
+      // Arriving in the box on the cutback is about timing the run.
+      w *= Math.pow(Math.max(0.5, idCurved(p, 'off_awr') * 100 / 70), 1.0);
+    }
+    const per = personalityOf(p);
+    if (per.length) {
+      if (per.indexOf('Selfish') !== -1) w *= 1.15;
+      if (per.indexOf('Team Player') !== -1) w *= 0.88;
+      if (per.indexOf('Playmaker') !== -1) w *= 0.85;
+      if (per.indexOf('Showboat') !== -1) w *= 1.05;
+      if ((chanceType === 'throughball' || chanceType === 'counter') && per.indexOf('Incisive Run') !== -1) w *= 1.35;
+      if ((chanceType === 'throughball' || chanceType === 'counter') && per.indexOf('Speeding Bullet') !== -1) w *= 1.3;
+      if (chanceType === 'cutback' && per.indexOf('Incisive Run') !== -1) w *= 1.1;
+      if (per.indexOf('Big-Game') !== -1 && idStakes()) w *= 1.15;
+      if (per.indexOf('Fragile') !== -1 && idStakes()) w *= 0.85;
+      if (per.indexOf('Confidence Player') !== -1) w *= 1 + 0.06 * idMomentum(p);
+      if (per.indexOf("Finisher's Instinct") !== -1 && idMinute() > 80) w *= 1.2;
+    }
+    return idClamp(w, 0.2, 3);
+  }
+  // ----- On-the-ball decision hooks ---------------------------------------------------
+  // Multiplier on one BALL_ACTIONS weight from a player's ground/lofted lean,
+  // ambition and personality. Composed with (not instead of) the attribute,
+  // playstyle and tactical factors evaluateBallActions() already applies.
+  function identityActionMult(p, action) {
+    if (!p) return 1;
+    const pid = passIdentity(p);
+    let m = 1;
+    switch (action) {
+      case 'cross':       m *= idClamp(Math.pow(pid.lean, 0.7) * Math.pow(pid.cross, 0.5), 0.5, 1.9); break;
+      case 'switch':      m *= idClamp(Math.pow(pid.lean, 0.8), 0.5, 1.8); break;
+      case 'throughball': m *= idClamp(Math.pow(1 / pid.lean, 0.35) * (1 + pid.amb * 2), 0.6, 1.7); break;
+      case 'pass':        m *= idClamp(Math.pow(1 / pid.lean, 0.2) * (1 - pid.amb * 0.4), 0.8, 1.2); break;
+      case 'backpass':    m *= idClamp(1 - pid.amb * 0.8, 0.7, 1.2); break;
+      default: break;
+    }
+    const per = personalityOf(p);
+    if (!per.length) return m;
+    const has = (t) => per.indexOf(t) !== -1;
+    if (has('Long Ball Expert')) {
+      if (action === 'switch') m *= 1.5; else if (action === 'cross') m *= 1.2;
+      else if (action === 'throughball') m *= 1.1; else if (action === 'pass' || action === 'backpass') m *= 0.9;
+    }
+    if (has('Playmaker')) {
+      if (action === 'throughball') m *= 1.25; else if (action === 'pass') m *= 1.1; else if (action === 'shoot') m *= 0.85;
+    }
+    if (has('Incisive Run')) {
+      if (action === 'carry') m *= 1.2; else if (action === 'dribble') m *= 1.05; else if (action === 'backpass') m *= 0.85;
+    }
+    if (has('Mazing Run')) {
+      if (action === 'dribble') m *= 1.25; else if (action === 'hold') m *= 0.9;
+    }
+    if (has('Trickster') && action === 'dribble') m *= 1.15;
+    if (has('Speeding Bullet') && action === 'carry') m *= 1.15;
+    if (has('Ball-carrying')) {
+      if (action === 'carry') m *= 1.3; else if (action === 'dribble') m *= 1.05; else if (action === 'pass') m *= 0.92;
+    }
+    // Taking responsibility: how often a player is willing to shoot depends on
+    // the moment, not only on whether his shots are better then.
+    if (action === 'shoot') {
+      if (has('Big-Game') && idStakes()) m *= 1.15;
+      if (has('Fragile') && idStakes()) m *= 0.85;
+      if (has('Confidence Player')) m *= 1 + 0.06 * idMomentum(p);
+      if (has("Finisher's Instinct") && idMinute() > 80) m *= 1.2;
+    }
+    return m;
+  }
   // Baseline willingness multiplier (1.0 = neutral, uncapped on purpose so
   // callers can clamp/scale to their own model) to actively engineer a
   // move away from the player's current club, before any club-specific
@@ -4279,13 +4891,22 @@ const PLAYSTYLE_BEHAVIOR = {
     const shotPower = shotContext.shotPower != null ? shotContext.shotPower : 0.5;
     const fatigueMult = gk ? staminaMultiplier(gk) : 1;
 
-    const posEdge = gk ? gkPositioningEdge(gk) * fatigueMult : 0;
+    // A chip only works on a keeper who has come off his line, so positioning
+    // counts for far more against it than against any other finish.
+    const posEdge = gk ? gkPositioningEdge(gk) * fatigueMult * (shotContext.techGk === 'position' ? 2.2 : 1) : 0;
     let situational = 0;
     if (gk) {
       const reflex = gkReflexEdge(gk) * fatigueMult;
       const reach = gkReachEdge(gk) * fatigueMult;
       situational += (closeRange || isHeader) ? reflex * 1.3 : reflex * 0.45;
       situational += (isLongRange || isCrossType) ? reach * 1.2 : reach * 0.35;
+      // The technique the shooter used decides which keeper trait matters most:
+      // a driven strike is a reflex test, a placed or curled finish tests his
+      // reach into the corners, and a chip is a test of positioning (handled
+      // through posEdge below). The shifts are zero-centred - a keeper who is
+      // average in every trait is unaffected.
+      if (shotContext.techGk === 'reflex') situational += reflex * 0.35 - reach * 0.10;
+      else if (shotContext.techGk === 'reach') situational += reach * 0.35 - reflex * 0.15;
     }
     const gkSkillBase = (gk ? (curvedAttr(gk.def || 70, 70) * 0.45 + curvedAttr(gk.ovr || 75, 75) * 0.25 + curvedAttr(gk.tec || 70, 70) * 0.15) / 100 : 0.68) * (gk ? conditionMultiplier(gk) : 1);
     const gkSkill = Math.max(0.05, Math.min(0.98, gkSkillBase + posEdge + situational));
@@ -7405,8 +8026,14 @@ const PLAYSTYLE_BEHAVIOR = {
     return flavor ? { ...chosen, desc: `${chosen.desc}, ${flavor}` } : chosen;
   }
 
-  function pickMissDesc(shooter) {
+  function pickMissDesc(shooter, tech, chanceType) {
     const foot = seededRandom() < 0.55 ? 'right footed' : 'left footed';
+    // Roughly half the time a miss describes the technique that was actually
+    // attempted (curler bends wide, drive flies over...) instead of a generic line.
+    if (tech && seededRandom() < 0.5) {
+      const d = techniqueMissDesc(tech, chanceType, foot);
+      if (d) return d;
+    }
     const areas = [
       foot + ' shot from outside the box misses to the left',
       foot + ' shot from outside the box is too high',
@@ -7424,8 +8051,8 @@ const PLAYSTYLE_BEHAVIOR = {
     return areas[Math.floor(seededRandom() * areas.length)];
   }
 
-  function sofascoreMiss(shooter, team) {
-    return 'Attempt missed. <span class="player">' + shooter.name + '</span> (' + (team.short || team.name) + ') ' + pickMissDesc(shooter) + '.';
+  function sofascoreMiss(shooter, team, tech, chanceType) {
+    return 'Attempt missed. <span class="player">' + shooter.name + '</span> (' + (team.short || team.name) + ') ' + pickMissDesc(shooter, tech, chanceType) + '.';
   }
 
   function sofascoreSave(gk, shooter, team, defTeam) {
@@ -8276,9 +8903,12 @@ const PLAYSTYLE_BEHAVIOR = {
         // Grinder: tackle/interception success specifically rises when his
         // team is behind — a genuine game-state gate, not a flat bonus.
         let grinderMult = 1;
+        // Aggressive: throws himself into challenges - a little more success on
+        // the tackle, paid for in the foul rate (see referee.js).
+        if (hasTrait(p, 'Aggressive')) grinderMult *= 1.08;
         if (((p.expandedAttrs && p.expandedAttrs.personality) || []).includes('Grinder')) {
           const losing = side === 'home' ? m.home.score < m.away.score : m.away.score < m.home.score;
-          if (losing) grinderMult = 1.18;
+          if (losing) grinderMult *= 1.18;
         }
         const chance = Math.min(0.24, (base * skillMult * engagementMult * pressureMult + actionEdge.chance) * grinderMult);
         if (seededRandom() >= chance) return;
@@ -8460,8 +9090,14 @@ const PLAYSTYLE_BEHAVIOR = {
         // role attempts far more lofted balls than a deep-lying mid does,
         // so the *same* lofted_pass rating pays off far more for a winger
         // than for a CDM who barely ever needs it.
-        const loftedShare = LOFTED_PASS_SHARE[slot] != null ? LOFTED_PASS_SHARE[slot] : 0.22;
-        const loftedCount = Math.round(count * loftedShare);
+        // The position sets the baseline share; the player's own Lofted Pass vs
+        // Low Pass, skills, playstyle and personality (passIdentity) scale it, so
+        // a long-ball centre-back and a short-passing one no longer share a
+        // split. Stochastic rounding keeps the expected share exact for the
+        // one-or-two-pass minutes this runs on (Math.round zeroed most of them).
+        const pid = passIdentity(p);
+        const loftedShare = idClamp((LOFTED_PASS_SHARE[slot] != null ? LOFTED_PASS_SHARE[slot] : 0.22) * pid.lean, 0.03, 0.8);
+        const loftedCount = Math.min(count, idStochRound(count * loftedShare));
         const groundCount = count - loftedCount;
         const groundSkill = groundPassingAbility(p) / 100;
         const loftedSkill = aerialPassingAbility(p) / 100;
@@ -8469,6 +9105,9 @@ const PLAYSTYLE_BEHAVIOR = {
         // against roughly 84-86% in the real top flights.
         let groundRate = Math.min(0.97, Math.max(0.55, 0.645 + groundSkill * 0.30));
         let loftedRate = Math.min(0.94, Math.max(0.42, 0.53 + loftedSkill * 0.34));
+        // Ambitious distributors (through-ball merchants, playmakers) complete a
+        // little fewer of their passes; cautious ones a little more.
+        groundRate -= pid.amb * 0.10; loftedRate -= pid.amb * 0.10;
         if (tac === 'press') { groundRate -= 0.03; loftedRate -= 0.03; }
         if (tac === 'attack') { groundRate -= 0.012; loftedRate -= 0.018; }
         groundRate = Math.min(0.97, Math.max(0.4, groundRate + pmods.passAccDelta));
@@ -8487,7 +9126,7 @@ const PLAYSTYLE_BEHAVIOR = {
         team.stats.passesCompleted = (team.stats.passesCompleted || 0) + completed;
         // Crosses: wide players and full-backs deliver most. Most are cleared, intercepted or overhit; a fair share of the
         // cleared ones go behind for a corner.
-        const crossRate = CROSS_PER_PASS[slot] || 0;
+        const crossRate = (CROSS_PER_PASS[slot] || 0) * pid.cross;
         if (crossRate) {
           let crossAtt = 0;
           for (let i = 0; i < count; i++) { if (seededRandom() < crossRate) crossAtt++; }
@@ -8939,6 +9578,15 @@ const PLAYSTYLE_BEHAVIOR = {
       bumpExtStat(shooter, 'aerialDuels', 1);
       if (opts.marker) bumpExtStat(opts.marker, 'aerialDuels', 1);
     }
+    // ---- Shot technique (engine/playerIdentity.js): every non-header shot is
+    // taken with a concrete technique chosen from the shooter's own attribute
+    // profile, skills, playstyle and personality. The technique moves shot
+    // quality (by how specialised he is at it, beyond plain Finishing), how
+    // often it's on target, how hard it is to block, how hard it's struck and
+    // which goalkeeper trait beats it - and it is what the goal/miss
+    // commentary describes afterwards.
+    const tech = isHeader ? null : pickShotTechnique(shooter, chanceType, { rebound: !!opts.rebound });
+    const techFx = tech ? shotTechniqueEffects(tech) : null;
 
     // ---- Shots phase: shot quality drawn straight from the shooter's own
     // finishing-relevant attributes and playstyle edges.
@@ -8973,6 +9621,7 @@ const PLAYSTYLE_BEHAVIOR = {
           + finishingEdge(shooter)
           + positioningEdge(shooter)
           + blitzCurlerEdge(shooter)
+          + (techFx ? techFx.q : 0)
           + (chanceType === 'dribble' ? dribbleSuccessEdge(shooter) * 0.5 : 0)
           + (chanceType === 'longshot' ? fkTakerEdge(shooter) * 0.6 : 0)));
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality + (opts.qualityBonus || 0)));
@@ -9005,8 +9654,11 @@ const PLAYSTYLE_BEHAVIOR = {
     // when several bonuses stack.
     let personalityEdge = 0;
     if (stakes) {
-      if (personality.includes('Big-Game')) personalityEdge += 0.15;
-      if (personality.includes('Fragile')) personalityEdge -= 0.15;
+      // Half of the old flat quality edge: the rest of what Big-Game/Fragile
+      // mean now shows up as behaviour (he takes the shot more/less often and
+      // trusts a different technique - see playerIdentity.js).
+      if (personality.includes('Big-Game')) personalityEdge += 0.09;
+      if (personality.includes('Fragile')) personalityEdge -= 0.09;
     }
     // Confidence Player: composure builds while he's on a live scoring run
     // this match and evaporates the moment an effort doesn't end in a goal
@@ -9016,13 +9668,13 @@ const PLAYSTYLE_BEHAVIOR = {
     // meaningful edge without becoming a lock.
     if (personality.includes('Confidence Player')) {
       const momentum = Math.min(3, (m.personalityMomentum && m.personalityMomentum[shooter.id]) || 0);
-      if (momentum > 0) personalityEdge += momentum * 0.03;
+      if (momentum > 0) personalityEdge += momentum * 0.02;
     }
     // Finisher's Instinct: extra late-game shot-quality bump distinct from
     // Big-Game's stakes gate above — fires purely off the clock, any
     // scoreline, including a dead rubber Big-Game's derby/final/close-
     // and-late gate would never trigger for.
-    if (personality.includes("Finisher's Instinct") && m.minute > 80) personalityEdge += 0.12;
+    if (personality.includes("Finisher's Instinct") && m.minute > 80) personalityEdge += 0.08;
     // Talisman aura: teammates play with a touch more composure while
     // he's out there with them — same aura pattern as the existing
     // Captaincy fatigue/form hooks, just read locally here since it only
@@ -9072,14 +9724,14 @@ const PLAYSTYLE_BEHAVIOR = {
     // Kicking Power feeds the shot's raw power independently of placement —
     // used below in the GK phase so a fiercely struck effort is genuinely
     // harder to keep out/hold onto than a technically similar but softer one.
-    const shotPower = shotPowerOf(shooter);
+    const shotPower = Math.max(0, Math.min(1, shotPowerOf(shooter) + (techFx ? techFx.power : 0)));
     if (!m.playerMatchStats) m.playerMatchStats = {};
     if (!m.playerMatchStats[shooter.id]) m.playerMatchStats[shooter.id] = blankPlayerMatchStats(shooter);
 
     // A defender in the shot's path can block it before it's even on target.
     const blocker = pickPlayer(defTeam, ['CB', 'CDM', 'RB', 'LB']);
     const blockSkill = blocker ? defensivePressure(blocker) / 100 : 0.6;
-    const blockChance = Math.max(0.04, Math.min(0.28, 0.15 + blockSkill * 0.10 - shotQuality * 0.10));
+    const blockChance = Math.max(0.04, Math.min(0.28, 0.15 + blockSkill * 0.10 - shotQuality * 0.10 + (techFx ? techFx.block : 0)));
     if (seededRandom() < blockChance) {
       // Extremely rare: a blocking body gets the deflection badly wrong and
       // loops it past his own keeper. Own goals stay a genuine rarity —
@@ -9098,7 +9750,7 @@ const PLAYSTYLE_BEHAVIOR = {
       if (blocker && seededRandom() < 0.4) {
         addEvent(m.minute, 'shot', `Attempt blocked. Blocked by <span class="player">${blocker.name}</span> (${defTeam.team.short}).`, defendingSide);
       } else {
-        addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team), attackingSide);
+        addEvent(m.minute, 'miss', sofascoreMiss(shooter, attTeam.team, tech, chanceType), attackingSide);
       }
       // A blocked effort loops behind for a corner far more often than
       // the old flat 40% allowed.
@@ -9117,7 +9769,7 @@ const PLAYSTYLE_BEHAVIOR = {
     // ~9.5 a match (real top-flight ~8.5-9), which is what inflated keeper save
     // counts. Trimming the on-target share (the rest go wide/over) cuts the
     // saves keepers face without touching total shot volume.
-    const onTargetChance = 0.95 * Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0)));
+    const onTargetChance = 0.95 * Math.min(0.62, Math.max(0.06, profile.baseOnTarget + shotQuality * 0.32 - defAvg * 0.28 + (opts.onTargetBonus || 0) + (techFx ? techFx.onTarget : 0)));
     if (seededRandom() >= onTargetChance) {
       m.playerMatchStats[shooter.id].xg += profile.baseXg * 0.5 + seededRandom() * 0.05;
       if (isBigChance) bumpExtStat(shooter, 'bigChancesMissed', 1);
@@ -9134,7 +9786,7 @@ const PLAYSTYLE_BEHAVIOR = {
       const bigChanceFlavor = isBigChance ? styleFlavor(shooter, BIG_CHANCE_FLAVOR) : null;
       addEvent(m.minute, 'miss', bigChanceFlavor
         ? `Big chance! <span class="player">${shooter.name}</span> (${attTeam.team.short}) ${bigChanceFlavor}, but can't make it count.`
-        : sofascoreMiss(shooter, attTeam.team), attackingSide);
+        : sofascoreMiss(shooter, attTeam.team, tech, chanceType), attackingSide);
       // Note: through-ball offside is now judged spatially, up front, in
       // resolveChanceCreation() before the shot is ever attempted — see
       // checkLiveOffside() in engine/offside.js — so there's no separate
@@ -9157,7 +9809,7 @@ const PLAYSTYLE_BEHAVIOR = {
     // random per-match factor.
     if (gk) bumpExtStat(gk, 'psxg', +(profile.baseXg + shotQuality * 0.3).toFixed(3));
     const closeRangeShot = !isHeader && (chanceType === 'dribble' || chanceType === 'openplay' || chanceType === 'counter' || chanceType === 'cutback');
-    const saveResult = resolveGkSave(gk, shooter, shotQuality, { isHeader, chanceType, shotPower, closeRange: closeRangeShot });
+    const saveResult = resolveGkSave(gk, shooter, shotQuality, { isHeader, chanceType, shotPower, closeRange: closeRangeShot, techGk: techFx ? techFx.gk : null });
     if (saveResult.saved) {
       // A shot the keeper has to save was still a real, on-target chance —
       // it needs to add to the shooter's xG just like a blocked or off-target
@@ -9197,7 +9849,7 @@ const PLAYSTYLE_BEHAVIOR = {
             reboundTaken = true;
             attTeam.stats.shots++;
             addEvent(m.minute, 'shot', `The rebound falls to <span class="player">${reboundShooter.name}</span>!`, attackingSide);
-            resolveShot(attackingSide, defendingSide, reboundShooter, 'openplay', { qualityBonus: 0.16, onTargetBonus: 0.1 });
+            resolveShot(attackingSide, defendingSide, reboundShooter, 'openplay', { qualityBonus: 0.16, onTargetBonus: 0.1, rebound: true });
           }
         }
         // A keeper who can't hold it (parry or punch) with no shot following
@@ -9226,7 +9878,9 @@ const PLAYSTYLE_BEHAVIOR = {
       if (!m.personalityMomentum) m.personalityMomentum = {};
       m.personalityMomentum[shooter.id] = (m.personalityMomentum[shooter.id] || 0) + 1;
     }
-    const method = isHeader ? { desc: 'towering header', xg: 0.3, puskas: false } : pickGoalMethod(shooter);
+    // The description is of the shot that actually happened (technique picked
+    // above), not a random flavour line drawn after the goal was decided.
+    const method = techniqueGoalMethod(shooter, tech, chanceType, isHeader, !!opts.rebound);
     recordStat('goals', shooter, attTeam.team);
     if (method.puskas) recordStat('puskas', shooter, attTeam.team);
     pushGoal(attackingSide, shooter, m.minute, method.desc);
@@ -9392,7 +10046,8 @@ const PLAYSTYLE_BEHAVIOR = {
   // becomes a cross for an aerial target; an Inside Forward cuts in and
   // shoots himself; a central entry through a Creative Playmaker becomes a
   // defence-splitting through ball.
-  function resolveChanceCreation(attackingSide, defendingSide, carrier, channel, extraQualityBonus) {
+  function resolveChanceCreation(attackingSide, defendingSide, carrier, channel, extraQualityBonus, ccOpts) {
+    ccOpts = ccOpts || {};
     const m = currentMatch;
     if (!m) return;
     const attTeam = m[attackingSide], defTeam = m[defendingSide];
@@ -9409,8 +10064,12 @@ const PLAYSTYLE_BEHAVIOR = {
     // mid-pitch decision in runPossessionSequence().
     const marker = pickMarker(defTeam, mirrorDefenderPos('ATT_' + channel), null, mirrorZoneKey('ATT_' + channel));
     if (marker) bumpExtStat(marker, 'pressures', 1);
-    const decision = decideBallAction(carrier, marker, 'ATT_' + channel, tacSelf, tacOpp, mods,
-      ['shoot', 'cross', 'throughball', 'dribble', 'pass']);
+    // An Early Crosser who whips it in from deeper skips the decision: the
+    // possession pipeline hands over a forced cross (see runPossessionSequence).
+    const decision = ccOpts.forceAction
+      ? { action: ccOpts.forceAction, scores: null }
+      : decideBallAction(carrier, marker, 'ATT_' + channel, tacSelf, tacOpp, mods,
+        ['shoot', 'cross', 'throughball', 'dribble', 'pass']);
 
     let chanceType, shooter;
     switch (decision.action) {
@@ -9432,7 +10091,7 @@ const PLAYSTYLE_BEHAVIOR = {
         const cutbackChance = wide ? Math.max(0.06, Math.min(0.55, 0.16 * (mods.cutbackBias || 1))) : 0;
         if (seededRandom() < cutbackChance) {
           chanceType = 'cutback';
-          shooter = pickPlayerWeighted(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
+          shooter = pickPlayerWeighted(attTeam, ['CAM', 'CM', 'ST', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id, (p) => chanceIdentityWeight(p, 'cutback'));
         } else {
           chanceType = 'cross';
           bumpExtStat(carrier, 'crosses', 1);
@@ -9443,7 +10102,7 @@ const PLAYSTYLE_BEHAVIOR = {
           // blended in alongside it so a striker's natural spot to attack a
           // cross from still counts for something, not just who jumps best.
           shooter = pickPlayerCustomWeighted(attTeam, ['ST', 'CB', 'CAM', 'CM'],
-            (p) => aerialSkill(p) * 1.3 + (GOAL_ROLE_WEIGHT[p.slot || (p.pos || [])[0]] || 0.5) * 0.5, carrier.id)
+            (p) => (aerialSkill(p) * 1.3 + (GOAL_ROLE_WEIGHT[p.slot || (p.pos || [])[0]] || 0.5) * 0.5) * chanceIdentityWeight(p, 'cross'), carrier.id)
             || pickPlayerWeighted(attTeam, ['ST', 'CAM'], GOAL_ROLE_WEIGHT, carrier.id);
         }
         break;
@@ -9451,7 +10110,7 @@ const PLAYSTYLE_BEHAVIOR = {
       case 'throughball':
         chanceType = 'throughball';
         bumpExtStat(carrier, 'throughBalls', 1);
-        shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id);
+        shooter = pickPlayerWeighted(attTeam, ['ST', 'CAM', 'RW', 'LW'], GOAL_ROLE_WEIGHT, carrier.id, (p) => chanceIdentityWeight(p, 'throughball'));
         break;
       case 'pass':
         // Opts to recycle rather than force a low-quality look — the chance
@@ -9465,7 +10124,7 @@ const PLAYSTYLE_BEHAVIOR = {
       default:
         chanceType = wide ? 'openplay' : (seededRandom() < 0.3 ? 'longshot' : 'openplay');
         shooter = chanceType === 'longshot' ? carrier
-          : pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id);
+          : pickPlayerWeighted(attTeam, ['ST', 'RW', 'LW', 'CAM', 'CM', 'RM', 'LM'], GOAL_ROLE_WEIGHT, carrier.id, (p) => chanceIdentityWeight(p, 'openplay'));
         break;
     }
     if (!shooter) shooter = carrier;
@@ -9480,6 +10139,11 @@ const PLAYSTYLE_BEHAVIOR = {
     // strong Lofted Pass rating still delivers a sharper cross than one
     // who doesn't — the raw attribute matters on top of the skill tags.
     if (chanceType === 'cross') creationQualityBonus += ((xattr(carrier, 'lofted_pass', 70) - 70) / 100) * 0.03;
+    // The ground-ball mirror of the above: a through ball or cutback is a Low
+    // Pass delivery, so that (not Lofted Pass) sets how sharp it is.
+    if (chanceType === 'throughball' || chanceType === 'cutback') creationQualityBonus += ((xattr(carrier, 'low_pass', 70) - 70) / 100) * 0.03;
+    // Early crosses come from deeper and are a touch easier to defend.
+    if (ccOpts.early) creationQualityBonus -= 0.03;
     if (hasSkill(carrier, 'No Look Pass') || hasSkill(carrier, 'Heel Trick') || hasSkill(carrier, 'Rabona')) creationQualityBonus += 0.015;
     // A through ball/cutback that actually arrives at a runner in the
     // half-space (not central, not pinned to the touchline — see
@@ -9538,12 +10202,15 @@ const PLAYSTYLE_BEHAVIOR = {
     const personality = (fouler.expandedAttrs && fouler.expandedAttrs.personality) || [];
     if (personality.includes('Volatile')) aggression *= 1.3;
     if (personality.includes('Calm')) aggression *= 0.8;
+    if (personality.includes('Aggressive')) aggression *= 1.15;
     // Provocateur: reads off the VICTIM's tag, not the fouler's — a player
     // who knows how to draw contact raises the marker's foul probability
     // just by being the one they're up against.
     if (victim) {
       const victimPersonality = (victim.expandedAttrs && victim.expandedAttrs.personality) || [];
       if (victimPersonality.includes('Provocateur')) aggression *= 1.2;
+      // A Trickster who takes people on draws more fouls from the men he beats.
+      if (victimPersonality.includes('Trickster')) aggression *= 1.12;
     }
     const foulText = victim
       ? `<span class="player">${fouler.name}</span> fouls <span class="player">${victim.name}</span>`
@@ -9730,7 +10397,9 @@ const PLAYSTYLE_BEHAVIOR = {
     const m = currentMatch;
     if (!m) return;
     const breakTeam = m[breakingSide];
-    const shooter = pickPlayerWeighted(breakTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], GOAL_ROLE_WEIGHT);
+    // Who leads the break depends on the player, not just the position: a
+    // Speeding Bullet / Goal Poacher gets in behind, a Target Man doesn't.
+    const shooter = pickPlayerWeighted(breakTeam, ['ST', 'RW', 'LW', 'CAM', 'CM'], GOAL_ROLE_WEIGHT, undefined, (p) => chanceIdentityWeight(p, 'counter'));
     if (!shooter) return;
     // A break is a straight foot race against a retreating defence — once
     // it's already sprung (see the Acceleration-driven counterProb in
@@ -10060,6 +10729,12 @@ const PLAYSTYLE_BEHAVIOR = {
       // but different tags still play noticeably differently here.
       const styleMult = playstyleActionMult(player, action);
       if (styleMult !== 1) w *= styleMult;
+      // Ground/lofted lean, ambition and personality (engine/playerIdentity.js):
+      // a Lofted-Pass-heavy player reaches for the cross and the switch, a Low-
+      // Pass playmaker for the through ball, and temperament changes how often
+      // a player takes responsibility for the shot.
+      const idMult = identityActionMult(player, action);
+      if (idMult !== 1) w *= idMult;
       if (hasSkill(player, 'Attack Trigger') && (action === 'dribble' || action === 'carry' || action === 'throughball')) w *= 1.08;
 
       // Personality tags (player-attributes.json "personality", optional —
@@ -10218,6 +10893,15 @@ const PLAYSTYLE_BEHAVIOR = {
         return;
       }
 
+      // Early Crosser: on the flank in midfield he'd rather whip the ball in now
+      // than work it into the final third first - a real change in what the
+      // move becomes, at the cost of a slightly easier-to-defend delivery.
+      if (i === 1 && channel !== 'C' && decision.action === 'pass' && hasTrait(carrier, 'Early Crosser') && seededRandom() < 0.15) {
+        if (seededRandom() < 0.5) addEvent(m.minute, 'pass', `<span class="player">${carrier.name}</span> doesn't wait — whips an early ball into the box`, attackingSide);
+        resolveChanceCreation(attackingSide, defendingSide, carrier, channel, chanceSpaceBonus(defendingSide), { forceAction: 'cross', early: true });
+        return;
+      }
+
       let holdBonus = 0;
       if (decision.action === 'switch') {
         const others = PITCH_CHANNELS.filter((c) => c !== channel);
@@ -10244,8 +10928,13 @@ const PLAYSTYLE_BEHAVIOR = {
         // decisionModel.js's evaluateBallActions; the flip side — slightly
         // higher turnover risk once he actually goes for it — lives here.
         const showboatPenalty = ((carrier.expandedAttrs && carrier.expandedAttrs.personality) || []).includes('Showboat') ? 0.04 : 0;
+        // A take-on reads close control (Dribbling/Ball Control/Balance), a
+        // carry reads pace and strength - typedCarryAbility() re-weights the
+        // blended ability toward whichever is being attempted - and
+        // dribbling-flavoured personalities change how it goes under pressure.
         const carryChance = Math.max(0.30, Math.min(0.93,
-          0.86 + (carryingAbility(carrier) - runPressure) / 140 + attackTriggerBonus - showboatPenalty));
+          0.86 + (typedCarryAbility(carrier, decision.action) - runPressure) / 140 + attackTriggerBonus - showboatPenalty
+          + carryIdentityBonus(carrier, decision.action, runPressure, fromThird)));
         // Carries/dribbles are now tallied live off this exact roll — every
         // attempt counts as a carry (and, if this was specifically a
         // take-on rather than just driving forward, a dribble attempt
@@ -10283,7 +10972,14 @@ const PLAYSTYLE_BEHAVIOR = {
       setBallZone(attackingSide, toThird, channel);
 
       // ===== Passing phase: can the carrier find them? =====
-      const passerSkill = passingAbility(carrier);
+      // Ground or lofted? Drawn from the passer's own Low Pass vs Lofted Pass
+      // lean (playerIdentity.js) - a ground pass is judged on Low Pass/Ball
+      // Control and hurt by tight marking, a lofted one on Lofted Pass/Curl and
+      // goes over the press but is riskier and needs the receiver to win it in
+      // the air.
+      const passType = pickPassType(carrier, decision.action, fromThird, defTac);
+      const lofted = passType === 'lofted';
+      const passerSkill = typedPassAbility(carrier, passType);
       const marker = pickMarker(defTeam, mirrorDefenderPos(targetZone), null, mirrorZoneKey(targetZone));
       if (marker) bumpExtStat(marker, 'pressures', 1);
       const pressure = marker ? defensivePressure(marker, carrier) : 60;
@@ -10298,8 +10994,10 @@ const PLAYSTYLE_BEHAVIOR = {
       // below a real match's output. This still leaves plenty of turnovers
       // (see resolveTurnover) — it just stops the pipe from being throttled
       // this hard before the ball even reaches a dangerous area.
-      let passChance = 0.80 + (passerSkill - pressure) / 130 + attMods.passAccDelta + attackTriggerBonus
-        + holdBonus + (decision.action === 'switch' ? 0.05 : 0);
+      const passPressure = lofted ? 60 + (pressure - 60) * 0.6 : pressure;
+      let passChance = 0.80 + (passerSkill - passPressure) / 130 + attMods.passAccDelta + attackTriggerBonus
+        + holdBonus + (decision.action === 'switch' ? 0.05 : 0) + (lofted ? LOFTED_PASS_ACC_DELTA : 0)
+        + (lofted && hasTrait(carrier, 'Long Ball Expert') ? 0.03 : 0);
       // A genuine numbers-up situation in the zone the ball is going into
       // gives the receiver real support to actually find, on top of
       // whatever the pass/pressure numbers already say — and the reverse
@@ -10307,13 +11005,13 @@ const PLAYSTYLE_BEHAVIOR = {
       passChance += Math.max(-0.06, Math.min(0.06, localOverload(attackingSide, defendingSide, targetZone) * 0.02));
       if (tac === 'attack') passChance -= 0.03;
       if (tac === 'press') passChance -= 0.015;
-      if (defTac === 'press') passChance -= 0.05;
+      if (defTac === 'press') passChance -= lofted ? 0.03 : 0.055; // a lofted ball goes over the press
       if (defTac === 'defend') passChance -= 0.03; // compact shape is harder to pass through
       // Tight Possession is specifically about composure in tight spaces
       // under close pressure — so it only matters here, against a genuine
       // high press, rather than being folded into every pass regardless of
       // context (that's what the blended passerSkill above already covers).
-      if (defTac === 'press') {
+      if (defTac === 'press' && !lofted) {
         const tightPos = xattr(carrier, 'tight_pos', null);
         if (tightPos != null) passChance += ((tightPos - 70) / 100) * 0.12;
       }
@@ -10328,8 +11026,12 @@ const PLAYSTYLE_BEHAVIOR = {
       // ===== immediate pressure (a 1v1 press right as the ball arrives).
       // Base raised from 0.78 -> 0.87 — see passChance above for why both
       // of these needed to come up together.
+      // Receiving a ground pass is a ball-control contest; a lofted ball is
+      // won in the air (Heading/Jump/Physical Contact), so who the target is
+      // decides how well each kind of ball is actually received.
+      const receiverSkill = lofted ? aerialSkill(targetPlayer) * 100 + LOFTED_RECEIVE_OFFSET : carryingAbility(targetPlayer);
       const duelChance = Math.max(0.35, Math.min(0.95,
-        0.91 + (carryingAbility(targetPlayer) - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0) + attackTriggerBonus));
+        0.91 + (receiverSkill - pressure) / 160 + (attMods.wingBiasMult - 1) * 0.05 - (defTac === 'press' ? 0.05 : 0) + attackTriggerBonus));
       if (seededRandom() >= duelChance) {
         resolveTurnover(attackingSide, defendingSide, targetPlayer, marker, fromThird, toThird, 'duel', channel);
         return;
@@ -10802,7 +11504,7 @@ const PLAYSTYLE_BEHAVIOR = {
   // Like pickPlayer, but multiplies selection weight by a role-tendency table so
   // (for example) strikers/wingers are picked as goalscorers far more often than
   // central/defensive midfielders, matching real-world scoring distributions.
-  function pickPlayerWeighted(side, preferredPos, roleWeights, excludeId) {
+  function pickPlayerWeighted(side, preferredPos, roleWeights, excludeId, extraFn) {
     if (!currentMatch || !side) return null;
     const ids = side === currentMatch.home ? currentMatch.homeOnPitch : currentMatch.awayOnPitch;
     let pool = (side.squad.all || []).filter(p => ids.includes(p.id) && p.id !== excludeId);
@@ -10834,7 +11536,10 @@ const PLAYSTYLE_BEHAVIOR = {
       const composite = (fin != null && offAwr != null)
         ? ((p.att || 70) * 0.40 + fin * 0.25 + offAwr * 0.15 + (p.ovr || 70) * 0.15 + (p.tec || 70) * 0.05)
         : ((p.att || 70) * 0.55 + (p.ovr || 70) * 0.30 + (p.tec || 70) * 0.15);
-      const w = Math.pow(Math.max(composite, 30) / 70, 2.2) * 100 * roleW;
+      // extraFn: optional identity weighting (playerIdentity.js chanceIdentityWeight)
+      // layered on top of the role/quality weight - playstyle and traits decide who
+      // in the pool actually ends up on the end of a given kind of chance.
+      const w = Math.pow(Math.max(composite, 30) / 70, 2.2) * 100 * roleW * (extraFn ? extraFn(p) : 1);
       return Math.max(1, w);
     });
     const total = weights.reduce((a, b) => a + b, 0);
