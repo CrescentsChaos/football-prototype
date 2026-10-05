@@ -69,8 +69,26 @@
 /*@CHUNK:c0066:END*/
 
 /*@CHUNK:c0067:START*/
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
+  // Cache map for O(1) team lookups instead of scanning allTeams array O(N)
+  let _teamByIdMap = null;
+  let _teamByIdMapRef = null;
 
+  function getTeam(id) {
+    if (!id) return undefined;
+    if (!_teamByIdMap || _teamByIdMapRef !== allTeams || _teamByIdMap.size !== allTeams.length) {
+      _teamByIdMap = new Map();
+      if (Array.isArray(allTeams)) {
+        for (let i = 0; i < allTeams.length; i++) {
+          const t = allTeams[i];
+          if (t && t.id && !_teamByIdMap.has(t.id)) {
+            _teamByIdMap.set(t.id, t);
+          }
+        }
+      }
+      _teamByIdMapRef = allTeams;
+    }
+    return _teamByIdMap.get(id);
+  }
 /*@CHUNK:c0067:END*/
 
 /*@CHUNK:c0068:START*/
