@@ -5616,7 +5616,27 @@ const PLAYSTYLE_BEHAVIOR = {
     });
   }
 
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
+  // O(1) team lookup cached map — rebuilt whenever allTeams reference or length changes,
+  // replacing the previous linear allTeams.find() scan called across matches & UI rendering.
+  let _teamByIdMap = null;
+  let _teamByIdRef = null;
+  let _teamByIdLength = 0;
+  function getTeam(id) {
+    if (id == null) return undefined;
+    const len = allTeams ? allTeams.length : 0;
+    if (!_teamByIdMap || _teamByIdRef !== allTeams || _teamByIdLength !== len) {
+      _teamByIdMap = new Map();
+      _teamByIdRef = allTeams;
+      _teamByIdLength = len;
+      if (Array.isArray(allTeams)) {
+        for (let i = 0; i < len; i++) {
+          const t = allTeams[i];
+          if (t && t.id != null) _teamByIdMap.set(t.id, t);
+        }
+      }
+    }
+    return _teamByIdMap.get(id);
+  }
 
   // Every match is played at the home team's stadium. Falls back to Wembley
   // Stadium whenever a team in teams.json doesn't define its own "stadium".
