@@ -1,0 +1,3 @@
+## 2025-10-09 - O(1) Map Caching for Frequently Called Lookups
+**Learning:** `getTeam(id)` was performing linear array scans (`allTeams.find(...)`) on every lookup across simulation and UI rendering. Using `if (!id) return null` altered return type semantics (`null` instead of `undefined`), and using `_teamByIdMap.size !== allTeams.length` as an invalidation check risks rebuilding the Map continuously if array length differs from unique map size.
+**Action:** Always preserve standard array method return semantics (`undefined` when missing) and use array reference/length checks (`_teamByIdLastArr !== allTeams || _teamByIdLastLen !== allTeams.length`) for safe cache invalidation.
