@@ -151,6 +151,24 @@
     // dribble far less appealing than simply recycling it.
     const pressureSensitivity = { pass: 0.28, dribble: 1.0, carry: 0.9, shoot: 0.5, cross: 0.45, throughball: 0.9, backpass: -0.9, switch: -0.5, hold: -0.7 };
 
+    // Pre-calculate loop-invariant context once before iterating over allowed actions
+    const tags = playstyleTagsOf(player);
+    const hasAttackTrigger = hasSkill(player, 'Attack Trigger');
+    const personality = (player.expandedAttrs && player.expandedAttrs.personality) || [];
+    const isSelfish = personality.includes('Selfish');
+    const isTeamPlayer = personality.includes('Team Player');
+    const isShowboat = personality.includes('Showboat');
+    const isHomebody = personality.includes('Homebody');
+    const weakFootLow = xattr(player, 'weak foot', 70) < 45;
+
+    const sideCtx = playerSideData(player);
+    const isAwayHomebody = isHomebody && sideCtx && sideCtx.sideKey === 'away';
+
+    const hs = halfSpaceOf(player, sideCtx);
+    const overload = sideCtx
+      ? localOverload(sideCtx.sideKey, sideCtx.sideKey === 'home' ? 'away' : 'home', ctx.zoneKey || (third + '_C'))
+      : 0;
+
     const scores = {};
     allowed.forEach((action) => {
       const b = base[action] != null ? base[action] : 1;
@@ -204,35 +222,31 @@
       // per-style breakdown; these are internal behavior parameters, not
       // raw attribute values, so two players with identical stat sheets
       // but different tags still play noticeably differently here.
-      const styleMult = playstyleActionMult(player, action);
-      if (styleMult !== 1) w *= styleMult;
-      if (hasSkill(player, 'Attack Trigger') && (action === 'dribble' || action === 'carry' || action === 'throughball')) w *= 1.08;
+      if (tags.length) {
+        const styleMult = playstyleActionMult(player, action);
+        if (styleMult !== 1) w *= styleMult;
+      }
+      if (hasAttackTrigger && (action === 'dribble' || action === 'carry' || action === 'throughball')) w *= 1.08;
 
       // Personality tags (player-attributes.json "personality", optional —
       // undefined on any player without a hand-authored entry, in which case
       // this is a no-op).
-      const personality = (player.expandedAttrs && player.expandedAttrs.personality) || [];
-      // Selfish/Team Player: nudges the shoot-or-dribble vs. pass-or-
-      // through-ball balance directly, independent of position/playstyle.
-      if (personality.includes('Selfish')) {
+      if (isSelfish) {
         if (action === 'shoot' || action === 'dribble') w *= 1.2;
         if (action === 'pass' || action === 'throughball' || action === 'cross') w *= 0.88;
       }
-      if (personality.includes('Team Player')) {
+      if (isTeamPlayer) {
         if (action === 'pass' || action === 'throughball') w *= 1.2;
         if (action === 'shoot' || action === 'dribble') w *= 0.85;
       }
       // Showboat: attempts more dribbles than the raw ability read alone
       // would justify — the higher turnover risk that comes with it lives
       // in the carryChance calc in engine/possession.js, not here.
-      if (personality.includes('Showboat') && action === 'dribble') w *= 1.25;
+      if (isShowboat && action === 'dribble') w *= 1.25;
       // Homebody: a genuine dip in incisive/risky ball actions away from
       // home, nothing to do with pressure or tactics.
-      if (personality.includes('Homebody')) {
-        const homeCtx = playerSideData(player);
-        if (homeCtx && homeCtx.sideKey === 'away' && (action === 'dribble' || action === 'shoot' || action === 'throughball' || action === 'cross')) {
-          w *= 0.92;
-        }
+      if (isAwayHomebody && (action === 'dribble' || action === 'shoot' || action === 'throughball' || action === 'cross')) {
+        w *= 0.92;
       }
       // Weak-foot suppression on top of the numeric weak-foot stat itself —
       // a genuinely one-footed player is less willing to shoot or whip in a
@@ -240,8 +254,8 @@
       // currently track which physical side of the body an action favors,
       // so the suppression applies to both actions outright; gate it with
       // that side-context once/if this model tracks it.
-      if (xattr(player, 'weak foot', 70) < 45) {
-        if (action === 'cross' || action === 'shoot') w *= 0.9;
+      if (weakFootLow && (action === 'cross' || action === 'shoot')) {
+        w *= 0.9;
       }
 
       // Half-spaces: a carrier actually standing in a half-space (not
@@ -251,7 +265,6 @@
       // balls/incisive passes get a real bump specifically from being
       // there; a winger pinned wide leans toward the cross he actually
       // has an angle for instead.
-      const hs = halfSpaceOf(player);
       if (hs === 'halfSpaceLeft' || hs === 'halfSpaceRight') {
         if (action === 'throughball') w *= 1.15;
         if (action === 'pass') w *= 1.05;
@@ -265,10 +278,6 @@
       // to actually find — pass/throughball become relatively more
       // attractive than forcing a dribble/shot into a crowded area, and
       // vice versa when the defence actually outnumbers the attack here.
-      const sideCtx = playerSideData(player);
-      const overload = sideCtx
-        ? localOverload(sideCtx.sideKey, sideCtx.sideKey === 'home' ? 'away' : 'home', ctx.zoneKey || (third + '_C'))
-        : 0;
       if (overload > 0) {
         if (action === 'pass' || action === 'throughball') w *= 1 + Math.min(0.24, overload * 0.08);
         if (action === 'dribble') w *= 1 - Math.min(0.15, overload * 0.05);
