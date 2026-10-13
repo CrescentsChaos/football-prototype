@@ -837,14 +837,27 @@
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
-    const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    let res = _canonSkillCache.get(s);
+    if (res === undefined) {
+      const k = normSkillKey(s);
+      res = SKILL_NAME_ALIASES[k] || k;
+      _canonSkillCache.set(s, res);
+    }
+    return res;
   }
+  // hasSkill uses a cached Set (_canonSkills) on p.expandedAttrs and canonSkillKey
+  // uses Map cache (_canonSkillCache) to convert O(N) array scans with string
+  // processing into O(1) lookups during simulation hot loops.
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    let set = p.expandedAttrs._canonSkills;
+    if (!set) {
+      set = new Set((p.expandedAttrs.skills || []).map(canonSkillKey));
+      p.expandedAttrs._canonSkills = set;
+    }
+    return set.has(canonSkillKey(skillName));
   }
 /*@CHUNK:c0031:END*/
 
