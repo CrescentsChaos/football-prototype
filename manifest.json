@@ -609,6 +609,62 @@
     "label": "func:playstyleTagsOf,playstyleActionMult,playstyleEdgeSum"
   },
   {
+    "id": "cpid01",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "identity overview"
+  },
+  {
+    "id": "cpid02",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:idClamp,idAttr,idMix helpers"
+  },
+  {
+    "id": "cpid03",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:passIdentity,pickPassType,typedPassAbility"
+  },
+  {
+    "id": "cpid04",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:typedCarryAbility,carryIdentityBonus"
+  },
+  {
+    "id": "cpid05",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "table:SHOT_TECHNIQUES + func:pickShotTechnique,shotTechniqueEffects"
+  },
+  {
+    "id": "cpid06",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:techniqueGoalMethod,techniqueMissDesc"
+  },
+  {
+    "id": "cpid07",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:chanceIdentityWeight"
+  },
+  {
+    "id": "cpid08",
+    "file": "engine/playerIdentity.js",
+    "start": -1,
+    "end": -1,
+    "label": "func:identityActionMult"
+  },
+  {
     "id": "ctrans01",
     "file": "ai/transferAI.js",
     "start": -1,
@@ -5521,6 +5577,55 @@
     "start": -1,
     "end": -1,
     "label": "func:searchHospital,filterHospitalSeverity,sortHospital"
+  },
+  {
+    "id": "cmd01",
+    "file": "data/mediaData.js",
+    "start": -1,
+    "end": -1,
+    "label": "media data"
+  },
+  {
+    "id": "cmd02",
+    "file": "data/mediaBanksMatch.js",
+    "start": -1,
+    "end": -1,
+    "label": "match banks"
+  },
+  {
+    "id": "cmd03",
+    "file": "data/mediaBanksWorld.js",
+    "start": -1,
+    "end": -1,
+    "label": "world banks"
+  },
+  {
+    "id": "cme01",
+    "file": "engine/mediaCore.js",
+    "start": -1,
+    "end": -1,
+    "label": "media core"
+  },
+  {
+    "id": "cme02",
+    "file": "engine/mediaStories.js",
+    "start": -1,
+    "end": -1,
+    "label": "media stories"
+  },
+  {
+    "id": "cme03",
+    "file": "engine/mediaWorld.js",
+    "start": -1,
+    "end": -1,
+    "label": "media world"
+  },
+  {
+    "id": "cmu01",
+    "file": "ui/mediaUI.js",
+    "start": -1,
+    "end": -1,
+    "label": "media UI"
   },
   {
     "id": "c0598",

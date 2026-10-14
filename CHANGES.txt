@@ -1,89 +1,48 @@
 Changed files (drop into your football-game folder, overwriting existing ones):
 
-REALISM PASS - set pieces, discipline, offsides, crosses
-- engine/referee.js -> new simulateRoutineFouls(): per-minute, per-side ordinary
-    mid-pitch fouls (fouler weighted by position x foulProneness, fouled player by
-    dribbling/pace; pressing and weaker sides foul more, chasing sides late on).
-    ~6.7 -> ~22 fouls a match. Card odds recalibrated (yellow base 0.04 -> 0.105 x
-    aggression, second-yellow leniency, straight-red slope 0.0013 -> 0.0006):
-    ~0.76 -> ~3.3 yellows, reds ~0.11 -> ~0.18. Routine fouls only sometimes reach
-    the live feed. ~5% of them open a free-kick routine.
-- engine/matchEngine.js -> calls simulateRoutineFouls() each minute.
-- engine/shooting.js -> corners now also come from parried/punched saves with no
-    rebound (30%), and blocked shots (40% -> 55%).
-- engine/passing.js -> crosses counted for wide players/full-backs (CROSS_PER_PASS),
-    ~6 -> ~33 a match; 20% of them are cleared for a corner; 20% of recycled
-    final-third moves end in a corner; background balls in behind are judged by the
-    existing offside model (~0.4 -> ~3.3 offsides); base pass-completion rates
-    eased ~3.5 points (89% -> 86%).
-    Corners overall: ~1.4 -> ~10.5 a match.
-- engine/offside.js -> checkLiveOffside() takes an optional quietMarginal flag so the
-    background runs don't spam "tight call" lines.
-- engine/goalkeeper.js -> save base 0.62 -> 0.66. The extra set pieces pushed goals to
-    ~3.3 a match; this brings it back to ~2.95 (same 500-800 match pairings).
-- dist/app.js -> rebuilt bundle (node build.js). No manifest change.
+APEX MEDIA CENTRE - news channels, TV studio, pundits and social media.
 
-Benchmark (800 matches, same pairings): goals 3.07 -> 2.93, shots 24.2 -> 25.8,
-H/D/A 46.6/24.6/28.8 -> 43.4/24.0/32.6 (within sampling noise of the earlier runs).
-Known: penalties remain ~0.14 a match (real ~0.3) - not changed.
-Harnesses: spatial 49/49, squadbuilder, qualifiers-congestion pass. roles,
-end-season and league-tournament harnesses fail identically on the original upload.
+New tab "📡 Media" with four views: Feed (X-style timeline with reply threads,
+polls, score cards, article and video cards), News (tabloid / broadsheet
+article cards), TV Studio (live banner, anchor script, 3-pundit panel, scrolling
+score ticker) and Trending (hashtags + outlets). Filter by team or post type.
 
----- previous delivery ----
-Changed files (drop into your football-game folder, overwriting existing ones):
+WHAT GETS COVERED
+ - Every finished match (live or auto-simmed): scoreline, breaking news, club
+   desks, 5-7 fan reactions, memes, radio rants, video titles, stats, tactics,
+   VAR/red-card posts, injury news, Man-of-the-Match poll, TV bulletin with
+   pundits, broadsheet + tabloid articles. Coverage is tiered by newsworthiness
+   (derbies, finals, upsets, comebacks, late winners, hat-tricks, red cards,
+   streaks, your career club...) so big games are loud and routine ones quiet.
+ - Match hype: preview posts for upcoming fixtures after each matchday and the
+   moment you kick off a live match (form, stakes, key men, injuries, win-
+   probability model, pundit predictions, referee, fan predictions, polls).
+   A "Pre-match buzz" card shows above the pitch; a "Media reaction" card shows
+   after full time.
+ - World events: trophies and awards, season previews/reviews, title race and
+   relegation battle updates, team of the week, top scorers, goal milestones,
+   sack-watch after losing streaks, injury crises, transfer rumours with an
+   insider "interest -> talks -> HERE WE GO" ladder, transfer-window and
+   deadline-day chatter, monthly calendar flavour, debate polls.
 
-- engine/spatialModel.js -> shared pitch geometry.
-    * New chunk csp02c: toSharedFrame() puts both teams on one 0-100 x 0-100
-      pitch (home untouched; away rotated x' = 100-x, y' = 100-y).
-      sidePitchLayout()/playerPitchPos() give every on-pitch player an {x, y}
-      on that pitch. Players are dealt into formation slot INDEXES the way
-      the pitch view does it, so the two CBs / CMs / STs no longer collapse
-      onto the first one's coordinates (slots.indexOf() would), and a
-      hand-built squad.customCoords shape is honoured.
-    * ballPointForZone()/setBallZone(): the ball's {x, y} (m.ballPos),
-      resolved from third + channel (centre of the zone in the possessing
-      side's frame, then mirrored for away). m.ballZone keeps its old shape.
-    * markingDistance() is now true Euclidean distance (sideways gap
-      included) instead of the vertical-gap approximation; the floor of 2
-      is gone, the 30 fallback for a missing player stays.
-    * New passingLaneOpen(from, to, defenders[, laneRadius]) built on
-      pointToSegmentDistance() (segment-to-point, clamped to the ends).
-      Default lane radius 4. Accepts players or {x, y} points.
-    * New coverShadow(defender, ball[, bodyRadius]) -> angle in RADIANS,
-      2*asin(r/d), PI when on top of the ball. Default body radius 1.
-      Ball omitted = live m.ballPos.
-    passingLaneOpen() and coverShadow() are not called by the engine yet.
+WHY IT FEELS INFINITE
+ ~2,000 template lines with nested {?a|b|c} choices and [bank] references,
+ filled from real data (scorers, minutes, xG, cards, form, h2h, tables), 20
+ storylines, ~12 outlet voices, 7 pundit lenses, 8 fan moods, and fan accounts
+ minted deterministically per club (the same regulars keep turning up). An
+ anti-repeat memory stops lines recurring.
 
-- engine/possession.js -> the three m.ballZone writes now go through
-                         setBallZone(), which also sets m.ballPos.
-- engine/transitions.js -> same for the fast-break write and the turnover
-                         write. On a turnover the zone label is written from
-                         the winner's side, but ballPos is resolved from the
-                         ATTACKER's zone so the ball stays where it was lost.
-- engine/defending.js -> defensivePressure()'s distance multiplier
-                         recalibrated from 1.3 - dist/50 to 1.39 - dist/64.
-                         The old constants were tuned for the vertical-only
-                         distance; with true Euclidean distance the average
-                         is ~34 instead of ~24.5, which on its own pushed
-                         goals/match from ~2.8 to ~3.35. The new mapping
-                         keeps the average multiplier (and the share of
-                         fully-tight / fully-loose markers) unchanged.
-- manifest.json       -> new chunks csp02c, csp06b, csp06c.
-- test/spatial-harness.js -> NEW. 49 checks: frame mirroring, slot layout,
-                         ball position, Euclidean distance, lane/shadow
-                         geometry, and a 12-match run verifying every
-                         ball write the real pipeline makes.
-- dist/app.js         -> rebuilt bundle (node build.js).
+SAFE FOR YOUR SAVES
+ - Media never touches seededRandom(), so seeded matches/seasons are unchanged.
+ - Stored under the single key "apexMedia" (capped ~170 KB), included in
+   Export/Import, wiped by Reset. "Clear feed" button in the tab.
+ - All outlets/pundits are FICTIONAL. Rename them in data/mediaData.js.
+ - Add derbies in MEDIA_DERBIES (data/mediaData.js).
 
-Balance check (same seeds/pairings, 700 matches): shots/match 24.5 vs 24.5,
-shots-on 8.7 vs 8.4, goals/match 3.07 vs 2.90. A residual of roughly +5%
-goals remains after recalibration (it showed in three separate runs); if you
-want it closer, the knob is the 1.39 in defending.js.
-
-Known quirk (not changed): marker selection matches channel LABELS (an
-attacker's ATT_L is marked by the defender's LB), which is the opposite
-flank once the away side is rotated. Average marking distance is ~40 on the
-L/R channels vs ~27 in the centre partly because of that.
-
-Existing harnesses: squadbuilder-harness passes. roles-harness fails
-identically on the original upload (penalty-taker icon count) - unrelated.
+New files (registered in manifest.json): data/mediaData.js,
+data/mediaBanksMatch.js, data/mediaBanksWorld.js, engine/mediaCore.js,
+engine/mediaStories.js, engine/mediaWorld.js, ui/mediaUI.js.
+Edited: engine/matchEngine.js (endMatch + startMatch hooks),
+simulation/seasonEngine.js (trophy/award/season hooks, save/load/export),
+ui/matchUI.js (view switch, exports, dropdown guard), index.html, styles.css,
+manifest.json, dist/app.js (rebuilt).

@@ -2783,3 +2783,72 @@ select.ss-native {
 .lg-legend-item i.lg-zone-champion { background: var(--gold); }
 .lg-legend-item i.lg-zone-continental { background: var(--blue); }
 .lg-legend-item i.lg-zone-relegation { background: var(--red); }
+
+/* ===================== APEX MEDIA CENTRE ===================== */
+.mc-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: start; }
+@media (max-width: 860px) { .mc-layout { grid-template-columns: 1fr; } .mc-side { order: -1; display: none; } }
+.mc-feed { display: flex; flex-direction: column; }
+.mc-card { padding: 12px 14px; margin-bottom: 14px; }
+.mc-trend { padding: 8px 0; border-top: 1px solid var(--border); cursor: pointer; display: flex; flex-direction: column; }
+.mc-trend:hover b { color: var(--gold); }
+.mc-trend small, .mc-out small { color: var(--text-3); font-size: 0.75rem; }
+.mc-out { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); font-size: 0.85rem; }
+.mc-out > div:last-child { display: flex; flex-direction: column; line-height: 1.15; }
+.mc-empty { color: var(--text-3); font-size: 0.85rem; }
+.mc-link { margin-left: auto; float: right; font-size: 0.75rem; color: var(--gold); cursor: pointer; font-weight: 600; }
+.media-buzz { margin-top: 14px; padding: 12px 14px; }
+.mp { display: flex; gap: 10px; padding: 12px 6px; border-bottom: 1px solid var(--border); }
+.mp.big { background: linear-gradient(90deg, rgba(240,193,75,0.07), transparent); border-left: 2px solid var(--gold); padding-left: 10px; }
+.mp.compact { padding: 8px 0; }
+.mp-av { width: 40px; height: 40px; min-width: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.12); }
+.mp-av.sm { width: 28px; height: 28px; min-width: 28px; font-size: 0.85rem; }
+.mp-main { flex: 1; min-width: 0; }
+.mp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 0.9rem; }
+.mp-handle, .mp-time { color: var(--text-3); font-size: 0.8rem; }
+.mp-ver { color: var(--blue); font-size: 0.75rem; }
+.mp-comp { background: var(--bg-3); color: var(--text-2); border-radius: 10px; padding: 0 7px; font-size: 0.68rem; margin-left: 4px; }
+.mp-teams { margin-left: auto; display: inline-flex; gap: 3px; }
+.mp-text { margin-top: 3px; line-height: 1.38; word-wrap: break-word; font-size: 0.97rem; }
+.mp-tag { color: var(--blue); cursor: pointer; } .mp-tag:hover { text-decoration: underline; }
+.mp-at { color: var(--cyan); }
+.mp-acts { display: flex; gap: 20px; margin-top: 7px; color: var(--text-3); font-size: 0.8rem; }
+.mp-act { cursor: default; } .mp-act.has { cursor: pointer; color: var(--text-2); } .mp-act.has:hover { color: var(--gold); }
+.mp-score { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0 2px; padding: 8px 12px; background: var(--bg-1); border: 1px solid var(--border); border-radius: 10px; }
+.mp-sc-t { display: flex; align-items: center; gap: 6px; flex: 1; font-size: 0.85rem; } .mp-sc-t.away { justify-content: flex-end; }
+.mp-sc-n { font-family: var(--display); font-size: 1.15rem; color: var(--gold); white-space: nowrap; } .mp-sc-n small { font-size: 0.65rem; color: var(--text-3); }
+.mp-poll { margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--bg-1); }
+.mp-poll-q { font-size: 0.8rem; color: var(--text-2); margin-bottom: 5px; }
+.mp-poll-row { position: relative; display: flex; justify-content: space-between; padding: 5px 8px; margin: 3px 0; font-size: 0.85rem; border-radius: 6px; overflow: hidden; background: var(--bg-2); }
+.mp-poll-row span, .mp-poll-row b { position: relative; z-index: 1; } .mp-poll-bar { position: absolute; inset: 0 auto 0 0; background: rgba(61,139,253,0.35); }
+.mp-poll-n { font-size: 0.7rem; color: var(--text-3); margin-top: 4px; }
+.mp-article { margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--bg-1); cursor: pointer; }
+.mp-art-h { font-weight: 700; font-size: 1rem; } .mp-art-by { font-size: 0.75rem; color: var(--text-3); margin: 2px 0 6px; } .mp-article p { margin: 6px 0; font-size: 0.9rem; color: var(--text-2); }
+.mp-art-more { font-size: 0.75rem; color: var(--gold); margin-top: 4px; }
+.mp-video { display: flex; gap: 10px; align-items: center; margin-top: 8px; padding: 10px; border-radius: 10px; background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid var(--border); }
+.mp-play { width: 44px; height: 44px; border-radius: 50%; background: rgba(239,68,68,0.9); display: flex; align-items: center; justify-content: center; color: #fff; }
+.mp-vid-meta { display: flex; flex-direction: column; font-size: 0.85rem; } .mp-vid-meta span { color: var(--text-3); font-size: 0.75rem; }
+.mp-tvmini { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 0.8rem; color: var(--text-2); } .mp-tvmini a { margin-left: auto; color: var(--gold); cursor: pointer; }
+.mp-tv-live { background: var(--red); color: #fff; font-weight: 700; font-size: 0.68rem; padding: 1px 7px; border-radius: 3px; letter-spacing: 0.5px; }
+.mp-thread { margin-top: 8px; padding-left: 8px; border-left: 2px solid var(--border); }
+.mp-reply { display: flex; gap: 8px; padding: 6px 0; font-size: 0.88rem; } .mp-rhead span { color: var(--text-3); font-size: 0.75rem; } .mp-ract { color: var(--text-3); font-size: 0.72rem; margin-top: 2px; }
+/* News */
+.mn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.mn-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.mn-mast { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 3px solid; padding-bottom: 5px; margin-bottom: 8px; font-weight: 700; font-size: 0.85rem; } .mn-mast small { color: var(--text-3); font-weight: 500; }
+.mn-card h3 { font-size: 1.12rem; line-height: 1.2; margin-bottom: 8px; } .mn-card p { font-size: 0.9rem; color: var(--text-2); margin: 6px 0; }
+.mn-tabloid h3 { text-transform: uppercase; font-family: var(--numeral); font-size: 1.45rem; color: #fca5a5; letter-spacing: 0.4px; }
+.mn-paper h3 { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; } .mn-paper p { font-family: Georgia, serif; }
+.mn-by { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-3); margin-top: 8px; }
+/* TV */
+.tv-screen { border-radius: 14px; overflow: hidden; background: radial-gradient(circle at 30% 0%, #1e293b, #070b14 70%); border: 1px solid var(--border-strong); }
+.tv-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(225,29,72,0.18); } .tv-live { color: var(--red); font-weight: 800; font-size: 0.8rem; animation: tvblink 1.4s infinite; } .tv-show { margin-left: auto; color: var(--text-2); font-size: 0.8rem; }
+@keyframes tvblink { 50% { opacity: 0.35; } }
+.tv-sc { padding: 10px 14px 0; }
+.tv-banner { margin: 12px 14px; padding: 10px 14px; background: #fff; color: #0b1220; font-weight: 700; font-size: 1.05rem; border-radius: 4px; border-left: 6px solid var(--red); } .tv-banner span { display: inline-block; background: var(--red); color: #fff; padding: 1px 8px; margin-right: 8px; font-size: 0.75rem; letter-spacing: 0.7px; }
+.tv-anchor { padding: 0 14px; color: var(--text-2); font-size: 0.93rem; } .tv-anchor p { margin: 5px 0; }
+.tv-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; padding: 12px 14px; }
+.tv-pundit { display: flex; gap: 8px; } .tv-bubble { background: var(--bg-2); border-radius: 10px; padding: 8px 10px; font-size: 0.85rem; } .tv-bubble small { color: var(--text-3); margin-left: 6px; } .tv-bubble p { margin-top: 3px; color: var(--text); }
+.tv-ticker { overflow: hidden; background: #0b1220; border-top: 2px solid var(--gold); white-space: nowrap; }
+.tv-ticker-in { display: inline-block; padding: 7px 0; animation: tvscroll 60s linear infinite; } .tv-ticker-in span { margin: 0 24px; font-size: 0.82rem; color: var(--gold); }
+@keyframes tvscroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tv-prev { padding: 8px 0; border-top: 1px solid var(--border); font-size: 0.88rem; color: var(--text-2); } .tv-prev b { margin: 0 4px; color: var(--text); }

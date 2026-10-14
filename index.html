@@ -33,6 +33,7 @@
         <button class="nav-tab" data-view="history">History</button>
         <button class="nav-tab" data-view="teams">Teams</button>
         <button class="nav-tab" data-view="players">Players</button>
+        <button class="nav-tab" data-view="media">📡 Media</button>
         <button class="nav-tab" data-view="hospital">🏥 Hospital</button>
         <button class="nav-tab" data-view="extras">🧰 Extras</button>
       </nav>
@@ -122,6 +123,7 @@
       </div>
 
       <div id="match-live" style="display:none">
+        <div class="card media-buzz" id="live-buzz" style="display:none"></div>
         <div class="match-arena">
           <div class="scoreboard">
             <div class="score-team home">
@@ -195,6 +197,7 @@
         <div class="pitch-wrap" id="pitch-display"></div>
         <div class="lineup-grid" id="lineup-display"></div>
         <div class="card post-match-panel" id="post-match-ratings" style="display:none"></div>
+        <div class="card media-buzz" id="post-match-media" style="display:none"></div>
         <div class="back-tour-btn" id="back-to-tournament" style="display:none">
           <button class="btn btn-primary" onclick="App.returnToTournament()">← Back to Tournament</button>
         </div>
@@ -584,6 +587,23 @@
         <div style="text-align:center;margin-top:16px">
           <button type="button" class="btn btn-secondary btn-sm" id="players-load-more" onclick="App.loadMorePlayers()" style="display:none">Load more players</button>
         </div>
+      </div>
+    </section>
+
+    <!-- MEDIA CENTRE -->
+    <section id="view-media" class="view">
+      <div class="card">
+        <div class="card-title">📡 Apex Media Centre</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">News channels, TV studio, pundits and fans react to every result, hype every fixture and chase every story. <span id="media-summary" style="color:var(--text-muted)"></span></p>
+        <div class="leaderboard-tabs">
+          <button class="lb-tab mc-tab active" data-mtab="feed" onclick="App.mediaTab('feed')">📱 Feed</button>
+          <button class="lb-tab mc-tab" data-mtab="news" onclick="App.mediaTab('news')">📰 News</button>
+          <button class="lb-tab mc-tab" data-mtab="tv" onclick="App.mediaTab('tv')">📺 TV Studio</button>
+          <button class="lb-tab mc-tab" data-mtab="trending" onclick="App.mediaTab('trending')">🔥 Trending</button>
+          <button class="btn btn-danger btn-sm" onclick="App.mediaClear()" style="margin-left:auto">Clear feed</button>
+        </div>
+        <div class="teams-toolbar" id="media-filters" style="margin:10px 0"></div>
+        <div id="media-content"></div>
       </div>
     </section>
 
