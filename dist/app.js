@@ -5350,6 +5350,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (view === 'players') renderPlayersList(false);
     if (view === 'hospital') renderHospitalList();
     if (view === 'season') goToSeason();
+    if (view === 'media') renderMediaView();
   }
 
   function randomMatch(category) {
@@ -7053,6 +7054,7 @@ const PLAYSTYLE_BEHAVIOR = {
     currentMatch.tactics.home = decideOpeningTactic(openStrHome, openStrAway, getManagerPlaystyle(homeTeam), homeTeam);
     currentMatch.tactics.away = decideOpeningTactic(openStrAway, openStrHome, getManagerPlaystyle(awayTeam), awayTeam);
 
+    try { const pmm = document.getElementById('post-match-media'); if (pmm) { pmm.style.display = 'none'; pmm.innerHTML = ''; } mediaOnKickoff(currentMatch); } catch (e) { console.warn('media kickoff', e); }
     const setup = document.getElementById('match-setup');
     const live = document.getElementById('match-live');
     if (setup) setup.style.display = 'none';
@@ -12691,6 +12693,7 @@ const PLAYSTYLE_BEHAVIOR = {
     });
     try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
     try { localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook)); } catch(e) {}
+    try { mediaOnMatchComplete(m); } catch (e) { console.warn('media hook', e); }
     saveStats();
     updateScoreboard();
     updateStatsPanel();
@@ -13723,6 +13726,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const t = Object.assign({ name, team: teamName, playerIds, type, date: Date.now() }, extra || {});
     trophies.push(t);
     saveTrophiesToStorage();
+    try { mediaOnTrophy(name, teamObj, type, extra); } catch (e) {}
     return t;
   }
   function pushIndividualTrophy(awardName, playerObj, type, extra) {
@@ -13730,6 +13734,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const t = Object.assign({ name: awardName, team: playerObj.team || '', player: playerObj.name, playerId: playerObj.id || null, type, date: Date.now() }, extra || {});
     trophies.push(t);
     saveTrophiesToStorage();
+    try { mediaOnAward(awardName, playerObj, type, extra); } catch (e) {}
     return t;
   }
   // Manager awards live alongside individual player awards in the trophy
@@ -14084,6 +14089,7 @@ const PLAYSTYLE_BEHAVIOR = {
     season.archived = true;
     season.completedAt = Date.now();
     archiveAndResetGlobalAwards(season.year);
+    try { mediaOnSeasonEvent('seasonEnd'); } catch (e) {}
     toast('Season ' + season.year + ' complete! Awards & leaderboard archived to History and reset.');
   }
 
@@ -14303,6 +14309,7 @@ const PLAYSTYLE_BEHAVIOR = {
       const sar = localStorage.getItem('apexStandaloneAwardsRound');
       if (sar) standaloneAwardsRound = parseInt(sar, 10) || 0;
     } catch(e) {}
+    try { mediaLoad(); } catch (e) {}
   }
 
   // ========== FULL PROGRESS PERSISTENCE (survive a page refresh) ==========
@@ -14330,6 +14337,7 @@ const PLAYSTYLE_BEHAVIOR = {
       if (careerTeamId) ok = safeSetItem('apexCareerTeamId', careerTeamId) && ok;
       else localStorage.removeItem('apexCareerTeamId');
       ok = persistPlayerForms() && ok;
+      if (mediaDirty) ok = mediaSave() && ok;
       const activeTab = document.querySelector('.nav-tab.active');
       if (activeTab && activeTab.dataset.view) safeSetItem('apexActiveView', activeTab.dataset.view);
     } catch (e) { ok = false; }
@@ -14551,6 +14559,7 @@ const PLAYSTYLE_BEHAVIOR = {
       data.apexPlayerForms = JSON.stringify(collectPlayerFormsMap());
       data.apexPlayerMatchLog = JSON.stringify(playerMatchLog);
       data.apexTeamMatchLog = JSON.stringify(teamMatchLog);
+      if (mediaState) data.apexMedia = mediaSerialize();
     } catch (e) {}
     return data;
   }
@@ -18924,6 +18933,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (setup) setup.style.display = 'none';
     if (dash) dash.style.display = 'block';
     toast('Season started — good luck!');
+    try { mediaOnSeasonEvent('seasonStart'); } catch (e) {}
     persistAll();
   }
 
@@ -19526,6 +19536,7 @@ const PLAYSTYLE_BEHAVIOR = {
     ensureNationalCycleForSeason(year);
     renderSeasonDashboard();
     toast('Year ' + year + ' kicks off!');
+    try { mediaOnSeasonEvent('seasonStart'); } catch (e) {}
     persistAll();
   }
 
@@ -21425,6 +21436,3025 @@ const PLAYSTYLE_BEHAVIOR = {
   function filterHospitalSeverity(v) { hospitalFilter.severity = v || 'all'; renderHospitalList(); }
   function sortHospital(v) { hospitalFilter.sort = v || 'matchesLeft'; renderHospitalList(); }
 
+  // ==========================================================================
+  // APEX MEDIA CENTRE — static data
+  // --------------------------------------------------------------------------
+  // Everything the news / social-media layer (engine/mediaEngine.js) draws on:
+  // the outlets, the studio pundits, the pools used to mint fan accounts, the
+  // derby table and the competition hashtags. All outlets and pundits are
+  // FICTIONAL on purpose — rename them freely here (name / handle / bio) and
+  // every post, headline and TV bulletin picks the change up. Nothing else in
+  // the game depends on these strings.
+  //
+  // `voice` on an outlet decides how its posts are phrased (see mgOutletLine in
+  // engine/mediaEngine.js); `followers` scales every like / repost / view count.
+  // ==========================================================================
+  const MEDIA_OUTLETS = {
+    asc:      { name: 'Apex Sports Centre', handle: '@ApexSportsCentre', kind: 'tv',      icon: '📺', color: '#e11d48', followers: 9800000, verified: true,  bio: 'Football 24/7. Live from the Apex studio.' },
+    bn:       { name: 'Breaking Ball',      handle: '@BreakingBall',     kind: 'wire',    icon: '🚨', color: '#f59e0b', followers: 7400000, verified: true,  bio: 'First with the football news. Always.' },
+    ftl:      { name: 'FullTime Live',      handle: '@FullTimeLive',     kind: 'scores',  icon: '⏱️', color: '#22c55e', followers: 5200000, verified: true,  bio: 'Every score. Every league. Every minute.' },
+    meridian: { name: 'The Meridian',       handle: '@MeridianFC',       kind: 'paper',   icon: '📰', color: '#94a3b8', followers: 2100000, verified: true,  bio: 'Football, considered.' },
+    gaffe:    { name: 'The Daily Gaffe',    handle: '@DailyGaffe',       kind: 'tabloid', icon: '🗞️', color: '#ef4444', followers: 4600000, verified: true,  bio: 'You read it here first (and often last).' },
+    statbook: { name: 'StatBook FC',        handle: '@StatBookFC',       kind: 'stats',   icon: '📊', color: '#38bdf8', followers: 3300000, verified: true,  bio: 'Numbers. Records. Receipts.' },
+    tac:      { name: 'Tactics Board',      handle: '@TacticsBoard',     kind: 'tactics', icon: '🧠', color: '#a78bfa', followers: 1400000, verified: false, bio: 'Shapes, triggers and half-spaces.' },
+    terrace:  { name: 'TerraceTalk Radio',  handle: '@TerraceTalk',      kind: 'radio',   icon: '📻', color: '#fb923c', followers: 1900000, verified: true,  bio: 'The phone-in where everyone is an expert.' },
+    viral:    { name: 'Footy Viral',        handle: '@FootyViral',       kind: 'meme',    icon: '😂', color: '#f472b6', followers: 6100000, verified: false, bio: 'Memes, clips and crimes against football.' },
+    ferrante: { name: 'Luca Ferrante',      handle: '@LucaFerrante',     kind: 'insider', icon: '✍️', color: '#2dd4bf', followers: 8800000, verified: true,  bio: 'Transfer insider. Says "DONE DEAL" only when it is. Mostly.' },
+    refwatch: { name: 'The VAR Room',       handle: '@TheVARRoom',       kind: 'ref',     icon: '🖥️', color: '#eab308', followers: 1100000, verified: false, bio: 'Offside lines, handballs and the rulebook.' },
+    fanvoices:{ name: 'Fan Voices TV',      handle: '@FanVoicesTV',      kind: 'video',   icon: '🎥', color: '#60a5fa', followers: 2700000, verified: true,  bio: 'The terraces, uncensored.' }
+  };
+
+  // Studio pundits. `lens` picks which opinion bank they speak from — see
+  // MB_PUNDIT in data/mediaBanksWorld.js.
+  const MEDIA_PUNDITS = {
+    hollis:   { name: 'Dave Hollis',    nick: 'Big Dave', role: 'Ex-centre-back',    icon: '🧔',   color: '#ef4444', lens: 'hardman' },
+    clarke:   { name: 'Imani Clarke',   nick: 'Imani',    role: 'Match analyst',     icon: '👩🏾‍🏫', color: '#38bdf8', lens: 'analyst' },
+    bastos:   { name: 'Rico Bastos',    nick: 'Rico',     role: 'Ex-striker',        icon: '😎',   color: '#f59e0b', lens: 'attacker' },
+    whitlock: { name: 'Gary Whitlock',  nick: 'Gaz',      role: 'Former captain',    icon: '👴🏻',   color: '#a3a3a3', lens: 'oldschool' },
+    tanaka:   { name: 'Dr. Mei Tanaka', nick: 'Dr. Mei',  role: 'Data scientist',    icon: '🧪',   color: '#a78bfa', lens: 'data' },
+    marchetti:{ name: 'Sofia Marchetti',nick: 'Sofia',    role: 'Ex-goalkeeper',     icon: '🧤',   color: '#34d399', lens: 'keeper' },
+    adebayo:  { name: 'Tunde Adebayo',  nick: 'Tunde',    role: 'Presenter',         icon: '🎙️',   color: '#f472b6', lens: 'host' }
+  };
+  const MEDIA_PANEL_LENSES = ['hardman', 'analyst', 'attacker', 'oldschool', 'data', 'keeper'];
+
+  // Fictional bylines for written articles.
+  const MEDIA_BYLINES = {
+    meridian: ['Harriet Vance', 'Olu Adeyemi', 'Tomasz Brandt', 'Lucía Ferreyra', 'Callum Reid', 'Anouk de Wit', 'Kofi Mensah', 'Ingrid Solheim'],
+    gaffe:    ['Mick "The Pen" Dunbar', 'Sharon Quick', 'Reggie Tuft', 'Baz Mulligan', 'Cheryl Nash', 'Ronnie Pike'],
+    bn:       ['Breaking Ball Desk', 'Newsroom Team', 'Breaking Ball Reporters'],
+    asc:      ['Apex Sports Centre Digital', 'ASC Newsroom']
+  };
+
+  // ---- Fan account pools ----------------------------------------------------
+  // Accounts are minted deterministically from a hash of (team id, slot), so
+  // the same "regular" keeps turning up for the same club across a whole save
+  // without a single account being stored.
+  const MEDIA_FIRST = ['Marcus','Aiko','Diego','Priya','Lars','Tomás','Chidi','Yuki','Ravi','Sven','Amara','Mateo','Fatima','Kwame','Ines','Luka','Zara','Nico','Hana','Omar','Bruno','Selin','Jonas','Kai','Mila','Santi','Ewa','Idris','Pablo','Noor','Declan','Rosa','Thabo','Elif','Gus','Wren','Dario','Leila','Femi','Anya','Callum','Soraya','Felix','Imran','Maeve','Ty','Greta','Hugo','Nadia','Rafa'];
+  const MEDIA_NOUN = ['Faithful','Army','Ultra','Terrace','Tunnel','Daily','Talk','Banter','Stand','Chants','Outpost','Zone','Lads','Corner','Gaffer','Matchday','Xtra','Hub','Podcast','Nation','Squad','Watch','Insider','Takes','Central','Til_Death','4Life','Oracle','Hotline','Diaries'];
+  const MEDIA_AVATAR = ['🧢','⚽','🦁','🐺','🦅','🔥','🐉','🦊','🐯','🦈','🛡️','⚔️','🏟️','🎺','🥁','🍺','🧣','👑','🦍','🐂','🦉','🐻','🐗','🐝','⭐','🌶️','🥶','🦄'];
+  const MEDIA_NEUTRAL_NOUN = ['Football_Brain','Neutral','Tactician','OnlyBall','Lurker','Weekend_Fan','PitchSide','ThePundit','xGnerd','BallWatcher','Scoreline','FootyDad','LateTackle','ThirdMan','Nutmeg'];
+
+  // Fan "moods": pick one per account (hash-seeded) and it colours every post.
+  const MEDIA_MOODS = ['optimist', 'doomer', 'delusional', 'banter', 'tactician', 'stat', 'wholesome', 'angry'];
+
+  // ---- Derbies & rivalries ---------------------------------------------------
+  // Each entry matches when BOTH name fragments appear (case-insensitive) in the
+  // two team names. Add your own — `name` is what the headlines call the game.
+  const MEDIA_DERBIES = [
+    { a: 'real madrid', b: 'barcelona',     name: 'El Clásico' },
+    { a: 'real madrid', b: 'atl',           name: 'the Madrid Derby' },
+    { a: 'sevilla',     b: 'betis',         name: 'the Seville Derby' },
+    { a: 'barcelona',   b: 'espanyol',      name: 'the Barcelona Derby' },
+    { a: 'ac milan',    b: 'inter',         name: 'the Derby della Madonnina' },
+    { a: 'milan',       b: 'inter',         name: 'the Derby della Madonnina' },
+    { a: 'inter',       b: 'juventus',      name: "the Derby d'Italia" },
+    { a: 'roma',        b: 'lazio',         name: 'the Derby della Capitale' },
+    { a: 'juventus',    b: 'torino',        name: 'the Derby della Mole' },
+    { a: 'napoli',      b: 'juventus',      name: 'the Sun-vs-Stripes grudge match' },
+    { a: 'bayern',      b: 'dortmund',      name: 'Der Klassiker' },
+    { a: 'dortmund',    b: 'schalke',       name: 'the Revierderby' },
+    { a: 'paris',       b: 'marseille',     name: 'Le Classique' },
+    { a: 'lyon',        b: 'saint',         name: 'the Rhône-Alpes derby' },
+    { a: 'arsenal',     b: 'tottenham',     name: 'the North London Derby' },
+    { a: 'manchester united', b: 'manchester city', name: 'the Manchester Derby' },
+    { a: 'liverpool',   b: 'everton',       name: 'the Merseyside Derby' },
+    { a: 'liverpool',   b: 'manchester united', name: 'the North-West Grudge Match' },
+    { a: 'chelsea',     b: 'arsenal',       name: 'the London Derby' },
+    { a: 'chelsea',     b: 'tottenham',     name: 'the London Derby' },
+    { a: 'west ham',    b: 'millwall',      name: 'the East London Derby' },
+    { a: 'newcastle',   b: 'sunderland',    name: 'the Tyne-Wear Derby' },
+    { a: 'celtic',      b: 'rangers',       name: 'the Old Firm' },
+    { a: 'ajax',        b: 'feyenoord',     name: 'De Klassieker' },
+    { a: 'benfica',     b: 'porto',         name: 'O Clássico' },
+    { a: 'benfica',     b: 'sporting',      name: 'the Lisbon Derby' },
+    { a: 'argentina',   b: 'brazil',        name: 'the Superclásico of the Americas' },
+    { a: 'england',     b: 'germany',       name: 'the Old Enemies tie' },
+    { a: 'england',     b: 'scotland',      name: 'the Auld Enemy clash' },
+    { a: 'england',     b: 'france',        name: 'the Channel Rivalry' },
+    { a: 'spain',       b: 'portugal',      name: 'the Iberian Derby' },
+    { a: 'italy',       b: 'france',        name: 'the Alpine Rivalry' },
+    { a: 'netherlands', b: 'germany',       name: 'the Rhine Rivalry' },
+    { a: 'egypt',       b: 'algeria',       name: 'the North African Showdown' },
+    { a: 'nigeria',     b: 'ghana',         name: 'the West African Derby' },
+    { a: 'japan',       b: 'south korea',   name: 'the East Asian Derby' },
+    { a: 'uruguay',     b: 'argentina',     name: 'the Río de la Plata Derby' },
+    { a: 'mexico',      b: 'united states', name: 'the Clásico Norteamericano' }
+  ];
+
+  // ---- Competition hashtags / kinds -------------------------------------------
+  const MEDIA_COMP_TAGS = {
+    'Premier League': '#PL', 'La Liga': '#LaLiga', 'Serie A': '#SerieA', 'Bundesliga': '#Bundesliga', 'Ligue 1': '#Ligue1',
+    'Champions League': '#UCL', 'World Cup': '#WorldCup', 'Nations League': '#NationsLeague',
+    'European Championship': '#Euros', 'Copa América': '#CopaAmerica', 'Africa Cup of Nations': '#AFCON',
+    'AFC Asian Cup': '#AsianCup', 'CONCACAF Gold Cup': '#GoldCup', 'FA Cup': '#FACup', 'EFL Cup': '#EFLCup',
+    'Copa del Rey': '#CopaDelRey', 'DFB-Pokal': '#DFBPokal', 'Coppa Italia': '#CoppaItalia', 'Coupe de France': '#CoupeDeFrance',
+    'World Cup Qualifying': '#WCQ', 'Friendly': '#Friendly'
+  };
+
+  // Competition prestige (0-1) — drives how loud the coverage is.
+  const MEDIA_COMP_WEIGHT = {
+    'World Cup': 1, 'Champions League': 0.92, 'European Championship': 0.9, 'Copa América': 0.85,
+    'Premier League': 0.72, 'La Liga': 0.68, 'Serie A': 0.64, 'Bundesliga': 0.62, 'Ligue 1': 0.56,
+    'Africa Cup of Nations': 0.7, 'AFC Asian Cup': 0.6, 'CONCACAF Gold Cup': 0.55, 'Nations League': 0.55,
+    'FA Cup': 0.66, 'EFL Cup': 0.5, 'Copa del Rey': 0.56, 'DFB-Pokal': 0.52, 'Coppa Italia': 0.5, 'Coupe de France': 0.46,
+    'World Cup Qualifying': 0.45, 'Friendly': 0.18
+  };
+
+
+  // ==========================================================================
+  // APEX MEDIA CENTRE — match storyline banks
+  // --------------------------------------------------------------------------
+  // Template syntax (expanded by mx() in engine/mediaEngine.js):
+  //   {name}        a value from the match context      {name|up} {name|poss} …
+  //   {?a|b|c}      pick one of the inline options
+  //   [bank]        pick one line from MB[bank] (recursive, never repeats lately)
+  // Fan templates are written from a supporter's point of view: {my} / {opp} /
+  // {myScore} are that supporter's side; core / formal / punny / meme / radio /
+  // vid / tac use the neutral {W} (winner) / {L} (loser) view.
+  // ==========================================================================
+  const MS = {
+
+    // ------------------------------------------------------------ plain win
+    win: {
+      core: [
+        "FULL TIME: {W} {wscore} {L}. {scorerS} the difference.",
+        "{W} beat {L} {wscore} in the {comp}. {motmS} named Player of the Match.",
+        "Three points for {W}: {scorers}.",
+        "{W} see off {L} — {wscore} at the final whistle.",
+        "{Wf} {W} {wscore} {L} {Lf} | MOTM: {motmS} ({motmR})"
+      ],
+      formal: [
+        "{W} prevail over {L} in a controlled {comp} display",
+        "{motmS} steers {W} past {L} with a composed performance",
+        "Clinical edge carries {W} to {wscore} win over {L}"
+      ],
+      punny: [
+        "{W} {?DEFEAT|DUMP|SEE OFF|SEND PACKING} {L}!",
+        "{motmS} {?STARS|SHINES|SHOWS HIS CLASS} as {W} {?DISPATCH|DOWN|ROLL OVER} {L}",
+        "THREE POINTS, ZERO DRAMA: {W} ease past {L}",
+        "{L} {?LEFT RUING IT|HUMBLED|FOUND WANTING} by {W}"
+      ],
+      fanW: [
+        "{myScore}. {?Job done.|Professional.|Clinical.|That'll do nicely.|Sorted.} [tail_win]",
+        "{myS} {?never looked in danger|were comfortable|managed it superbly|had the answers all night}. {myScore} and on we go. [tail_win]",
+        "{scorerS} again. Honestly can't remember {opp} having a shot worth mentioning. [tail_win]",
+        "Man of the match for me? {motmS}. {?Different gravy.|Class.|Sensational.|Wouldn't swap him for anyone.}"
+      ],
+      fanL: [
+        "{myScore}. {?Awful.|Unacceptable.|Embarrassing.|No fight at all.|Not good enough.} [tail_lose]",
+        "{opp} {?were better in every department|wanted it more|made us look ordinary}. Credit to them, but we were shocking. [tail_lose]",
+        "How do we {?lose that|get beaten by that lot|look so flat}?? Somebody explain. [tail_lose]",
+        "I'll say it: {oppS} deserved it. We showed up and forgot to play. [tail_lose]"
+      ],
+      fanN: [
+        "{W} {wscore} {L}. {?Sensible result.|Fair enough.|Nothing to see here, move along.|The better side won.} [tail_neutral]",
+        "{motmS} was {?quietly brilliant|the best player on the pitch|a class above} for {W}.",
+        "{W} just look like a proper side right now. {L} {?have questions to answer|need a reset}."
+      ],
+      meme: [
+        "{L} fans after {ws}-{ls}: 🙂➡️😐➡️🫠",
+        "{W} to {L}: \"thanks for the three points\" 🤝",
+        "POV: you wrote off {W} before kick-off 🤡"
+      ],
+      radio: [
+        "Caller from the {Lf} end says {L} \"turned up in body only\" — and he's not wrong.",
+        "Line two says {W} are favourites for everything now. Line three says calm down. Line four is shouting."
+      ],
+      vid: [
+        "{W} FANS REACT: {wscore} vs {L} | Full-time scenes",
+        "Walking out of the ground after {W} {wscore} {L} 🎥 (mixed emotions)"
+      ],
+      tac: [
+        "{W} controlled the tempo ({possW}% of the ball, {shW} shots) — {L} never found a way to disrupt it.",
+        "Key pattern: {W} won the second balls and made {L}'s press look a step late."
+      ]
+    },
+
+    // -------------------------------------------------------------- draw
+    draw: {
+      core: [
+        "FULL TIME: {H} {score} {A}. Honours even.",
+        "{H} and {A} share the spoils — {score}.",
+        "Points shared at the final whistle: {Hf} {H} {score} {A} {Af}.",
+        "No winner: {scorers}. It finishes {score}."
+      ],
+      formal: [
+        "{H} and {A} cancel each other out in a spirited {score} draw",
+        "A fair result: {H} and {A} settle for a point apiece"
+      ],
+      punny: [
+        "{H} and {A} SPLIT THE SPOILS — nobody's happy!",
+        "STALEMATE! {H} {score} {A} leaves everyone wanting more",
+        "ALL SQUARE: {H} and {A} {?cancel each other out|play out an entertaining draw|go home with a point each}"
+      ],
+      fanD: [
+        "{myScore}. {?Fine, I suppose.|Point gained, two dropped — can't decide.|Bit of both really.|Take it and move on.} [tail_draw]",
+        "{myS} {?had enough chances to win it|will be happier with the point|deserved more|were lucky to get anything}. [tail_draw]",
+        "Honestly a draw feels right. {oppS} had their moments, we had ours. [tail_draw]"
+      ],
+      fanN: [
+        "{score} between {H} and {A}. {?Fair.|Entertaining enough.|Nobody deserved to lose.} [tail_neutral]",
+        "A draw. {?Shock.|Again.|The most football result possible.}"
+      ],
+      meme: [
+        "{H} & {A} fans after {score}: 🤝🥲",
+        "Draws are just a loss with extra steps and a tiny bit of hope 🫠"
+      ],
+      radio: [
+        "Caller says a draw is \"a result for both sides\" — which is what you say when you have nothing to say.",
+        "Phone-in split down the middle on {score}: half say fair, half say robbed."
+      ],
+      vid: ["{H} vs {A} {score} | Fans react to the draw", "Split points: reaction from both ends"],
+      tac: [
+        "{H} and {A} neutralised each other — {possW}% / {possL}% possession, {shW}-{shL} shots. Few clear overloads either side."
+      ]
+    },
+
+    // -------------------------------------------------- goalless / bore draw
+    bore: {
+      core: [
+        "FULL TIME: {H} 0-0 {A}. Defences on top.",
+        "Goalless: {H} and {A} cancel each other out.",
+        "{H} 0-0 {A} — {gkS} and the back lines the stars. ({saves} saves)"
+      ],
+      formal: [
+        "{H} and {A} produce a goalless stalemate of few chances",
+        "Defensive discipline wins out as {H}-{A} ends 0-0"
+      ],
+      punny: [
+        "NIL BY MOUTH: {H} and {A} serve up a goalless SNOOZEFEST",
+        "0-0 SNORE-DRAW: {H} {?and|v|vs} {A} nothing to see here",
+        "{H} 0 {A} 0 — somebody wake the referee"
+      ],
+      fanD: [
+        "0-0. {?Riveting.|Thrilling.|I want those 90 minutes back.|Truly one for the purists.} [tail_draw]",
+        "Not a single {?moment of quality|clear chance|shot worth the name} from either side. {myS} fans deserve better. [tail_draw]",
+        "Defensively solid, sure. But can we please score a goal at some point?"
+      ],
+      fanN: [
+        "0-0 between {H} and {A}. Heavy sigh. [tail_neutral]",
+        "Went to make a tea in the 30th minute, came back to the same score. Perfect timing."
+      ],
+      meme: [
+        "{H} 0-0 {A}: highlights ⬛⬛⬛⬛⬛⬛",
+        "Both goalkeepers after 0-0: 😴 \"busy night, wasn't it?\""
+      ],
+      radio: ["Our caller calls it \"90 minutes of tactical chess\". Our host calls it \"a car park.\""],
+      vid: ["0-0 FANS REACT: {H} v {A} (zero goals, plenty of opinions)"],
+      tac: ["Blocks held firm: {shW}-{shL} shots, xG {xgW}-{xgL}. Both sides refused to risk the transition."]
+    },
+
+    // ------------------------------------------------ goal-fest (draw, 4+ goals)
+    draw_goalfest: {
+      core: [
+        "WHAT A GAME! {H} {score} {A} — nobody can believe it.",
+        "{H} and {A} share EIGHT… sorry, {tot} goals in a classic.",
+        "Pandemonium: {H} {score} {A}. {scorers}."
+      ],
+      formal: ["A breathless {score} draw between {H} and {A} defies tactical logic"],
+      punny: [
+        "GOAL-A-THON! {H} {score} {A} — {tot} goals and no winner",
+        "DEFENDING? WHAT DEFENDING?! {H} and {A} trade blows in {score} thriller"
+      ],
+      fanD: [
+        "{myScore}. My heart can't take this. {?Genuinely cannot defend.|Football is brilliant.|I need to lie down.} [tail_draw]",
+        "{tot} goals and we still didn't win. {?Unreal.|Of course.|This team will be the death of me.} [tail_draw]"
+      ],
+      fanN: [
+        "{H} {score} {A}. {?Best game of the weekend.|Absolute carnage and I loved it.|Cinema.|Please don't ever fix the defending.}",
+        "Neutral hat on: that was unbelievable entertainment."
+      ],
+      meme: ["Defenders in {H} {score} {A}: 🏃💨 …where's everyone going?"],
+      radio: ["Switchboard lit up after {score}: \"Nobody defends anymore!\" — \"Isn't that the point?\""],
+      vid: ["{tot} GOALS! {H} {score} {A} full-time reaction"],
+      tac: ["Transitions everywhere: {shH}-{shA} shots, xG {xgW}-{xgL}. Neither back line held its shape once the game opened up."]
+    },
+
+    // ------------------------------------------------------------ thriller
+    thriller: {
+      core: [
+        "THRILLER: {W} edge {L} {wscore} in a {tot}-goal epic.",
+        "{W} {wscore} {L}. {scorers}. What a match.",
+        "Seven kinds of chaos, but {W} survive {L} {wscore}.",
+        "{W} win it in a shootout of goals — {wscore} vs {L}."
+      ],
+      formal: [
+        "{W} survive an open game to beat {L} {wscore}",
+        "Chaos reigns, {W} emerge: {wscore} win over {L}"
+      ],
+      punny: [
+        "{W} WIN GOAL FEST! {tot} goals as {L} are left shell-shocked",
+        "WOW! {W} edge {L} in a {wscore} thriller",
+        "{W} HANG ON in a {tot}-goal BANANA SKIN of a match"
+      ],
+      fanW: [
+        "{myScore}!!! {?My heart rate is not safe.|I've aged ten years.|Absolute scenes.|Do not do this to me again.} [tail_win]",
+        "Won it, but defend like that again and we're in trouble. Still, {myScore}! [tail_win]",
+        "{?Football is the greatest game.|What a game of football.|That was a movie.} {myScore} and the points are ours."
+      ],
+      fanL: [
+        "{myScore}. We scored {myG} and STILL lost. {?Defending is optional apparently.|This backline is a crime scene.} [tail_lose]",
+        "That's the most entertaining way to lose I've ever seen. Still lost, though. [tail_lose]",
+        "{oppG} goals conceded. {?Unreal.|At home?|Again?} Somebody sort that defence. [tail_lose]"
+      ],
+      fanN: [
+        "{W} {wscore} {L} — the match of the weekend, and it isn't close. [tail_neutral]",
+        "Whoever scripted {W} v {L} deserves an award. {tot} goals, drama, the lot."
+      ],
+      meme: [
+        "{W} {wscore} {L}: both defences have left the group chat 🏳️",
+        "Goalkeepers in {W} v {L}: \"I'd like to speak to the manager\" 🧤😵"
+      ],
+      radio: ["Host: \"{tot} goals!\" Caller: \"Terrible defending!\" Host: \"Brilliant television.\""],
+      vid: ["{tot} GOALS! {W} {wscore} {L} — the full reaction", "INSANE finish at {W} v {L} (fans lose their minds)"],
+      tac: ["Open game by design: both sides pressed, both got bypassed. xG {xgW}-{xgL}; transitions decided it."]
+    },
+
+    // ---------------------------------------------------------- thrashing
+    thrashing: {
+      core: [
+        "{W} HAMMER {L}: {wscore}.",
+        "{W} {wscore} {L} — a statement win.",
+        "Rout at {W}: {L} beaten {wscore}. {scorers}.",
+        "{L} humbled — {W} win {wscore}."
+      ],
+      formal: [
+        "{W} dismantle {L} {wscore} in ruthless display",
+        "A statement: {W} overpower {L} {wscore}",
+        "{L} outclassed as {W} run riot"
+      ],
+      punny: [
+        "{W} DEMOLISH {L}! {wscore} BLOODBATH",
+        "{L} HAMMERED {wscore} — and it could've been more!",
+        "FOUR PLAY? {W} {?TROUNCE|TORCH|TEAR APART|FLATTEN} {L}",
+        "MERCY! {W} take {L} apart {wscore}"
+      ],
+      fanW: [
+        "{myScore}!!! {?Absolutely ruthless.|No mercy.|That was a performance.|Run riot.} [tail_win]",
+        "Put {ws} past {opp} and it could have been more. {?Frightening.|Title talk anyone?|Clinical.} [tail_win]",
+        "{motmS} {?was untouchable|is playing on another planet|ran the show}. {myScore}. [tail_win]"
+      ],
+      fanL: [
+        "{myScore}. {?Embarrassing.|Humiliating.|Gutted. Angry. Numb.|Nothing to say.} [tail_lose]",
+        "{ls} scored… for the other lot. {?Defence off.|Total collapse.|Absolute shambles.} [tail_lose]",
+        "I want a refund. Not for the ticket — for my time. {myScore}. [tail_lose]"
+      ],
+      fanN: [
+        "{W} {wscore} {L}. {?Ruthless.|Not even close.|Mercy rule when?} [tail_neutral]",
+        "That was a masterclass from {W}. Genuinely worried for {L} now."
+      ],
+      meme: [
+        "{L} defenders at {wscore}: 🏃‍♂️🏃‍♂️🏃‍♂️ \"which way's the exit?\"",
+        "{W} fans: 😎  {L} fans: 😶‍🌫️"
+      ],
+      radio: ["Caller: \"I've seen better defending in a pub five-a-side.\" Host: \"Careful, caller.\" Caller: \"Not wrong, though.\""],
+      vid: ["{W} {wscore} {L}: FULL FAN REACTION to the humiliation", "Scenes after {W}'s {wscore} thrashing of {L}"],
+      tac: ["{W} won {possW}% of possession and {shW} shots — but the damage came from {L}'s line sitting too high against runners."]
+    },
+
+    // ------------------------------------------------------------ comeback
+    comeback: {
+      core: [
+        "COMEBACK! {W} {wscore} {L} after trailing {deficit}.",
+        "{W} come from behind to beat {L} {wscore}.",
+        "From {deficit}-down to winners: {W} {wscore} {L}. {scorers}.",
+        "UNBELIEVABLE: {W} turn it around against {L}!"
+      ],
+      formal: [
+        "{W} rally from behind to claim {wscore} win over {L}",
+        "Resilience: {W} overturn deficit against {L}"
+      ],
+      punny: [
+        "GREAT ESCAPE! {W} come from {deficit} down to SLAY {L}",
+        "{L} THROW IT AWAY as {W} turn it around {wscore}",
+        "NEVER SAY DIE! {W} {?STUN|SHOCK|STORM PAST} {L} in comeback of the season"
+      ],
+      fanW: [
+        "WE WERE {deficit} DOWN. {myScore}. {?I'm shaking.|Football is mad.|Never leaving this team.|What a bunch of lads.} [tail_win]",
+        "Never doubted. (I doubted completely.) {myScore}!! [tail_win]",
+        "That's character. Went behind, didn't panic, won it. {?Proper side.|This is a team now.} [tail_win]"
+      ],
+      fanL: [
+        "{deficit} up and we lose {myScore}. {?Unforgivable.|The most us thing ever.|Throw it away why don't we.} [tail_lose]",
+        "We had it. We HAD it. {?Game management is a myth.|Sit back and let them score — textbook.} [tail_lose]",
+        "How do you lose after leading? {?Genuinely asking.|Ask the manager.} [tail_lose]"
+      ],
+      fanN: [
+        "{W} coming back from {deficit} down to win {wscore} is *peak* football. {?Love it.|Brilliant.|Wow.}",
+        "{L} will be sick: ahead, in control, then gone. {W} never stopped."
+      ],
+      meme: [
+        "{L} up {deficit}-0 at half-time: 😎 \"easy\". Full time: 🫥",
+        "{W} fans at halftime 😞 → at full time 🤯"
+      ],
+      radio: ["Caller: \"Don't tell me {L} were comfortable.\" Host: \"They were. For about an hour.\""],
+      vid: ["COMEBACK SCENES! {W} {wscore} {L} full reaction", "From {deficit} DOWN to WINNERS — {W} fans lose it"],
+      tac: ["{W} adjusted at the break — wide overloads and a higher press reversed the game. {L} dropped deeper and never recovered."]
+    },
+
+    // --------------------------------------------------------- late winner
+    late_winner: {
+      core: [
+        "{scorerS} WINS IT in the {ord} minute! {W} {wscore} {L}.",
+        "LATE DRAMA: {scorer} snatches it for {W} in the {ord}.",
+        "{W} beat {L} {wscore} with a goal at the death — {scorerS} ({min}').",
+        "{scorerS} {?breaks {L} hearts|sends {W} into dreamland|wins it late}. {wscore}."
+      ],
+      formal: [
+        "{scorerS} settles it in the {ord} minute as {W} edge {L}",
+        "Late strike from {scorerS} decides {W}-{L} contest"
+      ],
+      punny: [
+        "{scorerS} {?STRIKES|SNATCHES IT|STUNS {L}} IN THE {ord|up} MINUTE!",
+        "WHAT. A. FINISH! {scorerS} {?SINKS|SHATTERS|DEVASTATES} {L} at the death",
+        "CRUEL! {L} undone by {scorerS} in the {ord}",
+        "{scorerS} the hero: {W} take it {wscore} with seconds to spare"
+      ],
+      fanW: [
+        "{scorerS}!!! {ord} MINUTE!!! {?I'm screaming.|I'm crying.|I've lost my voice.|I'm on the floor.} {myScore}! [tail_win]",
+        "{min}'. {scorerS}. {?Football.|Cinema.|Unreal.|THAT'S WHY WE LOVE THIS.} [tail_win]",
+        "Cometh the hour, cometh {scorerS}. {myScore}. Never stop believing. [tail_win]",
+        "My neighbours know my team won. Everyone does. {scorerS} in the {ord}!!! [tail_win]"
+      ],
+      fanL: [
+        "{ord} minute. {?AGAIN.|Unreal.|I can't breathe.|Absolutely sick.} {myScore}. [tail_lose]",
+        "We were that close. {?One more clearance.|One more tackle.|Ninety minutes of work} and then THAT. [tail_lose]",
+        "{scorerS} at {min}'. I'm numb. {?Football is cruel.|Don't talk to me.|Going outside.} [tail_lose]",
+        "Defended brilliantly for ninety minutes, lost in the last. That's the sport. I hate it. [tail_lose]"
+      ],
+      fanN: [
+        "Last-gasp winner from {scorerS}. {?This is why we watch.|Cruel and glorious.|Remember this one.} [tail_neutral]",
+        "{W} {wscore} {L} — won in the {ord} minute. {?Pure drama.|Great ending.|Heartbreak and euphoria in 20 seconds.}"
+      ],
+      meme: [
+        "{scorerS} in the {ord}: 🏃‍♂️💨🔥 {L} players: 🧍🧍🧍",
+        "{L} fans after {min}': 🥲➡️💀"
+      ],
+      radio: ["Caller at the {Wf} end: \"I've never screamed so loud.\" Caller at the {Lf} end: \"Don't.\" Host: \"Thanks, both.\""],
+      vid: ["{scorerS} {ord}-MINUTE WINNER: fans go absolutely MAD", "LAST-MINUTE SCENES: {W} fans after {scorerS}'s winner"],
+      tac: ["{W} pushed a centre-back forward and went direct in the final ten — {scorerS} found space exactly where {L}'s block tired."]
+    },
+
+    // ------------------------------------------------------ late equaliser
+    late_equaliser: {
+      core: [
+        "{scorerS} SAVES A POINT in the {ord}! {W} salvage {score}.",
+        "Last-gasp leveller: {scorer} rescues {W} at {min}'.",
+        "{L} had it won… then {scorerS} struck in the {ord}.",
+        "Late equaliser! {H} {score} {A}."
+      ],
+      formal: [
+        "{scorerS}'s late leveller denies {L} in {score} draw",
+        "{W} snatch a point as {scorerS} strikes in the {ord} minute"
+      ],
+      punny: [
+        "LATE SHOW! {scorerS} DENIES {L} with an {ord}-minute leveller",
+        "SNATCHED! {W} STEAL A POINT as {scorerS} strikes at the death",
+        "{L} ROBBED as {scorerS} haunts them in the {ord}"
+      ],
+      fanW: [
+        "{scorerS}!!! {ord} MINUTE!!! {?Unbelievable.|Dead and buried and now alive.|Never say die!} {myScore}. [tail_win]",
+        "That's a point from nowhere. {?Take it and run.|Character!|Cheeky, but ours.} [tail_draw]",
+        "{min}'. {scorerS}. I'm a mess. {myScore}. [tail_draw]"
+      ],
+      fanL: [
+        "{min}'. Ahead for 85 minutes and then… {?this.|that.|unbelievable.} {myScore}. [tail_lose]",
+        "We threw away two points. {?Again.|Naturally.|Don't talk to me.} [tail_lose]",
+        "Can't believe it. {oppS} were dead and buried. {?Concentration.|Marking.|Concentration. Marking. Anything.} [tail_lose]"
+      ],
+      fanN: [
+        "Late equaliser, big drama, both sides can feel it. {?Perfect.|Football is great.|What a finish.} [tail_neutral]",
+        "{scorerS} rescued {W} at the death. {?Absolutely deserved? Debatable. Entertaining? Totally.}"
+      ],
+      meme: [
+        "{L} defenders at {min}': 🧍🧍🧍🧍 \"somebody mark him?\"",
+        "{W} fans at 89': 😭 At 90': 😭😭😭 (different kind)"
+      ],
+      radio: ["Caller from the {Lf} end: \"They've snatched a point — and they were awful.\" Host: \"Rude but accurate.\""],
+      vid: ["{ord}-MINUTE EQUALISER! {W} fans erupt", "Late leveller scenes: {W} {score} {L}"],
+      tac: ["{W} went to a back three and sent bodies into the box — {scorerS}'s equaliser came from the second wave."]
+    },
+
+    // -------------------------------------------------------------- upset
+    upset: {
+      core: [
+        "SHOCK: {W} beat {L} {wscore}.",
+        "UPSET! {W} stun {L} {wscore} in the {comp}.",
+        "{W} {wscore} {L} — one of the results of the season.",
+        "Giant-killers: {W} outfight {L}. {scorerS} the hero."
+      ],
+      formal: [
+        "{W} defy the odds to beat {L} {wscore}",
+        "A significant upset: {W} outwork {L} {wscore}"
+      ],
+      punny: [
+        "SHOCKER! {W} {?TOPPLE|STUN|SHOCK|SLAY} {L}!",
+        "DAVID v GOLIATH: {W} {?SLING|SMASH|STONE} {L} {wscore}",
+        "{L} {?BEATEN BY MINNOWS|HUMBLED|LEFT STUNNED} as {W} pull off massive upset",
+        "THE GIANTS FALL: {W} {wscore} {L}!"
+      ],
+      fanW: [
+        "WE BEAT {oppS}!!! {myScore}!!! {?I can't believe it.|Absolute scenes.|Nobody gave us a chance.|Pinch me.} [tail_win]",
+        "Everyone wrote us off. {myScore}. {?Remember this day.|Take a bow, lads.|We did that.} [tail_win]",
+        "The underdogs bit back. {scorerS} {?is a legend|should never buy a drink again}. [tail_win]"
+      ],
+      fanL: [
+        "Lost to {oppS}. {?LOST. TO. THEM.|I don't know what to say.|Unforgivable.|Embarrassing.} {myScore}. [tail_lose]",
+        "That's the worst result I've seen in years. {?Truly.|Honestly.|Sack the lot.} [tail_lose]",
+        "We arrived thinking it was a formality. Spoiler: it wasn't. {myScore}. [tail_lose]"
+      ],
+      fanN: [
+        "{W} just toppled {L}. {?Love it when the script gets torn up.|Footballing joy.|This is why we watch.} [tail_neutral]",
+        "{L} will be ruing this one. {W} deserved every bit of it."
+      ],
+      meme: [
+        "{W} {wscore} {L} — \"form is temporary, class is permanent\" the class: 🏳️",
+        "{L} fans: 💀 {W} fans: 🥹"
+      ],
+      radio: ["Caller: \"I told you {W} would do it!\" Host: \"You said 4-0 to {L}.\" Caller: \"…I had a feeling.\""],
+      vid: ["BIGGEST SHOCK OF THE SEASON? {W} {wscore} {L} FAN REACTION", "{W} FANS GO WILD after stunning {L}"],
+      tac: ["{W}'s low block frustrated {L}, then hit them on the break — a textbook underdog gameplan executed superbly."]
+    },
+
+    // ----------------------------------------------------------- hat-trick
+    hattrick: {
+      core: [
+        "HAT-TRICK HERO: {scorer} scores {ng} as {W} beat {L} {wscore}.",
+        "{scorerS} with a hat-trick! {W} {wscore} {L}.",
+        "THREE goals for {scorerS}. {W} win {wscore}.",
+        "{scorer}: {ng} goals, one match ball. {W} {wscore} {L}."
+      ],
+      formal: [
+        "{scorerS} hat-trick carries {W} past {L}",
+        "Three-goal {scorerS} masterclass leaves {L} powerless"
+      ],
+      punny: [
+        "{scorerS}: THAT'S A HAT-TRICK! {W} {wscore} {L}",
+        "{scorerS} TAKES HOME THE BALL as {W} {?crush|beat|swat aside} {L}",
+        "HAT-TRICK HERO {scorerS} {?STEALS THE SHOW|IS A ONE-MAN SHOW|SINGLE-HANDEDLY WINS IT}",
+        "THREE AND EASY! {scorerS} {?FIRES|NETS|BAGS} a treble"
+      ],
+      fanW: [
+        "{scorerS} {ng} goals. {?Absolute machine.|Ridiculous.|Take the ball home and the stadium too.|On a different level.} [tail_win]",
+        "HAT-TRICK!!! {scorerS} is {?unplayable|world class|a certified menace}. {myScore}! [tail_win]",
+        "Name a better striker. I'll wait. {scorerS}. {ng} goals. [tail_win]"
+      ],
+      fanL: [
+        "{scorerS} {ng}, us 0. {?We simply couldn't stop him.|No answers.|Awful marking.} [tail_lose]",
+        "Not a single defender wanted to tackle him. {?Terrifying.|Embarrassing.}",
+        "He's scored {ng} against us. {?Embarrassing.|Chats about 'respect' are over.} [tail_lose]"
+      ],
+      fanN: [
+        "{scorerS}'s hat-trick for {W}: {?clinical|ruthless|a finishing clinic}. [tail_neutral]",
+        "Neutral hat: {scorerS} is {?having the season of his life|ridiculous|one of the best around}."
+      ],
+      meme: [
+        "{scorerS} after the hat-trick: 🧍‍♂️⚽⚽⚽🏆 \"Anyone seen my ball?\"",
+        "{L} defenders: 🏳️ {scorerS}: 🤝 'see you next week'"
+      ],
+      radio: ["Caller: \"Hat-trick? He's scored more than most midfielders all year.\" Host: \"He's a striker, caller.\" Caller: \"Still.\""],
+      vid: ["{scorerS} HAT-TRICK REACTION from the {Wf} end", "All THREE goals: {scorerS} | {W} {wscore} {L}"],
+      tac: ["{scorerS} attacked the blind side again and again — three different runs, three different finishes. {L}'s line never solved it."]
+    },
+
+    // --------------------------------------------------------------- brace
+    brace: {
+      core: [
+        "{scorerS} DOUBLE: {W} beat {L} {wscore}.",
+        "Brace from {scorerS} as {W} win {wscore}.",
+        "{scorer} scores twice — {W} {wscore} {L}."
+      ],
+      punny: ["{scorerS} DOUBLES UP! {W} {?SINK|DOWN|BEAT} {L}", "TWICE THE PAIN: {scorerS} brace sinks {L}"],
+      fanW: ["{scorerS} {?brace!|scores twice!|bags a double!} {?Class.|Ice cold.|Machine.} [tail_win]"],
+      fanL: ["{scorerS} {?scored twice|got a brace} against us. {?Again.|Naturally.|Of course.} [tail_lose]"],
+      fanN: ["Two for {scorerS}. {?Clinical.|Quality.}"],
+      meme: ["{scorerS} with his second: 😎 {L}: 🙂"],
+      radio: ["Line one: \"{scorerS}'s brace was outstanding.\" Line two: \"{L}'s marking was not.\""],
+      vid: ["BOTH goals: {scorerS} brace vs {L}"],
+      tac: ["{scorerS} drifted between centre-backs — {L} kept passing him on."]
+    },
+
+    // --------------------------------------------------------- red card
+    redcard: {
+      core: [
+        "RED CARD: {red} ({redTeam}) sent off in the {redMin}th minute. {W} {wscore} {L}.",
+        "{redTeam} reduced to ten after {redS} dismissal ({redMin}'). Final: {score}.",
+        "Sent off: {red}. {redTeam} had to play {?on with ten|the rest of the match a man short}."
+      ],
+      formal: [
+        "{redS}'s dismissal reshapes {W}-{L} contest",
+        "A pivotal red card: {redTeam} falter after {redS} sees red"
+      ],
+      punny: [
+        "SEEING RED! {red} {?SENT OFF|WALKS|DISMISSED} as {W} {?WIN|PREVAIL}",
+        "{redS} BLOWS IT: {redTeam} left with TEN MEN",
+        "ONE FOR THE ROAD? {red} sees red after {?reckless|rash|crazy} challenge"
+      ],
+      fanW: [
+        "{?Red card changed the game.|They went down to ten and we did the rest.|Never a better time to be a man up.} {myScore}. [tail_win]",
+        "{redS} walked. Honestly {?had it coming|stupid challenge|that's a clear red}. {myScore}. [tail_win]"
+      ],
+      fanL: [
+        "{redS} {?has let us down|ruined everything|was a complete disaster}. {myScore}. [tail_lose]",
+        "Ten men for {?most of the game|the last half hour|the whole second half}. You can't fight it. {myScore}. [tail_lose]",
+        "That red was {?soft|a joke|harsh|a total mistake}. {myScore}. [tail_lose]"
+      ],
+      fanN: [
+        "Red card for {redS} swung it. {?Foolish.|Costly.|Brutal.} [tail_neutral]",
+        "Ten men, one minute of madness. {?Football discipline matters.|Pure drama.}"
+      ],
+      meme: [
+        "{redS}: *sees red* The team: 🧍 \"cheers, mate\"",
+        "Ten men {redTeamS}: \"we're fine\" — physics: 🫠"
+      ],
+      radio: ["Caller: \"That's a clear red.\" Other caller: \"Soft.\" Host: \"Thank you, gentlemen. Moving on…\""],
+      vid: ["{redS} RED CARD REACTION: was it the right call?", "{redTeam} fans react to the sending-off"],
+      tac: ["After {redS}'s dismissal ({redMin}'), {redTeam} dropped to a 4-4-1 and conceded the ball: the game's tempo shifted completely."]
+    },
+
+    // ------------------------------------------------------ keeper heroics
+    keeper: {
+      core: [
+        "{gk} STANDS TALL: {saves} saves as {W} {wscore} {L}.",
+        "{gkS} the hero — {saves} saves keep {Ws} in it.",
+        "Goalkeeper masterclass: {gk} ({saves} saves)."
+      ],
+      formal: [
+        "{gkS} produces a decisive goalkeeping display ({saves} saves)",
+        "Wall in goal: {gkS} frustrates opponents with {saves} stops"
+      ],
+      punny: [
+        "{gkS} — THE GREAT WALL! {saves} saves keep {W} in it",
+        "NOT TODAY! {gk} {?DENIES|STOPS|SAVES} {saves} times",
+        "HANDS LIKE GLOVES! {gkS} is the match-winner"
+      ],
+      fanW: [
+        "{gkS}. {saves} saves. {?Different level.|Absolutely brilliant.|I need him on a long contract.} {myScore}. [tail_win]",
+        "Man of the match: {gkS} for me. {?Great.|Class.|Inhumane.} [tail_win]"
+      ],
+      fanL: [
+        "{gkS} {?had a game of his life|stopped everything|was unbeatable}. {saves} saves. We should've scored more. [tail_lose]",
+        "We had {shL} shots and their keeper stopped them all. {?Unlucky.|Gutting.} [tail_lose]"
+      ],
+      fanN: [
+        "{gkS}'s {saves} saves. {?Keepers are heroes.|Hands like buckets.|Great stuff.} [tail_neutral]"
+      ],
+      meme: [
+        "{gkS}: \"{saves} saves, no biggie\" 🧤😎 {L}: 🫠",
+        "Shot #{saves}: *saved* — {gkS}: \"anything else?\""
+      ],
+      radio: ["Caller wants {gkS} in the team of the week. Host wants him in the Hall of Fame."],
+      vid: ["{gkS}: ALL {saves} SAVES vs {L}", "{gk} goalkeeper masterclass — the best saves"],
+      tac: ["{gkS} faced {shL} shots — {saves} saves, many from close range. A goalkeeper-led defensive display."]
+    },
+
+    // ------------------------------------------------------ xG robbery
+    xg_robbery: {
+      core: [
+        "xG says otherwise: {L} created {xgL} xG to {W}'s {xgW} but lost {wscore}.",
+        "{W} {wscore} {L} — despite {L}'s {xgL} xG.",
+        "Numbers vs score: {L} {xgL} xG, {W} {xgW}. Result: {wscore} to {W}."
+      ],
+      formal: [
+        "{W} win despite trailing on expected goals ({xgW} v {xgL})",
+        "Efficiency over dominance: {W} take the points"
+      ],
+      punny: [
+        "ROBBED?! {L} {?DOMINATE|CREATE EVERYTHING|OUTPLAY} but {W} take it {wscore}",
+        "FOOTBALL IS CRUEL: {L} {?CREATE|MISS|WASTE} {?chance after chance|everything} — {W} STEAL IT",
+        "{W} {?LOOT|STEAL|MUG} {L}!"
+      ],
+      fanW: [
+        "Got away with one there. {?Don't tell the xG people.|Take it and move on.|Efficiency is a skill.} {myScore}. [tail_win]",
+        "Not pretty. Don't care. {myScore}. {?Three points are three points.|Winning ugly is an art.} [tail_win]"
+      ],
+      fanL: [
+        "{xgL} xG and zero luck. {?Football is a joke.|Unbelievable.|Dominated and lost.} {myScore}. [tail_lose]",
+        "We had {shL} shots and they win {wscore}?? {?Make it make sense.|This sport.} [tail_lose]"
+      ],
+      fanN: [
+        "{L} was better and lost. {?Cruel.|Football is unfair.|Classic.} [tail_neutral]"
+      ],
+      meme: ["xG: {L} {xgL} – {xgW} {W}. Scoreboard: {wscore} {W}. xG: 🤡 Football: 💅"],
+      radio: ["Caller: \"Expected goals? It's the actual goals that count.\" Host: \"Not wrong, but also… {xgL} to {xgW}.\""],
+      vid: ["ROBBED? {L} fans react after {wscore} loss with {xgL} xG", "{W} STEAL IT: fan reaction"],
+      tac: ["{L} dominated shot quality ({xgL} xG) but {W}'s block and keeper turned nearly everything away."]
+    },
+
+    // ---------------------------------------------------------- shootout
+    shootout: {
+      core: [
+        "PENALTIES: {W} win {penScore} on spot-kicks after {score} draw with {L}.",
+        "{W} survive the shootout against {L} — {penScore}.",
+        "Shootout drama: {W} through on penalties."
+      ],
+      formal: [
+        "{W} edge {L} in the shootout after {score} deadlock",
+        "{W} advance on penalties following a tense {score} draw"
+      ],
+      punny: [
+        "SPOT OF BOTHER! {W} WIN IT ON PENS ({penScore})",
+        "NERVES OF STEEL! {W} survive penalties against {L}",
+        "{L} OUT! The PENALTY LOTTERY crushes them again"
+      ],
+      fanW: [
+        "PENALTIES!!! {?I can't feel my legs.|My nails are gone.|I need a lie-down.} {penScore}! {?We are through!|Up we go!} [tail_win]",
+        "{?Heartbreak turned to joy.|Never doubted. (Doubted always.)} {penScore} on pens. [tail_win]"
+      ],
+      fanL: [
+        "Penalties. {?Again.|Always.|Why do we do this to ourselves?} {penScore}. [tail_lose]",
+        "Lost on pens. {?Gutted.|It's a lottery.|We deserved better.} [tail_lose]"
+      ],
+      fanN: ["Shootouts are the best/worst thing in football. {?Tension.|Heart-in-mouth.} [tail_neutral]"],
+      meme: ["Every penalty taker: 🧠 \"top corner\" ⚽ Reality: 🥅 \"the keeper's hands\""],
+      radio: ["Caller: \"Pens are a lottery.\" Host: \"Yes, and you've been buying the same ticket for years.\""],
+      vid: ["PENALTY SHOOTOUT REACTION: {W} v {L} (the tension is real)"],
+      tac: ["Both sides cancelled out over 120 minutes — {score}. The shootout decided it: composure over data."]
+    },
+
+    // -------------------------------------------------------- own goal
+    og: {
+      core: [
+        "OWN GOAL: {ogS} turns it into his own net — {W} {wscore} {L}.",
+        "Cruel luck for {ogS} — own goal gifts {Ws} the lead.",
+        "Own goal drama: {W} {wscore} {L} after {ogS}'s misfortune."
+      ],
+      formal: ["An unfortunate own goal from {ogS} proves decisive as {W} edge {L}"],
+      punny: [
+        "{ogS} SCORES FOR THE OTHER SIDE! {W} {?TAKE|STEAL|WIN}",
+        "OH NO! {ogS} {?SLICES|DEFLECTS|DIVERTS} {W} into the lead",
+        "OWN GOAL AGONY for {ogS} as {W} win"
+      ],
+      fanW: ["{ogS} scoring for us? {?Thanks, mate.|Not complaining.|Lucky? Absolutely. Take it.} {myScore}. [tail_win]"],
+      fanL: ["{ogS} {?own goal|OG}. {?Cruel.|Unreal.|Don't blame him, that was a deflection.} {myScore}. [tail_lose]"],
+      fanN: ["Own goals: the cruelest part of football. Feel for {ogS}. [tail_neutral]"],
+      meme: ["{ogS} when the ball hit him: 🥺 \"I swear I didn't mean it\""],
+      radio: ["Caller: \"Not his fault!\" Host: \"Who else's name is on the scoresheet for them, caller?\""],
+      vid: ["{ogS} OWN GOAL: unlucky or unforgivable?"],
+      tac: ["The own goal came from {W}'s pressure — a cutback that stretched {L}'s line, with {ogS} the unlucky recipient."]
+    },
+
+    // --------------------------------------------------------- super-sub
+    sub_hero: {
+      core: [
+        "SUPER-SUB: {scorerS} comes off the bench and scores for {W} ({min}').",
+        "{scorer} scores within minutes of coming on — {W} {wscore} {L}.",
+        "Bench hero {scorerS} settles it: {W} beat {L} {wscore}."
+      ],
+      formal: ["Substitute {scorerS} makes a decisive impact as {W} beat {L}"],
+      punny: [
+        "BENCH HERO! {scorerS} {?COMES ON|ARRIVES|STEPS UP} and {?WINS IT|SCORES|DECIDES IT}",
+        "SUB-LIME! {scorerS} {?FIRES|STRIKES|NETS} off the bench for {W}"
+      ],
+      fanW: ["{scorerS} off the bench and scores. {?Manager's got the golden touch.|Fresh legs, fresh goals.|Subs matter!} [tail_win]"],
+      fanL: ["Their sub {scorerS} {?changed the game|killed us|won it}. {?Why couldn't we have a bench like that?|Bench depth, sigh.} [tail_lose]"],
+      fanN: ["{scorerS} off the bench to score — {?impact sub of the weekend|great stuff}. [tail_neutral]"],
+      meme: ["Coach: \"Go get us a goal.\" {scorerS}: ✅ in 6 minutes"],
+      radio: ["Caller: \"He's too good for the bench.\" Host: \"Evidently the manager disagrees. Until tonight.\""],
+      vid: ["SUPER-SUB {scorerS} wins it — fans react"],
+      tac: ["{scorerS}'s introduction changed the geometry — a fresh runner against tiring centre-backs."]
+    }
+  };
+
+  // ---- Overlay banks (extra sentences glued onto the main lines) ---------------
+  const MB_OVERLAY = {
+    derby: [
+      "{derbyName|cap}: bragging rights to {Ws}.",
+      "In {derbyName}, nothing else matters but the result.",
+      "{derbyName|cap} always delivers — this one had everything.",
+      "Local pride on the line in {derbyName}.",
+      "Nobody forgets {derbyName}. Ever."
+    ],
+    final: [
+      "A {stage} to remember.",
+      "Silverware on the line — and {Ws} delivered.",
+      "Trophy night: {Ws} had the nerve when it mattered."
+    ],
+    knockout: [
+      "{stage}: win or go home — {Ws} go through.",
+      "A {stage} tie decided on {?the night|the day}.",
+      "{Ls} are out. {Ws} march on."
+    ],
+    streak_win: [
+      "That's {streakN} wins on the bounce for {streakWho}.",
+      "{streakWho} extend their winning run to {streakN}.",
+      "{streakN} straight wins now — {streakWho} look unstoppable."
+    ],
+    streak_lose: [
+      "{streakWho} have now lost {streakN} in a row.",
+      "A {streakN}-match losing run for {streakWho}. The pressure is mounting.",
+      "{streakN} defeats on the spin: crisis club for {streakWho}."
+    ],
+    streak_unbeaten: [
+      "{streakWho} extend their unbeaten run to {streakN}.",
+      "{streakN} matches without defeat for {streakWho}."
+    ],
+    streak_winless: [
+      "{streakWho} haven't won in {streakN} matches.",
+      "{streakN} games and counting without a win for {streakWho}."
+    ],
+    revenge: [
+      "Revenge served: the last meeting went {lastMeeting}.",
+      "Payback for {Ws} — the reverse fixture saw {Ls} win."
+    ],
+    cleansheet: [
+      "{Ws} keep a clean sheet.",
+      "Shutout: {gkS} and the defence hold firm."
+    ],
+    record: [
+      "Third consecutive meeting won by {Ws}.",
+      "{Ws} have now beaten {Ls} {h2hWins} times in {h2hN} meetings."
+    ]
+  };
+
+  // ---- Fan tails and mood lines -----------------------------------------------
+  const MB_TAILS = {
+    tail_win: [
+      "{?Up the {myS}!|Come on {myS}!|Proud of every one of them.|Take a bow, lads.|What a team.|Class.|Deserved.}",
+      "{?Different class.|That'll do.|Magnificent.|We go again.|Mood: elite.}",
+      "{?Told you.|Never in doubt.|Sleep well, everyone.|Best day of the week.}",
+      "{?Pure joy.|Football, bloody hell.|Love this club.|Unreal feeling.}"
+    ],
+    tail_lose: [
+      "{?Gutted.|Sick of this.|Pain.|It hurts.|Needs sorting.|Not good enough.}",
+      "{?Back to work.|Sack the lot.|We go again, I guess.|Next week, please.}",
+      "{?Going to bed.|Don't talk to me.|Logging off.|Dark times.}",
+      "{?Heartbreaking.|Cruel.|Football hates us.|This season…}"
+    ],
+    tail_draw: [
+      "{?Fine.|Meh.|Take it.|Could've been better.|Could've been worse.}",
+      "{?On to the next one.|A point is a point.|Honours even.}",
+      "{?Mixed feelings.|Bittersweet.|Frustrating.}"
+    ],
+    tail_neutral: [
+      "{?Great stuff.|Love football.|Entertainment.|Classic football.}",
+      "{?Fair result.|What a weekend.|Back for more tomorrow.}",
+      "{?Football, eh?|The league is wild this year.|Don't blink.}"
+    ]
+  };
+
+  // Mood-coloured one-liners (outcome: win | lose | draw)
+  const MB_MOOD = {
+    optimist: {
+      win: ["Told you we'd win it. {?Title race? Why not.|Believe!|The sky's the limit.}", "This is the start of something special."],
+      lose: ["Just a blip. {?We bounce back.|Onwards and upwards.|I still believe.}", "One bad day. Next week we go again, and win."],
+      draw: ["A point is progress. {?Onwards.|Positive signs.}", "We'll look back on this as a point that mattered."]
+    },
+    doomer: {
+      win: ["Don't get carried away. {?We're a mess.|It won't last.|We'll lose next week.}", "Won but I'm still worried about the defence."],
+      lose: ["Same old story. {?This club.|I knew it.|Of course.}", "I'm prepared for the worst. And the worst usually comes."],
+      draw: ["We'll regret those dropped points. Mark my words.", "A draw feels like a loss when you've been hurt this many times."]
+    },
+    delusional: {
+      win: ["{?Invincibles 2.0.|Quadruple on.|Easy league win.|We are cruising to the title.} Count the trophies.", "Best team in the world. Fight me."],
+      lose: ["We were robbed. {?Ref's a disgrace.|That's not a loss, that's a conspiracy.|Still the better team.}", "xG says we won. Nobody can tell me otherwise."],
+      draw: ["Two points dropped, but we still played better. Heads high.", "We won that in every way except the scoreline."]
+    },
+    banter: {
+      win: ["Cheers for the three points, {oppS}. {?See you at the next one.|Enjoy the trip home.}", "{oppS} fans, how's the weather out there? 🌧️"],
+      lose: ["Enjoy it while it lasts, {oppS} fans. We'll be back.", "Fair play {oppS}. See you next time, plenty of banter to come."],
+      draw: ["Both sides rubbish, the draw was fair. 🤝", "I'll take the point and the banter."]
+    },
+    tactician: {
+      win: ["Key moment: the shape change on 60'. {?Midfield overloaded and it flipped.|Pressing triggers worked beautifully.}", "The way we moved the ball through the half-spaces was a joy."],
+      lose: ["Tactically we were second best. {?Too wide.|No width.|No midfield control.} Questions for the manager.", "We lost the second balls. And the game with it."],
+      draw: ["Fine margins: both sides cancelled each other out. {?Wide overloads weren't enough.|Midfield stalemate.}", "A tactical draw, honestly."]
+    },
+    stat: {
+      win: ["{shW} shots, {possW}% of the ball, {xgW} xG. {?Numbers back it up.|Result matches process.}", "{xgW} xG to {xgL}. Process, not luck."],
+      lose: ["{xgL} xG for them, {xgW} for us. {?Data doesn't lie.|Hard to argue.}", "{shL} shots against us. That's how you lose."],
+      draw: ["{xgW}-{xgL} xG. A draw is fair on the data.", "Possession {possW}-{possL}. Nobody dominated."]
+    },
+    wholesome: {
+      win: ["Beautiful to watch. Thank you, lads. 💛", "Love this team, love this club, love this game."],
+      lose: ["Proud of the effort regardless. We stick together. 💙", "Lost, but I'd still choose this club every time."],
+      draw: ["A point shared and a good game of football. 🤝", "Good match, good fans, good day. Onwards."]
+    },
+    angry: {
+      win: ["Won, but I'm still livid about that first half. {?Defend!|Sort it out!}", "Three points but the performance was shocking."],
+      lose: ["That is NOT acceptable. {?Heads should roll.|Board take note.|Wake up!}", "I'm done with excuses. Fix it."],
+      draw: ["Dropped points AGAIN. {?Infuriating.|Pathetic.|Sick of it.}", "A draw is not good enough and everyone knows it."]
+    }
+  };
+
+  // Reply banks for threads — {tone}: agree / disagree / joke / stat / banter
+  const MB_REPLY = {
+    agree: ["Exactly this.", "100%.", "Couldn't have said it better.", "This. All of this.", "Spot on.", "Facts.", "Nailed it."],
+    disagree: ["Respectfully, no.", "Watch the game again.", "Bold take. Wrong, but bold.", "Not convinced at all.", "Hard disagree.", "That's a stretch."],
+    joke: ["💀💀💀", "I'm in tears 😭", "The way I just laughed out loud 😂", "Not me reading this at 3am 🤡", "Call the police 🚨", "Disgusting behaviour 😂"],
+    stat: ["The xG tells a different story, though.", "Shots: {shW}-{shL}. That says it all.", "Possession {possW}% → {possL}% — context matters.", "Fun fact: the last meeting went {lastMeeting}."],
+    banter: ["Cry about it 😘", "See you in the return fixture 😏", "Not a bad team, but not THAT good.", "Enjoy the points while you can.", "This aged well. 🍷"],
+    shock: ["I can't believe this.", "Are you KIDDING me?", "What a game.", "Wow. Just wow.", "Honestly speechless."]
+  };
+
+
+  // ==========================================================================
+  // APEX MEDIA CENTRE — pundits, TV, previews and world-event banks
+  // ==========================================================================
+
+  // ---- Pundit opinions: MB_PUNDIT[lens][situation] --------------------------------
+  // situations: win draw bore thrash comeback late upset hat red keeper xgrob pre
+  const MB_PUNDIT = {
+    hardman: {
+      win:      ["{W} wanted it more. Simple as that. {L} didn't win enough second balls.", "Won every duel that mattered. That's how you beat {L}."],
+      draw:     ["Both sides too nice. Nobody wanted to put a foot in. A point apiece is generous.", "I'd have kicked someone in the first ten minutes. That's all I'm saying."],
+      bore:     ["Nobody got stuck in. Nil-nil because nobody had the bottle.", "Where was the edge? Where was the snarl? Dire."],
+      thrash:   ["{L} had no spine. {wscore}? They got bullied.", "That's what happens when you don't show up for the fight. Beaten by {ls} goals to {ws}."],
+      comeback: ["{L} switched off. You go {deficit} up and you close it out. No excuses.", "Character from {W}. {L} should be ashamed of that collapse."],
+      late:     ["{min}th minute and {L} still hadn't dealt with the long ball. Lesson learned. Hopefully.", "You never switch off for 90. {scorerS} proved it."],
+      upset:    ["{W} showed {L} what hunger looks like. {L}'s big names didn't want the fight.", "Underdogs with teeth. {L} got bitten."],
+      hat:      ["Three goals? The defenders were scared of him. Where was the first tackle?", "{scorerS} could've been stopped. He just wasn't touched."],
+      red:      ["{redS} is a fool. You can't put your team in that position. Red every day.", "I'd have {redS} in the manager's office. Stupid, stupid challenge."],
+      keeper:   ["{gkS} stood up when it mattered. That's what a keeper's for.", "Best player on the pitch was in goal. Says it all about the defence in front of him."],
+      xgrob:    ["xG doesn't win games. Goals do. {W} were hungrier in the box.", "Stats are nice. {W} took chances. {L} didn't. Done."],
+      pre:      ["{fav} by two. It'll be physical. Whoever wins the midfield wins it.", "I'm not predicting a score, I'm predicting bruises. {fav} edges it."]
+    },
+    analyst: {
+      win:      ["{W}'s structure out of possession was the key — they funnelled {L} wide and dominated the half-spaces.", "{W} controlled the central lanes ({possW}% possession). {L} never solved the press."],
+      draw:     ["Neither side could create overloads. {possW}-{possL} possession tells you it was a balanced, cautious game.", "A draw is a fair reflection: both sides defended their principles."],
+      bore:     ["Two compact blocks, almost no vertical passing — a game without space is a game without goals.", "Shots {shW}-{shL}. Neither team broke the lines. A tactical stalemate."],
+      thrash:   ["{L}'s high line was exposed repeatedly. {W} found the space behind and punished it {ws} times.", "{wscore} isn't random — {W} identified the weakness early and kept exploiting it."],
+      comeback: ["{W} changed shape at half-time, stretched {L} wide and found the half-spaces — a proper tactical turnaround.", "{L} sat too deep once ahead. {W} dictated the tempo and the turnaround was inevitable."],
+      late:     ["{W}'s late pressure came from structural changes: an extra runner, a higher press. {scorerS} was the reward.", "The {ord}-minute goal had been coming — {W}'s xG rose 40% after the 70th."],
+      upset:    ["{W} didn't park the bus — they pressed in specific triggers. {L} had no answer.", "Underdog gameplan executed perfectly: compact shape, quick transitions, clinical finishing."],
+      hat:      ["{scorerS} attacked three different zones — near post, back post, penalty spot. A hat-trick built on movement.", "Positionally, {scorerS} was always one step ahead of {L}'s back line."],
+      red:      ["After {redS}'s red, {redTeam} dropped to a 4-4-1 — structurally compact but offered no outlet."],
+      keeper:   ["{gkS}'s {saves} saves covered for defensive lapses. The underlying numbers were not as flattering."],
+      xgrob:    ["{L} created {xgL} xG to {W}'s {xgW}. In the long run, {L} win that more often than not."],
+      pre:      ["{H} vs {A}: possession against transition. {favS} have the structural edge but {dogS} have the speed to hurt them."]
+    },
+    attacker: {
+      win:      ["That's what I want to see! {W} played with freedom — they smiled, they attacked, they won!", "{motmS} was a joy to watch. Football should always be like that."],
+      draw:     ["A draw? Too cautious for me. Somebody take a risk next time!", "Both teams had the quality — just not the courage to win it. Go for it!"],
+      bore:     ["No goals, no joy. Where was the ambition? Football's supposed to be fun!", "I wanted to leave at half-time. Somebody dribble!"],
+      thrash:   ["Beautiful football! {W} attacked in waves and {L} had no idea what hit them.", "{wscore}?! That's the kind of game I'd have paid triple to watch."],
+      comeback: ["THAT'S football! From {deficit} down to winning — pure heart and pure quality!", "I loved every minute of {W}'s comeback. Brave, bold, brilliant."],
+      late:     ["{scorerS} in the {ord}! You can't write it. This is why we love the game!", "Late winner, crowd erupting — nothing beats it!"],
+      upset:    ["Underdogs with flair! {W} attacked fearlessly and {L} couldn't cope.", "Never write off a side with nothing to lose. {W} played like it."],
+      hat:      ["{scorerS} with a hat-trick — that's a striker's dream night. Pure instinct!", "Take the ball home, {scorerS}! You earned every touch."],
+      red:      ["A silly red card, {redS}. It killed the game. We want ELEVEN against ELEVEN!", "Don't send a man off and ruin the game, {redS}!"],
+      keeper:   ["{gkS} stole the show — and good for them. But I came for goals!", "Great saves, sure. But I want to see the net bulge!"],
+      xgrob:    ["{L} did everything but score. Finishing, finishing, finishing — that's the game!", "{W} took their chances. That's the art of striking."],
+      pre:      ["{H} v {A}: I want goals! {fav} 3-2 and everyone goes home happy.", "I'm backing the attacking side. {fav}, 2-1 in a thriller."]
+    },
+    oldschool: {
+      win:      ["{W} had leaders out there. You need characters — and they had them.", "{W} fit, focused, together. {L} looked like strangers."],
+      draw:     ["Fair enough. Nobody took charge. You need someone to pick the side up by the scruff of the neck.", "A point each; in my day a draw was a draw."],
+      bore:     ["Back in my day we'd have gone for the throat. No leaders on either side, no fight."],
+      thrash:   ["Disgraceful from {L}. No mentality, no fitness, no pride. {wscore}!", "That's a team that's lost the dressing room. Plain as day."],
+      comeback: ["Mentality. Fitness. Belief. {W} had all three, {L} none. That's why they won.", "You can't teach that kind of heart."],
+      late:     ["{min} minutes in and the winner arrives — that's fitness. The better-conditioned side wins late."],
+      upset:    ["{W} had the mentality of winners. {L}'s big names? Not a clue.", "That's what happens when you coast. {L} thought it was easy."],
+      hat:      ["{scorerS} is a proper striker. Doesn't need fancy tricks — just instinct and fitness."],
+      red:      ["{redS} lost his head. A captain would've calmed him. Where was the leadership?"],
+      keeper:   ["Great keepers are leaders. {gkS} bossed that defence all night."],
+      xgrob:    ["Stats? In my day we looked at the scoreboard. {W} won. That's all that matters."],
+      pre:      ["{fav} will win because they've got the experience. {dog} will fight, but fight alone doesn't win."]
+    },
+    data: {
+      win:      ["The model gave {W} a {winP}% win probability pre-match — a fair outcome. Process and result matched.", "{W}: {shW} shots, {xgW} xG vs {xgL}. Efficient and deserved."],
+      draw:     ["Our simulation of this fixture gives a draw about 26% of the time — this was an entirely ordinary result.", "xG {xgW}-{xgL}: the draw sits right in the expected distribution."],
+      bore:     ["xG total: {xgTot}. A low-event game — roughly the 15th percentile of this season's matches."],
+      thrash:   ["A {margin}-goal margin occurs in roughly 1 in 20 matches. {W}'s xG of {xgW} says it wasn't entirely luck."],
+      comeback: ["{W}'s win probability dipped to under 10% at the low point. This type of comeback happens about once in 25 times."],
+      late:     ["A winner after the 85th minute has roughly a 6% chance in any given game. {scorerS} beat the odds."],
+      upset:    ["{L} were pre-match favourites at {favP}%. {W}'s win was a roughly 1-in-{upsetOdds} outcome."],
+      hat:      ["A hat-trick from {scorerS} outperformed his xG significantly — expect some regression."],
+      red:      ["Red cards reduce a team's win probability by about 30-40 percentage points on average. {redTeam} lost it from the moment {redS} walked."],
+      keeper:   ["{gkS} saved {saves} shots. Post-shot xG suggests he saved around {psx} more goals than average."],
+      xgrob:    ["{L}: {xgL} xG, 0.8 expected points more than the actual. {W} overperformed by roughly {xgDiff} goals."],
+      pre:      ["Our model: {pH}% {H}, {pD}% draw, {pA}% {A}. Most likely scoreline: {pred}."]
+    },
+    keeper: {
+      win:      ["The back line and keeper were organised. Communication wins games.", "Clean positioning in the box; {W}'s keeper dealt with everything."],
+      draw:     ["A draw: nobody made a keeper's mistake. Good concentration all round."],
+      bore:     ["Sat through 90 minutes without being tested. A keeper's dream — and nightmare."],
+      thrash:   ["{L}'s keeper had no chance behind that defence. Poor protection."],
+      comeback: ["When a team's behind, the keeper's distribution sets the tone. {W} got it right at the break."],
+      late:     ["Keepers hate stoppage-time goals. {scorerS} wins it and the keeper gets no help."],
+      upset:    ["The giants' keeper was exposed — the defence hung him out to dry."],
+      hat:      ["{scorerS}'s hat-trick? The keeper was left alone three times. That's a defensive failure, not just a save issue."],
+      red:      ["The red card left {redTeam} exposed at the back. A keeper's nightmare — more crosses, more pressure."],
+      keeper:   ["{gkS}: {saves} saves. That's not luck — that's positioning, reflexes and nerve. Textbook."],
+      xgrob:    ["{L} had the shots; {W}'s keeper didn't blink. That's goalkeeping."],
+      pre:      ["Goalkeeping duel: {gkH} vs {gkA}. Whoever blinks first loses this one."]
+    },
+    host: {
+      win:      ["Well, that was something. {W} get the win — we'll dissect it after the break.", "{W} victorious, {L} licking their wounds. Let's hear from the panel."],
+      draw:     ["Honours even. Let's see how our panel sees it."],
+      bore:     ["Not one for the highlights reel. Let's find something to talk about."],
+      thrash:   ["A statement from {W}. {L} will want to forget that one."],
+      comeback: ["Drama! {W} turn it around — what do we make of that?"],
+      late:     ["Unbelievable finish! {scorerS} the hero. Let's hear it from the panel."],
+      upset:    ["A seismic result. Who saw that coming?"],
+      hat:      ["{scorerS} with the match ball. What a performance!"],
+      red:      ["A red card changed everything. Was it the right decision?"],
+      keeper:   ["{gkS} on form. Let's look at those saves."],
+      xgrob:    ["The stats say one thing; the scoreboard another. Let's discuss."],
+      pre:      ["Big game on the horizon. Let's get the panel's predictions."]
+    }
+  };
+
+  // ---- Studio scripts ---------------------------------------------------------------
+  const MB_TV = {
+    open: [
+      "Good evening, and welcome to Match Night Live.",
+      "We're live at Apex Sports Centre — and what a night of football.",
+      "Welcome back. It's full time and there is a lot to unpack.",
+      "Right, strap in — the panel has plenty to say.",
+      "Good evening football fans, the results are in."
+    ],
+    intro_win: ["{W} have beaten {L} {wscore}, and {motmS} was at the heart of it.", "A big result for {W}: {wscore} over {L} in the {comp}."],
+    intro_draw: ["{H} and {A} finished {score} — a result that leaves both sides with questions.", "It ended {score} at {stadium}, and nobody can quite agree who got the better of it."],
+    intro_drama: ["Drama at {stadium}: {scorerS} with the goal that changed everything.", "You could not have scripted this. {W} {wscore} {L}."],
+    intro_shock: ["A real shock tonight: {W} have stunned {L}.", "The form book has been torn up at {stadium}."],
+    close: ["That's all from the studio. Back after the break.", "Plenty more to come, don't go anywhere.", "More analysis after this. Stay with us.", "We'll have all the reaction coming up."],
+    banner_result: ["FULL TIME", "MATCH REPORT", "RESULT", "STUDIO ANALYSIS"],
+    banner_drama: ["LATE DRAMA", "SCENES AT FULL TIME", "UNBELIEVABLE FINISH", "BREAKING"],
+    banner_shock: ["SHOCK RESULT", "UPSET ALERT", "GIANT-KILLERS", "SENSATION"],
+    banner_pre: ["MATCH PREVIEW", "KICK-OFF COUNTDOWN", "BIG GAME BUILD-UP", "THE KICKOFF SHOW"],
+    banner_news: ["BREAKING NEWS", "TRANSFER WATCH", "NEWS DESK", "LIVE UPDATE"],
+    banner_award: ["AWARDS NIGHT", "THE BIG NIGHT", "GOLDEN MOMENT", "CEREMONY LIVE"],
+    banner_champs: ["CHAMPIONS", "TITLE WON", "PARTY TIME", "TROPHY NIGHT"],
+    show_post: ["Match Night Live", "The Late Kickoff", "Full Time Show", "Studio 90"],
+    show_pre: ["The Kickoff Show", "Match Preview Live", "Countdown to Kickoff"],
+    show_wk: ["The Weekend Debate", "Football Daily", "The Big Table"]
+  };
+
+  // ---- Match previews -------------------------------------------------------------------
+  const MB_PRE = {
+    core: [
+      "MATCH PREVIEW: {H} host {A} in the {comp}. {stakes}",
+      "{Hf} {H} v {A} {Af} — {comp}, {when}. {formLine}",
+      "Kick-off approaching: {H} take on {A}. {keyLine}",
+      "TEAM NEWS to follow as {H} prepare for {A} in the {comp}."
+    ],
+    stakes_title: ["Title race on the line.", "A potential title decider.", "Both sides eyeing the top spot.", "{leadS} can open up a gap."],
+    stakes_europe: ["A fight for European places.", "Champions League qualification at stake.", "Every point counts in the race for Europe."],
+    stakes_relegation: ["Relegation fears for {dropS}.", "A potential six-pointer at the bottom.", "Survival is at stake."],
+    stakes_cup: ["{stage}: win or go home.", "A cup tie with a place in the next round on the line.", "One match, one place in the next round."],
+    stakes_derby: ["{derbyName|cap} — bragging rights, pride, everything.", "{derbyName|cap} always throws up the unexpected."],
+    stakes_generic: ["An intriguing contest on paper.", "Both sides will be eyeing three points.", "A game with plenty at stake for both.", "Neither side can afford to slip."],
+    formLine: ["{H}: {formH}. {A}: {formA}.", "Form guide — {H} {formH}, {A} {formA}.", "{H} come in on {formH}; {A} on {formA}."],
+    keyLine: ["Key men: {keyH} for {Hs}, {keyA} for {As}.", "Watch for {keyH} and {keyA}.", "{keyH} v {keyA} could decide it."],
+    gaffe: [
+      "BIG GAME BARNEY: {H} v {A} — {?who'll blink first?|it's all kicking off!|buckle up, football fans!}",
+      "{keyH} v {keyA}: THE DUEL EVERYONE'S TALKING ABOUT",
+      "{H} {?FACE THE MUSIC|SQUARE UP|GO TOE-TO-TOE} with {A} — {?no prisoners|everything to play for|and we can't wait}",
+      "WHO WINS? {H} or {A} — we asked 12 fans and got 12 different answers"
+    ],
+    meridian: [
+      "{H} v {A}: the tactical questions that will decide it",
+      "Preview: {style} duel as {H} meet {A}",
+      "{H} and {A} go head to head — what to watch for",
+      "How {H} and {A} match up: shapes, styles and key battles"
+    ],
+    fanH: [
+      "{H} v {A} today. {?Feeling confident.|Nervous but ready.|Home advantage — let's use it.|Bring it on.} {?Up the {Hs}!|Come on {Hs}!|Let's go {Hs}!}",
+      "Matchday. {?Wake me at full-time.|Can't focus on anything else.|The anticipation is killing me.} {?Prediction: {pred}.|I say {pred}.|Calling {pred}.}",
+      "{keyH} is going to {?score today|decide this|be the difference}. Calling it. {pred}.",
+      "{H} fans, what's the prediction? I'm going {pred}. {?Confidence: 7/10.|Nerves: 10/10.}"
+    ],
+    fanA: [
+      "{A} away at {H}. {?Tough one.|Underestimated again.|Let's go and take three.|Just play your game, lads.} {?Up the {As}!|Come on {As}!}",
+      "Travelling to {H}. {?Fingers crossed.|Hope we turn up.|Time to silence the home end.} {pred}.",
+      "{keyA} to {?step up|shut them up|do what he does}. {pred}. {?Let's go!|Bring it home!}",
+      "{A} fans: {?Who's travelling?|Anyone going?|Predictions below.} Mine's {pred}."
+    ],
+    fanN: [
+      "{H} v {A} is the one to watch today. {?Popcorn ready.|Pull up a chair.|My money's on goals.} Prediction: {pred}.",
+      "{H} v {A}: {?I'm giving this a 2-2.|Could be anything.|This could go either way.} What's your prediction?",
+      "Unpopular opinion: {dog} will {?cause a problem|pinch something|get a result} today. {pred}."
+    ],
+    meme: [
+      "{H} fans before the game: 😎. After the game: 🤷‍♂️ (we'll find out)",
+      "{H} v {A} predictions: 80% of you are going to be wrong and I'm one of them 🫠",
+      "Me: \"I'm calm about {H} v {A}.\" My heart rate: 📈📈📈"
+    ],
+    radio: [
+      "The phone lines are open for {H} v {A}. Early callers say {favS} win it. Don't @ us.",
+      "Caller says {H} v {A} \"is the biggest game of the year.\" Host asks him which year."
+    ],
+    vid: [
+      "{H} v {A}: FULL PREVIEW with fan predictions",
+      "WHO WINS? {H} v {A} FAN PANEL",
+      "{keyH} vs {keyA}: THE BATTLE TO WATCH"
+    ],
+    tac: [
+      "{H} ({fmH}, {styleH}) v {A} ({fmA}, {styleA}): the question is who controls the tempo.",
+      "Matchup: {styleH} meets {styleA}. {tacHook}",
+      "Pressing triggers: expect {Hs} to {pressH}; {As} will {pressA}."
+    ],
+    tacHook: [
+      "Whoever wins the midfield wins the game.",
+      "Space behind will decide it.",
+      "Set pieces could be the difference.",
+      "The first goal matters more than usual."
+    ],
+    pressH: ["press high from the first whistle", "sit compact and counter", "keep the ball and wait for gaps", "go long early and fight for second balls"],
+    pressA: ["try to catch them on the break", "keep the ball and slow it down", "press selectively in midfield", "hit them directly behind the line"],
+    teamnews: [
+      "TEAM NEWS: {missLine}",
+      "{missLine} A late call is expected.",
+      "INJURY UPDATE ahead of {H} v {A}: {missLine}"
+    ],
+    var: [
+      "Referee for {H} v {A}: {ref}. {refNote}",
+      "Officials named: {ref} takes the whistle for {H} v {A}. {refNote}"
+    ],
+    refNote: ["A strict one on fouls.", "Known for letting the game flow.", "Quick with the cards, usually.", "Handled a derby recently without drama.", "Expect VAR to be busy.", "Fewest cards in the league so far."],
+    odds: [
+      "StatBook model — {H} {pH}% · Draw {pD}% · {A} {pA}%. Most likely score: {pred}.",
+      "Win probability: {H} {pH}%, draw {pD}%, {A} {pA}%. Most common scoreline: {pred}.",
+      "Pre-match numbers: {H} {pH}% / {pD}% / {pA}% {A}. xG model expects {xgPredH}-{xgPredA}."
+    ],
+    poll_q: ["Who wins {H} v {A}?", "Your prediction for {H} v {A}?", "{H} v {A}: how does it end?"]
+  };
+
+  // ---- Transfers / rumours -----------------------------------------------------------------
+  const MB_RUMOR = {
+    // Insider ladder: stage 1 = interest ... stage 4 = medical/here we go
+    ferrante: [
+      ["{to} are {?monitoring|tracking|keeping tabs on} {player}. Early stage, no talks yet. {?Watch this space.|Scouts have been present.}",
+       "{to} have {?internally discussed|added to the shortlist} {player} as a {?potential target|summer option}. Nothing concrete yet."],
+      ["{to} {?have opened talks|have made contact} for {player}. {from} {?are not in a rush to sell|want a big fee}. Fee talk starts around {fee}.",
+       "Conversations ongoing between {to} and {from} over {player}. Initial valuation: {fee}. More to follow."],
+      ["{player} to {to}: talks {?advancing|moving in the right direction}. {from} open to the deal at {fee}. Personal terms {?looking good|being finalised}.",
+       "{to} close in on {player} — {from} expected to accept {fee}. Sources suggest an announcement {?soon|shortly}."],
+      ["HERE WE GO! 🚨 {player} to {to}, {fee}. Medical booked. {?Documents ready.|Contract signed.} {from} confirmed.",
+       "DONE DEAL: {player} joins {to} from {from}. {fee}. Deal sealed — official announcement coming."]
+    ],
+    gaffe: [
+      "{player} TO {to}?! {?Bombshell|Shock} move for {from} star — {fee} on the table!",
+      "{to} SET TO {?SNATCH|SIGN|PINCH} {player} — {from} {?FUMING|STUNNED|PANICKING}",
+      "EXCLUSIVE: {player} {?SNUBS|DUMPS|WANTS OUT OF} {from}! {to} {?READY TO POUNCE|LEADING THE RACE|CIRCLING}"
+    ],
+    deny: [
+      "{from} {?categorically deny|firmly dismiss|reject} reports linking {player} with a move: \"he is not for sale.\"",
+      "Not true: {from} {?refute|rubbish|dismiss} {player} transfer speculation.",
+      "{from} issue a short statement: {player} is part of our plans. No offers received."
+    ],
+    fan_from: [
+      "If {player} leaves {fromS} I'm done. {?Absolutely not.|Don't sell.|Over my dead body.}",
+      "{fromS} would be insane to sell {player}. Keep him. {?Whatever the fee.|Build around him.}",
+      "Not selling {player}. I'll chain myself to the training ground if I have to."
+    ],
+    fan_to: [
+      "{player} to {toS}?? {?YES PLEASE.|Make it happen.|Sign him NOW.|The final piece.}",
+      "I'd take {player} at {toS} tomorrow. {?Fee? Pay it.|Class act.|A major upgrade.}",
+      "Please let {player} to {toS} be real. {?I'm begging.|My heart can't take the tease.}"
+    ],
+    meme: ["{player} to {toS}: 🧍➡️✍️  {fromS} fans: 🏃‍♂️💨", "{toS} fans refreshing the transfer page for the 40th time: 🔄🔄🔄"],
+    radio: ["Caller thinks {player} will end up at {toS}. Host says his sources say Mars. Line two disagrees."],
+    fees: ["€35m", "€48m", "€55m", "€62m", "€70m", "€85m", "€95m", "€110m", "€130m", "€150m"],
+    windowOpen: [
+      "The transfer window is open. Expect agents, rumours and bin-bags of bluster.",
+      "Window open: {n} clubs reportedly circling stars across the {leagueSet}.",
+      "Transfer silly season is here — and Ferrante has already been awake for 14 hours."
+    ],
+    windowClose: [
+      "DEADLINE DAY: phones ringing, fax machines jammed, intermediaries sweating. {?Anything can happen.|Brace yourself.}",
+      "TRANSFER WINDOW SLAMS SHUT: who got their man, who did not.",
+      "Final hours of the window: {?it's about to get weird.|it's chaos in the corridors.}"
+    ]
+  };
+
+  // ---- Pressure / sack watch / crises --------------------------------------------------------
+  const MB_CRISIS = {
+    sackwatch: {
+      gaffe: ["{mgrS} ON THE BRINK: {n} defeats in a row leave {team} boss {?under fire|fighting for his job|hanging by a thread}", "CRISIS AT {team|up}: {mgrS} {?FACES THE AXE|IN THE FIRING LINE|LOSES THE FANS}"],
+      meridian: ["{team} in freefall: what has gone wrong under {mgrS}?", "Analysis: {team}'s {n}-match losing run and the reasons behind it"],
+      fan: ["{mgrS} out. {?I've seen enough.|It's run its course.|It's time.} {n} defeats.", "Hard to see {mgrS} surviving this. {?The board must act.|One more loss and it's over.}", "{team} need a reset. Whoever's in charge, it isn't working."],
+      defend: ["Give {mgrS} time. {?The squad is thin.|The injuries have hit hard.|Look at the fixtures.} {?Back him.|Support the manager.}", "Sacking managers doesn't fix anything. {?We need patience.|Look at the bigger picture.}"],
+      meme: ["{mgrS}: *checks the calendar* \"maybe next week\" 🫣", "{team} fans: 🧍 {mgrS}: 🧍‍♂️ The board: 🔥"],
+      radio: ["Caller: \"{mgrS} has to go.\" Host: \"{n} defeats — I'd say that's a fair view.\""],
+      vid: ["SACK {mgrS}? {team} fans give their verdict", "{team} CRISIS: fans react to {n} straight losses"]
+    },
+    injury_crisis: {
+      core: ["{team} INJURY CRISIS: {n} players out including {names}.", "{team}'s injury list grows: {names} among {n} absentees."],
+      meridian: ["{team} are being stretched thin: {n} injured, and a congested schedule ahead", "Why {team} can't stay fit — and what it means for the run-in"],
+      gaffe: ["HOSPITAL PASS: {team} lose {n} stars to injury", "{team}'S TREATMENT ROOM FULL — {names} all out!"],
+      fan: ["{team}'s medical team needs a miracle. {n} out. {?Unlucky or cursed?|Send help.|I'm devastated.}", "{names}… all injured. {?How are we even supposed to field a team?|Next man up, I guess.}"],
+      meme: ["{team} physio: 🧍‍♂️🩹🩹🩹🩹🩹 \"just keep going\""]
+    }
+  };
+
+  // ---- Milestones / injuries -------------------------------------------------------------------
+  const MB_MILESTONE = {
+    goals: [
+      "{player} reaches {n} career goals — {?a landmark|a remarkable achievement|an astonishing tally}.",
+      "MILESTONE: {playerS} bags goal number {n} in the {comp}.",
+      "{n} goals and counting for {playerS}. {?Legend status loading.|The record books are watching.}"
+    ],
+    seasonGoals: [
+      "{playerS} has now scored {n} this season — {?the Golden Boot race is heating up|the top-scorer chart looks very different now}.",
+      "{n} goals for {playerS} this season. {?On course for something special.|At this rate, the record falls.}"
+    ],
+    apps: ["{player} makes his {n}th appearance — {?loyalty and consistency|a model professional}."],
+    fan: ["{playerS}: {n} goals. {?What a servant.|He's a legend.|Just incredible.} 🙌", "Bow down to {playerS}. {n} goals. {?Truly.|Take your time.}"],
+    meme: ["{playerS}'s goal tally: 📈📈📈 Defenders: 📉📉📉"],
+    stat: ["{player}: {n} career {?goals|strikes} for {team}. {?Next target: {next}.|The milestone list grows.}"]
+  };
+  const MB_INJURY = {
+    bn: [
+      "INJURY BLOW: {inj} ({injTeam}) {?suffers|picks up|is forced off with} {injType} — out for {injOut} {?matches|games}.",
+      "{injTeam} {?lose|suffer a blow as they lose} {inj} to {injType}. Expected absence: {injOut}.",
+      "BAD NEWS: {inj} will miss the next {injOut} {?games|matches} after {injType}."
+    ],
+    gaffe: ["{inj} {?LIMPS OFF|IN AGONY|STRETCHERED OFF}: {injTeam} {?DEVASTATED|FUMING|IN SHOCK}", "{injTeam} STAR {inj}: {injType} {?NIGHTMARE|BLOW|HORROR}"],
+    fan: ["Get well soon, {injS}. {?We need you back.|Heal fast.|Thoughts with you.} 💙", "{injS} out for {injOut}. {?Absolutely sick.|That hurts.|Next man up, I guess.}"],
+    severe: [
+      "SEVERE: {inj} could be out for {injOut} matches with {injType}. {?The season is over for him.|Long road to recovery.}",
+      "{injTeam}'s {inj} faces a lengthy lay-off: {injType}, {injOut} matches."
+    ],
+    wish: ["Wishing {inj} a full and quick recovery. Football can be cruel.", "From all of us at {outlet}: get well soon, {injS}."]
+  };
+
+  // ---- Trophy celebrations ----------------------------------------------------------------------
+  const MB_TROPHY = {
+    bn: [
+      "{team} ARE {trophy|up} CHAMPIONS! {?The trophy is theirs.|History made.|Celebrations begin.} 🏆",
+      "OFFICIAL: {team} win the {trophy}. {?A season to remember.|A triumph for the ages.}",
+      "{team} crowned {trophy} {?champions|winners}. {?Unstoppable.|Deserved.|What a team.}"
+    ],
+    tv: [
+      "{team} are the {trophy} champions. Scenes of joy as the players lift the trophy.",
+      "It's official: {team} have won the {trophy}. Lights, trophy, flares — the party begins."
+    ],
+    gaffe: [
+      "CHAMPIONS! {team} {?WIN THE {trophy|up}|LIFT THE {trophy|up}|CLAIM THE {trophy|up}} — {?PARTY TIME!|WHAT A SEASON!|CUE THE PARADE!}",
+      "THEY'VE DONE IT! {team} {?TAKE THE CROWN|STORM TO GLORY|CRUSH THE COMPETITION}",
+      "{team} {?SLAY|SMASH|CONQUER} to win the {trophy}!"
+    ],
+    meridian: [
+      "{team}'s {trophy} triumph: how it was built",
+      "The making of champions: {team} and the {trophy}",
+      "{team} win the {trophy} — a study in consistency and nerve"
+    ],
+    fan: [
+      "CHAMPIONS!!! {?We did it.|Years of waiting, worth every second.|I can't stop crying.|Best day of my life.} 🏆",
+      "{team} are {trophy} CHAMPIONS. {?Tell your mates.|Tell your grandkids.|Tell everyone.} 🏆🎉",
+      "{?My heart.|My voice.|My wallet.} All gone. {team} won the {trophy}. Worth it."
+    ],
+    rival: [
+      "Congrats to {team}. {?We'll be back.|Enjoy it.|Fair play, you earned it.} 🤝",
+      "Fair play to {team}. {?Deserved.|Class.|Tough to watch, but fair.}"
+    ],
+    meme: [
+      "{team} fans after winning the {trophy}: 🍺🍺🍺🍺🍺 Everyone else: 🧍",
+      "{team}: 🏆 The rest of the league: 🥲"
+    ],
+    radio: ["Caller: \"{team} are the best side in the land!\" Host: \"You said that in August.\" Caller: \"And I was right.\""],
+    vid: ["{team} PARADE: full celebration coverage!", "FANS GO WILD: {team} win the {trophy}", "Open-top bus: {team} champions parade"],
+    tac: ["How {team} won the {trophy}: pressing, structure, patience. A blueprint."],
+    stat: ["{team}: {trophy} champions. {?Another one for the cabinet.|A season of dominance.|Another golden chapter.}"]
+  };
+
+  // ---- Awards ------------------------------------------------------------------------------------------
+  const MB_AWARD = {
+    bn: [
+      "{award|up}: {winner} ({team}) takes the prize. {?Deserved?|A fitting winner.|A landmark season.}",
+      "OFFICIAL: {winner} wins the {award}. {?What a season.|The best in the business.}",
+      "{winner} crowned {award} winner for {year}. {?Celebrations in {teamS}.|Another milestone.}"
+    ],
+    gaffe: [
+      "{winner} WINS THE {award|up}! {?ABOUT TIME|ROBBERY?|WHO ELSE?}",
+      "{award|up}: {winner} {?CLAIMS|SNATCHES|TAKES} THE CROWN",
+      "{winner} {?SHINES|TRIUMPHS} but {?was it deserved?|did the right man win?|are the fans happy?}"
+    ],
+    meridian: [
+      "{award}: why {winner} deserved it",
+      "{winner} and the {award}: a season in focus",
+      "Reading the vote: the case for {winner}"
+    ],
+    fan: [
+      "{winner} winning the {award}? {?Obviously.|Well deserved.|Unbelievable season.} 🏆",
+      "Whoever voted for anyone but {winnerS} needs their head checked. {award}.",
+      "{winnerS} {?wins|takes} the {award}. {?Proud.|Unreal.|Legend.}"
+    ],
+    robbed: [
+      "{runnerS} was ROBBED. {?Look at the stats.|Obvious snub.|No other opinion.}",
+      "{runnerS} should've won it. {?Mark my words.|I said what I said.}",
+      "Snub of the century: {runnerS} over {winnerS}? {?Nope.|Please.}"
+    ],
+    meme: ["{winnerS} gets the {award}: 🥇 {runnerS}: 👀", "{award} winners be like: 😎 Everyone else: 😤"],
+    radio: ["Caller: \"{winnerS}? Not even close.\" Host: \"Who would you have picked?\" Caller: \"…{runnerS}.\""],
+    vid: ["{award} REACTION: fans debate the winner", "WAS IT {winnerS}? Fan panel on the {award}"],
+    stat: ["{winnerS}: {award}. Season stats: {statLine}."]
+  };
+
+  // ---- League / season context --------------------------------------------------------------------------
+  const MB_CONTEXT = {
+    title: [
+      "TITLE RACE: {leadS} lead {league} by {gap} points with {left} to play. {secondS} {?chase|are hunting|refuse to fall away}.",
+      "{leadS} top the {league} on {leadPts} points — {gap} clear of {secondS}.",
+      "{league}: {leadS} {?stretch|extend} their lead to {gap} points. {?The chasing pack is running out of time.|Can anyone stop them?}"
+    ],
+    title_tight: [
+      "ALL TO PLAY FOR: just {gap} points between {leadS} and {secondS} in the {league}.",
+      "{league} title race is a two-horse race: {leadS} lead {secondS} by {gap}.",
+      "{leadS} v {secondS}: the {league} title race goes down to the wire."
+    ],
+    relegation: [
+      "RELEGATION BATTLE: {dropS} sit in the drop zone in the {league}. {?Panic is setting in.|Every point is gold dust.}",
+      "{dropS} are in trouble: {gapSafe} points from safety with {left} left to play.",
+      "{league}: the bottom three — {drop3} — look nervously over their shoulders."
+    ],
+    totw: [
+      "TEAM OF THE WEEK ({league}): {names}.",
+      "{league} TEAM OF THE WEEK: {names}."
+    ],
+    scorers: [
+      "TOP SCORERS ({league}): {names}.",
+      "Golden Boot race ({league}): {names}."
+    ],
+    roundup: [
+      "{league} round-up: {results}.",
+      "FT SCORES ({league}): {results}."
+    ],
+    seasonStart: [
+      "NEW SEASON: {league} predictions. Favourites: {favs}. Dark horses: {dark}.",
+      "The {league} is back. Pick your champions: {favs} lead the way.",
+      "Season preview ({league}): {favs} start as favourites; {dark} could surprise."
+    ],
+    seasonEnd: [
+      "SEASON REVIEW: {league} champions {champ}. {?A year of triumph and heartbreak.|The year in numbers, drama and chaos.}",
+      "{league} ends with {champ} on top. {?A campaign to remember.|Great season, well deserved.}"
+    ],
+    calendar: {
+      August: ["New season, new hope. Optimism hits maximum capacity.", "August: the 'we're winning the league' month."],
+      September: ["The first international break arrives. Everyone holds their breath for injuries.", "Early-season form tables mean nothing. And everything."],
+      October: ["The nights are drawing in and the tension is rising.", "October: when the contenders separate from the pretenders."],
+      November: ["Fixture congestion bites. Squad depth is about to matter.", "November: a tough month for the thin squads."],
+      December: ["The festive fixture list. Rotation, injuries, chaos.", "December is where leagues are won or lost."],
+      January: ["Transfer window open. Expect the circus.", "Mid-season reset. Resolutions? We'll see."],
+      February: ["Run-in preview: who has the legs for it?", "February: the knockout rounds loom."],
+      March: ["Spring has sprung — so has the tension.", "March: the business end begins."],
+      April: ["Squeaky-bum time. Every point suddenly heavy.", "April: titles, relegation, European places all hang in the balance."],
+      May: ["The final weeks of the season. Everything's on the line.", "May: legends are made, jobs are lost."]
+    },
+    debate: [
+      "DEBATE: who's the best player in the world right now — {a} or {b}? {?Vote below.|Poll below.}",
+      "Hot take: {a} is overrated. {?Fight me.|Change my mind.|Discuss.}",
+      "Who's better: {a} or {b}? {?Settle it.|Explain.}"
+    ],
+    statWave: [
+      "STAT OF THE MATCHDAY: {fact}",
+      "StatBook: {fact}",
+      "Did you know? {fact}"
+    ]
+  };
+
+  // ---- TV / presenter chatter for world events ----------------------------------------------------------------
+  const MB_STUDIO = {
+    title_race: ["The title race: {leadS} lead by {gap}. How many mistakes can {secondS} afford?", "Our panel is split: {leadS} for the title, or {secondS} to catch them?"],
+    sack: ["{mgrS} is under pressure. Our panel weighs in on whether he should stay.", "{team} are in a crisis. What can they do?"],
+    transfer: ["Transfer buzz around {player}: {?is he worth {fee}?|will he move?|how would he fit at {to}?}"],
+    champs: ["{team} are the champions. Let's take a look at how they did it.", "A season of triumph — {team} have won it all."],
+    awards: ["Tonight: the awards. Who deserved it, who was snubbed?", "A night of glory for {winnerS}. But was it the right choice?"]
+  };
+
+
+  // ==========================================================================
+  // APEX MEDIA CENTRE — core
+  // --------------------------------------------------------------------------
+  // The news / social layer. Every finished match (live or auto-simmed) queues a
+  // compact fact sheet; a debounced flush then turns the most newsworthy ones
+  // into dozens of posts across ~12 outlets, studio pundits and a cast of
+  // procedurally minted fans — headlines, breaking banners, TV bulletins,
+  // articles, memes, radio rants, video titles, polls and reply threads.
+  //
+  // Design rules:
+  //   * Media NEVER touches seededRandom() — match/season determinism stays
+  //     exactly as it was. It has its own Math.random-based helpers (mR…).
+  //   * Everything is generated from real match data (scorers, minutes, xG,
+  //     cards, injuries, form, h2h, tables), so no two posts read alike.
+  //   * The store is capped and compact (see MEDIA_CAP_*), persisted under the
+  //     single localStorage key "apexMedia" and included in Export/Import.
+  //
+  // Files: data/media*.js (content) · engine/mediaCore.js (this) ·
+  //        engine/mediaStories.js (match analysis + coverage) ·
+  //        engine/mediaWorld.js (previews, world events, flush, hooks) ·
+  //        ui/mediaUI.js (Media tab).
+  // ==========================================================================
+  const MEDIA_CAP_FEED = 320;   // ordinary posts kept
+  const MEDIA_CAP_KEEP = 80;    // landmark posts (trophies, awards, shocks) kept longer
+  const MEDIA_STORAGE_KEY = 'apexMedia';
+
+  let mediaState = null;       // lazily created / loaded
+  let mediaDirty = false;
+  let _mediaQueue = [];        // fact sheets waiting for the next flush
+  let _mediaEventQueue = [];   // trophies / awards waiting for the next flush
+  let _mediaFlushTimer = null;
+  let _mediaLastFlushAt = 0;
+  const _mRecent = {};         // bank key -> recently used indexes (anti-repeat)
+
+  function mediaBlank() {
+    return { v: 1, seq: 0, pid: 0, feed: [], keep: [], h2h: {}, run: {}, lastMonth: null, rumors: {}, tvLast: 0 };
+  }
+  function ensureMedia() {
+    if (!mediaState) mediaState = mediaBlank();
+    return mediaState;
+  }
+
+  function mediaLoad() {
+    try {
+      const raw = localStorage.getItem(MEDIA_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.feed)) {
+          mediaState = Object.assign(mediaBlank(), parsed);
+          mediaState.keep = mediaState.keep || [];
+          return;
+        }
+      }
+    } catch (e) {}
+    mediaState = mediaBlank();
+  }
+
+  function mediaSerialize() {
+    ensureMedia();
+    // Trim reply threads on older posts so the save stays small.
+    const feed = mediaState.feed;
+    for (let i = 0; i < feed.length - 70; i++) { if (feed[i].r && feed[i].r.length > 2) feed[i].r.length = 2; }
+    return JSON.stringify(mediaState);
+  }
+  function mediaSave() {
+    if (!mediaState) return true;
+    try {
+      const ok = safeSetItem(MEDIA_STORAGE_KEY, mediaSerialize());
+      if (ok) mediaDirty = false;
+      return ok;
+    } catch (e) { return false; }
+  }
+  function mediaClearAll() {
+    mediaState = mediaBlank();
+    _mediaQueue = []; _mediaEventQueue = [];
+    mediaSave();
+    try { renderMediaView(); } catch (e) {}
+  }
+
+  // ---- random helpers (NOT the seeded sim RNG) ----------------------------------------
+  function mR() { return Math.random(); }
+  function mInt(a, b) { return a + Math.floor(mR() * (b - a + 1)); }
+  function mPick(arr) { return arr && arr.length ? arr[Math.floor(mR() * arr.length)] : ''; }
+  function mChance(p) { return mR() < p; }
+  function mShuffle(arr) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(mR() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function mClamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function mWeighted(items) { // items: [{w, v}]
+    const tot = items.reduce((s, x) => s + x.w, 0);
+    if (tot <= 0) return items.length ? items[0].v : null;
+    let r = mR() * tot;
+    for (const it of items) { r -= it.w; if (r <= 0) return it.v; }
+    return items[items.length - 1].v;
+  }
+  // Pick from `arr` avoiding whatever was used recently under `key`.
+  function mFresh(arr, key) {
+    if (!arr || !arr.length) return '';
+    if (arr.length === 1) return arr[0];
+    const rec = _mRecent[key] || (_mRecent[key] = []);
+    const window = Math.min(arr.length - 1, Math.max(2, Math.floor(arr.length * 0.6)));
+    let idx, tries = 0;
+    do { idx = Math.floor(mR() * arr.length); tries++; } while (rec.indexOf(idx) !== -1 && tries < 12);
+    rec.push(idx);
+    while (rec.length > window) rec.shift();
+    return arr[idx];
+  }
+  function mHash(s) {
+    let h = 2166136261;
+    s = String(s);
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function mSeeded(seed) {   // mulberry32
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ---- text helpers ---------------------------------------------------------------------------
+  function mOrd(n) {
+    n = Math.round(n);
+    const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+  function mSur(name) {
+    if (!name) return '';
+    name = String(name).replace(/\s*\((OG|og)\)\s*$/, '').trim();
+    const parts = name.split(/\s+/);
+    if (parts.length === 1) return parts[0];
+    let last = parts[parts.length - 1];
+    if (/^(jr\.?|junior|sr\.?|ii|iii)$/i.test(last) && parts.length > 2) return parts[parts.length - 2];
+    const prev = parts[parts.length - 2];
+    if (/^(de|van|von|dos|da|di|del|della|al|el|ter|le|la|der|den|mac|mc|bin|ben|dal|do|du)$/i.test(prev)) return prev + ' ' + last;
+    return last;
+  }
+  function mPoss(name) { return /s$/i.test(name) ? name + "'" : name + "'s"; }
+  function mTag(s) { return '#' + String(s || '').replace(/[^A-Za-z0-9]/g, ''); }
+  function mTeamName(t, keepYear) {
+    if (!t) return '';
+    let n = t.name || '';
+    if (!keepYear) n = n.replace(/\s+\d{4}(?:[-\/]\d{2,4})?$/, '');
+    return n;
+  }
+  function mFmt(n) {
+    n = Math.round(n);
+    if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'K';
+    return String(n);
+  }
+  function mClean(s) {
+    return String(s == null ? '' : s)
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.!?;:])/g, '$1')
+      .replace(/([!?])\1{3,}/g, '$1$1$1')
+      .replace(/\.{4,}/g, '...')
+      .replace(/ \./g, '.')
+      .trim();
+  }
+  function mEsc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ---- bank registry (flattened so [bank] refs resolve everywhere) ------------------------------
+  const MB = {};
+  (function registerBanks() {
+    Object.keys(MB_TAILS).forEach(k => { MB[k] = MB_TAILS[k]; });
+    Object.keys(MB_REPLY).forEach(k => { MB['reply_' + k] = MB_REPLY[k]; });
+    Object.keys(MB_OVERLAY).forEach(k => { MB['ov_' + k] = MB_OVERLAY[k]; });
+  })();
+
+  // ---- template expander --------------------------------------------------------------------------
+  function mxClose(s, i, open, close) {
+    let depth = 0;
+    for (let j = i; j < s.length; j++) {
+      const ch = s[j];
+      if (ch === open) depth++;
+      else if (ch === close) { depth--; if (depth === 0) return j; }
+    }
+    return -1;
+  }
+  function mxSplit(s, sep) {
+    const out = []; let depth = 0, cur = '';
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '{' || ch === '[') depth++;
+      else if (ch === '}' || ch === ']') depth--;
+      if (ch === sep && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+  function mxMod(mod, v) {
+    switch (mod) {
+      case 'up': return v.toUpperCase();
+      case 'low': return v.toLowerCase();
+      case 'cap': return v.charAt(0).toUpperCase() + v.slice(1);
+      case 'sur': return mSur(v);
+      case 'tag': return mTag(v);
+      case 'poss': return mPoss(v);
+      default: return v;
+    }
+  }
+  // c = context object. Missing variables expand to ''.
+  function mx(tpl, c, depth) {
+    depth = depth || 0;
+    if (tpl == null) return '';
+    tpl = String(tpl);
+    if (depth > 7) return tpl;
+    let out = '', i = 0;
+    while (i < tpl.length) {
+      const ch = tpl[i];
+      if (ch === '{') {
+        const j = mxClose(tpl, i, '{', '}');
+        if (j < 0) { out += ch; i++; continue; }
+        const inner = tpl.slice(i + 1, j);
+        if (inner[0] === '?') {
+          const opts = mxSplit(inner.slice(1), '|');
+          out += mx(opts[Math.floor(mR() * opts.length)], c, depth + 1);
+        } else {
+          const bits = inner.split('|');
+          let v = c[bits[0]];
+          v = v == null ? '' : String(v);
+          for (let k = 1; k < bits.length; k++) v = mxMod(bits[k], v);
+          out += v;
+        }
+        i = j + 1;
+      } else if (ch === '[') {
+        const j = mxClose(tpl, i, '[', ']');
+        if (j < 0) { out += ch; i++; continue; }
+        const name = tpl.slice(i + 1, j);
+        const bank = MB[name];
+        out += bank ? mx(mFresh(bank, 'b:' + name), c, depth + 1) : '';
+        i = j + 1;
+      } else { out += ch; i++; }
+    }
+    return mClean(out);
+  }
+  // Drop templates that reference a variable the context has no value for.
+  function mOk(arr, c) {
+    const ok = arr.filter(t => { const re = /\{([A-Za-z0-9_]+)(?:\|[a-z]+)?\}/g; let m; while ((m = re.exec(t))) { if (c[m[1]] == null || c[m[1]] === '') return false; } return true; });
+    return ok.length ? ok : arr;
+  }
+  // Expand a random fresh template from an array.
+  function mxPick(arr, c, key) { return arr && arr.length ? mx(mFresh(arr, key || ('a:' + arr[0].slice(0, 24))), c) : ''; }
+
+  // ---- fan voice quirks -------------------------------------------------------------------------------------
+  function mVoice(text, mood) {
+    let t = text;
+    const r = mR();
+    if (mood === 'angry' && r < 0.5) {
+      const words = t.split(' ');
+      const idxs = words.map((w, i) => [w, i]).filter(x => x[0].replace(/[^A-Za-z]/g, '').length >= 4);
+      for (let k = 0; k < Math.min(2, idxs.length); k++) { const pick = idxs[Math.floor(mR() * idxs.length)][1]; words[pick] = words[pick].toUpperCase(); }
+      t = words.join(' ');
+    } else if (mood === 'banter' && r < 0.4) {
+      t = t.replace(/\.$/, '') + ' 😂';
+    } else if (mood === 'doomer' && r < 0.4) {
+      t = t.toLowerCase().replace(/[.!]+$/, '') + '...';
+    } else if (mood === 'wholesome' && r < 0.5) {
+      t = t + ' ' + mPick(['💙', '❤️', '🫶', '🙏', '✨', '🤗']);
+    } else if (mood === 'delusional' && r < 0.4) {
+      t = t + ' ' + mPick(['🏆', '👑', '🔥', '🐐']);
+    } else if (mood === 'stat' && r < 0.3) {
+      t = t + ' 📊';
+    }
+    if (mR() < 0.06) t = t.replace(/ing\b/g, "in'");
+    if (mR() < 0.05) t = t.toLowerCase();
+    if (/\b(lmao|omg|nooo*|wow|fml)\b/i.test(t) && mR() < 0.4) t = t.replace(/\b(lmao|omg|wow)\b/i, m => m + m.slice(-1).repeat(mInt(1, 4)));
+    return t;
+  }
+
+  // ---- team fame / strength helpers -----------------------------------------------------------------------------
+  function mTeamOvr(t) {
+    if (!t) return 70;
+    try { if (typeof teamAvgOvr === 'function') { const v = teamAvgOvr(t); if (isFinite(v) && v > 0) return v; } } catch (e) {}
+    const ps = (t.players || []).map(p => p.ovr || 0).sort((a, b) => b - a).slice(0, 11);
+    return ps.length ? ps.reduce((s, x) => s + x, 0) / ps.length : 70;
+  }
+  function mFame(t) { return mClamp((mTeamOvr(t) - 62) / 30, 0.05, 1); }
+
+  // ---- accounts ---------------------------------------------------------------------------------------------------------
+  // Fans are minted from a hash of (team id, slot): same regulars, zero storage.
+  function mFan(team, slot, wantMood) {
+    const R = mSeeded(mHash((team ? team.id : 'neutral') + '#' + slot));
+    const first = MEDIA_FIRST[Math.floor(R() * MEDIA_FIRST.length)];
+    const noun = MEDIA_NOUN[Math.floor(R() * MEDIA_NOUN.length)];
+    const nnoun = MEDIA_NEUTRAL_NOUN[Math.floor(R() * MEDIA_NEUTRAL_NOUN.length)];
+    const avatar = MEDIA_AVATAR[Math.floor(R() * MEDIA_AVATAR.length)];
+    const num = Math.floor(R() * 99);
+    const style = Math.floor(R() * 5);
+    const short = team ? String(team.short || team.name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 5) : '';
+    const tname = team ? mTeamName(team).replace(/[^A-Za-z0-9]/g, '').slice(0, 12) : '';
+    let handle, name;
+    if (team) {
+      handle = ['@' + first + short + num, '@' + tname + noun, '@' + first + '_' + short, '@The' + first + noun, '@' + short + noun + num][style];
+      name = [first + ' (' + short + ')', tname + ' ' + noun, first + ' ' + avatar, 'The ' + first + ' Show', short + ' ' + noun][style];
+    } else {
+      handle = ['@' + nnoun + num, '@' + first + '_' + nnoun, '@' + first + nnoun, '@' + nnoun + '_' + first, '@' + first + num][style];
+      name = [first, first + ' ' + avatar, nnoun.replace(/_/g, ' '), first + ' • ' + nnoun.replace(/_/g, ' '), 'The ' + nnoun.replace(/_/g, ' ')][style];
+    }
+    const mood = wantMood || MEDIA_MOODS[Math.floor(R() * MEDIA_MOODS.length)];
+    const fame = team ? mFame(team) : 0.35;
+    const followers = Math.round(120 + Math.pow(R(), 2.2) * 60000 * (0.3 + fame));
+    return { n: name, h: handle, a: avatar, c: team && team.color ? team.color : '#64748b', t: team ? team.id : null, m: mood, f: followers };
+  }
+  // Compact form for storage (drops mood/followers).
+  function mUserRef(u) {
+    if (typeof u === 'string') return u;
+    const o = { n: u.n, h: u.h, a: u.a, c: u.c };
+    if (u.t) o.t = u.t;
+    if (u.v) o.v = 1;
+    return o;
+  }
+  function mClubDesk(team) {
+    const nm = mTeamName(team);
+    return { n: nm + ' Media', h: '@' + (team.short || nm).replace(/[^A-Za-z0-9]/g, '') + '_Media', a: team.flag || '⚽', c: team.color || '#64748b', t: team.id, v: 1, f: Math.round(400000 + mFame(team) * 6000000), m: 'wholesome' };
+  }
+
+  // ---- engagement ---------------------------------------------------------------------------------------------------------------
+  function mEng(followers, virality) {
+    const v = virality || 1;
+    const base = followers * (0.004 + mR() * 0.018) * v;
+    const l = Math.max(0, Math.round(base * (0.4 + mR() * 1.3)));
+    return {
+      l,
+      rt: Math.round(l * (0.05 + mR() * 0.16)),
+      rp: Math.round(l * (0.015 + mR() * 0.07)),
+      vw: Math.round(Math.max(l, 1) * (10 + mR() * 30))
+    };
+  }
+
+  // ---- batches & posts -------------------------------------------------------------------------------------------------------------
+  function mBatch(whenLabel) {
+    ensureMedia();
+    return { seq: ++mediaState.seq, when: whenLabel || '', posts: [] };
+  }
+  // kind: res rec pre take news rumor award stat meme vid tv art poll tw
+  function mkPost(batch, u, kind, x, o) {
+    o = o || {};
+    ensureMedia();
+    let followers = 5000;
+    if (typeof u === 'string') {
+      if (MEDIA_OUTLETS[u]) followers = MEDIA_OUTLETS[u].followers;
+      else if (u.indexOf('p:') === 0) followers = 700000;
+    } else followers = u.f || 5000;
+    const eng = mEng(followers, o.v || 1);
+    const p = {
+      id: ++mediaState.pid, s: batch.seq, dt: o.dt == null ? mInt(0, 90) : o.dt, k: kind,
+      u: mUserRef(u), x: mClean(x), im: o.im || 0, l: eng.l, rt: eng.rt, rp: eng.rp, vw: eng.vw
+    };
+    if (o.ph) p.ph = o.ph;
+    if (o.ts && o.ts.length) p.ts = o.ts.filter(Boolean);
+    if (o.mk) p.mk = o.mk;
+    if (o.tg && o.tg.length) p.tg = o.tg.filter(Boolean);
+    if (o.c) p.c = o.c;
+    if (batch.when) p.w = batch.when;
+    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
+    batch.posts.push(p);
+    return p;
+  }
+
+  function mCommit(batch) {
+    ensureMedia();
+    if (!batch || !batch.posts.length) return;
+    batch.posts.forEach(p => {
+      if (p.im >= 3) mediaState.keep.push(p);
+      else mediaState.feed.push(p);
+    });
+    while (mediaState.feed.length > MEDIA_CAP_FEED) mediaState.feed.shift();
+    while (mediaState.keep.length > MEDIA_CAP_KEEP) mediaState.keep.shift();
+    mediaDirty = true;
+  }
+
+  // Everything, newest first (by batch then dt).
+  function mediaAllPosts() {
+    ensureMedia();
+    const all = mediaState.feed.concat(mediaState.keep);
+    all.sort((a, b) => (b.s - a.s) || (b.dt - a.dt) || (b.id - a.id));
+    return all;
+  }
+
+  // Trending hashtags weighted by engagement over the most recent batches.
+  function mediaTrending(limit) {
+    ensureMedia();
+    const maxSeq = mediaState.seq;
+    const counts = {};
+    mediaAllPosts().forEach(p => {
+      if (!p.tg || p.s < maxSeq - 18) return;
+      const w = 1 + Math.log10(1 + (p.l || 0)) * 1.6 + (p.im || 0);
+      p.tg.forEach(t => { counts[t] = (counts[t] || 0) + w; });
+    });
+    const arr = Object.keys(counts).map(t => ({ tag: t, score: counts[t], posts: Math.round(counts[t] * (3200 + (mHash(t) % 4000))) }));
+    arr.sort((a, b) => b.score - a.score);
+    return arr.slice(0, limit || 8);
+  }
+
+
+  // ==========================================================================
+  // APEX MEDIA CENTRE — match facts, storyline detection, coverage
+  // ==========================================================================
+
+  function mMatchComp() {
+    let name = 'Friendly', stage = '', md = '';
+    try {
+      if (currentSeasonComp && currentSeasonComp.name) {
+        const c = currentSeasonComp;
+        name = c.name;
+        if (c.stage && c.stage !== 'league') stage = ({ qf: 'Quarter-final', sf: 'Semi-final', final: 'Final' })[c.stage] || '';
+        else if (c.roundName && !c.table) stage = c.roundName;
+        if (c.table && typeof c.currentRound === 'number') md = String(c.currentRound + 1);
+      } else if (typeof tournament !== 'undefined' && tournament) {
+        name = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
+        const st = tournament.stage;
+        if (st === 'groups') stage = 'Group stage';
+        else if (st && Array.isArray(tournament.knockout) && tournament.knockout.length) {
+          const last = tournament.knockout[tournament.knockout.length - 1];
+          stage = (last && (last.name || last.roundName)) || 'Knockout';
+        } else if (st) stage = String(st);
+      } else if (currentMatch && currentMatch.countForLeaderboard) name = 'Cup';
+    } catch (e) {}
+    return { name, stage, md };
+  }
+
+  function mWhenLabel() {
+    try {
+      if (season && typeof season.year === 'number') return 'Y' + season.year + ' · ' + computeSeasonMonth(season).slice(0, 3);
+    } catch (e) {}
+    return '';
+  }
+
+  // Win/draw/win probabilities (percent) from two strengths.
+  function mProb(hOvr, aOvr) {
+    const diff = hOvr - aOvr + 2;
+    const ph = 1 / (1 + Math.exp(-diff / 6));
+    const draw = 0.27 * (1 - Math.abs(2 * ph - 1) * 0.55);
+    const pH = Math.round(ph * (1 - draw) * 100), pD = Math.round(draw * 100);
+    return { pH, pD, pA: 100 - pH - pD };
+  }
+  function mXI(side) {
+    const ps = (side.squad && side.squad.starting) || [];
+    const v = ps.map(p => p.ovr || 0).filter(Boolean);
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : mTeamOvr(side.team);
+  }
+
+  function mFindDerby(H, A) {
+    const hn = mTeamName(H).toLowerCase(), an = mTeamName(A).toLowerCase();
+    for (const d of MEDIA_DERBIES) {
+      if ((hn.indexOf(d.a) !== -1 && an.indexOf(d.b) !== -1) || (hn.indexOf(d.b) !== -1 && an.indexOf(d.a) !== -1)) return d.name;
+    }
+    return null;
+  }
+
+  // ---- fact sheet ------------------------------------------------------------------------------------------
+  function mediaBuildFacts(m) {
+    const H = m.home.team, A = m.away.team;
+    const cm = mMatchComp();
+    const hs = m.home.score, as = m.away.score;
+    const winSide = hs > as ? 'home' : as > hs ? 'away' : null;
+    const f = {
+      live: !m.quietSim, key: Date.now().toString(36) + mInt(100, 999),
+      comp: cm.name, stage: cm.stage, md: cm.md, when: mWhenLabel(),
+      H, A, hs, as, winSide, tot: hs + as, margin: Math.abs(hs - as),
+      pen: m.home.penScore != null ? { h: m.home.penScore, a: m.away.penScore } : null,
+      goals: [], cards: [], injuries: [], motm: null, gk: null, stories: []
+    };
+    const stats = m.playerMatchStats || {};
+    const nameOf = id => (stats[id] && stats[id].name) || '';
+    // goals + assists (parsed from the goal events, in order)
+    const goalEvents = (m.events || []).filter(e => e.type === 'goal');
+    (m.goalList || []).forEach((g, i) => {
+      const isOG = /own goal/i.test(g.method || '') || /\(OG\)/.test(g.player || '');
+      const ev = goalEvents[i];
+      let assist = '';
+      if (ev && ev.text) { const mm = /Assisted by <span class="player">([^<]+)</; const r = mm.exec(ev.text); if (r) assist = r[1]; }
+      const sub = m.subLog && m.subLog[g.side] && m.subLog[g.side][g.id];
+      f.goals.push({
+        side: g.side, name: String(g.player || '').replace(/\s*\(OG\)\s*$/, ''), id: g.id,
+        min: g.dispMin != null ? g.dispMin : g.minute, og: isOG, pen: !!g.pen, method: g.method || '', assist,
+        sub: !!(sub && typeof sub.inMin === 'number')
+      });
+    });
+    // timeline replay
+    let h = 0, a = 0, at70 = { h: 0, a: 0 }, maxDef = { home: 0, away: 0 }, winGoal = null, lastLevel = null;
+    f.goals.forEach(g => {
+      const before = { h, a };
+      if (g.side === 'home') h++; else a++;
+      if (g.min <= 70) at70 = { h, a };
+      maxDef.home = Math.max(maxDef.home, a - h); maxDef.away = Math.max(maxDef.away, h - a);
+      if (winSide) {
+        const w = winSide === 'home' ? h : a, o = winSide === 'home' ? a : h;
+        const wb = winSide === 'home' ? before.h : before.a, ob = winSide === 'home' ? before.a : before.h;
+        if (w > o && !(wb > ob)) winGoal = g;
+      } else if (h === a && before.h !== before.a) lastLevel = g;
+    });
+    f.winGoal = winGoal; f.lastLevel = lastLevel;
+    f.deficit = winSide ? maxDef[winSide] : 0;
+    f.behindAt70 = winSide ? (winSide === 'home' ? at70.h < at70.a : at70.a < at70.h) : false;
+    // scorers by player
+    const byScorer = {};
+    f.goals.filter(g => !g.og).forEach(g => { (byScorer[g.id] = byScorer[g.id] || { name: g.name, id: g.id, side: g.side, n: 0, mins: [] }); byScorer[g.id].n++; byScorer[g.id].mins.push(g.min); });
+    f.scorers = Object.values(byScorer).sort((x, y) => y.n - x.n);
+    f.topScorer = f.scorers[0] || null;
+    // cards / injuries
+    Object.values(stats).forEach(ps => {
+      const side = (m.home.squad.all || []).some(p => p.id === ps.id) ? 'home' : 'away';
+      if (ps.red) {
+        const ev = (m.events || []).find(e => e.type === 'red' && e.text && e.text.indexOf(ps.name) !== -1);
+        f.cards.push({ side, name: ps.name, id: ps.id, type: 'red', min: ev ? (ev.dispMin != null ? ev.dispMin : ev.minute) : 60 });
+      }
+    });
+    (m.injuries || []).forEach(pid => {
+      const rec = injuryBook[pid];
+      const side = (m.home.squad.all || []).some(p => p.id === pid) ? 'home' : 'away';
+      if (rec) f.injuries.push({ side, name: rec.playerName, id: pid, type: rec.type, sev: rec.severity, out: rec.matchesTotal || rec.matchesLeft || 1 });
+    });
+    // MOTM / best & worst / keeper
+    if (m.motmId && stats[m.motmId]) {
+      const ps = stats[m.motmId];
+      f.motm = { name: ps.name, id: ps.id, rating: ps.rating || 7, goals: ps.goals || 0, assists: ps.assists || 0, side: (m.home.squad.all || []).some(p => p.id === ps.id) ? 'home' : 'away' };
+    }
+    let gk = null;
+    Object.values(stats).forEach(ps => {
+      if ((ps.pos === 'GK' || (ps.posArr || []).indexOf('GK') !== -1) && (ps.saves || 0) > ((gk && gk.saves) || -1)) {
+        gk = { name: ps.name, id: ps.id, saves: ps.saves || 0, side: (m.home.squad.all || []).some(p => p.id === ps.id) ? 'home' : 'away' };
+      }
+    });
+    f.gk = gk;
+    // top rated list for team-of-the-week
+    f.top = Object.values(stats).filter(ps => ps.rating).sort((x, y) => y.rating - x.rating).slice(0, 3).map(ps => ({
+      id: ps.id, name: ps.name, r: Math.round(ps.rating * 10) / 10, pos: ps.pos || '', t: (m.home.squad.all || []).some(p => p.id === ps.id) ? H.id : A.id
+    }));
+    // team numbers
+    const hst = m.home.stats || {}, ast = m.away.stats || {};
+    let poss = typeof hst.possession === 'number' ? hst.possession : 50;
+    const homeIds = new Set((m.home.squad.all || []).map(p => p.id));
+    let sxH = 0, sxA = 0;
+    Object.values(stats).forEach(ps => { if (homeIds.has(ps.id)) sxH += ps.xg || 0; else sxA += ps.xg || 0; });
+    f.st = {
+      shH: hst.shots || 0, shA: ast.shots || 0, onH: hst.shotsOn || 0, onA: ast.shotsOn || 0,
+      possH: Math.round(poss), possA: Math.round(100 - poss),
+      xgH: Math.round(Math.max(hst.xg || 0, sxH) * 10) / 10, xgA: Math.round(Math.max(ast.xg || 0, sxA) * 10) / 10,
+      coH: hst.corners || 0, coA: ast.corners || 0
+    };
+    f.ovrH = mXI(m.home); f.ovrA = mXI(m.away);
+    f.fameH = mFame(H); f.fameA = mFame(A);
+    f.derby = mFindDerby(H, A);
+    f.fmH = (m.home.squad && m.home.squad.formation) || ''; f.fmA = (m.away.squad && m.away.squad.formation) || '';
+    f.stadium = (typeof getStadium === 'function') ? getStadium(H) : '';
+    f.careerInvolved = !!(typeof careerTeamId !== 'undefined' && careerTeamId && (H.id === careerTeamId || A.id === careerTeamId));
+    f.isKO = /final|round of|quarter|semi|knockout|playoff/i.test(f.stage || '');
+    f.isFinal = /^final$/i.test(f.stage || '');
+    mPickStory(f);
+    return f;
+  }
+
+  // ---- storyline choice ----------------------------------------------------------------------------------------
+  function mPickStory(f) {
+    const c = [];
+    const W = f.winSide;
+    if (f.pen && !W) { f.story = 'shootout'; mFinishStory(f); return; }
+    if (!W) {
+      if (f.tot === 0) c.push({ w: 10, v: 'bore' });
+      else if (f.lastLevel && f.lastLevel.min >= 86 && f.tot >= 2) c.push({ w: 9, v: 'late_equaliser' });
+      if (f.tot >= 4) c.push({ w: 7, v: 'draw_goalfest' });
+      c.push({ w: 3, v: 'draw' });
+    } else {
+      const wOvr = W === 'home' ? f.ovrH : f.ovrA, lOvr = W === 'home' ? f.ovrA : f.ovrH;
+      const gap = lOvr - wOvr;
+      const ts = f.topScorer;
+      if (ts && ts.n >= 3) c.push({ w: 10, v: 'hattrick' });
+      if (f.deficit >= 2 || (f.deficit >= 1 && f.behindAt70)) c.push({ w: 8 + f.deficit, v: 'comeback' });
+      if (f.winGoal && f.winGoal.min >= 85 && f.margin === 1) c.push({ w: 7, v: 'late_winner' });
+      if (gap >= 4) c.push({ w: 6 + Math.min(gap, 10) / 2, v: 'upset' });
+      if (f.margin >= 4 || (f.margin >= 3 && Math.max(f.hs, f.as) >= 5)) c.push({ w: 7, v: 'thrashing' });
+      if (f.cards.length) c.push({ w: 5, v: 'redcard' });
+      if (f.gk && f.gk.saves >= 7) c.push({ w: 4, v: 'keeper' });
+      if (f.tot >= 5 && f.margin <= 2) c.push({ w: 6, v: 'thriller' });
+      const xW = W === 'home' ? f.st.xgH : f.st.xgA, xL = W === 'home' ? f.st.xgA : f.st.xgH;
+      if (xL - xW >= 1.2) c.push({ w: 4, v: 'xg_robbery' });
+      if (f.goals.some(g => g.og) && f.margin <= 1) c.push({ w: 3, v: 'og' });
+      if (f.winGoal && f.winGoal.sub && f.margin <= 2) c.push({ w: 4, v: 'sub_hero' });
+      if (ts && ts.n === 2) c.push({ w: 2.5, v: 'brace' });
+      c.push({ w: 1.5, v: 'win' });
+    }
+    f.story = mWeighted(c) || 'win';
+    mFinishStory(f);
+  }
+  function mFinishStory(f) {
+    // Newsworthiness
+    const compW = MEDIA_COMP_WEIGHT[f.comp] != null ? MEDIA_COMP_WEIGHT[f.comp] : 0.5;
+    const bonus = { comeback: 22, late_winner: 18, late_equaliser: 14, upset: 24, hattrick: 18, redcard: 10, thriller: 14, thrashing: 15, draw_goalfest: 12, shootout: 16, keeper: 7, xg_robbery: 5, og: 6, sub_hero: 8, brace: 4, bore: -8, draw: -3, win: 0 };
+    let nw = 14 + (f.fameH + f.fameA) * 22 + compW * 24 + (bonus[f.story] || 0);
+    if (f.derby) nw += 18;
+    if (f.isFinal) nw += 25; else if (f.isKO) nw += 9;
+    if (f.careerInvolved) nw += 30;
+    if (f.live) nw += 40;
+    f.nw = mClamp(nw, 0, 100);
+  }
+
+  // ---- memory: h2h and streaks ------------------------------------------------------------------------------------------
+  function mediaUpdateMemory(f) {
+    ensureMedia();
+    const H = f.H.id, A = f.A.id;
+    const key = [H, A].sort().join('|');
+    const prev = mediaState.h2h[key];
+    f.prev = prev ? JSON.parse(JSON.stringify(prev)) : null;
+    const rec = prev || { a: [H, A].sort()[0], aw: 0, bw: 0, d: 0, n: 0 };
+    rec.n++;
+    if (f.winSide) { const wId = f.winSide === 'home' ? H : A; if (wId === rec.a) rec.aw++; else rec.bw++; } else rec.d++;
+    rec.ls = f.hs + '-' + f.as; rec.lh = H;
+    mediaState.h2h[key] = rec;
+    // trim h2h store
+    const keys = Object.keys(mediaState.h2h);
+    if (keys.length > 700) delete mediaState.h2h[keys[0]];
+    // streaks
+    const upd = (id, res) => {
+      const r = mediaState.run[id] || { w: 0, l: 0, u: 0, nw: 0 };
+      if (res === 'w') { r.w++; r.l = 0; r.u++; r.nw = 0; }
+      else if (res === 'l') { r.l++; r.w = 0; r.u = 0; r.nw++; }
+      else { r.w = 0; r.l = 0; r.u++; r.nw++; }
+      mediaState.run[id] = r;
+    };
+    upd(H, f.winSide === 'home' ? 'w' : f.winSide === 'away' ? 'l' : 'd');
+    upd(A, f.winSide === 'away' ? 'w' : f.winSide === 'home' ? 'l' : 'd');
+    f.runH = Object.assign({}, mediaState.run[H]); f.runA = Object.assign({}, mediaState.run[A]);
+    // milestones (career goals)
+    f.miles = [];
+    f.scorers.forEach(s => {
+      const cs = careerStats && careerStats.goals && careerStats.goals[s.id];
+      const sc = stats && stats.goals && stats.goals[s.id];
+      const career = cs ? cs.count : 0, seasonN = sc ? sc.count : 0;
+      const before = career - s.n;
+      [25, 50, 75, 100, 150, 200, 250, 300, 400, 500].forEach(t => { if (before < t && career >= t) f.miles.push({ id: s.id, name: s.name, kind: 'goals', n: t, side: s.side }); });
+      const sBefore = seasonN - s.n;
+      [10, 15, 20, 25, 30, 40].forEach(t => { if (sBefore < t && seasonN >= t) f.miles.push({ id: s.id, name: s.name, kind: 'seasonGoals', n: t, side: s.side }); });
+    });
+    if (f.miles.length) f.nw = mClamp(f.nw + 6, 0, 100);
+    if (f.runH.l >= 4 || f.runA.l >= 4 || f.runH.w >= 6 || f.runA.w >= 6) f.nw = mClamp(f.nw + 8, 0, 100);
+  }
+
+  // ---- context for templates ----------------------------------------------------------------------------------------------------
+  function mediaCtx(f) {
+    const H = f.H, A = f.A;
+    const keepYear = !(f.comp && f.comp !== 'Friendly') && mTeamName(H, true) !== mTeamName(H, false) && /\d{4}/.test(H.name) && /\d{4}/.test(A.name) && (H.name.match(/\d{4}.*$/) || [''])[0] !== (A.name.match(/\d{4}.*$/) || [''])[0];
+    const Hn = mTeamName(H, keepYear), An = mTeamName(A, keepYear);
+    const c = {
+      H: Hn, A: An, Hs: H.short || Hn, As: A.short || An, Hf: H.flag || '', Af: A.flag || '',
+      hg: f.hs, ag: f.as, score: f.hs + '-' + f.as, tot: f.tot, margin: f.margin,
+      comp: f.comp, stage: f.stage || f.comp, md: f.md, when: f.when, stadium: f.stadium,
+      ctag: MEDIA_COMP_TAGS[f.comp] || mTag(f.comp), tag: mTag(H.short || Hn) + mTag(A.short || An).slice(1),
+      derbyName: f.derby || '', mgrH: H.manager ? H.manager.name : '', mgrA: A.manager ? A.manager.name : '',
+      xgH: f.st.xgH.toFixed(1), xgA: f.st.xgA.toFixed(1), shH: f.st.shH, shA: f.st.shA, possH: f.st.possH, possA: f.st.possA,
+      xgTot: (f.st.xgH + f.st.xgA).toFixed(1), deficit: f.deficit, penScore: f.pen ? f.pen.h + '-' + f.pen.a : '',
+      saves: f.gk ? f.gk.saves : '', gk: f.gk ? f.gk.name : '', gkS: f.gk ? mSur(f.gk.name) : ''
+    };
+    // winner / loser
+    let wSide = f.winSide || 'home';
+    if (f.story === 'late_equaliser' && f.lastLevel) wSide = f.lastLevel.side;
+    if (f.story === 'shootout' && f.pen) wSide = f.pen.h > f.pen.a ? 'home' : 'away';
+    const lSide = wSide === 'home' ? 'away' : 'home';
+    const Wt = wSide === 'home' ? H : A, Lt = wSide === 'home' ? A : H;
+    c.W = mTeamName(Wt, keepYear); c.L = mTeamName(Lt, keepYear);
+    c.Ws = Wt.short || c.W; c.Ls = Lt.short || c.L; c.Wf = Wt.flag || ''; c.Lf = Lt.flag || '';
+    c.ws = wSide === 'home' ? f.hs : f.as; c.ls = wSide === 'home' ? f.as : f.hs;
+    c.wscore = c.ws + '-' + c.ls;
+    c.xgW = (wSide === 'home' ? f.st.xgH : f.st.xgA).toFixed(1); c.xgL = (wSide === 'home' ? f.st.xgA : f.st.xgH).toFixed(1);
+    c.shW = wSide === 'home' ? f.st.shH : f.st.shA; c.shL = wSide === 'home' ? f.st.shA : f.st.shH;
+    c.possW = wSide === 'home' ? f.st.possH : f.st.possA; c.possL = 100 - c.possW;
+    const wm = wSide === 'home' ? H.manager : A.manager, lm = wSide === 'home' ? A.manager : H.manager;
+    c.mgrW = wm ? wm.name : ''; c.mgrL = lm ? lm.name : ''; c.mgrWs = mSur(c.mgrW); c.mgrLs = mSur(c.mgrL);
+    // key scorer
+    let ks = null;
+    if (f.story === 'hattrick' || f.story === 'brace') ks = f.topScorer;
+    else if (f.story === 'late_equaliser' && f.lastLevel) ks = f.lastLevel;
+    else if (f.winGoal) ks = f.winGoal;
+    else if (f.topScorer) ks = f.topScorer;
+    if (ks) {
+      c.scorer = ks.name; c.scorerS = mSur(ks.name);
+      c.min = ks.min != null ? ks.min : (ks.mins ? ks.mins[ks.mins.length - 1] : '');
+      c.ord = c.min !== '' ? mOrd(c.min) : '';
+      c.ng = f.topScorer && ks.id === f.topScorer.id ? f.topScorer.n : 1;
+    }
+    c.scorers = f.goals.length ? f.goals.map(g => mSur(g.name) + (g.og ? ' (OG)' : '') + " " + g.min + "'" + (g.pen ? ' (pen)' : '')).join(', ') : 'no goals';
+    const wSideReal = f.winSide;
+    if (f.motm && (!wSideReal || f.motm.side === wSideReal)) { c.motm = f.motm.name; c.motmS = mSur(f.motm.name); c.motmR = f.motm.rating.toFixed(1); }
+    else if (f.motm && c.scorer && wSideReal) { c.motm = c.scorer; c.motmS = c.scorerS; c.motmR = ''; }
+    else if (f.motm) { c.motm = f.motm.name; c.motmS = mSur(f.motm.name); c.motmR = f.motm.rating.toFixed(1); }
+    else { c.motm = c.scorer || c.W; c.motmS = c.scorerS || c.W; c.motmR = ''; }
+    const og = f.goals.find(g => g.og);
+    c.ogS = og ? mSur(og.name) : '';
+    if (f.cards.length) {
+      const r = f.cards[0];
+      c.red = r.name; c.redS = mSur(r.name); c.redMin = r.min;
+      const rt = r.side === 'home' ? H : A;
+      c.redTeam = mTeamName(rt, keepYear); c.redTeamS = rt.short || c.redTeam;
+    }
+    if (f.injuries.length) {
+      const i = f.injuries[0], it = i.side === 'home' ? H : A;
+      c.inj = i.name; c.injS = mSur(i.name); c.injType = i.type; c.injOut = i.out; c.injTeam = mTeamName(it, keepYear);
+    }
+    // model numbers
+    const pr = mProb(f.ovrH, f.ovrA);
+    c.pH = pr.pH; c.pD = pr.pD; c.pA = pr.pA;
+    const pw = wSide === 'home' ? pr.pH : pr.pA, pl = wSide === 'home' ? pr.pA : pr.pH;
+    c.winP = pw; c.favP = Math.max(pw, pl); c.upsetOdds = Math.max(2, Math.round(100 / Math.max(3, pw)));
+    c.xgDiff = Math.abs(parseFloat(c.xgW) - parseFloat(c.xgL)).toFixed(1);
+    c.psx = (f.gk ? Math.max(1, Math.round(f.gk.saves * 0.35)) : 1);
+    // streak text
+    const pick = (r, t) => r.w >= 3 ? { n: r.w, who: t, k: 'win' } : r.l >= 3 ? { n: r.l, who: t, k: 'lose' } : r.u >= 6 ? { n: r.u, who: t, k: 'unbeaten' } : r.nw >= 5 ? { n: r.nw, who: t, k: 'winless' } : null;
+    const sk = pick(f.runH || {}, Hn) || pick(f.runA || {}, An);
+    if (f.runH && f.runA) {
+      const cands = [pick(f.runH, Hn), pick(f.runA, An)].filter(Boolean).sort((x, y) => y.n - x.n);
+      if (cands[0]) { c.streakN = cands[0].n; c.streakWho = cands[0].who; f.streakKind = cands[0].k; }
+    } else if (sk) { c.streakN = sk.n; c.streakWho = sk.who; f.streakKind = sk.k; }
+    if (f.prev) {
+      c.lastMeeting = f.prev.ls; c.h2hN = f.prev.n + 1;
+      const wId = wSide === 'home' ? H.id : A.id;
+      c.h2hWins = (wId === f.prev.a ? f.prev.aw : f.prev.bw) + (f.winSide ? 1 : 0);
+    }
+    return c;
+  }
+
+  // Add a supporter's point of view to a copy of the context.
+  function mPersp(c, f, side) {
+    const x = Object.assign({}, c);
+    const mine = side === 'home' ? f.H : f.A, opp = side === 'home' ? f.A : f.H;
+    x.my = mTeamName(mine); x.myS = mine.short || x.my; x.opp = mTeamName(opp); x.oppS = opp.short || x.opp;
+    x.myG = side === 'home' ? f.hs : f.as; x.oppG = side === 'home' ? f.as : f.hs;
+    x.myScore = x.myG + '-' + x.oppG;
+    return x;
+  }
+  function mOutcomeFor(f, side) { return !f.winSide ? 'draw' : f.winSide === side ? 'win' : 'lose'; }
+
+  // ---- bank access -------------------------------------------------------------------------------------------------------------
+  function mS(f, key) { return (MS[f.story] && MS[f.story][key]) || MS.win[key] || []; }
+  function mSitu(story) {
+    return ({ win: 'win', draw: 'draw', bore: 'bore', draw_goalfest: 'draw', thriller: 'win', thrashing: 'thrash', comeback: 'comeback', late_winner: 'late', late_equaliser: 'late', upset: 'upset', hattrick: 'hat', brace: 'win', redcard: 'red', keeper: 'keeper', xg_robbery: 'xgrob', shootout: 'win', og: 'win', sub_hero: 'win' })[story] || 'win';
+  }
+  function mOverlay(f, c) {
+    const opts = [];
+    if (f.derby) opts.push('ov_derby');
+    if (f.isFinal) opts.push('ov_final'); else if (f.isKO) opts.push('ov_knockout');
+    if (f.streakKind && c.streakN) opts.push('ov_streak_' + f.streakKind);
+    if (f.prev && f.winSide) opts.push('ov_record');
+    if (f.winSide && (f.winSide === 'home' ? f.as : f.hs) === 0 && f.tot > 0) opts.push('ov_cleansheet');
+    if (!opts.length) return '';
+    return mx('[' + mPick(opts) + ']', c);
+  }
+
+  // ---- panel of pundits ------------------------------------------------------------------------------------------------------------
+  function mPundits() { const o = {}; Object.keys(MEDIA_PUNDITS).forEach(k => { o[MEDIA_PUNDITS[k].lens] = k; }); return o; }
+  function mPanel(f, c, situOverride) {
+    const situ = situOverride || mSitu(f.story);
+    const byLens = mPundits();
+    let lenses = mShuffle(MEDIA_PANEL_LENSES.filter(l => l !== 'keeper' || /keeper|red|late|hat/.test(situ)));
+    if (situ === 'keeper' || situ === 'red') lenses = ['keeper'].concat(lenses.filter(l => l !== 'keeper'));
+    if (situ === 'xgrob' || situ === 'bore') lenses = ['data'].concat(lenses.filter(l => l !== 'data'));
+    return lenses.slice(0, 3).map(l => {
+      const bank = (MB_PUNDIT[l] && (MB_PUNDIT[l][situ] || MB_PUNDIT[l].win)) || [];
+      return { p: byLens[l], x: mx(mFresh(bank, 'pn:' + l + situ), c) };
+    }).filter(x => x.p && x.x);
+  }
+
+  // ---- fan posts / replies ---------------------------------------------------------------------------------------------------------------
+  function mFanText(f, c, side, acct, forceNeutral) {
+    const outcome = forceNeutral ? 'neutral' : mOutcomeFor(f, side);
+    const px = forceNeutral ? Object.assign({}, c, { my: c.H, myS: c.Hs, opp: c.A, oppS: c.As, myScore: c.score }) : mPersp(c, f, side);
+    let bank = outcome === 'win' ? mS(f, 'fanW') : outcome === 'lose' ? mS(f, 'fanL') : outcome === 'draw' ? mS(f, 'fanD') : mS(f, 'fanN');
+    if (!bank.length) bank = outcome === 'draw' ? mS(f, 'fanN') : mS(f, 'fanN');
+    if (!bank.length) bank = MS.win.fanN;
+    let text = mx(mFresh(bank, 'fan:' + f.story + outcome), px);
+    if (!forceNeutral && mChance(0.4) && MB_MOOD[acct.m]) {
+      const key = outcome === 'win' ? 'win' : outcome === 'lose' ? 'lose' : 'draw';
+      const mood = mx(mFresh(MB_MOOD[acct.m][key], 'mood:' + acct.m + key), px);
+      text = mChance(0.5) ? mood + ' ' + text : text + ' ' + mood;
+    }
+    const ov = (!forceNeutral && mChance(0.25)) ? mOverlay(f, px) : '';
+    if (ov) text += ' ' + ov;
+    return mVoice(text, acct.m);
+  }
+
+  function mgReplies(post, f, c, n, opts) {
+    opts = opts || {};
+    const rs = [];
+    for (let i = 0; i < n; i++) {
+      const kind = mPick(['W', 'L', 'N', 'N', 'R']);
+      const side = kind === 'W' ? (f.winSide || 'home') : kind === 'L' ? (f.winSide === 'home' ? 'away' : 'home') : mPick(['home', 'away']);
+      const team = kind === 'N' ? null : kind === 'R' ? null : (side === 'home' ? f.H : f.A);
+      const acct = mFan(team, 'r' + mInt(0, 999), kind === 'R' ? 'banter' : null);
+      let text;
+      if (mChance(0.55)) {
+        const tone = mPick(['agree', 'disagree', 'joke', 'joke', 'stat', 'banter', 'shock']);
+        text = mx(mFresh(mOk(MB['reply_' + tone], c), 'rp:' + tone), mPersp(c, f, side));
+      } else text = mFanText(f, c, side, acct, kind === 'N' || kind === 'R');
+      rs.push({ u: mUserRef(acct), x: mClean(mVoice(text, acct.m)), l: mInt(0, Math.max(3, Math.round((post.l || 100) * 0.04))) });
+    }
+    post.r = rs;
+  }
+
+  // ---- full coverage of one match ------------------------------------------------------------------------------------------------------
+  function mgCoverage(batch, f, tier) {
+    const c = mediaCtx(f);
+    f.ctx = c;
+    const ts = [f.H.id, f.A.id];
+    const tg = [c.tag, c.ctag].concat(f.derby ? [mTag(f.derby.replace(/^the /i, '')).slice(0, 22)] : []);
+    const base = { ts, mk: f.key, tg, c: f.comp, ph: 'post' };
+    const big = f.nw >= 72;
+    const sc = { h: f.H.id, a: f.A.id, hs: f.hs, as: f.as, pk: c.penScore || null };
+    const virality = 0.6 + f.nw / 55;
+    const ov = mOverlay(f, c);
+    const coreLine = mx(mFresh(mS(f, 'core'), 'core:' + f.story), c);
+    const created = {};
+
+    // 1 — FullTime Live scoreline
+    const scLine = f.goals.length ? ' | ⚽ ' + c.scorers : '';
+    mkPost(batch, 'ftl', 'res', 'FT | ' + c.Hf + ' ' + c.H + ' ' + c.hg + '-' + c.ag + ' ' + c.A + ' ' + c.Af + (c.penScore ? ' (pens ' + c.penScore + ')' : '') + scLine, Object.assign({}, base, { dt: 0, sc, v: virality * 0.8, im: f.isFinal ? 3 : 0 }));
+
+    // 2 — Breaking Ball
+    if (tier >= 2) {
+      const pre = mx('{?🚨 BREAKING:|🚨 JUST IN:|⚡ NEWS:|🔴 UPDATE:|📢 LATEST:}', c);
+      const p = mkPost(batch, 'bn', 'news', pre + ' ' + coreLine + (ov && mChance(0.6) ? ' ' + ov : ''), Object.assign({}, base, { dt: mInt(1, 5), v: virality * 1.4, im: f.nw >= 78 ? 3 : 1, sc }));
+      created.bn = p;
+    }
+    // 3 — club desks
+    if (tier >= 2) {
+      const wt = f.winSide === 'away' ? f.A : f.H;
+      const dw = mClubDesk(wt);
+      const deskTxt = f.winSide
+        ? mx('{?FULL TIME:|FT:|✅ Final whistle:} {W} {wscore} {L}. {?Three points in the bag.|What a performance, lads.|Thank you for the support.|Proud of that.} {?🔥|💪|🙌|✊}', c)
+        : mx('{?FULL TIME:|FT:} {H} {score} {A}. {?A point to take away.|We go again.|On to the next one.} {?🤝|💙|⚽}', c);
+      mkPost(batch, dw, 'tw', deskTxt, Object.assign({}, base, { dt: mInt(4, 22), v: 1 + mFame(wt) }));
+      if (tier >= 3 && f.winSide) {
+        const lt = f.winSide === 'away' ? f.H : f.A;
+        mkPost(batch, mClubDesk(lt), 'tw', mx('{?FULL TIME:|FT:} {H} {score} {A}. {?We go again.|Not the result we wanted — we will be back.|Thanks to the fans who travelled.|Heads up. Work starts tomorrow.}', c), Object.assign({}, base, { dt: mInt(8, 40), v: 0.9 }));
+      }
+    }
+    // 4 — fans
+    const nFans = tier >= 3 ? mInt(5, 7) : tier === 2 ? 3 : 1;
+    const slots = mShuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    for (let i = 0; i < nFans; i++) {
+      const kind = (i === 0) ? 'W' : (i === 1) ? 'L' : mPick(['W', 'L', 'N', 'N', 'R']);
+      const sideW = f.winSide || mPick(['home', 'away']);
+      const side = kind === 'W' ? sideW : kind === 'L' ? (sideW === 'home' ? 'away' : 'home') : mPick(['home', 'away']);
+      const team = (kind === 'N' || kind === 'R') ? null : (side === 'home' ? f.H : f.A);
+      const acct = mFan(team, 's' + slots[i], kind === 'R' ? 'banter' : null);
+      const txt = mFanText(f, c, side, acct, kind === 'N' || kind === 'R');
+      const p = mkPost(batch, acct, 'tw', txt, Object.assign({}, base, { dt: mInt(3, 140), v: 0.8 + mR() * 1.6 }));
+      if (i < 2 && tier >= 3) mgReplies(p, f, c, mInt(1, 3));
+    }
+    // 5 — meme page
+    if (tier >= 3 || (tier === 2 && mChance(0.55))) {
+      const p = mkPost(batch, 'viral', 'meme', mx(mFresh(mS(f, 'meme'), 'meme:' + f.story), c), Object.assign({}, base, { dt: mInt(8, 70), v: virality * 1.5 }));
+      if (tier >= 3) mgReplies(p, f, c, mInt(3, 5));
+    }
+    // 6 — tabloid
+    if (tier >= 2) {
+      const hd = mx(mFresh(mS(f, 'punny'), 'pun:' + f.story), c);
+      if (tier >= 3) {
+        const body = mgTabloidBody(f, c);
+        mkPost(batch, 'gaffe', 'art', hd, Object.assign({}, base, { dt: mInt(20, 90), h: hd, b: body, by: mPick(MEDIA_BYLINES.gaffe), v: virality, im: big ? 2 : 1 }));
+      } else mkPost(batch, 'gaffe', 'news', hd, Object.assign({}, base, { dt: mInt(12, 80), v: virality }));
+    }
+    if (tier < 3) return;
+
+    // ---- tier 3 extras --------------------------------------------------------------------------------
+    // TV bulletin with studio panel
+    const situ = mSitu(f.story);
+    const banKey = (f.story === 'upset' || f.story === 'thrashing') ? 'banner_shock' : (/late|comeback|hattrick|shootout|goalfest/.test(f.story)) ? 'banner_drama' : 'banner_result';
+    const introKey = banKey === 'banner_shock' ? 'intro_shock' : banKey === 'banner_drama' ? 'intro_drama' : f.winSide ? 'intro_win' : 'intro_draw';
+    const panel = mPanel(f, c);
+    const an = [mx(mFresh(MB_TV.open, 'tv:open'), c), mx(mFresh(MB_TV[introKey], 'tv:' + introKey), c)];
+    if (ov) an.push(ov);
+    an.push(mx(mFresh(MB_TV.close, 'tv:close'), c));
+    const tick = [c.Hf + ' ' + c.Hs + ' ' + c.hg + '-' + c.ag + ' ' + c.As + ' ' + c.Af];
+    const tvPost = mkPost(batch, 'asc', 'tv', coreLine, Object.assign({}, base, {
+      dt: mInt(20, 45), v: virality * 1.2, im: big ? 3 : 1, sc,
+      ban: mFresh(MB_TV[banKey], 'tv:' + banKey), show: mFresh(MB_TV.show_post, 'tv:show'), an, pn: panel, tick
+    }));
+    // broadsheet article
+    {
+      const hd = mx(mFresh(mS(f, 'formal'), 'for:' + f.story), c);
+      const body = mgBroadsheetBody(f, c);
+      mkPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: mInt(40, 120), h: hd, b: body, by: mPick(MEDIA_BYLINES.meridian), v: 0.9, im: big ? 2 : 1 }));
+    }
+    // stats / tactics / radio / video
+    mkPost(batch, 'statbook', 'stat', mgStatLine(f, c), Object.assign({}, base, { dt: mInt(10, 50), v: 0.9 }));
+    mkPost(batch, 'tac', 'take', mx(mFresh(mS(f, 'tac'), 'tac:' + f.story), c), Object.assign({}, base, { dt: mInt(40, 100) }));
+    if (mChance(0.75)) mkPost(batch, 'terrace', 'take', mx(mFresh(mS(f, 'radio'), 'rad:' + f.story), c), Object.assign({}, base, { dt: mInt(60, 130) }));
+    mkPost(batch, 'fanvoices', 'vid', mx(mFresh(mS(f, 'vid'), 'vid:' + f.story), c), Object.assign({}, base, { dt: mInt(90, 220), vid: { vw: mInt(40000, 1800000) * (0.3 + f.nw / 60) | 0, dur: mInt(3, 14) + ':' + String(mInt(0, 59)).padStart(2, '0') }, v: 1.2 }));
+    // VAR / ref
+    if (f.cards.length) {
+      const q = mx('{?VAR check:|Officials:|Decision review:} {red} ({redTeam}) sent off in the {redMin}th minute. {?The right call — clear and obvious.|Debatable, but within the laws.|A harsh sanction in my view.|Verdict: red card stands.}', c);
+      mkPost(batch, 'refwatch', 'take', q, Object.assign({}, base, { dt: mInt(15, 70), v: 1.1 }));
+    }
+    // injuries
+    f.injuries.slice(0, 2).forEach(inj => {
+      const cc = Object.assign({}, c, { inj: inj.name, injS: mSur(inj.name), injType: inj.type, injOut: inj.out, injTeam: mTeamName(inj.side === 'home' ? f.H : f.A) });
+      const bank = inj.sev === 'Severe' || inj.sev === 'Major' ? MB_INJURY.severe.concat(MB_INJURY.bn) : MB_INJURY.bn;
+      mkPost(batch, 'bn', 'news', mx(mFresh(bank, 'inj:bn'), cc), Object.assign({}, base, { dt: mInt(10, 60), v: 1.1, im: inj.sev === 'Severe' ? 3 : 0 }));
+      mkPost(batch, mFan(inj.side === 'home' ? f.H : f.A, 'inj' + mInt(0, 9)), 'tw', mx(mFresh(MB_INJURY.fan, 'inj:fan'), cc), Object.assign({}, base, { dt: mInt(20, 150) }));
+    });
+    // milestones
+    (f.miles || []).slice(0, 2).forEach(ml => {
+      const mc = Object.assign({}, c, { player: ml.name, playerS: mSur(ml.name), n: ml.n, team: mTeamName(ml.side === 'home' ? f.H : f.A) });
+      const bank = ml.kind === 'goals' ? MB_MILESTONE.goals : MB_MILESTONE.seasonGoals;
+      mkPost(batch, 'statbook', 'stat', mx(mFresh(bank, 'mile:' + ml.kind), mc), Object.assign({}, base, { dt: mInt(10, 60), im: ml.kind === 'goals' && ml.n >= 100 ? 3 : 1 }));
+      mkPost(batch, mFan(ml.side === 'home' ? f.H : f.A, 'mil' + mInt(0, 9)), 'tw', mx(mFresh(MB_MILESTONE.fan, 'mile:fan'), mc), Object.assign({}, base, { dt: mInt(15, 100) }));
+    });
+    // MOTM poll
+    if (f.top && f.top.length >= 3) {
+      const opts = f.top.map((t, i) => ({ t: t.name, w: Math.max(1, t.r - 5) * (1.4 - i * 0.2) * (0.7 + mR() * 0.8) }));
+      const sum = opts.reduce((s, x) => s + x.w, 0);
+      let left = 100;
+      const poll = { q: 'Man of the Match: ' + c.H + ' ' + c.score + ' ' + c.A, o: opts.map((o, i) => { const v = i === opts.length - 1 ? left : Math.round(o.w / sum * 100); left -= v; return { t: o.t, v: Math.max(0, v) }; }), n: mInt(8000, 220000) };
+      mkPost(batch, 'ftl', 'poll', 'Your Man of the Match? Vote below 👇', Object.assign({}, base, { dt: mInt(20, 45), poll, v: 0.9 }));
+    }
+    if (created.bn) mgReplies(created.bn, f, c, mInt(3, 5));
+    if (tvPost) mgReplies(tvPost, f, c, mInt(2, 4));
+    return c;
+  }
+
+  // ---- article bodies ---------------------------------------------------------------------------------------------------------------------
+  function mgStandings(f) { return ''; }
+
+  function mgTabloidBody(f, c) {
+    const lead = f.winSide
+      ? mx('{?Scenes at {stadium}!|You could not make it up.|Talk about a night to remember.|What a night.} {W} {?came out on top|won it|were the better side} against {L}, {wscore}.', c)
+      : mx('{?Neither side could find a winner.|It was all square at the end.} {H} and {A} share the points: {score}.', c);
+    const mid = f.goals.length ? mx('{?On target for {W}:|The goals:} {scorers}.', c) : 'Not a single goal to show for it.';
+    const tail = c.motmS ? mx('{?The man of the match? {motmS}.|{motmS} was {?brilliant|unplayable|simply the best} on the night.} ' + (f.cards.length ? '{redS} {?will want to forget his night|saw red}.' : '{?Fans will talk about this for weeks.|Wait till you see the reaction.}'), c) : '';
+    return [lead + ' ' + mid, tail].filter(Boolean);
+  }
+  function mgBroadsheetBody(f, c) {
+    const p1 = f.winSide
+      ? mx('{W} won {wscore} in the {comp}{stageTxt}, with {motmS} setting the tone. {shW} shots to {shL} and {possW}% of the possession told the broad story, though the xG ({xgW} to {xgL}) suggests the margin {?was fair|flattered one side|was close}.', Object.assign({ stageTxt: f.stage ? ' (' + f.stage + ')' : '' }, c))
+      : mx('{H} and {A} drew {score} in the {comp}. With {xgH} xG to {xgA} and {shH} shots to {shA}, neither side could claim to have been the better team.', c);
+    const para2 = [];
+    if (f.deficit >= 1 && f.winSide) para2.push(mx('{W} had to come from {deficit} down, a {?display of resilience|testament to their squad depth}.', c));
+    if (f.cards.length) para2.push(mx('{redS}\'s dismissal in the {redMin}th minute changed the shape of the afternoon for {redTeam}.', c));
+    if (f.streakKind && c.streakN) para2.push(mx('{streakWho} now have {streakN} ' + ({ win: 'straight wins', lose: 'straight defeats', unbeaten: 'unbeaten', winless: 'matches without a win' })[f.streakKind] + ' to their name.', c));
+    if (f.prev) para2.push(mx('The previous meeting between the sides ended {lastMeeting}.', c));
+    if (!para2.length) para2.push(mx('{?The manager will take positives from the performance.|Both managers will have plenty to analyse.|The details of the second half will keep analysts busy.}', c));
+    return [p1, para2.join(' ')];
+  }
+
+  function mgStatLine(f, c) {
+    const opts = [];
+    opts.push(c.H + ' ' + c.xgH + ' xG – ' + c.xgA + ' xG ' + c.A + '. Shots ' + c.shH + '-' + c.shA + ', possession ' + c.possH + '%-' + c.possA + '%.');
+    if (f.derby) opts.push(f.derby.charAt(0).toUpperCase() + f.derby.slice(1) + ': ' + c.H + ' ' + c.score + ' ' + c.A + '. Head-to-head in this save: ' + (f.prev ? (f.prev.n + 1) + ' meetings.' : 'first meeting.'));
+    if (f.topScorer && f.topScorer.n >= 2) opts.push(f.topScorer.name + ' has scored ' + f.topScorer.n + ' in this match — involved in ' + Math.round(f.topScorer.n / Math.max(1, f.tot) * 100) + '% of the match\'s goals.');
+    if (f.streakKind && c.streakN) opts.push(c.streakWho + ': ' + c.streakN + ' ' + ({ win: 'straight wins', lose: 'straight defeats', unbeaten: 'matches unbeaten', winless: 'matches without a win' })[f.streakKind] + '.');
+    if (f.winGoal) opts.push('Decisive goal: ' + mSur(f.winGoal.name) + ' at ' + f.winGoal.min + "'. " + c.W + ' went on to win ' + c.wscore + '.');
+    if (f.gk && f.gk.saves >= 5) opts.push(c.gk + ': ' + c.saves + ' saves — the most in the match.');
+    return mPick(opts);
+  }
+
+  // ---- queue hook (called from endMatch) --------------------------------------------------------------------------------------------------------------
+  function mediaOnMatchComplete(m) {
+    if (!m || m._mediaDone) return;
+    m._mediaDone = true;
+    ensureMedia();
+    const f = mediaBuildFacts(m);
+    mediaUpdateMemory(f);
+    _mediaQueue.push(f);
+    mediaScheduleFlush();
+  }
+
+
+  // ==========================================================================
+  // APEX MEDIA CENTRE — previews, world events, flush, hooks
+  // ==========================================================================
+  const MEDIA_REF_SURNAMES = ['Okonkwo', 'Lindqvist', 'Marek', 'Alvarado', 'Whitcombe', 'Tanabe', 'Haddad', 'Kowalczyk', 'Bernardi', 'Mbeki', 'Oyelaran', 'Stavros', 'Delacroix', 'Sorensen'];
+
+  function mAsTeam(x) { if (!x) return null; if (typeof x === 'string') return getTeam(x); if (x.id && (x.players || x.name)) return x.players ? x : (getTeam(x.id) || x); return null; }
+
+  function mFormLetters(team) {
+    const log = (typeof teamMatchLog !== 'undefined' && teamMatchLog[team.id]) || [];
+    const l = log.slice(0, 5).map(e => { const sf = Array.isArray(e) ? e[2] : e.sf, sa = Array.isArray(e) ? e[3] : e.sa; return sf > sa ? 'W' : sf < sa ? 'L' : 'D'; });
+    return l.join('') || '—';
+  }
+  function mFormText(team) {
+    const r = (mediaState && mediaState.run[team.id]) || null;
+    if (!r) return '';
+    if (r.w >= 3) return 'won ' + r.w + ' in a row';
+    if (r.l >= 3) return 'lost ' + r.l + ' straight';
+    if (r.u >= 5) return 'unbeaten in ' + r.u;
+    if (r.nw >= 4) return 'winless in ' + r.nw;
+    return '';
+  }
+  function mKeyPlayers(team) {
+    const out = [], miss = [];
+    (team.players || []).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, 14).forEach(p => {
+      const inj = injuryBook[p.id], sus = suspensionBook[p.id];
+      if (inj && inj.matchesLeft > 0) miss.push(p.name + ' (' + inj.type + ')');
+      else if (sus && sus.matchesLeft > 0) miss.push(p.name + ' (suspended)');
+      else if (!(p.pos || []).includes('GK') || out.length === 0) out.push(p);
+    });
+    const gk = (team.players || []).filter(p => (p.pos || []).includes('GK')).sort((a, b) => (b.ovr || 0) - (a.ovr || 0))[0];
+    return { key: out.slice(0, 2), miss, gk };
+  }
+  function mPredScore(pr) {
+    const d = pr.pH - pr.pA;
+    const fav = d >= 0 ? 'h' : 'a', ad = Math.abs(d);
+    let f, u;
+    if (ad > 28) { f = mPick([3, 3, 2, 4]); u = mPick([0, 0, 1]); }
+    else if (ad > 10) { f = mPick([2, 2, 1, 3]); u = mPick([0, 1, 1]); }
+    else { f = mPick([1, 2, 2, 1]); u = mPick([1, 1, 0, 2]); }
+    return fav === 'h' ? f + '-' + u : u + '-' + f;
+  }
+  function mFindLeagueComp(H, A) {
+    try {
+      if (!season) return null;
+      const comps = Object.values(season.leagues || {}).concat(season.ucl ? [season.ucl] : []);
+      return comps.find(c => c.table && c.table.some(r => r.team.id === H.id) && c.table.some(r => r.team.id === A.id)) || null;
+    } catch (e) { return null; }
+  }
+
+  // ---- preview ------------------------------------------------------------------------------------------------
+  function mgPreview(batch, H, A, o, level) {
+    o = o || {};
+    const hn = mTeamName(H), an = mTeamName(A);
+    const kh = mKeyPlayers(H), ka = mKeyPlayers(A);
+    const pr = mProb(mTeamOvr(H), mTeamOvr(A));
+    const derby = mFindDerby(H, A);
+    const comp = o.comp || 'Friendly';
+    const c = {
+      H: hn, A: an, Hs: H.short || hn, As: A.short || an, Hf: H.flag || '', Af: A.flag || '', comp, stage: o.stage || comp,
+      when: batch.when || '', md: o.md || '', pH: pr.pH, pD: pr.pD, pA: pr.pA,
+      formH: mFormLetters(H), formA: mFormLetters(A), derbyName: derby || '',
+      keyH: kh.key[0] ? mSur(kh.key[0].name) : hn, keyA: ka.key[0] ? mSur(ka.key[0].name) : an,
+      gkH: kh.gk ? mSur(kh.gk.name) : 'the keeper', gkA: ka.gk ? mSur(ka.gk.name) : 'the keeper',
+      pred: mPredScore(pr), xgPredH: (1.1 + pr.pH / 60).toFixed(1), xgPredA: (1.1 + pr.pA / 60).toFixed(1)
+    };
+    const fav = pr.pH >= pr.pA ? 'H' : 'A';
+    c.fav = fav === 'H' ? hn : an; c.dog = fav === 'H' ? an : hn; c.favS = fav === 'H' ? c.Hs : c.As; c.dogS = fav === 'H' ? c.As : c.Hs;
+    let sty = (t) => { try { const s = getManagerPlaystyle(t); return (s && s.name) || (typeof s === 'string' ? s : '') || (t.manager && t.manager.playstyle) || ''; } catch (e) { return (t.manager && t.manager.playstyle) || ''; } };
+    c.styleH = sty(H) || 'balanced'; c.styleA = sty(A) || 'balanced';
+    c.style = c.styleH + ' v ' + c.styleA;
+    try { c.fmH = pickTeamFormation(H); c.fmA = pickTeamFormation(A); } catch (e) { c.fmH = '4-3-3'; c.fmA = '4-3-3'; }
+    c.tacHook = mFresh(MB_PRE.tacHook, 'pre:hook'); c.pressH = mFresh(MB_PRE.pressH, 'pre:pH'); c.pressA = mFresh(MB_PRE.pressA, 'pre:pA');
+    c.formLine = mx(mFresh(MB_PRE.formLine, 'pre:fl'), c); c.keyLine = mx(mFresh(MB_PRE.keyLine, 'pre:kl'), c);
+    const missAll = kh.miss.concat(ka.miss);
+    c.missLine = missAll.length ? 'Without ' + missAll.slice(0, 3).join(', ') + '.' : '';
+    c.ref = mPick(MEDIA_FIRST) + ' ' + mPick(MEDIA_REF_SURNAMES); c.refNote = mFresh(MB_PRE.refNote, 'pre:ref');
+    // stakes
+    let stakes = '';
+    const lc = mFindLeagueComp(H, A);
+    if (derby) stakes = mx(mFresh(MB_PRE.stakes_derby, 'pre:sd'), c);
+    else if (o.stage && /final|round|quarter|semi/i.test(o.stage)) { c.stage = o.stage; stakes = mx(mFresh(MB_PRE.stakes_cup, 'pre:sc'), c); }
+    else if (lc && lc.table) {
+      const tb = sortedTable(lc.table), n = tb.length;
+      const ph = tb.findIndex(r => r.team.id === H.id) + 1, pa = tb.findIndex(r => r.team.id === A.id) + 1;
+      c.posH = mOrd(ph); c.posA = mOrd(pa); c.leadS = tb[0].team.short || mTeamName(tb[0].team); c.dropS = tb[n - 1].team.short || mTeamName(tb[n - 1].team);
+      if (lc.rounds && lc.currentRound > 3) {
+        if (Math.min(ph, pa) <= 3 && Math.max(ph, pa) <= 6) stakes = mx(mFresh(MB_PRE.stakes_title, 'pre:st'), c);
+        else if (Math.min(ph, pa) >= n - 4) stakes = mx(mFresh(MB_PRE.stakes_relegation, 'pre:sr'), c);
+        else if (Math.max(ph, pa) <= 8) stakes = mx(mFresh(MB_PRE.stakes_europe, 'pre:se'), c);
+      }
+      if (lc.rounds && lc.currentRound > 3) c.formLine += ' ' + c.Hs + ' ' + c.posH + ', ' + c.As + ' ' + c.posA + '.';
+    }
+    if (!stakes) stakes = mx(mFresh(MB_PRE.stakes_generic, 'pre:sg'), c);
+    c.stakes = stakes;
+    const ts = [H.id, A.id], tg = [mTag(c.Hs) + mTag(c.As).slice(1), MEDIA_COMP_TAGS[comp] || mTag(comp)];
+    const base = { ts, tg, c: comp, ph: 'pre', mk: o.key };
+    const virality = 0.7 + (mFame(H) + mFame(A)) * 0.8 + (derby ? 0.8 : 0) + (o.live ? 0.6 : 0);
+    const dtp = () => -mInt(20, 600);
+    const full = level === 'full';
+
+    mkPost(batch, 'bn', 'pre', mx(mFresh(MB_PRE.core, 'pre:core'), c), Object.assign({}, base, { dt: dtp(), v: virality, im: o.live || derby ? 1 : 0 }));
+    if (full) {
+      mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_PRE.odds, 'pre:odds'), c), Object.assign({}, base, { dt: dtp() }));
+      mkPost(batch, 'tac', 'take', mx(mFresh(MB_PRE.tac, 'pre:tac'), c), Object.assign({}, base, { dt: dtp() }));
+      const hd = mx(mFresh(MB_PRE.meridian, 'pre:mer'), c);
+      mkPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: dtp(), h: hd, by: mPick(MEDIA_BYLINES.meridian), b: [mx('{H} ({fmH}, {styleH}) meet {A} ({fmA}, {styleA}). {formLine} {keyLine}', c), mx('{?The key question is who controls midfield.|Set pieces and second balls may decide it.|Whoever scores first changes the complexion of the game.|Space in behind could be the story.} {missLine}', c)] }));
+      mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_PRE.gaffe, 'pre:gaf'), c), Object.assign({}, base, { dt: dtp(), v: virality }));
+      // TV preview with pundit predictions
+      const byLens = mPundits();
+      const lenses = mShuffle(['hardman', 'analyst', 'attacker', 'oldschool', 'data']).slice(0, 3);
+      const pn = lenses.map(l => {
+        const cc = Object.assign({}, c, { pred: mPredScore(pr) });
+        return { p: byLens[l], x: mx(mFresh(MB_PUNDIT[l].pre, 'pn:pre' + l), cc) };
+      });
+      mkPost(batch, 'asc', 'tv', mx(mFresh(MB_PRE.core, 'pre:core2'), c), Object.assign({}, base, {
+        dt: dtp(), v: virality, ban: mFresh(MB_TV.banner_pre, 'tv:bp'), show: mFresh(MB_TV.show_pre, 'tv:sp'),
+        an: [mx('Welcome to the build-up: {H} v {A} in the {comp}.', c), c.stakes, mx('{?Our panel has made its predictions.|Let us hear what the studio thinks.}', c)], pn, tick: [c.Hf + ' ' + c.Hs + ' v ' + c.As + ' ' + c.Af]
+      }));
+      mkPost(batch, 'terrace', 'take', mx(mFresh(MB_PRE.radio, 'pre:rad'), c), Object.assign({}, base, { dt: dtp() }));
+      mkPost(batch, 'fanvoices', 'vid', mx(mFresh(MB_PRE.vid, 'pre:vid'), c), Object.assign({}, base, { dt: dtp(), vid: { vw: mInt(30000, 900000), dur: mInt(4, 12) + ':' + String(mInt(0, 59)).padStart(2, '0') } }));
+      if (c.missLine) mkPost(batch, mClubDesk(mChance(0.5) ? H : A), 'tw', mx(mFresh(MB_PRE.teamnews, 'pre:tn'), c), Object.assign({}, base, { dt: -mInt(10, 120) }));
+      mkPost(batch, 'refwatch', 'take', mx(mFresh(MB_PRE.var, 'pre:var'), c), Object.assign({}, base, { dt: -mInt(10, 90) }));
+      // prediction poll
+      const pv = [pr.pH, pr.pD, pr.pA].map(v => Math.max(4, Math.round(v * (0.75 + mR() * 0.5))));
+      const ps = pv[0] + pv[1] + pv[2];
+      const pp = pv.map(v => Math.round(v / ps * 100)); pp[2] = 100 - pp[0] - pp[1];
+      mkPost(batch, 'ftl', 'poll', mx(mFresh(MB_PRE.poll_q, 'pre:pq'), c), Object.assign({}, base, { dt: dtp(), poll: { q: c.H + ' v ' + c.A, o: [{ t: c.H + ' win', v: pp[0] }, { t: 'Draw', v: pp[1] }, { t: c.A + ' win', v: Math.max(0, pp[2]) }], n: mInt(5000, 150000) } }));
+    } else if (mChance(0.5)) mkPost(batch, 'tac', 'take', mx(mFresh(MB_PRE.tac, 'pre:tac'), c), Object.assign({}, base, { dt: dtp() }));
+    // fans & memes
+    const nF = full ? 5 : 2;
+    for (let i = 0; i < nF; i++) {
+      const kind = i === 0 ? 'H' : i === 1 ? 'A' : mPick(['H', 'A', 'N', 'N']);
+      const team = kind === 'H' ? H : kind === 'A' ? A : null;
+      const acct = mFan(team, 'p' + mInt(0, 400), kind === 'N' ? null : null);
+      const cc = Object.assign({}, c, { pred: mPredScore(pr) });
+      const bank = kind === 'H' ? MB_PRE.fanH : kind === 'A' ? MB_PRE.fanA : MB_PRE.fanN;
+      mkPost(batch, acct, 'tw', mVoice(mx(mFresh(bank, 'pre:fan' + kind), cc), acct.m), Object.assign({}, base, { dt: dtp(), v: 0.8 + mR() * 1.4 }));
+    }
+    if (full) mkPost(batch, 'viral', 'meme', mx(mFresh(MB_PRE.meme, 'pre:meme'), c), Object.assign({}, base, { dt: dtp(), v: virality * 1.2 }));
+    return c;
+  }
+
+  // ---- upcoming fixtures collector -----------------------------------------------------------------------------------
+  function mCollectUpcoming() {
+    const out = [];
+    const add = (h, a, comp, stage, md) => { const H = mAsTeam(h), A = mAsTeam(a); if (H && A) out.push({ H, A, comp, stage: stage || '', md: md || '' }); };
+    try {
+      if (season) {
+        Object.values(season.leagues || {}).forEach(c => { if (!c.finished && c.rounds && c.rounds[c.currentRound]) c.rounds[c.currentRound].filter(f => !f.played).forEach(f => add(f.home, f.away, c.name, '', c.currentRound + 1)); });
+        const u = season.ucl;
+        if (u && !u.finished) {
+          if (u.stage === 'league' && u.rounds[u.currentRound]) u.rounds[u.currentRound].filter(f => !f.played).forEach(f => add(f.home, f.away, u.name, '', u.currentRound + 1));
+          else if (u.knockout && u.knockout[u.stage] && u.knockout[u.stage].fixtures) u.knockout[u.stage].fixtures.filter(f => !f.played).forEach(f => add(f.home, f.away, u.name, ({ qf: 'Quarter-final', sf: 'Semi-final', final: 'Final' })[u.stage]));
+        }
+        Object.values(season.cups || {}).forEach(c => { if (!c.finished && c.rounds && c.rounds[c.currentRound]) c.rounds[c.currentRound].filter(f => !f.played).forEach(f => add(f.home, f.away, c.name, c.roundName)); });
+      }
+      if (typeof tournament !== 'undefined' && tournament && !tournament.champion) {
+        const cn = tournament.competitionName || 'World Cup';
+        (tournament.fixtures || []).filter(f => !f.played).slice(0, 6).forEach(f => add(f.home, f.away, cn, 'Group stage'));
+        if (tournament.rounds && tournament.rounds[tournament.currentRound]) tournament.rounds[tournament.currentRound].filter(f => !f.played).forEach(f => add(f.home, f.away, cn, '', (tournament.currentRound || 0) + 1));
+        (tournament.knockout || []).forEach(r => (r.matches || []).filter(x => !x.played && x.home && x.away).forEach(x => add(x.home, x.away, cn, r.name || 'Knockout')));
+      }
+    } catch (e) {}
+    return out;
+  }
+  function mFixtureWeight(x) {
+    let w = mFame(x.H) + mFame(x.A);
+    if (mFindDerby(x.H, x.A)) w += 1;
+    if (/final|semi|quarter/i.test(x.stage)) w += 0.8;
+    if (typeof careerTeamId !== 'undefined' && careerTeamId && (x.H.id === careerTeamId || x.A.id === careerTeamId)) w += 3;
+    return w + mR() * 0.4;
+  }
+
+  // ---- trophies, awards, season ------------------------------------------------------------------------------------------------
+  const MEDIA_MAJOR_AWARDS = ["Ballon d'Or", 'Golden Ball', 'Puskás Award', 'Yashin Trophy', 'Gerd Müller Award', 'Golden Glove', 'Golden Boot'];
+
+  function mgTrophy(batch, ev) {
+    const t = ev.team; if (!t || !t.id) return;
+    const nm = mTeamName(t);
+    const c = { team: nm, teamS: t.short || nm, trophy: ev.name, year: (ev.extra && ev.extra.year) || '', mgr: t.manager ? t.manager.name : '', mgrS: t.manager ? mSur(t.manager.name) : '' };
+    const base = { ts: [t.id], tg: [mTag(t.short || nm), (MEDIA_COMP_TAGS[ev.name] || mTag(ev.name)), '#Champions'], c: ev.name, ph: 'ev', im: 3 };
+    mkPost(batch, 'bn', 'news', mx(mFresh(MB_TROPHY.bn, 'tr:bn'), c), Object.assign({}, base, { dt: 0, v: 2.2 }));
+    mkPost(batch, 'gaffe', 'art', mx(mFresh(MB_TROPHY.gaffe, 'tr:gf'), c), Object.assign({}, base, { dt: 8, v: 1.6, h: mx(mFresh(MB_TROPHY.gaffe, 'tr:gf2'), c), b: [mx('{team} are {trophy} champions and the celebrations have already started.', c), mx('{?Fans poured onto the streets.|The squad celebrated long into the night.|The cabinet has a new occupant.}', c)], by: mPick(MEDIA_BYLINES.gaffe) }));
+    const hd = mx(mFresh(MB_TROPHY.meridian, 'tr:mer'), c);
+    mkPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 40, h: hd, b: [mx('{team} have won the {trophy}, a triumph built on {?consistency|pressing and patience|squad depth|a settled XI|collective nerve}.', c), mx('{?Their manager has carved out a team in his own image.|The question now is whether the core can stay together.|Rivals will study the blueprint.}', c)], by: mPick(MEDIA_BYLINES.meridian) }));
+    const byLens = mPundits();
+    const panel = ['analyst', 'attacker', 'oldschool'].map(l => ({ p: byLens[l], x: mx(({
+      analyst: '{team} earned this: structure, depth and a coach who made the right changes at the right time.',
+      attacker: 'I loved watching {teamS} this season — fearless, fluent, fun. Champions!',
+      oldschool: 'Winners everywhere you look. That dressing room has proper characters.'
+    })[l], c) }));
+    mkPost(batch, 'asc', 'tv', mx('{team} win the {trophy}', c), Object.assign({}, base, { dt: 12, v: 2, ban: mFresh(MB_TV.banner_champs, 'tv:bc'), show: 'Trophy Night Special', an: [mx(mFresh(MB_STUDIO.champs, 'st:ch'), c), mx('Lights, trophy, flares — {team} are the {trophy} champions.', c)], pn: panel, tick: [c.team + ' — ' + c.trophy + ' CHAMPIONS'] }));
+    for (let i = 0; i < 4; i++) { const a = mFan(t, 'c' + mInt(0, 400)); mkPost(batch, a, 'tw', mVoice(mx(mFresh(MB_TROPHY.fan, 'tr:fan'), c), a.m), Object.assign({}, base, { dt: mInt(5, 200), v: 2 + mR() * 2 })); }
+    for (let i = 0; i < 2; i++) { const a = mFan(null, 'rv' + mInt(0, 400), 'banter'); mkPost(batch, a, 'tw', mx(mFresh(MB_TROPHY.rival, 'tr:rv'), c), Object.assign({}, base, { dt: mInt(10, 250), v: 1.2 })); }
+    mkPost(batch, 'viral', 'meme', mx(mFresh(MB_TROPHY.meme, 'tr:meme'), c), Object.assign({}, base, { dt: mInt(10, 80), v: 2 }));
+    mkPost(batch, 'terrace', 'take', mx(MB_TROPHY.radio[0], c), Object.assign({}, base, { dt: mInt(40, 120) }));
+    mkPost(batch, 'fanvoices', 'vid', mx(mFresh(MB_TROPHY.vid, 'tr:vid'), c), Object.assign({}, base, { dt: mInt(60, 240), vid: { vw: mInt(200000, 4000000), dur: mInt(5, 20) + ':' + String(mInt(0, 59)).padStart(2, '0') }, v: 1.6 }));
+    mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_TROPHY.stat, 'tr:st'), c), Object.assign({}, base, { dt: mInt(20, 60) }));
+  }
+
+  function mgAward(batch, ev) {
+    const p = ev.player; if (!p || !p.name) return;
+    const team = p.teamId ? getTeam(p.teamId) : (allTeams.find(t => t.name === p.team) || null);
+    const major = MEDIA_MAJOR_AWARDS.indexOf(ev.name) !== -1;
+    const c = { award: ev.name, winner: p.name, winnerS: mSur(p.name), team: p.team ? p.team.replace(/\s+\d{4}.*$/, '') : '', teamS: team ? (team.short || '') : '', year: (ev.extra && ev.extra.year) ? 'Season ' + ev.extra.year : 'the season', runner: ev.runner || '', runnerS: ev.runner ? mSur(ev.runner) : '', statLine: ev.statLine || 'a standout year' };
+    const base = { ts: team ? [team.id] : [], tg: [mTag(ev.name.replace(/'/g, '')), '#Awards'], c: ev.name, ph: 'ev', im: major ? 3 : 1 };
+    mkPost(batch, 'bn', 'news', mx(mFresh(MB_AWARD.bn, 'aw:bn'), c), Object.assign({}, base, { dt: 0, v: major ? 2 : 1 }));
+    if (!major) { if (team) { const a = mFan(team, 'aw' + mInt(0, 300)); mkPost(batch, a, 'tw', mx(mFresh(MB_AWARD.fan, 'aw:fan'), c), Object.assign({}, base, { dt: mInt(5, 120) })); } return; }
+    mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_AWARD.gaffe, 'aw:gf'), c), Object.assign({}, base, { dt: 6, v: 1.4 }));
+    const hd = mx(mFresh(MB_AWARD.meridian, 'aw:mer'), c);
+    mkPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 30, h: hd, b: [mx('{winner} has been named {award} winner after a campaign that {?never let up|set the standard|defined the season}.', c), c.runner ? mx('{runner} was the closest challenger and many will feel {runnerS} deserved more.', c) : mx('The vote was widely seen as {?deserved|a formality|one of the clearest in years}.', c)], by: mPick(MEDIA_BYLINES.meridian) }));
+    const byLens = mPundits();
+    mkPost(batch, 'asc', 'tv', mx('{winner} wins the {award}', c), Object.assign({}, base, { dt: 10, ban: mFresh(MB_TV.banner_award, 'tv:ba'), show: 'Awards Night Live', an: [mx(mFresh(MB_STUDIO.awards, 'st:aw'), c), mx('{winner} takes home the {award} for {year}.', c)], pn: ['analyst', 'attacker', 'hardman'].map(l => ({ p: byLens[l], x: mx(({ analyst: '{winnerS} was the standout on the numbers, no argument from me.', attacker: 'Joyful, brilliant, decisive — {winnerS} earned it. Absolutely!', hardman: c.runner ? '{runnerS} might feel hard done by but {winnerS} did it when it mattered.' : '{winnerS} stood up when it counted. Deserved.' })[l], c) })), tick: [c.award + ': ' + c.winner] }));
+    for (let i = 0; i < 3; i++) { const a = mFan(team, 'aw' + mInt(0, 300)); mkPost(batch, a, 'tw', mVoice(mx(mFresh(MB_AWARD.fan, 'aw:fan'), c), a.m), Object.assign({}, base, { dt: mInt(5, 200), v: 1.6 })); }
+    if (c.runner) { const a = mFan(null, 'rb' + mInt(0, 300), 'angry'); mkPost(batch, a, 'tw', mVoice(mx(mFresh(MB_AWARD.robbed, 'aw:rob'), c), 'angry'), Object.assign({}, base, { dt: mInt(10, 220), v: 1.8 })); }
+    mkPost(batch, 'viral', 'meme', mx(mFresh(mOk(MB_AWARD.meme, c), 'aw:meme'), c), Object.assign({}, base, { dt: mInt(10, 90), v: 1.6 }));
+    if (c.runner) mkPost(batch, 'terrace', 'take', mx(MB_AWARD.radio[0], c), Object.assign({}, base, { dt: mInt(40, 120) }));
+    mkPost(batch, 'fanvoices', 'vid', mx(mFresh(MB_AWARD.vid, 'aw:vid'), c), Object.assign({}, base, { dt: mInt(60, 200), vid: { vw: mInt(100000, 2500000), dur: mInt(4, 16) + ':' + String(mInt(0, 59)).padStart(2, '0') } }));
+  }
+
+  function mgSeasonStart(batch) {
+    if (!season) return;
+    Object.values(season.leagues || {}).forEach(lg => {
+      const ranked = lg.teams.slice().sort((a, b) => mTeamOvr(b) - mTeamOvr(a));
+      const c = { league: lg.name, favs: ranked.slice(0, 3).map(t => t.short || mTeamName(t)).join(', '), dark: ranked.slice(4, 7).map(t => t.short || mTeamName(t)).join(', ') };
+      const base = { ts: ranked.slice(0, 3).map(t => t.id), tg: [MEDIA_COMP_TAGS[lg.name] || mTag(lg.name), '#NewSeason'], c: lg.name, ph: 'wk', im: 2 };
+      mkPost(batch, 'meridian', 'news', mx(mFresh(MB_CONTEXT.seasonStart, 'cx:ss'), c), Object.assign({}, base, { dt: 0, v: 1.4 }));
+      mkPost(batch, 'asc', 'news', mx('{?🎙️ Season preview:|📺 The new season is here:} {league} — {favs} the ones to beat.', c), Object.assign({}, base, { dt: 4 }));
+      const a = mFan(ranked[mInt(0, 2)], 'ss' + mInt(0, 300), 'delusional');
+      mkPost(batch, a, 'tw', mVoice('New season, same plan: win the ' + lg.name + '. ' + mPick(['No pressure.', 'Believe.', 'Not a drop of doubt.']), a.m), Object.assign({}, base, { dt: mInt(5, 120), im: 0 }));
+    });
+  }
+  function mgSeasonEnd(batch) {
+    if (!season) return;
+    Object.values(season.leagues || {}).forEach(lg => {
+      if (!lg.champion) return;
+      const c = { league: lg.name, champ: mTeamName(lg.champion) };
+      mkPost(batch, 'meridian', 'news', mx(mFresh(MB_CONTEXT.seasonEnd, 'cx:se'), c), { ts: [lg.champion.id], tg: [MEDIA_COMP_TAGS[lg.name] || mTag(lg.name), '#SeasonReview'], c: lg.name, ph: 'ev', im: 2, dt: 30 });
+    });
+  }
+
+  // ---- league context posts ------------------------------------------------------------------------------------------------------------------
+  function mgLeagueContext(batch, compName, matches, bulk) {
+    const lg = season && Object.values(season.leagues || {}).find(l => l.name === compName);
+    const tag = MEDIA_COMP_TAGS[compName] || mTag(compName);
+    // round-up
+    if (matches.length >= 3 && (!bulk || mChance(0.5))) {
+      const res = matches.slice(0, 10).map(f => (f.H.short || mTeamName(f.H)) + ' ' + f.hs + '-' + f.as + ' ' + (f.A.short || mTeamName(f.A))).join(' | ');
+      mkPost(batch, 'ftl', 'res', mx(mFresh(MB_CONTEXT.roundup, 'cx:ru'), { league: compName, results: res }), { tg: [tag], c: compName, ph: 'wk', dt: 5, v: 0.9 });
+    }
+    // team of the week
+    if (matches.length >= 5 && (!bulk || mChance(0.35))) {
+      const all = [];
+      matches.forEach(f => (f.top || []).forEach(t => all.push(t)));
+      all.sort((a, b) => b.r - a.r);
+      const seen = {}; const pick = [];
+      all.forEach(t => { if (!seen[t.id] && pick.length < 7) { seen[t.id] = 1; pick.push(t); } });
+      const names = pick.map(t => t.name + ' (' + ((getTeam(t.t) || {}).short || '') + ') ' + t.r.toFixed(1)).join(', ');
+      mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_CONTEXT.totw, 'cx:totw'), { league: compName, names }), { tg: [tag, '#TOTW'], c: compName, ph: 'wk', dt: 25, ts: pick.map(t => t.t) });
+    }
+    if (!lg || bulk) return;
+    const tb = sortedTable(lg.table), n = tb.length, left = lg.rounds.length - lg.currentRound;
+    if (lg.currentRound >= 4 && n >= 4) {
+      const lead = tb[0], sec = tb[1], gap = lead.pts - sec.pts;
+      const c = { league: compName, leadS: lead.team.short || mTeamName(lead.team), secondS: sec.team.short || mTeamName(sec.team), gap, left, leadPts: lead.pts };
+      mkPost(batch, 'bn', 'news', mx(mFresh(gap <= 3 ? MB_CONTEXT.title_tight : MB_CONTEXT.title, 'cx:t'), c), { tg: [tag, '#TitleRace'], c: compName, ph: 'wk', dt: 10, ts: [lead.team.id, sec.team.id], v: 1.1, im: left <= 5 ? 2 : 0 });
+      const dr = tb.slice(-3), c2 = { league: compName, dropS: dr[2].team.short || mTeamName(dr[2].team), gapSafe: Math.max(0, tb[n - 4].pts - dr[2].pts), left, drop3: dr.map(r => r.team.short || mTeamName(r.team)).join(', ') };
+      mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_CONTEXT.relegation, 'cx:r'), c2), { tg: [tag, '#Relegation'], c: compName, ph: 'wk', dt: 20, ts: dr.map(r => r.team.id) });
+      const sc = lg.stats && lg.stats.goals ? Object.values(lg.stats.goals).sort((a, b) => b.count - a.count).slice(0, 4) : [];
+      if (sc.length >= 3) mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_CONTEXT.scorers, 'cx:sc'), { league: compName, names: sc.map(s => s.name + ' ' + s.count).join(', ') }), { tg: [tag, '#GoldenBoot'], c: compName, ph: 'wk', dt: 30 });
+      const fanT = mChance(0.5) ? lead.team : sec.team;
+      const a = mFan(fanT, 'tr' + mInt(0, 300));
+      mkPost(batch, a, 'tw', mVoice(mx('{?Title race is ON.|Nerves already.|Every single point matters now.} {leadS} {?lead the way|are setting the pace}, but {secondS} {?will not go away|are right behind}.', c), a.m), { tg: [tag, '#TitleRace'], c: compName, ph: 'wk', dt: mInt(15, 90), ts: [fanT.id] });
+    }
+  }
+
+  // ---- crises, rumours, calendar -----------------------------------------------------------------------------------------------------------------
+  function mgSackWatch(batch, t, n) {
+    const nm = mTeamName(t), c = { team: nm, mgrS: t.manager ? mSur(t.manager.name) : 'the manager', n };
+    const base = { ts: [t.id], tg: [mTag(t.short || nm), '#SackWatch'], ph: 'wk' };
+    mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_CRISIS.sackwatch.gaffe, 'cr:gf'), c), Object.assign({}, base, { dt: 10, v: 1.3 }));
+    const hd = mx(mFresh(MB_CRISIS.sackwatch.meridian, 'cr:mer'), c);
+    mkPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 40, h: hd, by: mPick(MEDIA_BYLINES.meridian), b: [mx('{team} have lost {n} in a row and the pressure on {mgrS} is growing.', c), mx('{?Supporters are split between patience and demands for change.|The board is said to be watching closely.|The next fixture looks pivotal.}', c)] }));
+    for (let i = 0; i < 2; i++) { const a = mFan(t, 'sw' + mInt(0, 300)); mkPost(batch, a, 'tw', mVoice(mx(mFresh(i ? MB_CRISIS.sackwatch.defend : MB_CRISIS.sackwatch.fan, 'cr:fan' + i), c), a.m), Object.assign({}, base, { dt: mInt(10, 160), v: 1.4 })); }
+    mkPost(batch, 'viral', 'meme', mx(mFresh(MB_CRISIS.sackwatch.meme, 'cr:meme'), c), Object.assign({}, base, { dt: mInt(10, 80), v: 1.3 }));
+    mkPost(batch, 'terrace', 'take', mx(MB_CRISIS.sackwatch.radio[0], c), Object.assign({}, base, { dt: mInt(40, 100) }));
+    mkPost(batch, 'fanvoices', 'vid', mx(mFresh(MB_CRISIS.sackwatch.vid, 'cr:vid'), c), Object.assign({}, base, { dt: mInt(60, 160), vid: { vw: mInt(50000, 900000), dur: mInt(5, 14) + ':' + String(mInt(0, 59)).padStart(2, '0') } }));
+  }
+  function mgInjuryCrisis(batch, t, list) {
+    const nm = mTeamName(t), c = { team: nm, n: list.length, names: list.slice(0, 3).map(p => p.playerName).join(', ') };
+    const base = { ts: [t.id], tg: [mTag(t.short || nm), '#InjuryCrisis'], ph: 'wk' };
+    mkPost(batch, 'bn', 'news', mx(mFresh(MB_CRISIS.injury_crisis.core, 'ic:c'), c), Object.assign({}, base, { dt: 5, v: 1.1 }));
+    mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_CRISIS.injury_crisis.gaffe, 'ic:g'), c), Object.assign({}, base, { dt: 20 }));
+    const a = mFan(t, 'ic' + mInt(0, 300)); mkPost(batch, a, 'tw', mVoice(mx(mFresh(MB_CRISIS.injury_crisis.fan, 'ic:f'), c), a.m), Object.assign({}, base, { dt: mInt(10, 120) }));
+  }
+  function mgRumor(batch, teams) {
+    const pool = teams.filter(t => t && t.players && t.players.length);
+    if (pool.length < 2) return;
+    const fromT = mPick(pool);
+    const star = (fromT.players || []).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, 4);
+    const P = mPick(star); if (!P) return;
+    const candidates = pool.filter(t => t.id !== fromT.id && mTeamOvr(t) >= mTeamOvr(fromT) - 2);
+    const toT = candidates.length ? mPick(candidates) : mPick(pool.filter(t => t.id !== fromT.id));
+    if (!toT) return;
+    ensureMedia();
+    const stage = Math.min(3, (mediaState.rumors[P.id] || 0));
+    mediaState.rumors[P.id] = stage >= 3 ? 0 : stage + 1;
+    const keys = Object.keys(mediaState.rumors); if (keys.length > 150) delete mediaState.rumors[keys[0]];
+    const c = { player: P.name, playerS: mSur(P.name), from: mTeamName(fromT), fromS: fromT.short || mTeamName(fromT), to: mTeamName(toT), toS: toT.short || mTeamName(toT), fee: mPick(MB_RUMOR.fees) };
+    const base = { ts: [fromT.id, toT.id], tg: [mTag(c.playerS), '#TransferNews'], ph: 'wk' };
+    mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.ferrante[stage], 'ru:f' + stage), c), Object.assign({}, base, { dt: 0, v: 1.8 + stage * 0.3, im: stage === 3 ? 3 : 1 }));
+    mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_RUMOR.gaffe, 'ru:g'), c), Object.assign({}, base, { dt: 12, v: 1.2 }));
+    const a1 = mFan(fromT, 'ru' + mInt(0, 300)), a2 = mFan(toT, 'ru' + mInt(0, 300));
+    mkPost(batch, a1, 'tw', mVoice(mx(mFresh(MB_RUMOR.fan_from, 'ru:ff'), c), a1.m), Object.assign({}, base, { dt: mInt(10, 120), v: 1.5 }));
+    mkPost(batch, a2, 'tw', mVoice(mx(mFresh(MB_RUMOR.fan_to, 'ru:ft'), c), a2.m), Object.assign({}, base, { dt: mInt(10, 120), v: 1.5 }));
+    if (stage < 2 && mChance(0.5)) mkPost(batch, mClubDesk(fromT), 'tw', mx(mFresh(MB_RUMOR.deny, 'ru:d'), c), Object.assign({}, base, { dt: mInt(30, 100) }));
+    if (mChance(0.5)) mkPost(batch, 'viral', 'meme', mx(mFresh(MB_RUMOR.meme, 'ru:m'), c), Object.assign({}, base, { dt: mInt(15, 90) }));
+  }
+  function mgDebate(batch) {
+    const top = Object.values((stats && stats.goals) || {}).sort((a, b) => b.count - a.count).slice(0, 4);
+    if (top.length < 2) return;
+    const [a, b] = mShuffle(top).slice(0, 2);
+    const c = { a: a.name, b: b.name };
+    const x = Math.round(35 + mR() * 30);
+    mkPost(batch, mChance(0.5) ? 'terrace' : 'viral', 'poll', mx(mFresh(MB_CONTEXT.debate, 'cx:deb'), c), { tg: ['#Debate'], ph: 'wk', dt: 5, v: 1.3, poll: { q: 'Better striker?', o: [{ t: a.name, v: x }, { t: b.name, v: 100 - x }], n: mInt(9000, 180000) } });
+  }
+  function mgCalendar(batch) {
+    if (!season) return;
+    let mo; try { mo = computeSeasonMonth(season); } catch (e) { return; }
+    ensureMedia();
+    if (mediaState.lastMonth === mo) return;
+    const prev = mediaState.lastMonth; mediaState.lastMonth = mo;
+    const line = MB_CONTEXT.calendar[mo]; if (!line) return;
+    mkPost(batch, mChance(0.5) ? 'asc' : 'viral', 'news', '📅 ' + mo + ': ' + mPick(line), { tg: ['#' + mo], ph: 'wk', dt: 0 });
+    if (mo === 'August' || mo === 'January') mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.windowOpen, 'ru:wo'), { n: mInt(6, 14), leagueSet: 'top five leagues' }), { tg: ['#TransferWindow'], ph: 'wk', dt: 3, v: 1.8, im: 1 });
+    if ((mo === 'September' || mo === 'February') && prev) mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.windowClose, 'ru:wc'), {}), { tg: ['#DeadlineDay'], ph: 'wk', dt: 3, v: 2, im: 2 });
+  }
+
+  // ---- flush ------------------------------------------------------------------------------------------------------------------------------------------
+  function mediaScheduleFlush() {
+    if (_mediaFlushTimer) return;
+    _mediaFlushTimer = setTimeout(function () {
+      _mediaFlushTimer = null;
+      try { mediaFlush(); } catch (e) { console.warn('Media flush failed', e); }
+    }, 0);
+  }
+
+  function mediaFlush() {
+    ensureMedia();
+    const q = _mediaQueue; _mediaQueue = [];
+    const evs = _mediaEventQueue; _mediaEventQueue = [];
+    if (!q.length && !evs.length) return;
+    const now = Date.now();
+    const anyLive = q.some(f => f.live);
+    const bulk = (now - _mediaLastFlushAt) < 2500 && !anyLive;
+    _mediaLastFlushAt = now;
+    const batch = mBatch(mWhenLabel());
+
+    // tiering
+    q.sort((a, b) => b.nw - a.nw);
+    const k3 = bulk ? 1 : 4, k2 = bulk ? 2 : 6, k1 = bulk ? 0 : 4;
+    let n3 = 0, n2 = 0, n1 = 0;
+    q.forEach(f => {
+      if (f.live || f.careerInvolved || (n3 < k3 && f.nw >= 46)) { f.tier = 3; n3++; }
+      else if (n2 < k2 && f.nw >= 30) { f.tier = 2; n2++; }
+      else if (n1 < k1 && f.nw >= 20) { f.tier = 1; n1++; }
+      else f.tier = 0;
+    });
+    q.forEach(f => { if (f.tier > 0) { try { mgCoverage(batch, f, f.tier); } catch (e) { console.warn('Media coverage error', e); } } });
+
+    // world layer
+    const byComp = {};
+    q.forEach(f => { (byComp[f.comp] = byComp[f.comp] || []).push(f); });
+    Object.keys(byComp).forEach(cn => { try { mgLeagueContext(batch, cn, byComp[cn], bulk); } catch (e) { console.warn(e); } });
+    const teams = []; const seenT = {};
+    q.forEach(f => [f.H, f.A].forEach(t => { if (!seenT[t.id]) { seenT[t.id] = 1; teams.push(t); } }));
+    if (!bulk || mChance(0.15)) {
+      teams.forEach(t => { const r = mediaState.run[t.id]; if (r && r.l >= 4 && mChance(0.6)) { try { mgSackWatch(batch, t, r.l); } catch (e) {} } });
+      const injCount = {};
+      Object.keys(injuryBook || {}).forEach(pid => { const r = injuryBook[pid]; if (r && r.matchesLeft > 0) (injCount[r.teamName] = injCount[r.teamName] || []).push(r); });
+      teams.forEach(t => { const l = injCount[t.name]; if (l && l.length >= 3 && mChance(0.3)) { try { mgInjuryCrisis(batch, t, l); } catch (e) {} } });
+    }
+    if (teams.length >= 2 && mChance(bulk ? 0.1 : 0.5)) { try { mgRumor(batch, teams); } catch (e) { console.warn(e); } }
+    if (!bulk && mChance(0.25)) { try { mgDebate(batch); } catch (e) {} }
+    try { mgCalendar(batch); } catch (e) {}
+    if (!bulk && q.length >= 4 && mChance(0.5)) {
+      const tg = q.reduce((s, f) => s + f.tot, 0);
+      mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_CONTEXT.statWave, 'cx:sw'), { fact: tg + ' goals in ' + q.length + ' matches (' + (tg / q.length).toFixed(2) + ' per game).' }), { ph: 'wk', dt: 15 });
+    }
+
+    // events (trophies / awards / season)
+    const isMajor = ev => ev.kind !== 'award' || MEDIA_MAJOR_AWARDS.indexOf(ev.name) !== -1;
+    const evPick = evs.filter(isMajor).slice(0, 8).concat(evs.filter(e => !isMajor(e)).slice(0, 3));
+    evPick.forEach(ev => {
+      try {
+        if (ev.kind === 'trophy') mgTrophy(batch, ev);
+        else if (ev.kind === 'award') mgAward(batch, ev);
+        else if (ev.kind === 'seasonStart') mgSeasonStart(batch);
+        else if (ev.kind === 'seasonEnd') mgSeasonEnd(batch);
+      } catch (e) { console.warn('Media event error', e); }
+    });
+
+    // upcoming fixtures hype
+    try {
+      const ups = mCollectUpcoming();
+      if (ups.length) {
+        ups.forEach(x => { x.w = mFixtureWeight(x); });
+        ups.sort((a, b) => b.w - a.w);
+        const lim = bulk ? 1 : 3;
+        const chosen = ups.slice(0, lim);
+        const career = ups.find(x => typeof careerTeamId !== 'undefined' && careerTeamId && (x.H.id === careerTeamId || x.A.id === careerTeamId));
+        if (career && chosen.indexOf(career) === -1) chosen.push(career);
+        chosen.forEach((x, i) => { if (!bulk || i === 0) mgPreview(batch, x.H, x.A, { comp: x.comp, stage: x.stage, md: x.md }, i === 0 && !bulk ? 'full' : 'mid'); });
+      }
+    } catch (e) { console.warn('Media preview error', e); }
+
+    mCommit(batch);
+    mediaSave();
+    try { if (anyLive) { const lf = q.find(f => f.live); renderPostMatchMedia(batch.seq, lf && lf.key); } } catch (e) {}
+    try { if (document.getElementById('view-media') && document.getElementById('view-media').classList.contains('active')) renderMediaView(); } catch (e) {}
+  }
+
+  // Live match kickoff: immediate full preview + buzz card.
+  function mediaOnKickoff(m) {
+    if (!m || !m.home || !m.away) return;
+    ensureMedia();
+    const cm = mMatchComp();
+    const batch = mBatch(mWhenLabel());
+    mgPreview(batch, m.home.team, m.away.team, { comp: cm.name, stage: cm.stage, md: cm.md, live: true, key: 'k' + Date.now().toString(36) }, 'full');
+    mCommit(batch);
+    mediaSave();
+    try { renderLiveBuzz(batch.seq); } catch (e) {}
+  }
+
+  function mediaOnTrophy(name, teamObj, type, extra) {
+    ensureMedia();
+    _mediaEventQueue.push({ kind: 'trophy', name, team: (teamObj && teamObj.id) ? teamObj : null, type, extra });
+    mediaScheduleFlush();
+  }
+  function mediaOnAward(name, playerObj, type, extra) {
+    ensureMedia();
+    const ev = { kind: 'award', name, player: playerObj, type, extra };
+    try {
+      if (name === "Ballon d'Or" && typeof computeBallonRanking === 'function') {
+        const r = computeBallonRanking(stats) || [];
+        const other = r.find(x => x && x.name && x.name !== playerObj.name);
+        if (other) ev.runner = other.name;
+      }
+      const g = stats.goals && stats.goals[playerObj.id];
+      const as = stats.assists && stats.assists[playerObj.id];
+      if (g || as) ev.statLine = (g ? g.count + ' goals' : '') + (g && as ? ', ' : '') + (as ? as.count + ' assists' : '');
+    } catch (e) {}
+    _mediaEventQueue.push(ev);
+    mediaScheduleFlush();
+  }
+  function mediaOnSeasonEvent(kind) {
+    ensureMedia();
+    _mediaEventQueue.push({ kind });
+    mediaScheduleFlush();
+  }
+
+
+  // ==========================================================================
+  // APEX MEDIA CENTRE — Media tab UI
+  // ==========================================================================
+  let mediaTabId = 'feed';
+  let mediaFilterTeam = '';
+  let mediaFilterKind = 'all';
+  let mediaFilterTag = '';
+  let mediaShown = 40;
+  const mediaOpenThreads = new Set();
+  const mediaOpenArticles = new Set();
+
+  const MEDIA_KIND_FILTERS = [
+    ['all', 'All'], ['scores', 'Scores'], ['previews', 'Previews'], ['news', 'News'],
+    ['social', 'Fans & takes'], ['transfers', 'Transfers'], ['events', 'Awards & trophies']
+  ];
+
+  function mUserView(u) {
+    if (typeof u === 'string') {
+      if (MEDIA_OUTLETS[u]) { const o = MEDIA_OUTLETS[u]; return { name: o.name, handle: o.handle, avatar: o.icon, color: o.color, verified: o.verified, outlet: true }; }
+      if (u.indexOf('p:') === 0) { const p = MEDIA_PUNDITS[u.slice(2)]; if (p) return { name: p.name, handle: p.role, avatar: p.icon, color: p.color, verified: true, outlet: true }; }
+      return { name: u, handle: '', avatar: '👤', color: '#64748b' };
+    }
+    return { name: u.n, handle: u.h, avatar: u.a, color: u.c || '#64748b', verified: !!u.v };
+  }
+  function mTimeLabel(p) {
+    const w = p.w ? p.w + ' · ' : '';
+    if (p.ph === 'pre') { const m = Math.abs(p.dt); return w + 'KO −' + (m >= 90 ? Math.round(m / 60) + 'h' : m + 'm'); }
+    if (p.ph === 'post') return w + (p.dt <= 0 ? 'FT' : p.dt < 90 ? 'FT +' + p.dt + 'm' : 'FT +' + Math.round(p.dt / 60) + 'h');
+    if (p.ph === 'ev') return w + 'Just in';
+    return w + 'Matchday';
+  }
+  function mHighlight(esc) {
+    return esc.replace(/(^|\s)(#[A-Za-z0-9_]+)/g, '$1<span class="mp-tag" onclick="App.mediaTag(\'$2\')">$2</span>').replace(/(^|\s)(@[A-Za-z0-9_]+)/g, '$1<span class="mp-at">$2</span>');
+  }
+  function mMark(id, size) {
+    const t = id ? getTeam(id) : null;
+    return t ? teamMark(t, size || 22) : '';
+  }
+
+  function mScoreCard(sc) {
+    const H = getTeam(sc.h), A = getTeam(sc.a);
+    if (!H || !A) return '';
+    return '<div class="mp-score"><span class="mp-sc-t">' + teamMark(H, 24) + '<b>' + mEsc(mTeamName(H)) + '</b></span>' +
+      '<span class="mp-sc-n">' + sc.hs + ' - ' + sc.as + (sc.pk ? '<small> (' + mEsc(sc.pk) + ' pens)</small>' : '') + '</span>' +
+      '<span class="mp-sc-t away"><b>' + mEsc(mTeamName(A)) + '</b>' + teamMark(A, 24) + '</span></div>';
+  }
+  function mPollHtml(poll) {
+    return '<div class="mp-poll"><div class="mp-poll-q">' + mEsc(poll.q) + '</div>' + poll.o.map(o =>
+      '<div class="mp-poll-row"><div class="mp-poll-bar" style="width:' + o.v + '%"></div><span>' + mEsc(o.t) + '</span><b>' + o.v + '%</b></div>').join('') +
+      '<div class="mp-poll-n">' + mFmt(poll.n) + ' votes · poll closed</div></div>';
+  }
+
+  function mPostHtml(p, compact) {
+    const u = mUserView(p.u);
+    const open = mediaOpenThreads.has(p.id);
+    const text = mHighlight(mEsc(p.x));
+    let extra = '';
+    if (p.sc) extra += mScoreCard(p.sc);
+    if (p.poll) extra += mPollHtml(p.poll);
+    if (p.k === 'art' && p.h) {
+      const o = mediaOpenArticles.has(p.id);
+      extra += '<div class="mp-article" onclick="App.mediaToggleArticle(' + p.id + ')"><div class="mp-art-h">' + mEsc(p.h) + '</div>' +
+        (p.by ? '<div class="mp-art-by">By ' + mEsc(p.by) + '</div>' : '') +
+        (o && p.b ? p.b.map(b => '<p>' + mEsc(b) + '</p>').join('') : '<div class="mp-art-more">Tap to read ▾</div>') + '</div>';
+    }
+    if (p.k === 'vid' && p.vid) {
+      extra += '<div class="mp-video"><div class="mp-play">▶</div><div class="mp-vid-meta"><b>' + mEsc(p.x) + '</b><span>' + mFmt(p.vid.vw) + ' views · ' + mEsc(p.vid.dur) + '</span></div></div>';
+    }
+    if (p.k === 'tv' && p.ban) {
+      extra += '<div class="mp-tvmini"><span class="mp-tv-live">' + mEsc(p.ban) + '</span><span>' + mEsc(p.show || '') + '</span><a onclick="App.mediaTab(\'tv\')">Watch ▸</a></div>';
+    }
+    const replies = (open && p.r && p.r.length) ? '<div class="mp-thread">' + p.r.map(r => {
+      const ru = mUserView(r.u);
+      return '<div class="mp-reply"><div class="mp-av sm" style="background:' + ru.color + '">' + ru.avatar + '</div><div><div class="mp-rhead"><b>' + mEsc(ru.name) + '</b> <span>' + mEsc(ru.handle) + '</span></div><div>' + mHighlight(mEsc(r.x)) + '</div><div class="mp-ract">❤️ ' + mFmt(r.l || 0) + '</div></div></div>';
+    }).join('') + '</div>' : '';
+    const teams = (p.ts || []).slice(0, 2).map(id => mMark(id, 16)).join('');
+    return '<article class="mp' + (p.im >= 3 ? ' big' : '') + (compact ? ' compact' : '') + '" data-pid="' + p.id + '">' +
+      '<div class="mp-av" style="background:' + u.color + '">' + u.avatar + '</div>' +
+      '<div class="mp-main"><div class="mp-head"><b>' + mEsc(u.name) + '</b>' + (u.verified ? ' <span class="mp-ver" title="Verified">✔</span>' : '') +
+      ' <span class="mp-handle">' + mEsc(u.handle) + '</span><span class="mp-time">· ' + mEsc(mTimeLabel(p)) + '</span>' + (p.c ? '<span class="mp-comp">' + mEsc(p.c) + '</span>' : '') + '<span class="mp-teams">' + teams + '</span></div>' +
+      '<div class="mp-text">' + (p.k === 'vid' ? '🎥 ' : '') + ((p.k === 'tv' || (p.k === 'art' && p.h)) ? '' : text) + '</div>' + extra +
+      '<div class="mp-acts"><span onclick="App.mediaToggleThread(' + p.id + ')" class="mp-act' + (p.r && p.r.length ? ' has' : '') + '">💬 ' + mFmt(p.rp) + '</span><span class="mp-act">🔁 ' + mFmt(p.rt) + '</span><span class="mp-act">❤️ ' + mFmt(p.l) + '</span><span class="mp-act">📊 ' + mFmt(p.vw) + '</span></div>' +
+      replies + '</div></article>';
+  }
+
+  function mFilteredPosts() {
+    let list = mediaAllPosts();
+    if (mediaFilterTeam) list = list.filter(p => (p.ts || []).indexOf(mediaFilterTeam) !== -1);
+    if (mediaFilterTag) list = list.filter(p => (p.tg || []).indexOf(mediaFilterTag) !== -1 || (p.x || '').indexOf(mediaFilterTag) !== -1);
+    const k = mediaFilterKind;
+    if (k === 'scores') list = list.filter(p => p.k === 'res' || p.k === 'poll');
+    else if (k === 'previews') list = list.filter(p => p.ph === 'pre');
+    else if (k === 'news') list = list.filter(p => ['news', 'art', 'tv', 'stat'].indexOf(p.k) !== -1);
+    else if (k === 'social') list = list.filter(p => ['tw', 'meme', 'vid', 'take'].indexOf(p.k) !== -1);
+    else if (k === 'transfers') list = list.filter(p => p.k === 'rumor');
+    else if (k === 'events') list = list.filter(p => p.ph === 'ev');
+    return list;
+  }
+
+  function mSideColumn() {
+    const tr = mediaTrending(8);
+    const outs = Object.keys(MEDIA_OUTLETS).map(id => MEDIA_OUTLETS[id]);
+    return '<div class="mc-side">' +
+      '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">🔥 Trending</div>' +
+      (tr.length ? tr.map((t, i) => '<div class="mc-trend" onclick="App.mediaTag(\'' + t.tag + '\')"><small>' + (i + 1) + ' · Trending</small><b>' + mEsc(t.tag) + '</b><small>' + mFmt(t.posts) + ' posts</small></div>').join('') : '<p class="mc-empty">Nothing trending yet.</p>') + '</div>' +
+      '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">📡 Outlets</div>' +
+      outs.slice(0, 8).map(o => '<div class="mc-out"><div class="mp-av sm" style="background:' + o.color + '">' + o.icon + '</div><div><b>' + mEsc(o.name) + '</b>' + (o.verified ? ' <span class="mp-ver">✔</span>' : '') + '<small>' + mEsc(o.handle) + ' · ' + mFmt(o.followers) + '</small></div></div>').join('') + '</div></div>';
+  }
+
+  function mTvHtml() {
+    const tvs = mediaAllPosts().filter(p => p.k === 'tv');
+    if (!tvs.length) return '<div class="empty-state"><div class="icon">📺</div><p>No broadcasts yet — play or simulate a match and the studio goes live.</p></div>';
+    const cur = tvs[0];
+    const ticks = []; mediaAllPosts().filter(p => p.tick || p.k === 'res').slice(0, 14).forEach(p => { if (p.tick) ticks.push(p.tick[0]); else ticks.push(p.x.split('|')[0].replace(/^FT\s*\|?\s*/, '')); });
+    const panel = (cur.pn || []).map(b => { const pu = MEDIA_PUNDITS[b.p] || {}; return '<div class="tv-pundit"><div class="mp-av" style="background:' + (pu.color || '#64748b') + '">' + (pu.icon || '🎙️') + '</div><div class="tv-bubble"><b>' + mEsc(pu.name || '') + '</b><small>' + mEsc(pu.role || '') + '</small><p>' + mEsc(b.x) + '</p></div></div>'; }).join('');
+    let h = '<div class="tv-screen"><div class="tv-top"><span class="tv-live">● LIVE</span><b>' + mEsc(MEDIA_OUTLETS.asc.name) + '</b><span class="tv-show">' + mEsc(cur.show || '') + '</span></div>' +
+      (cur.sc ? '<div class="tv-sc">' + mScoreCard(cur.sc) + '</div>' : '') +
+      '<div class="tv-banner"><span>' + mEsc(cur.ban || 'NEWS') + '</span>' + mEsc(cur.x) + '</div>' +
+      '<div class="tv-anchor">' + (cur.an || []).map(a => '<p>🎙️ ' + mEsc(a) + '</p>').join('') + '</div>' +
+      '<div class="tv-panel">' + panel + '</div>' +
+      '<div class="tv-ticker"><div class="tv-ticker-in">' + (ticks.concat(ticks)).map(t => '<span>' + mEsc(t) + '</span>').join('') + '</div></div></div>';
+    if (tvs.length > 1) {
+      h += '<div class="card-title" style="margin:18px 0 8px;font-size:0.95rem">Earlier broadcasts</div>' + tvs.slice(1, 9).map(p =>
+        '<div class="tv-prev"><span class="mp-tv-live">' + mEsc(p.ban || '') + '</span><b>' + mEsc(p.show || '') + '</b> — ' + mEsc(p.x) + '</div>').join('');
+    }
+    return h;
+  }
+
+  function mNewsHtml() {
+    const arts = mFilteredPosts().filter(p => p.k === 'art' && p.h);
+    if (!arts.length) return '<div class="empty-state"><div class="icon">📰</div><p>No articles yet — results make headlines.</p></div>';
+    return '<div class="mn-grid">' + arts.slice(0, mediaShown).map(p => {
+      const o = typeof p.u === 'string' ? MEDIA_OUTLETS[p.u] : null;
+      const kind = o ? o.kind : 'paper';
+      return '<article class="mn-card mn-' + kind + '"><div class="mn-mast" style="border-color:' + (o ? o.color : '#94a3b8') + '"><span>' + (o ? o.icon + ' ' + mEsc(o.name) : '') + '</span><small>' + mEsc(mTimeLabel(p)) + (p.c ? ' · ' + mEsc(p.c) : '') + '</small></div>' +
+        '<h3>' + mEsc(p.h) + '</h3>' + (p.sc ? mScoreCard(p.sc) : '') +
+        (p.b || []).map(b => '<p>' + mEsc(b) + '</p>').join('') +
+        '<div class="mn-by">' + (p.by ? 'By ' + mEsc(p.by) : '') + ' <span>❤️ ' + mFmt(p.l) + ' · 💬 ' + mFmt(p.rp) + '</span></div></article>';
+    }).join('') + '</div>';
+  }
+
+  function renderMediaView() {
+    const el = document.getElementById('media-content');
+    if (!el) return;
+    ensureMedia();
+    document.querySelectorAll('.mc-tab').forEach(b => b.classList.toggle('active', b.dataset.mtab === mediaTabId));
+    const all = mediaAllPosts();
+    const sum = document.getElementById('media-summary');
+    if (sum) sum.textContent = all.length + ' posts · ' + mediaState.seq + ' broadcasts & updates';
+    // filters
+    const teamIds = {}; all.forEach(p => (p.ts || []).forEach(id => { teamIds[id] = (teamIds[id] || 0) + 1; }));
+    const opts = Object.keys(teamIds).map(id => { const t = getTeam(id); return t ? { id, n: mTeamName(t) } : null; }).filter(Boolean).sort((a, b) => a.n.localeCompare(b.n));
+    const fb = document.getElementById('media-filters');
+    const fKey = opts.map(o => o.id).join(',') + '|' + mediaFilterTeam + '|' + mediaFilterKind + '|' + mediaFilterTag;
+    if (fb && fb.dataset.fkey !== fKey) {
+      fb.dataset.fkey = fKey;
+      fb.innerHTML = '<select onchange="App.mediaFilter(\'team\',this.value)" aria-label="Filter by team"><option value="">All teams</option>' + opts.map(o => '<option value="' + mEsc(o.id) + '"' + (o.id === mediaFilterTeam ? ' selected' : '') + '>' + mEsc(o.n) + '</option>').join('') + '</select>' +
+        '<select onchange="App.mediaFilter(\'kind\',this.value)" aria-label="Filter by type">' + MEDIA_KIND_FILTERS.map(k => '<option value="' + k[0] + '"' + (k[0] === mediaFilterKind ? ' selected' : '') + '>' + k[1] + '</option>').join('') + '</select>' +
+        (mediaFilterTag ? '<button class="btn btn-secondary btn-sm" onclick="App.mediaTag(\'\')">✕ ' + mEsc(mediaFilterTag) + '</button>' : '');
+    }
+    let html;
+    if (mediaTabId === 'tv') html = mTvHtml();
+    else if (mediaTabId === 'news') html = mNewsHtml();
+    else if (mediaTabId === 'trending') html = mSideColumn();
+    else {
+      const list = mFilteredPosts();
+      html = list.length
+        ? '<div class="mc-layout"><div class="mc-feed">' + list.slice(0, mediaShown).map(p => mPostHtml(p)).join('') +
+          (list.length > mediaShown ? '<div style="text-align:center;margin:14px"><button class="btn btn-secondary btn-sm" onclick="App.mediaMore()">Load more</button></div>' : '') + '</div>' + mSideColumn() + '</div>'
+        : '<div class="empty-state"><div class="icon">📡</div><p>' + (all.length ? 'Nothing matches these filters.' : 'The news desk is quiet. Play or simulate a match — headlines, fan reactions, TV and transfer gossip appear here.') + '</p></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function mediaTab(id) { mediaTabId = id; mediaShown = 40; renderMediaView(); }
+  function mediaFilter(kind, v) { if (kind === 'team') mediaFilterTeam = v; else mediaFilterKind = v; mediaShown = 40; renderMediaView(); }
+  function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (mediaTabId === 'trending') mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
+  function mediaMore() { mediaShown += 40; renderMediaView(); }
+  function mediaToggleThread(id) { if (mediaOpenThreads.has(id)) mediaOpenThreads.delete(id); else mediaOpenThreads.add(id); renderMediaView(); }
+  function mediaToggleArticle(id) { if (mediaOpenArticles.has(id)) mediaOpenArticles.delete(id); else mediaOpenArticles.add(id); renderMediaView(); }
+  function mediaClear() {
+    if (!confirm('Clear the whole media feed? Results and stats are not affected.')) return;
+    mediaClearAll(); toast('Media feed cleared');
+  }
+
+  // Cards inside the Match view ---------------------------------------------------------------------------------------
+  function mCardPosts(seq, key, phase, n) {
+    return mediaAllPosts().filter(p => p.s === seq && (key ? (p.mk === key || phase === 'pre') : true) && (phase ? p.ph === phase : true) && p.k !== 'tv' && p.k !== 'poll')
+      .sort((a, b) => (b.im - a.im) || (b.l - a.l)).slice(0, n);
+  }
+  function renderLiveBuzz(seq) {
+    const el = document.getElementById('live-buzz'); if (!el) return;
+    const ps = mCardPosts(seq, null, 'pre', 1000).filter(p => p.k !== 'art' && p.k !== 'vid').slice(0, 3);
+    if (!ps.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = '<div class="card-title" style="font-size:0.95rem">📣 Pre-match buzz <a class="mc-link" onclick="App.switchView(\'media\')">Open Media Centre ▸</a></div>' + ps.map(p => mPostHtml(p, true)).join('');
+  }
+  function renderPostMatchMedia(seq, key) {
+    const el = document.getElementById('post-match-media'); if (!el) return;
+    const ps = mCardPosts(seq, key, 'post', 4);
+    if (!ps.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = '<div class="card-title" style="font-size:0.95rem">📰 Media reaction <a class="mc-link" onclick="App.switchView(\'media\')">Open Media Centre ▸</a></div>' + ps.map(p => mPostHtml(p, true)).join('');
+  }
+
+
   return {
     setRngSeed, getRngSeed,
     init, switchView, goToMatch, goToTournament, selectTournamentFormat, selectTournamentSize, updateTeamPreview,
@@ -21459,7 +24489,8 @@ const PLAYSTYLE_BEHAVIOR = {
     togglePlayersCompareMode, togglePlayerCompare, clearPlayersCompare, openPlayersCompare,
     renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital,
     setCareerTeam, clearCareerTeam, findCareerFixtureDue,
-    manualSubstitute, toggleCareerPanel, applyUserTactic, applyUserFormation, confirmUserSub
+    manualSubstitute, toggleCareerPanel, applyUserTactic, applyUserFormation, confirmUserSub,
+    renderMediaView, mediaTab, mediaFilter, mediaTag, mediaMore, mediaToggleThread, mediaToggleArticle, mediaClear
   };
 })();
 
@@ -21507,7 +24538,7 @@ try { window.App = App; } catch (e) {}
     return `<span class="team-mark" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.82)}px">${f}</span>`;
   }
   function enhanceSelect(select) {
-    if (!select || select.dataset.ssEnhanced || select.closest('.ss-wrap')) return;
+    if (!select || !select.parentNode || select.dataset.ssEnhanced || select.closest('.ss-wrap')) return;
     select.dataset.ssEnhanced = '1';
 
     const wrap = document.createElement('div');
