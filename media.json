@@ -1,0 +1,4249 @@
+{
+ "_comment": "Apex Media Centre content. Edit freely — no rebuild needed when served over http(s). Template syntax: {var} / {var|up|cap|sur|poss|tag} = context value; {?a|b|c} = pick one; [bank] = pick a line from another bank. MEDIA_OUTLETS / MEDIA_PUNDITS are fictional — rename them here. MEDIA_DERBIES: add {a,b,name} entries (lowercase name fragments).",
+ "MEDIA_OUTLETS": {
+  "asc": {
+   "name": "Apex Sports Centre",
+   "handle": "@ApexSportsCentre",
+   "kind": "tv",
+   "icon": "📺",
+   "color": "#e11d48",
+   "followers": 9800000,
+   "verified": true,
+   "bio": "Football 24/7. Live from the Apex studio."
+  },
+  "bn": {
+   "name": "Breaking Ball",
+   "handle": "@BreakingBall",
+   "kind": "wire",
+   "icon": "🚨",
+   "color": "#f59e0b",
+   "followers": 7400000,
+   "verified": true,
+   "bio": "First with the football news. Always."
+  },
+  "ftl": {
+   "name": "FullTime Live",
+   "handle": "@FullTimeLive",
+   "kind": "scores",
+   "icon": "⏱️",
+   "color": "#22c55e",
+   "followers": 5200000,
+   "verified": true,
+   "bio": "Every score. Every league. Every minute."
+  },
+  "meridian": {
+   "name": "The Meridian",
+   "handle": "@MeridianFC",
+   "kind": "paper",
+   "icon": "📰",
+   "color": "#94a3b8",
+   "followers": 2100000,
+   "verified": true,
+   "bio": "Football, considered."
+  },
+  "gaffe": {
+   "name": "The Daily Gaffe",
+   "handle": "@DailyGaffe",
+   "kind": "tabloid",
+   "icon": "🗞️",
+   "color": "#ef4444",
+   "followers": 4600000,
+   "verified": true,
+   "bio": "You read it here first (and often last)."
+  },
+  "statbook": {
+   "name": "StatBook FC",
+   "handle": "@StatBookFC",
+   "kind": "stats",
+   "icon": "📊",
+   "color": "#38bdf8",
+   "followers": 3300000,
+   "verified": true,
+   "bio": "Numbers. Records. Receipts."
+  },
+  "tac": {
+   "name": "Tactics Board",
+   "handle": "@TacticsBoard",
+   "kind": "tactics",
+   "icon": "🧠",
+   "color": "#a78bfa",
+   "followers": 1400000,
+   "verified": false,
+   "bio": "Shapes, triggers and half-spaces."
+  },
+  "terrace": {
+   "name": "TerraceTalk Radio",
+   "handle": "@TerraceTalk",
+   "kind": "radio",
+   "icon": "📻",
+   "color": "#fb923c",
+   "followers": 1900000,
+   "verified": true,
+   "bio": "The phone-in where everyone is an expert."
+  },
+  "viral": {
+   "name": "Footy Viral",
+   "handle": "@FootyViral",
+   "kind": "meme",
+   "icon": "😂",
+   "color": "#f472b6",
+   "followers": 6100000,
+   "verified": false,
+   "bio": "Memes, clips and crimes against football."
+  },
+  "ferrante": {
+   "name": "Luca Ferrante",
+   "handle": "@LucaFerrante",
+   "kind": "insider",
+   "icon": "✍️",
+   "color": "#2dd4bf",
+   "followers": 8800000,
+   "verified": true,
+   "bio": "Transfer insider. Says \"DONE DEAL\" only when it is. Mostly."
+  },
+  "refwatch": {
+   "name": "The VAR Room",
+   "handle": "@TheVARRoom",
+   "kind": "ref",
+   "icon": "🖥️",
+   "color": "#eab308",
+   "followers": 1100000,
+   "verified": false,
+   "bio": "Offside lines, handballs and the rulebook."
+  },
+  "fanvoices": {
+   "name": "Fan Voices TV",
+   "handle": "@FanVoicesTV",
+   "kind": "video",
+   "icon": "🎥",
+   "color": "#60a5fa",
+   "followers": 2700000,
+   "verified": true,
+   "bio": "The terraces, uncensored."
+  },
+  "pubcast": {
+   "name": "The Pub Podcast",
+   "handle": "@ThePubPodcast",
+   "kind": "extra",
+   "icon": "🍻",
+   "color": "#f59e0b",
+   "followers": 1500000,
+   "verified": false,
+   "bio": "Four pints, six opinions, zero tactics.",
+   "extra": true
+  },
+  "retro": {
+   "name": "Retro Football Club",
+   "handle": "@RetroFootballClub",
+   "kind": "extra",
+   "icon": "📼",
+   "color": "#a16207",
+   "followers": 1200000,
+   "verified": false,
+   "bio": "It was better in black-and-white.",
+   "extra": true
+  },
+  "youth": {
+   "name": "Academy Watch",
+   "handle": "@AcademyWatch",
+   "kind": "extra",
+   "icon": "🌱",
+   "color": "#22c55e",
+   "followers": 900000,
+   "verified": false,
+   "bio": "The next generation, early.",
+   "extra": true
+  },
+  "ultras": {
+   "name": "Ultras Voice",
+   "handle": "@UltrasVoice",
+   "kind": "extra",
+   "icon": "📣",
+   "color": "#ef4444",
+   "followers": 1700000,
+   "verified": false,
+   "bio": "Noise from the terraces.",
+   "extra": true
+  },
+  "agent": {
+   "name": "Agent Whispers",
+   "handle": "@AgentWhispers",
+   "kind": "extra",
+   "icon": "🕶️",
+   "color": "#64748b",
+   "followers": 1300000,
+   "verified": false,
+   "bio": "Sources say. Sources always say.",
+   "extra": true
+  },
+  "quiz": {
+   "name": "Footy Facts Daily",
+   "handle": "@FootyFactsDaily",
+   "kind": "extra",
+   "icon": "❓",
+   "color": "#38bdf8",
+   "followers": 1000000,
+   "verified": false,
+   "bio": "Did you know?",
+   "extra": true
+  },
+  "physio": {
+   "name": "The Treatment Room",
+   "handle": "@TreatmentRoomFC",
+   "kind": "extra",
+   "icon": "🩹",
+   "color": "#14b8a6",
+   "followers": 700000,
+   "verified": false,
+   "bio": "Fitness, load, hamstrings.",
+   "extra": true
+  },
+  "sunday": {
+   "name": "Sunday League Legend",
+   "handle": "@SundayLegend",
+   "kind": "extra",
+   "icon": "🥾",
+   "color": "#f472b6",
+   "followers": 2200000,
+   "verified": false,
+   "bio": "Not a professional. Not a pundit. Opinions anyway.",
+   "extra": true
+  },
+  "chant": {
+   "name": "Chant Corner",
+   "handle": "@ChantCorner",
+   "kind": "extra",
+   "icon": "🎶",
+   "color": "#a78bfa",
+   "followers": 800000,
+   "verified": false,
+   "bio": "Songs from the stands.",
+   "extra": true
+  }
+ },
+ "MEDIA_PUNDITS": {
+  "hollis": {
+   "name": "Dave Hollis",
+   "nick": "Big Dave",
+   "role": "Ex-centre-back",
+   "icon": "🧔",
+   "color": "#ef4444",
+   "lens": "hardman"
+  },
+  "clarke": {
+   "name": "Imani Clarke",
+   "nick": "Imani",
+   "role": "Match analyst",
+   "icon": "👩🏾‍🏫",
+   "color": "#38bdf8",
+   "lens": "analyst"
+  },
+  "bastos": {
+   "name": "Rico Bastos",
+   "nick": "Rico",
+   "role": "Ex-striker",
+   "icon": "😎",
+   "color": "#f59e0b",
+   "lens": "attacker"
+  },
+  "whitlock": {
+   "name": "Gary Whitlock",
+   "nick": "Gaz",
+   "role": "Former captain",
+   "icon": "👴🏻",
+   "color": "#a3a3a3",
+   "lens": "oldschool"
+  },
+  "tanaka": {
+   "name": "Dr. Mei Tanaka",
+   "nick": "Dr. Mei",
+   "role": "Data scientist",
+   "icon": "🧪",
+   "color": "#a78bfa",
+   "lens": "data"
+  },
+  "marchetti": {
+   "name": "Sofia Marchetti",
+   "nick": "Sofia",
+   "role": "Ex-goalkeeper",
+   "icon": "🧤",
+   "color": "#34d399",
+   "lens": "keeper"
+  },
+  "adebayo": {
+   "name": "Tunde Adebayo",
+   "nick": "Tunde",
+   "role": "Presenter",
+   "icon": "🎙️",
+   "color": "#f472b6",
+   "lens": "host"
+  }
+ },
+ "MEDIA_PANEL_LENSES": [
+  "hardman",
+  "analyst",
+  "attacker",
+  "oldschool",
+  "data",
+  "keeper"
+ ],
+ "MEDIA_BYLINES": {
+  "meridian": [
+   "Harriet Vance",
+   "Olu Adeyemi",
+   "Tomasz Brandt",
+   "Lucía Ferreyra",
+   "Callum Reid",
+   "Anouk de Wit",
+   "Kofi Mensah",
+   "Ingrid Solheim",
+   "Sunniva Haugen",
+   "Wale Okafor",
+   "Beatrix Lindgren",
+   "Aryan Mehta",
+   "Marguerite Dubois",
+   "Teodor Nilsson"
+  ],
+  "gaffe": [
+   "Mick \"The Pen\" Dunbar",
+   "Sharon Quick",
+   "Reggie Tuft",
+   "Baz Mulligan",
+   "Cheryl Nash",
+   "Ronnie Pike",
+   "Dazza \"Scoop\" Mahoney",
+   "Trixie Bell",
+   "Lenny Quill",
+   "Gerry \"The Headline\" Haines",
+   "Pippa Crank"
+  ],
+  "bn": [
+   "Breaking Ball Desk",
+   "Newsroom Team",
+   "Breaking Ball Reporters",
+   "Breaking Ball Night Desk",
+   "Breaking Ball Live Team"
+  ],
+  "asc": [
+   "Apex Sports Centre Digital",
+   "ASC Newsroom",
+   "ASC Match Desk",
+   "Apex Sports Centre Reporters"
+  ]
+ },
+ "MEDIA_FIRST": [
+  "Marcus",
+  "Aiko",
+  "Diego",
+  "Priya",
+  "Lars",
+  "Tomás",
+  "Chidi",
+  "Yuki",
+  "Ravi",
+  "Sven",
+  "Amara",
+  "Mateo",
+  "Fatima",
+  "Kwame",
+  "Ines",
+  "Luka",
+  "Zara",
+  "Nico",
+  "Hana",
+  "Omar",
+  "Bruno",
+  "Selin",
+  "Jonas",
+  "Kai",
+  "Mila",
+  "Santi",
+  "Ewa",
+  "Idris",
+  "Pablo",
+  "Noor",
+  "Declan",
+  "Rosa",
+  "Thabo",
+  "Elif",
+  "Gus",
+  "Wren",
+  "Dario",
+  "Leila",
+  "Femi",
+  "Anya",
+  "Callum",
+  "Soraya",
+  "Felix",
+  "Imran",
+  "Maeve",
+  "Ty",
+  "Greta",
+  "Hugo",
+  "Nadia",
+  "Rafa",
+  "Anders",
+  "Bashir",
+  "Camila",
+  "Dominic",
+  "Esi",
+  "Farid",
+  "Gaia",
+  "Hiro",
+  "Ilse",
+  "Jamal",
+  "Kaveh",
+  "Leona",
+  "Mateus",
+  "Nadir",
+  "Olivia",
+  "Pavel",
+  "Quincy",
+  "Rhea",
+  "Sami",
+  "Tatiana",
+  "Umar",
+  "Vera",
+  "Wesley",
+  "Xavi",
+  "Yara",
+  "Zeke",
+  "Aleksander",
+  "Bianca",
+  "Cormac",
+  "Dalia",
+  "Emeka",
+  "Freya",
+  "Giorgos",
+  "Halima",
+  "Iker",
+  "Jasmine",
+  "Klaus",
+  "Lucia",
+  "Mehmet",
+  "Oskar",
+  "Petra",
+  "Rashid",
+  "Stella",
+  "Tariq",
+  "Uma",
+  "Viktor",
+  "Wanjiru",
+  "Xiomara",
+  "Yusuf",
+  "Zofia",
+  "Angus",
+  "Bea",
+  "Cyrus",
+  "Delphine",
+  "Ewan",
+  "Fiona",
+  "Gustavo"
+ ],
+ "MEDIA_NOUN": [
+  "Faithful",
+  "Army",
+  "Ultra",
+  "Terrace",
+  "Tunnel",
+  "Daily",
+  "Talk",
+  "Banter",
+  "Stand",
+  "Chants",
+  "Outpost",
+  "Zone",
+  "Lads",
+  "Corner",
+  "Gaffer",
+  "Matchday",
+  "Xtra",
+  "Hub",
+  "Podcast",
+  "Nation",
+  "Squad",
+  "Watch",
+  "Insider",
+  "Takes",
+  "Central",
+  "Til_Death",
+  "4Life",
+  "Oracle",
+  "Hotline",
+  "Diaries",
+  "Rant",
+  "Review",
+  "Wire",
+  "Clips",
+  "Highlights",
+  "Lounge",
+  "Vibes",
+  "Experts",
+  "Dugout",
+  "Bench",
+  "Cabin",
+  "Whistle",
+  "Stadium",
+  "Kit",
+  "Boots",
+  "Scarves",
+  "Nutmeg",
+  "Volley",
+  "Header"
+ ],
+ "MEDIA_AVATAR": [
+  "🧢",
+  "⚽",
+  "🦁",
+  "🐺",
+  "🦅",
+  "🔥",
+  "🐉",
+  "🦊",
+  "🐯",
+  "🦈",
+  "🛡️",
+  "⚔️",
+  "🏟️",
+  "🎺",
+  "🥁",
+  "🍺",
+  "🧣",
+  "👑",
+  "🦍",
+  "🐂",
+  "🦉",
+  "🐻",
+  "🐗",
+  "🐝",
+  "⭐",
+  "🌶️",
+  "🥶",
+  "🦄",
+  "🎽",
+  "🏆",
+  "🥅",
+  "🟨",
+  "🟥",
+  "🧤",
+  "📣",
+  "🎯",
+  "⚡",
+  "🎧",
+  "🧠",
+  "🐢",
+  "🦖",
+  "🎲",
+  "🌊",
+  "🧿",
+  "🦦",
+  "🍀",
+  "🍕",
+  "🚌"
+ ],
+ "MEDIA_NEUTRAL_NOUN": [
+  "Football_Brain",
+  "Neutral",
+  "Tactician",
+  "OnlyBall",
+  "Lurker",
+  "Weekend_Fan",
+  "PitchSide",
+  "ThePundit",
+  "xGnerd",
+  "BallWatcher",
+  "Scoreline",
+  "FootyDad",
+  "LateTackle",
+  "ThirdMan",
+  "Nutmeg",
+  "Armchair_Coach",
+  "Back_Four",
+  "Dugout_Dave",
+  "FullTimeFan",
+  "HalfTimeOrange",
+  "OffsideTrap",
+  "OnlyFootball",
+  "Pundit_Pete",
+  "ShinPad",
+  "StoppageTime",
+  "TheTenthMan",
+  "Touchline",
+  "VARcast",
+  "WingBack"
+ ],
+ "MEDIA_MOODS": [
+  "optimist",
+  "doomer",
+  "delusional",
+  "banter",
+  "tactician",
+  "stat",
+  "wholesome",
+  "angry"
+ ],
+ "MEDIA_DERBIES": [
+  {
+   "a": "real madrid",
+   "b": "barcelona",
+   "name": "El Clásico"
+  },
+  {
+   "a": "real madrid",
+   "b": "atl",
+   "name": "the Madrid Derby"
+  },
+  {
+   "a": "sevilla",
+   "b": "betis",
+   "name": "the Seville Derby"
+  },
+  {
+   "a": "barcelona",
+   "b": "espanyol",
+   "name": "the Barcelona Derby"
+  },
+  {
+   "a": "ac milan",
+   "b": "inter",
+   "name": "the Derby della Madonnina"
+  },
+  {
+   "a": "milan",
+   "b": "inter",
+   "name": "the Derby della Madonnina"
+  },
+  {
+   "a": "inter",
+   "b": "juventus",
+   "name": "the Derby d'Italia"
+  },
+  {
+   "a": "roma",
+   "b": "lazio",
+   "name": "the Derby della Capitale"
+  },
+  {
+   "a": "juventus",
+   "b": "torino",
+   "name": "the Derby della Mole"
+  },
+  {
+   "a": "napoli",
+   "b": "juventus",
+   "name": "the Sun-vs-Stripes grudge match"
+  },
+  {
+   "a": "bayern",
+   "b": "dortmund",
+   "name": "Der Klassiker"
+  },
+  {
+   "a": "dortmund",
+   "b": "schalke",
+   "name": "the Revierderby"
+  },
+  {
+   "a": "paris",
+   "b": "marseille",
+   "name": "Le Classique"
+  },
+  {
+   "a": "lyon",
+   "b": "saint",
+   "name": "the Rhône-Alpes derby"
+  },
+  {
+   "a": "arsenal",
+   "b": "tottenham",
+   "name": "the North London Derby"
+  },
+  {
+   "a": "manchester united",
+   "b": "manchester city",
+   "name": "the Manchester Derby"
+  },
+  {
+   "a": "liverpool",
+   "b": "everton",
+   "name": "the Merseyside Derby"
+  },
+  {
+   "a": "liverpool",
+   "b": "manchester united",
+   "name": "the North-West Grudge Match"
+  },
+  {
+   "a": "chelsea",
+   "b": "arsenal",
+   "name": "the London Derby"
+  },
+  {
+   "a": "chelsea",
+   "b": "tottenham",
+   "name": "the London Derby"
+  },
+  {
+   "a": "west ham",
+   "b": "millwall",
+   "name": "the East London Derby"
+  },
+  {
+   "a": "newcastle",
+   "b": "sunderland",
+   "name": "the Tyne-Wear Derby"
+  },
+  {
+   "a": "celtic",
+   "b": "rangers",
+   "name": "the Old Firm"
+  },
+  {
+   "a": "ajax",
+   "b": "feyenoord",
+   "name": "De Klassieker"
+  },
+  {
+   "a": "benfica",
+   "b": "porto",
+   "name": "O Clássico"
+  },
+  {
+   "a": "benfica",
+   "b": "sporting",
+   "name": "the Lisbon Derby"
+  },
+  {
+   "a": "argentina",
+   "b": "brazil",
+   "name": "the Superclásico of the Americas"
+  },
+  {
+   "a": "england",
+   "b": "germany",
+   "name": "the Old Enemies tie"
+  },
+  {
+   "a": "england",
+   "b": "scotland",
+   "name": "the Auld Enemy clash"
+  },
+  {
+   "a": "england",
+   "b": "france",
+   "name": "the Channel Rivalry"
+  },
+  {
+   "a": "spain",
+   "b": "portugal",
+   "name": "the Iberian Derby"
+  },
+  {
+   "a": "italy",
+   "b": "france",
+   "name": "the Alpine Rivalry"
+  },
+  {
+   "a": "netherlands",
+   "b": "germany",
+   "name": "the Rhine Rivalry"
+  },
+  {
+   "a": "egypt",
+   "b": "algeria",
+   "name": "the North African Showdown"
+  },
+  {
+   "a": "nigeria",
+   "b": "ghana",
+   "name": "the West African Derby"
+  },
+  {
+   "a": "japan",
+   "b": "south korea",
+   "name": "the East Asian Derby"
+  },
+  {
+   "a": "uruguay",
+   "b": "argentina",
+   "name": "the Río de la Plata Derby"
+  },
+  {
+   "a": "mexico",
+   "b": "united states",
+   "name": "the Clásico Norteamericano"
+  }
+ ],
+ "MEDIA_COMP_TAGS": {
+  "Premier League": "#PL",
+  "La Liga": "#LaLiga",
+  "Serie A": "#SerieA",
+  "Bundesliga": "#Bundesliga",
+  "Ligue 1": "#Ligue1",
+  "Champions League": "#UCL",
+  "World Cup": "#WorldCup",
+  "Nations League": "#NationsLeague",
+  "European Championship": "#Euros",
+  "Copa América": "#CopaAmerica",
+  "Africa Cup of Nations": "#AFCON",
+  "AFC Asian Cup": "#AsianCup",
+  "CONCACAF Gold Cup": "#GoldCup",
+  "FA Cup": "#FACup",
+  "EFL Cup": "#EFLCup",
+  "Copa del Rey": "#CopaDelRey",
+  "DFB-Pokal": "#DFBPokal",
+  "Coppa Italia": "#CoppaItalia",
+  "Coupe de France": "#CoupeDeFrance",
+  "World Cup Qualifying": "#WCQ",
+  "Friendly": "#Friendly"
+ },
+ "MEDIA_COMP_WEIGHT": {
+  "World Cup": 1,
+  "Champions League": 0.92,
+  "European Championship": 0.9,
+  "Copa América": 0.85,
+  "Premier League": 0.72,
+  "La Liga": 0.68,
+  "Serie A": 0.64,
+  "Bundesliga": 0.62,
+  "Ligue 1": 0.56,
+  "Africa Cup of Nations": 0.7,
+  "AFC Asian Cup": 0.6,
+  "CONCACAF Gold Cup": 0.55,
+  "Nations League": 0.55,
+  "FA Cup": 0.66,
+  "EFL Cup": 0.5,
+  "Copa del Rey": 0.56,
+  "DFB-Pokal": 0.52,
+  "Coppa Italia": 0.5,
+  "Coupe de France": 0.46,
+  "World Cup Qualifying": 0.45,
+  "Friendly": 0.18
+ },
+ "MS": {
+  "win": {
+   "core": [
+    "FULL TIME: {W} {wscore} {L}. {scorerS} the difference.",
+    "{W} beat {L} {wscore} in the {comp}. {motmS} named Player of the Match.",
+    "Three points for {W}: {scorers}.",
+    "{W} see off {L} — {wscore} at the final whistle.",
+    "{Wf} {W} {wscore} {L} {Lf} | MOTM: {motmS} ({motmR})",
+    "{W} {?make it three|bank the points|keep their form going} with a {wscore} win over {L}.",
+    "{L} {?can't stop|cannot cope with|have no answer to} {W}: {wscore} in the {comp}.",
+    "{motmS} ({motmR}) was the pick of the players in {W}'s {wscore} win over {L}.",
+    "{W} {?edge|beat|see off} {L} {wscore}; {scorers}."
+   ],
+   "formal": [
+    "{W} prevail over {L} in a controlled {comp} display",
+    "{motmS} steers {W} past {L} with a composed performance",
+    "Clinical edge carries {W} to {wscore} win over {L}"
+   ],
+   "punny": [
+    "{W} {?DEFEAT|DUMP|SEE OFF|SEND PACKING} {L}!",
+    "{motmS} {?STARS|SHINES|SHOWS HIS CLASS} as {W} {?DISPATCH|DOWN|ROLL OVER} {L}",
+    "THREE POINTS, ZERO DRAMA: {W} ease past {L}",
+    "{L} {?LEFT RUING IT|HUMBLED|FOUND WANTING} by {W}",
+    "{W} {?WIN, {L} WHINE|WIN, {L} WEEP|WIN, {L} RUE IT}",
+    "{motmS} {?DOES IT AGAIN|RUNS RIOT|RULES THE ROOST}: {W} {wscore} {L}",
+    "{L} {?FAIL THE TEST|SIT THE EXAM AND FLUNK} as {W} take {comp} points"
+   ],
+   "fanW": [
+    "{myScore}. {?Job done.|Professional.|Clinical.|That'll do nicely.|Sorted.} [tail_win]",
+    "{myS} {?never looked in danger|were comfortable|managed it superbly|had the answers all night}. {myScore} and on we go. [tail_win]",
+    "{scorerS} again. Honestly can't remember {opp} having a shot worth mentioning. [tail_win]",
+    "Man of the match for me? {motmS}. {?Different gravy.|Class.|Sensational.|Wouldn't swap him for anyone.}",
+    "{myS} {?mean business|look serious|are rolling}. {myScore} and a pretty comfortable evening. [tail_win]",
+    "{scorerS} {?scoring again|the man for the big moment|doing what he does}. {myScore}."
+   ],
+   "fanL": [
+    "{myScore}. {?Awful.|Unacceptable.|Embarrassing.|No fight at all.|Not good enough.} [tail_lose]",
+    "{opp} {?were better in every department|wanted it more|made us look ordinary}. Credit to them, but we were shocking. [tail_lose]",
+    "How do we {?lose that|get beaten by that lot|look so flat}?? Somebody explain. [tail_lose]",
+    "I'll say it: {oppS} deserved it. We showed up and forgot to play. [tail_lose]",
+    "{oppS} {?took their chances, we didn't|punished every mistake}. {myScore}. [tail_lose]",
+    "Nothing to say about {myScore} that hasn't already been said. [tail_lose]"
+   ],
+   "fanN": [
+    "{W} {wscore} {L}. {?Sensible result.|Fair enough.|Nothing to see here, move along.|The better side won.} [tail_neutral]",
+    "{motmS} was {?quietly brilliant|the best player on the pitch|a class above} for {W}.",
+    "{W} just look like a proper side right now. {L} {?have questions to answer|need a reset}."
+   ],
+   "meme": [
+    "{L} fans after {ws}-{ls}: 🙂➡️😐➡️🫠",
+    "{W} to {L}: \"thanks for the three points\" 🤝",
+    "POV: you wrote off {W} before kick-off 🤡",
+    "{W} winning {wscore}: 😌 {L} losing {wscore}: 🙄",
+    "{L} defenders have left the building 🚪🏃"
+   ],
+   "radio": [
+    "Caller from the {Lf} end says {L} \"turned up in body only\" — and he's not wrong.",
+    "Line two says {W} are favourites for everything now. Line three says calm down. Line four is shouting."
+   ],
+   "vid": [
+    "{W} FANS REACT: {wscore} vs {L} | Full-time scenes",
+    "Walking out of the ground after {W} {wscore} {L} 🎥 (mixed emotions)"
+   ],
+   "tac": [
+    "{W} dictated where the game was played ({possW}% of the ball, {shW} shots to {shL}) — {L} never found a way to disrupt it.",
+    "Key pattern: {W} won the second balls and made {L}'s press look a step late."
+   ]
+  },
+  "draw": {
+   "core": [
+    "FULL TIME: {H} {score} {A}. Honours even.",
+    "{H} and {A} share the spoils — {score}.",
+    "Points shared at the final whistle: {Hf} {H} {score} {A} {Af}.",
+    "No winner: {scorers}. It finishes {score}.",
+    "{H} and {A} {?play out|settle for|go home with} {score}.",
+    "{score} at the final whistle: {H} v {A}. {?No winner.|Shared spoils.}"
+   ],
+   "formal": [
+    "{H} and {A} cancel each other out in a spirited {score} draw",
+    "A fair result: {H} and {A} settle for a point apiece"
+   ],
+   "punny": [
+    "{H} and {A} SPLIT THE SPOILS — nobody's happy!",
+    "STALEMATE! {H} {score} {A} leaves everyone wanting more",
+    "ALL SQUARE: {H} and {A} {?cancel each other out|play out an entertaining draw|go home with a point each}",
+    "{H} AND {A}: {?SQUARE AND FAIR|A STALEMATE|EVEN STEVENS}",
+    "{score}: {?THE GREAT DEADLOCK|THE POINT THAT NOBODY WANTED|DRAWN BATTLE}"
+   ],
+   "fanD": [
+    "{myScore}. {?Fine, I suppose.|Point gained, two dropped — can't decide.|Bit of both really.|Take it and move on.} [tail_draw]",
+    "{myS} {?had enough chances to win it|will be happier with the point|deserved more|were lucky to get anything}. [tail_draw]",
+    "Honestly a draw feels right. {oppS} had their moments, we had ours. [tail_draw]",
+    "{myScore}. We'll {?take it|live with it|move on}. [tail_draw]",
+    "That {?felt|feels} like a {?missed opportunity|fair draw|small step}. {myScore}."
+   ],
+   "fanN": [
+    "{score} between {H} and {A}. {?Fair.|Entertaining enough.|Nobody deserved to lose.} [tail_neutral]",
+    "A draw. {?Shock.|Again.|The most football result possible.}"
+   ],
+   "meme": [
+    "{H} & {A} fans after {score}: 🤝🥲",
+    "Draws are just a loss with extra steps and a tiny bit of hope 🫠",
+    "{score}: 🤝🙂🤷",
+    "Draws are like cold coffee: not good, not bad, just there ☕"
+   ],
+   "radio": [
+    "Caller says a draw is \"a result for both sides\" — which is what you say when you have nothing to say.",
+    "Phone-in split down the middle on {score}: half say fair, half say robbed."
+   ],
+   "vid": [
+    "{H} vs {A} {score} | Fans react to the draw",
+    "Split points: reaction from both ends"
+   ],
+   "tac": [
+    "{H} and {A} neutralised each other — {possW}% / {possL}% possession, {shW}-{shL} shots. Few clear overloads either side."
+   ]
+  },
+  "bore": {
+   "core": [
+    "FULL TIME: {H} 0-0 {A}. Defences on top.",
+    "Goalless: {H} and {A} cancel each other out.",
+    "{H} 0-0 {A} — {gkS} and the back lines the stars. ({saves} saves)",
+    "Goalless again: {H} {score} {A}. {?Nothing to see.|Not much to say.}",
+    "{H} v {A}: {?no goals, no problem, apparently|a night for the defenders}."
+   ],
+   "formal": [
+    "{H} and {A} produce a goalless stalemate of few chances",
+    "Defensive discipline wins out as {H}-{A} ends 0-0"
+   ],
+   "punny": [
+    "NIL BY MOUTH: {H} and {A} serve up a goalless SNOOZEFEST",
+    "0-0 SNORE-DRAW: {H} {?and|v|vs} {A} nothing to see here",
+    "{H} 0 {A} 0 — somebody wake the referee",
+    "GOALLESS GRIND: {H} {score} {A}",
+    "{H} AND {A} DO NOTHING VERY WELL",
+    "{?SNOOZE-FEST|NILL-NILL NIGHTMARE|BLANK CHEQUE}: {H} v {A}"
+   ],
+   "fanD": [
+    "0-0. {?Riveting.|Thrilling.|I want those 90 minutes back.|Truly one for the purists.} [tail_draw]",
+    "Not a single {?moment of quality|clear chance|shot worth the name} from either side. {myS} fans deserve better. [tail_draw]",
+    "Defensively solid, sure. But can we please score a goal at some point?",
+    "{score}. {?Ninety minutes of nothing.|Not a thing happened.|Why do we do this to ourselves.} [tail_draw]"
+   ],
+   "fanN": [
+    "0-0 between {H} and {A}. Heavy sigh. [tail_neutral]",
+    "Went to make a tea in the 30th minute, came back to the same score. Perfect timing."
+   ],
+   "meme": [
+    "{H} 0-0 {A}: highlights ⬛⬛⬛⬛⬛⬛",
+    "Both goalkeepers after 0-0: 😴 \"busy night, wasn't it?\"",
+    "Goals in {H} v {A}: 0️⃣ Shots wide: ♾️",
+    "Highlights package for {H} v {A}: ⬛ (no footage available)"
+   ],
+   "radio": [
+    "Our caller calls it \"90 minutes of tactical chess\". Our host calls it \"a car park.\""
+   ],
+   "vid": [
+    "0-0 FANS REACT: {H} v {A} (zero goals, plenty of opinions)"
+   ],
+   "tac": [
+    "Blocks held firm: {shW}-{shL} shots, xG {xgW}-{xgL}. Both sides refused to risk the transition."
+   ]
+  },
+  "draw_goalfest": {
+   "core": [
+    "WHAT A GAME! {H} {score} {A} — nobody can believe it.",
+    "{H} and {A} share EIGHT… sorry, {tot} goals in a classic.",
+    "Pandemonium: {H} {score} {A}. {scorers}.",
+    "{H} {score} {A}: {tot} goals and no winner.",
+    "{tot} goals shared between {H} and {A}: {scorers}."
+   ],
+   "formal": [
+    "A breathless {score} draw between {H} and {A} defies tactical logic"
+   ],
+   "punny": [
+    "GOAL-A-THON! {H} {score} {A} — {tot} goals and no winner",
+    "DEFENDING? WHAT DEFENDING?! {H} and {A} trade blows in {score} thriller",
+    "{tot} GOALS, ZERO WINNERS: {H} {score} {A}",
+    "BONKERS! {H} and {A} trade {tot} goals"
+   ],
+   "fanD": [
+    "{myScore}. My heart can't take this. {?Genuinely cannot defend.|Football is brilliant.|I need to lie down.} [tail_draw]",
+    "{tot} goals and we still didn't win. {?Unreal.|Of course.|This team will be the death of me.} [tail_draw]",
+    "{tot} goals and my nerves are shot. {myScore}. [tail_draw]",
+    "That game could have ended 6-6. {myScore}."
+   ],
+   "fanN": [
+    "{H} {score} {A}. {?Best game of the weekend.|Absolute carnage and I loved it.|Cinema.|Please don't ever fix the defending.}",
+    "Neutral hat on: that was unbelievable entertainment."
+   ],
+   "meme": [
+    "Defenders in {H} {score} {A}: 🏃💨 …where's everyone going?",
+    "Defenders in {H} v {A}: 🏃‍♂️💨 (not seen since kick-off)"
+   ],
+   "radio": [
+    "Switchboard lit up after {score}: \"Nobody defends anymore!\" — \"Isn't that the point?\""
+   ],
+   "vid": [
+    "{tot} GOALS! {H} {score} {A} full-time reaction"
+   ],
+   "tac": [
+    "Transitions everywhere: {shH}-{shA} shots, xG {xgW}-{xgL}. Neither back line held its shape once the game opened up."
+   ]
+  },
+  "thriller": {
+   "core": [
+    "THRILLER: {W} edge {L} {wscore} in a {tot}-goal epic.",
+    "{W} {wscore} {L}. {scorers}. What a match.",
+    "Seven kinds of chaos, but {W} survive {L} {wscore}.",
+    "{W} win it in a shootout of goals — {wscore} vs {L}.",
+    "Thriller: {W} {wscore} {L}. {tot} goals and no breathing.",
+    "{W} outlast {L} in a {tot}-goal classic.",
+    "{wscore} to {W}: a game for the ages."
+   ],
+   "formal": [
+    "{W} survive an open game to beat {L} {wscore}",
+    "Chaos reigns, {W} emerge: {wscore} win over {L}"
+   ],
+   "punny": [
+    "{W} WIN GOAL FEST! {tot} goals as {L} are left shell-shocked",
+    "WOW! {W} edge {L} in a {wscore} thriller",
+    "{W} HANG ON in a {tot}-goal BANANA SKIN of a match",
+    "{tot} GOALS! {W} EDGE A CLASSIC",
+    "{W} AND {L} GIVE US A MATCH FOR THE AGES",
+    "{?HEART-STOPPER|CARDIAC SPECIAL|NAIL-BITER}: {W} {wscore} {L}"
+   ],
+   "fanW": [
+    "{myScore}!!! {?My heart rate is not safe.|I've aged ten years.|Absolute scenes.|Do not do this to me again.} [tail_win]",
+    "Won it, but defend like that again and we're in trouble. Still, {myScore}! [tail_win]",
+    "{?Football is the greatest game.|What a game of football.|That was a movie.} {myScore} and the points are ours.",
+    "{myScore}!! My heart. My lungs. My sanity. {?Gone.|Lost.|On the pitch.} [tail_win]",
+    "Ninety-plus minutes of chaos and we came out on top. {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{myScore}. We scored {myG} and STILL lost. {?Defending is optional apparently.|This backline is a crime scene.} [tail_lose]",
+    "That's the most entertaining way to lose I've ever seen. Still lost, though. [tail_lose]",
+    "{oppG} goals conceded. {?Unreal.|At home?|Again?} Somebody sort that defence. [tail_lose]",
+    "{myScore}. {?So close.|Gutting.|So many goals, so little defence.} [tail_lose]"
+   ],
+   "fanN": [
+    "{W} {wscore} {L} — the match of the weekend, and it isn't close. [tail_neutral]",
+    "Whoever scripted {W} v {L} deserves an award. {tot} goals, drama, the lot."
+   ],
+   "meme": [
+    "{W} {wscore} {L}: both defences have left the group chat 🏳️",
+    "Goalkeepers in {W} v {L}: \"I'd like to speak to the manager\" 🧤😵",
+    "Both defences, all game: 🏃‍♂️💨 {tot} goals: 🎉🎉🎉"
+   ],
+   "radio": [
+    "Host: \"{tot} goals!\" Caller: \"Terrible defending!\" Host: \"Brilliant television.\""
+   ],
+   "vid": [
+    "{tot} GOALS! {W} {wscore} {L} — the full reaction",
+    "INSANE finish at {W} v {L} (fans lose their minds)"
+   ],
+   "tac": [
+    "Open game by design: both sides pressed, both got bypassed. xG {xgW}-{xgL}; transitions decided it."
+   ]
+  },
+  "thrashing": {
+   "core": [
+    "{W} HAMMER {L}: {wscore}.",
+    "{W} {wscore} {L} — a statement win.",
+    "Rout at {W}: {L} beaten {wscore}. {scorers}.",
+    "{L} humbled — {W} win {wscore}.",
+    "{W} run riot: {wscore} against {L}.",
+    "{W} {wscore} {L} — {L}'s night to forget.",
+    "Clinical, ruthless, complete: {W} {wscore} {L}."
+   ],
+   "formal": [
+    "{W} dismantle {L} {wscore} in ruthless display",
+    "A statement: {W} overpower {L} {wscore}",
+    "{L} outclassed as {W} run riot"
+   ],
+   "punny": [
+    "{W} DEMOLISH {L}! {wscore} BLOODBATH",
+    "{L} HAMMERED {wscore} — and it could've been more!",
+    "FOUR PLAY? {W} {?TROUNCE|TORCH|TEAR APART|FLATTEN} {L}",
+    "MERCY! {W} take {L} apart {wscore}",
+    "{W} TORCH {L}! {wscore}!",
+    "{L} DEMOLISHED — {wscore}!",
+    "{?MASSACRE|BLOODBATH|CARNAGE}: {W} {wscore} {L}"
+   ],
+   "fanW": [
+    "{myScore}!!! {?Absolutely ruthless.|No mercy.|That was a performance.|Run riot.} [tail_win]",
+    "Put {ws} past {opp} and it could have been more. {?Frightening.|Title talk anyone?|Clinical.} [tail_win]",
+    "{motmS} {?was untouchable|is playing on another planet|ran the show}. {myScore}. [tail_win]",
+    "{myScore}!!! {?I want more.|Give us another.|Savage.|Ruthless.} [tail_win]",
+    "If that wasn't a statement, I don't know what is. {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{myScore}. {?Embarrassing.|Humiliating.|Gutted. Angry. Numb.|Nothing to say.} [tail_lose]",
+    "{ls} scored… for the other lot. {?Defence off.|Total collapse.|Absolute shambles.} [tail_lose]",
+    "I want a refund. Not for the ticket — for my time. {myScore}. [tail_lose]",
+    "{myScore}. {?No words.|No excuses.|We were out-fought.} [tail_lose]"
+   ],
+   "fanN": [
+    "{W} {wscore} {L}. {?Ruthless.|Not even close.|Mercy rule when?} [tail_neutral]",
+    "That was a masterclass from {W}. Genuinely worried for {L} now."
+   ],
+   "meme": [
+    "{L} defenders at {wscore}: 🏃‍♂️🏃‍♂️🏃‍♂️ \"which way's the exit?\"",
+    "{W} fans: 😎  {L} fans: 😶‍🌫️",
+    "{L}: *exists* {W}: {wscore}",
+    "{L}'s defence: 🧱➡️🥧"
+   ],
+   "radio": [
+    "Caller: \"I've seen better defending in a pub five-a-side.\" Host: \"Careful, caller.\" Caller: \"Not wrong, though.\""
+   ],
+   "vid": [
+    "{W} {wscore} {L}: FULL FAN REACTION to the humiliation",
+    "Scenes after {W}'s {wscore} thrashing of {L}"
+   ],
+   "tac": [
+    "{W} won {possW}% of possession and {shW} shots — but the damage came from {L}'s line sitting too high against runners."
+   ]
+  },
+  "comeback": {
+   "core": [
+    "COMEBACK! {W} {wscore} {L} after trailing {deficit}.",
+    "{W} come from behind to beat {L} {wscore}.",
+    "From {deficit}-down to winners: {W} {wscore} {L}. {scorers}.",
+    "UNBELIEVABLE: {W} turn it around against {L}!",
+    "{W} complete the comeback: {wscore} after trailing.",
+    "{W} defy the deficit to win {wscore} vs {L}.",
+    "From {deficit} down: {W} {wscore} {L}."
+   ],
+   "formal": [
+    "{W} rally from behind to claim {wscore} win over {L}",
+    "Resilience: {W} overturn deficit against {L}"
+   ],
+   "punny": [
+    "GREAT ESCAPE! {W} come from {deficit} down to SLAY {L}",
+    "{L} THROW IT AWAY as {W} turn it around {wscore}",
+    "NEVER SAY DIE! {W} {?STUN|SHOCK|STORM PAST} {L} in comeback of the season",
+    "{W} FIGHT BACK! {wscore} COMEBACK AGAINST {L}",
+    "THE GREAT COMEBACK: {W} STUN {L}",
+    "{?COMEBACK KINGS|NEVER SAY DIE|PHOENIX RISING}: {W} {wscore}"
+   ],
+   "fanW": [
+    "WE WERE {deficit} DOWN. {myScore}. {?I'm shaking.|Football is mad.|Never leaving this team.|What a bunch of lads.} [tail_win]",
+    "Never doubted. (I doubted completely.) {myScore}!! [tail_win]",
+    "That's character. Went behind, didn't panic, won it. {?Proper side.|This is a team now.} [tail_win]",
+    "We were {deficit} down and I'd given up. {myScore}. {?Sorry, lads.|I'm an idiot.|Never again.} [tail_win]",
+    "Mentality monsters. {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{deficit} up and we lose {myScore}. {?Unforgivable.|The most us thing ever.|Throw it away why don't we.} [tail_lose]",
+    "We had it. We HAD it. {?Game management is a myth.|Sit back and let them score — textbook.} [tail_lose]",
+    "How do you lose after leading? {?Genuinely asking.|Ask the manager.} [tail_lose]",
+    "{deficit} up… then {?we blinked|we collapsed|we gave it away}. {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "{W} coming back from {deficit} down to win {wscore} is *peak* football. {?Love it.|Brilliant.|Wow.}",
+    "{L} will be sick: ahead, in control, then gone. {W} never stopped."
+   ],
+   "meme": [
+    "{L} up {deficit}-0 at half-time: 😎 \"easy\". Full time: 🫥",
+    "{W} fans at halftime 😞 → at full time 🤯",
+    "{W} at 0-{deficit}: 😰 {W} at {ws}-{ls}: 😎"
+   ],
+   "radio": [
+    "Caller: \"Don't tell me {L} were comfortable.\" Host: \"They were. For about an hour.\""
+   ],
+   "vid": [
+    "COMEBACK SCENES! {W} {wscore} {L} full reaction",
+    "From {deficit} DOWN to WINNERS — {W} fans lose it"
+   ],
+   "tac": [
+    "{W} adjusted at the break — wide overloads and a higher press reversed the game. {L} dropped deeper and never recovered."
+   ]
+  },
+  "late_winner": {
+   "core": [
+    "{scorerS} WINS IT in the {ord} minute! {W} {wscore} {L}.",
+    "LATE DRAMA: {scorer} snatches it for {W} in the {ord}.",
+    "{W} beat {L} {wscore} with a goal at the death — {scorerS} ({min}').",
+    "{scorerS} {?breaks {L} hearts|sends {W} into dreamland|wins it late}. {wscore}.",
+    "{scorerS} {?strikes|wins it|settles it} at {min}'. {W} {wscore} {L}.",
+    "Late, late show: {scorerS} ({min}') seals it for {W}.",
+    "{W} snatch victory: {scorerS} at {min}'."
+   ],
+   "formal": [
+    "{scorerS} settles it in the {ord} minute as {W} edge {L}",
+    "Late strike from {scorerS} decides {W}-{L} contest"
+   ],
+   "punny": [
+    "{scorerS} {?STRIKES|SNATCHES IT|STUNS {L}} IN THE {ord|up} MINUTE!",
+    "WHAT. A. FINISH! {scorerS} {?SINKS|SHATTERS|DEVASTATES} {L} at the death",
+    "CRUEL! {L} undone by {scorerS} in the {ord}",
+    "{scorerS} the hero: {W} take it {wscore} with seconds to spare",
+    "{scorerS} {?STRIKES LATE|WINS IT AT THE DEATH|IS THE LAST-GASP HERO}",
+    "LATE SHOW! {scorerS} {?STUNS|SPARKS|SHOCKS} {L}",
+    "{ord|up} MINUTE MAGIC: {scorerS} {?DEVASTATES|DELIGHTS} AS {W} WIN"
+   ],
+   "fanW": [
+    "{scorerS}!!! {ord} MINUTE!!! {?I'm screaming.|I'm crying.|I've lost my voice.|I'm on the floor.} {myScore}! [tail_win]",
+    "{min}'. {scorerS}. {?Football.|Cinema.|Unreal.|THAT'S WHY WE LOVE THIS.} [tail_win]",
+    "Cometh the hour, cometh {scorerS}. {myScore}. Never stop believing. [tail_win]",
+    "My neighbours know my team won. Everyone does. {scorerS} in the {ord}!!! [tail_win]",
+    "{scorerS}!!! {ord} MINUTE!!! {?I'm screaming.|My neighbours hate me.|I'm shaking.} {myScore}! [tail_win]",
+    "Late goals are the best goals. {scorerS}. {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{ord} minute. {?AGAIN.|Unreal.|I can't breathe.|Absolutely sick.} {myScore}. [tail_lose]",
+    "We were that close. {?One more clearance.|One more tackle.|Ninety minutes of work} and then THAT. [tail_lose]",
+    "{scorerS} at {min}'. I'm numb. {?Football is cruel.|Don't talk to me.|Going outside.} [tail_lose]",
+    "Defended brilliantly for ninety minutes, lost in the last. That's the sport. I hate it. [tail_lose]",
+    "Conceded in the {ord} minute. {?Again.|Why.|It's always the way.} {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "Last-gasp winner from {scorerS}. {?This is why we watch.|Cruel and glorious.|Remember this one.} [tail_neutral]",
+    "{W} {wscore} {L} — won in the {ord} minute. {?Pure drama.|Great ending.|Heartbreak and euphoria in 20 seconds.}"
+   ],
+   "meme": [
+    "{scorerS} in the {ord}: 🏃‍♂️💨🔥 {L} players: 🧍🧍🧍",
+    "{L} fans after {min}': 🥲➡️💀",
+    "Defenders, 89th minute: 🧍 {scorerS}, 90th minute: ⚽"
+   ],
+   "radio": [
+    "Caller at the {Wf} end: \"I've never screamed so loud.\" Caller at the {Lf} end: \"Don't.\" Host: \"Thanks, both.\""
+   ],
+   "vid": [
+    "{scorerS} {ord}-MINUTE WINNER: fans go absolutely MAD",
+    "LAST-MINUTE SCENES: {W} fans after {scorerS}'s winner"
+   ],
+   "tac": [
+    "{W} pushed a centre-back forward and went direct in the final ten — {scorerS} found space exactly where {L}'s block tired."
+   ]
+  },
+  "late_equaliser": {
+   "core": [
+    "{scorerS} SAVES A POINT in the {ord}! {W} salvage {score}.",
+    "Last-gasp leveller: {scorer} rescues {W} at {min}'.",
+    "{L} had it won… then {scorerS} struck in the {ord}.",
+    "Late equaliser! {H} {score} {A}.",
+    "{scorerS} {?rescues|salvages|snatches} a point: {H} {score} {A}.",
+    "Late leveller: {scorerS} {min}'.",
+    "{W} salvage a draw through {scorerS} at {min}'."
+   ],
+   "formal": [
+    "{scorerS}'s late leveller denies {L} in {score} draw",
+    "{W} snatch a point as {scorerS} strikes in the {ord} minute"
+   ],
+   "punny": [
+    "LATE SHOW! {scorerS} DENIES {L} with an {ord}-minute leveller",
+    "SNATCHED! {W} STEAL A POINT as {scorerS} strikes at the death",
+    "{L} ROBBED as {scorerS} haunts them in the {ord}",
+    "EQUALISER AT THE DEATH! {scorerS} {?HAUNTS|SPARES|SAVES} {W}",
+    "LATE LEVELLER: {scorerS} DENIES {L}",
+    "{?ESCAPOLOGISTS|GREAT ESCAPE}: {W} HOLD ON"
+   ],
+   "fanW": [
+    "{scorerS}!!! {ord} MINUTE!!! {?Unbelievable.|Dead and buried and now alive.|Never say die!} {myScore}. [tail_win]",
+    "That's a point from nowhere. {?Take it and run.|Character!|Cheeky, but ours.} [tail_draw]",
+    "{min}'. {scorerS}. I'm a mess. {myScore}. [tail_draw]",
+    "{scorerS}!!! {ord} MINUTE! {?I'm gone.|I can't breathe.|Football!} {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{min}'. Ahead for 85 minutes and then… {?this.|that.|unbelievable.} {myScore}. [tail_lose]",
+    "We threw away two points. {?Again.|Naturally.|Don't talk to me.} [tail_lose]",
+    "Can't believe it. {oppS} were dead and buried. {?Concentration.|Marking.|Concentration. Marking. Anything.} [tail_lose]",
+    "{ord} minute. {?How?|Again?|Please.} {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "Late equaliser, big drama, both sides can feel it. {?Perfect.|Football is great.|What a finish.} [tail_neutral]",
+    "{scorerS} rescued {W} at the death. {?Absolutely deserved? Debatable. Entertaining? Totally.}"
+   ],
+   "meme": [
+    "{L} defenders at {min}': 🧍🧍🧍🧍 \"somebody mark him?\"",
+    "{W} fans at 89': 😭 At 90': 😭😭😭 (different kind)",
+    "{L} fans at 89': 😎 At 90+: 😭"
+   ],
+   "radio": [
+    "Caller from the {Lf} end: \"They've snatched a point — and they were awful.\" Host: \"Rude but accurate.\""
+   ],
+   "vid": [
+    "{ord}-MINUTE EQUALISER! {W} fans erupt",
+    "Late leveller scenes: {W} {score} {L}"
+   ],
+   "tac": [
+    "{W} went to a back three and sent bodies into the box — {scorerS}'s equaliser came from the second wave."
+   ]
+  },
+  "upset": {
+   "core": [
+    "SHOCK: {W} beat {L} {wscore}.",
+    "UPSET! {W} stun {L} {wscore} in the {comp}.",
+    "{W} {wscore} {L} — one of the results of the season.",
+    "Giant-killers: {W} outfight {L}. {scorerS} the hero.",
+    "UPSET ALERT: {W} beat {L} {wscore}.",
+    "{W} stun {L} in the {comp} — {wscore}.",
+    "Result of the round? {W} {wscore} {L}."
+   ],
+   "formal": [
+    "{W} defy the odds to beat {L} {wscore}",
+    "A significant upset: {W} outwork {L} {wscore}"
+   ],
+   "punny": [
+    "SHOCKER! {W} {?TOPPLE|STUN|SHOCK|SLAY} {L}!",
+    "DAVID v GOLIATH: {W} {?SLING|SMASH|STONE} {L} {wscore}",
+    "{L} {?BEATEN BY MINNOWS|HUMBLED|LEFT STUNNED} as {W} pull off massive upset",
+    "THE GIANTS FALL: {W} {wscore} {L}!",
+    "SHOCK RESULT! {W} {wscore} {L}",
+    "{L} HUMBLED! {W} {?TAKE THEIR SCALP|STUN THE GIANTS}",
+    "CAN'T BELIEVE IT: {W} {wscore} {L}"
+   ],
+   "fanW": [
+    "WE BEAT {oppS}!!! {myScore}!!! {?I can't believe it.|Absolute scenes.|Nobody gave us a chance.|Pinch me.} [tail_win]",
+    "Everyone wrote us off. {myScore}. {?Remember this day.|Take a bow, lads.|We did that.} [tail_win]",
+    "The underdogs bit back. {scorerS} {?is a legend|should never buy a drink again}. [tail_win]",
+    "{opp}?? We just beat {oppS}. {myScore}. {?I'm shaking.|I need to sit down.|WHAT.} [tail_win]"
+   ],
+   "fanL": [
+    "Lost to {oppS}. {?LOST. TO. THEM.|I don't know what to say.|Unforgivable.|Embarrassing.} {myScore}. [tail_lose]",
+    "That's the worst result I've seen in years. {?Truly.|Honestly.|Sack the lot.} [tail_lose]",
+    "We arrived thinking it was a formality. Spoiler: it wasn't. {myScore}. [tail_lose]",
+    "Lost to {opp}. {?I'm broken.|I'm humiliated.|I'm numb.} {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "{W} just toppled {L}. {?Love it when the script gets torn up.|Footballing joy.|This is why we watch.} [tail_neutral]",
+    "{L} will be ruing this one. {W} deserved every bit of it."
+   ],
+   "meme": [
+    "{W} {wscore} {L} — \"form is temporary, class is permanent\" the class: 🏳️",
+    "{L} fans: 💀 {W} fans: 🥹",
+    "Bookmakers: 😎 {W}: {wscore} Bookmakers: 😳"
+   ],
+   "radio": [
+    "Caller: \"I told you {W} would do it!\" Host: \"You said 4-0 to {L}.\" Caller: \"…I had a feeling.\""
+   ],
+   "vid": [
+    "BIGGEST SHOCK OF THE SEASON? {W} {wscore} {L} FAN REACTION",
+    "{W} FANS GO WILD after stunning {L}"
+   ],
+   "tac": [
+    "{W}'s low block frustrated {L}, then hit them on the break — a textbook underdog gameplan executed superbly."
+   ]
+  },
+  "hattrick": {
+   "core": [
+    "HAT-TRICK HERO: {scorer} scores {ng} as {W} beat {L} {wscore}.",
+    "{scorerS} with a hat-trick! {W} {wscore} {L}.",
+    "THREE goals for {scorerS}. {W} win {wscore}.",
+    "{scorer}: {ng} goals, one match ball. {W} {wscore} {L}.",
+    "{scorer}'s hat-trick leads {W} to a {wscore} win.",
+    "{scorerS} ({ng} goals): {W} {wscore} {L}.",
+    "{ng} for {scorerS}! {W} win {wscore}."
+   ],
+   "formal": [
+    "{scorerS} hat-trick carries {W} past {L}",
+    "Three-goal {scorerS} masterclass leaves {L} powerless"
+   ],
+   "punny": [
+    "{scorerS}: THAT'S A HAT-TRICK! {W} {wscore} {L}",
+    "{scorerS} TAKES HOME THE BALL as {W} {?crush|beat|swat aside} {L}",
+    "HAT-TRICK HERO {scorerS} {?STEALS THE SHOW|IS A ONE-MAN SHOW|SINGLE-HANDEDLY WINS IT}",
+    "THREE AND EASY! {scorerS} {?FIRES|NETS|BAGS} a treble",
+    "HAT-TRICK HERO {scorerS}! {W} {wscore} {L}",
+    "{scorerS}: {?THE MAN WITH THE MATCH BALL|THE HAT-TRICK HERO|A ONE-MAN SHOW}",
+    "{ng} GOALS FOR {scorerS|up}!"
+   ],
+   "fanW": [
+    "{scorerS} {ng} goals. {?Absolute machine.|Ridiculous.|Take the ball home and the stadium too.|On a different level.} [tail_win]",
+    "HAT-TRICK!!! {scorerS} is {?unplayable|world class|a certified menace}. {myScore}! [tail_win]",
+    "Name a better striker. I'll wait. {scorerS}. {ng} goals. [tail_win]",
+    "{scorerS} {ng}. Absolute {?machine|beast|legend}. {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{scorerS} {ng}, us 0. {?We simply couldn't stop him.|No answers.|Awful marking.} [tail_lose]",
+    "Not a single defender wanted to tackle him. {?Terrifying.|Embarrassing.}",
+    "He's scored {ng} against us. {?Embarrassing.|Chats about 'respect' are over.} [tail_lose]",
+    "{scorerS} scored {ng} against us. {?Unreal.|What a nightmare.|Why him?} {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "{scorerS}'s hat-trick for {W}: {?clinical|ruthless|a finishing clinic}. [tail_neutral]",
+    "Neutral hat: {scorerS} is {?having the season of his life|ridiculous|one of the best around}."
+   ],
+   "meme": [
+    "{scorerS} after the hat-trick: 🧍‍♂️⚽⚽⚽🏆 \"Anyone seen my ball?\"",
+    "{L} defenders: 🏳️ {scorerS}: 🤝 'see you next week'",
+    "{scorerS}: *scores {ng}* Referee: \"Sure, take the ball.\""
+   ],
+   "radio": [
+    "Caller: \"Hat-trick? He's scored more than most midfielders all year.\" Host: \"He's a striker, caller.\" Caller: \"Still.\""
+   ],
+   "vid": [
+    "{scorerS} HAT-TRICK REACTION from the {Wf} end",
+    "All THREE goals: {scorerS} | {W} {wscore} {L}"
+   ],
+   "tac": [
+    "{scorerS} attacked the blind side again and again — three different runs, three different finishes. {L}'s line never solved it."
+   ]
+  },
+  "brace": {
+   "core": [
+    "{scorerS} DOUBLE: {W} beat {L} {wscore}.",
+    "Brace from {scorerS} as {W} win {wscore}.",
+    "{scorer} scores twice — {W} {wscore} {L}.",
+    "{scorerS} {?brace|double|two goals}: {W} win {wscore}.",
+    "Two for {scorerS} — {W} {wscore} {L}."
+   ],
+   "punny": [
+    "{scorerS} DOUBLES UP! {W} {?SINK|DOWN|BEAT} {L}",
+    "TWICE THE PAIN: {scorerS} brace sinks {L}",
+    "{scorerS} DOUBLES UP",
+    "{scorerS}: TWO IS COMPANY"
+   ],
+   "fanW": [
+    "{scorerS} {?brace!|scores twice!|bags a double!} {?Class.|Ice cold.|Machine.} [tail_win]",
+    "{scorerS} scored twice. {?Great.|Love it.} {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{scorerS} {?scored twice|got a brace} against us. {?Again.|Naturally.|Of course.} [tail_lose]",
+    "{scorerS} {?scored twice|got a brace}. {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "Two for {scorerS}. {?Clinical.|Quality.}"
+   ],
+   "meme": [
+    "{scorerS} with his second: 😎 {L}: 🙂",
+    "{scorerS} after the second goal: 😌✌️"
+   ],
+   "radio": [
+    "Line one: \"{scorerS}'s brace was outstanding.\" Line two: \"{L}'s marking was not.\""
+   ],
+   "vid": [
+    "BOTH goals: {scorerS} brace vs {L}"
+   ],
+   "tac": [
+    "{scorerS} drifted between centre-backs — {L} kept passing him on."
+   ]
+  },
+  "redcard": {
+   "core": [
+    "RED CARD: {red} ({redTeam}) sent off in the {redMin}th minute. {W} {wscore} {L}.",
+    "{redTeam} reduced to ten after {redS} dismissal ({redMin}'). Final: {score}.",
+    "Sent off: {red}. {redTeam} had to play {?on with ten|the rest of the match a man short}.",
+    "Red card at {redMin}': {red} ({redTeam}). Final: {W} {wscore} {L}.",
+    "{redS} sent off, {redTeam} down to ten. {wscore}.",
+    "{red} sees red: it changes everything."
+   ],
+   "formal": [
+    "{redS}'s dismissal reshapes {W}-{L} contest",
+    "A pivotal red card: {redTeam} falter after {redS} sees red"
+   ],
+   "punny": [
+    "SEEING RED! {red} {?SENT OFF|WALKS|DISMISSED} as {W} {?WIN|PREVAIL}",
+    "{redS} BLOWS IT: {redTeam} left with TEN MEN",
+    "ONE FOR THE ROAD? {red} sees red after {?reckless|rash|crazy} challenge",
+    "{redS} SEES RED! {redTeam} PAY THE PRICE",
+    "SENT OFF! {red} {?WALKS|LEAVES|IS OUT} AT {redMin}'",
+    "{?TEN MEN|RED MIST|BIG MISTAKE}: {redTeam} {?HIT|PAY|PAY THE PRICE}"
+   ],
+   "fanW": [
+    "{?Red card changed the game.|They went down to ten and we did the rest.|Never a better time to be a man up.} {myScore}. [tail_win]",
+    "{redS} walked. Honestly {?had it coming|stupid challenge|that's a clear red}. {myScore}. [tail_win]",
+    "Ten against eleven, we won. {myScore}. {?Easy-ish.|Don't tell them.} [tail_win]"
+   ],
+   "fanL": [
+    "{redS} {?has let us down|ruined everything|was a complete disaster}. {myScore}. [tail_lose]",
+    "Ten men for {?most of the game|the last half hour|the whole second half}. You can't fight it. {myScore}. [tail_lose]",
+    "That red was {?soft|a joke|harsh|a total mistake}. {myScore}. [tail_lose]",
+    "{redS} {?let us down|was silly|had a rush of blood}. {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "Red card for {redS} swung it. {?Foolish.|Costly.|Brutal.} [tail_neutral]",
+    "Ten men, one minute of madness. {?Football discipline matters.|Pure drama.}"
+   ],
+   "meme": [
+    "{redS}: *sees red* The team: 🧍 \"cheers, mate\"",
+    "Ten men {redTeamS}: \"we're fine\" — physics: 🫠",
+    "{redS}: *sees red* Referee: \"ok bye\" {redTeam}: 😵"
+   ],
+   "radio": [
+    "Caller: \"That's a clear red.\" Other caller: \"Soft.\" Host: \"Thank you, gentlemen. Moving on…\""
+   ],
+   "vid": [
+    "{redS} RED CARD REACTION: was it the right call?",
+    "{redTeam} fans react to the sending-off"
+   ],
+   "tac": [
+    "After {redS}'s dismissal ({redMin}'), {redTeam} dropped to a 4-4-1 and conceded the ball: the game's tempo shifted completely."
+   ]
+  },
+  "keeper": {
+   "core": [
+    "{gk} STANDS TALL: {saves} saves as {W} {wscore} {L}.",
+    "{gkS} the hero — {saves} saves keep {Ws} in it.",
+    "Goalkeeper masterclass: {gk} ({saves} saves).",
+    "{gk} {saves} saves: {W} {wscore} {L}.",
+    "{gkS}'s heroics: {saves} saves, {wscore}.",
+    "{gkS} the wall: {W} win {wscore}."
+   ],
+   "formal": [
+    "{gkS} produces a decisive goalkeeping display ({saves} saves)",
+    "Wall in goal: {gkS} frustrates opponents with {saves} stops"
+   ],
+   "punny": [
+    "{gkS} — THE GREAT WALL! {saves} saves keep {W} in it",
+    "NOT TODAY! {gk} {?DENIES|STOPS|SAVES} {saves} times",
+    "HANDS LIKE GLOVES! {gkS} is the match-winner",
+    "{gkS}: SAVE AFTER SAVE!",
+    "THE {gkS|up} SHOW: {saves} SAVES",
+    "{gkS} {?DENIES|FRUSTRATES|SHUTS OUT} EVERYONE"
+   ],
+   "fanW": [
+    "{gkS}. {saves} saves. {?Different level.|Absolutely brilliant.|I need him on a long contract.} {myScore}. [tail_win]",
+    "Man of the match: {gkS} for me. {?Great.|Class.|Inhumane.} [tail_win]",
+    "{gkS} {?is incredible|is the best|is unbeatable}: {saves} saves. {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "{gkS} {?had a game of his life|stopped everything|was unbeatable}. {saves} saves. We should've scored more. [tail_lose]",
+    "We had {shL} shots and their keeper stopped them all. {?Unlucky.|Gutting.} [tail_lose]",
+    "{gkS} stopped everything. {?Everything.|Absolutely everything.} {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "{gkS}'s {saves} saves. {?Keepers are heroes.|Hands like buckets.|Great stuff.} [tail_neutral]"
+   ],
+   "meme": [
+    "{gkS}: \"{saves} saves, no biggie\" 🧤😎 {L}: 🫠",
+    "Shot #{saves}: *saved* — {gkS}: \"anything else?\"",
+    "{gkS} with {saves} saves: 🧤🧤🧤 Strikers: 🥲"
+   ],
+   "radio": [
+    "Caller wants {gkS} in the team of the week. Host wants him in the Hall of Fame."
+   ],
+   "vid": [
+    "{gkS}: ALL {saves} SAVES vs {L}",
+    "{gk} goalkeeper masterclass — the best saves"
+   ],
+   "tac": [
+    "{gkS} faced {shL} shots — {saves} saves, many from close range. A goalkeeper-led defensive display."
+   ]
+  },
+  "xg_robbery": {
+   "core": [
+    "xG says otherwise: {L} created {xgL} xG to {W}'s {xgW} but lost {wscore}.",
+    "{W} {wscore} {L} — despite {L}'s {xgL} xG.",
+    "Numbers vs score: {L} {xgL} xG, {W} {xgW}. Result: {wscore} to {W}.",
+    "xG says {L}; scoreboard says {W}. {wscore}.",
+    "{W} win {wscore} despite xG {xgW} to {xgL}.",
+    "{L} deserved more: xG {xgL}–{xgW}."
+   ],
+   "formal": [
+    "{W} win despite trailing on expected goals ({xgW} v {xgL})",
+    "Efficiency over dominance: {W} take the points"
+   ],
+   "punny": [
+    "ROBBED?! {L} {?DOMINATE|CREATE EVERYTHING|OUTPLAY} but {W} take it {wscore}",
+    "FOOTBALL IS CRUEL: {L} {?CREATE|MISS|WASTE} {?chance after chance|everything} — {W} STEAL IT",
+    "{W} {?LOOT|STEAL|MUG} {L}!",
+    "ROBBERY! {L} PAY FOR WASTEFULNESS",
+    "{W} STEAL IT: {wscore}",
+    "xG? WHO CARES? {W} WIN"
+   ],
+   "fanW": [
+    "Got away with one there. {?Don't tell the xG people.|Take it and move on.|Efficiency is a skill.} {myScore}. [tail_win]",
+    "Not pretty. Don't care. {myScore}. {?Three points are three points.|Winning ugly is an art.} [tail_win]",
+    "Took our chances. {myScore}. {?Efficiency!|Clinical!|Pure class.} [tail_win]"
+   ],
+   "fanL": [
+    "{xgL} xG and zero luck. {?Football is a joke.|Unbelievable.|Dominated and lost.} {myScore}. [tail_lose]",
+    "We had {shL} shots and they win {wscore}?? {?Make it make sense.|This sport.} [tail_lose]",
+    "xG says we won. Scoreboard says no. {myScore}. {?Make it make sense.|Football is broken.} [tail_lose]"
+   ],
+   "fanN": [
+    "{L} was better and lost. {?Cruel.|Football is unfair.|Classic.} [tail_neutral]"
+   ],
+   "meme": [
+    "xG: {L} {xgL} – {xgW} {W}. Scoreboard: {wscore} {W}. xG: 🤡 Football: 💅",
+    "xG: {L} {xgL}–{xgW} {W} Score: {W} {wscore} Football: 🤡"
+   ],
+   "radio": [
+    "Caller: \"Expected goals? It's the actual goals that count.\" Host: \"Not wrong, but also… {xgL} to {xgW}.\""
+   ],
+   "vid": [
+    "ROBBED? {L} fans react after {wscore} loss with {xgL} xG",
+    "{W} STEAL IT: fan reaction"
+   ],
+   "tac": [
+    "{L} dominated shot quality ({xgL} xG) but {W}'s block and keeper turned nearly everything away."
+   ]
+  },
+  "shootout": {
+   "core": [
+    "PENALTIES: {W} win {penScore} on spot-kicks after {score} draw with {L}.",
+    "{W} survive the shootout against {L} — {penScore}.",
+    "Shootout drama: {W} through on penalties.",
+    "{W} through after the shootout ({penScore}).",
+    "Penalties: {W} {penScore} {L}.",
+    "Spot-kick drama: {W} win it."
+   ],
+   "formal": [
+    "{W} edge {L} in the shootout after {score} deadlock",
+    "{W} advance on penalties following a tense {score} draw"
+   ],
+   "punny": [
+    "SPOT OF BOTHER! {W} WIN IT ON PENS ({penScore})",
+    "NERVES OF STEEL! {W} survive penalties against {L}",
+    "{L} OUT! The PENALTY LOTTERY crushes them again",
+    "PENALTY HEARTBREAK! {W} WIN {penScore}",
+    "{L} OUT ON PENS!",
+    "{?NERVES OF STEEL|ICE IN THEIR VEINS}: {W} {?TRIUMPH|SURVIVE} {penScore}"
+   ],
+   "fanW": [
+    "PENALTIES!!! {?I can't feel my legs.|My nails are gone.|I need a lie-down.} {penScore}! {?We are through!|Up we go!} [tail_win]",
+    "{?Heartbreak turned to joy.|Never doubted. (Doubted always.)} {penScore} on pens. [tail_win]",
+    "Pens. {penScore}. {?I can't feel my hands.|I'm in tears.|I'm in love.} [tail_win]"
+   ],
+   "fanL": [
+    "Penalties. {?Again.|Always.|Why do we do this to ourselves?} {penScore}. [tail_lose]",
+    "Lost on pens. {?Gutted.|It's a lottery.|We deserved better.} [tail_lose]",
+    "Out on penalties. {penScore}. {?Again.|Cruel.|Football.} [tail_lose]"
+   ],
+   "fanN": [
+    "Shootouts are the best/worst thing in football. {?Tension.|Heart-in-mouth.} [tail_neutral]"
+   ],
+   "meme": [
+    "Every penalty taker: 🧠 \"top corner\" ⚽ Reality: 🥅 \"the keeper's hands\"",
+    "Penalty takers: 😎 → 😰 → 💀"
+   ],
+   "radio": [
+    "Caller: \"Pens are a lottery.\" Host: \"Yes, and you've been buying the same ticket for years.\""
+   ],
+   "vid": [
+    "PENALTY SHOOTOUT REACTION: {W} v {L} (the tension is real)"
+   ],
+   "tac": [
+    "Both sides cancelled out over 120 minutes — {score}. The shootout decided it: composure over data."
+   ]
+  },
+  "og": {
+   "core": [
+    "OWN GOAL: {ogS} turns it into his own net — {W} {wscore} {L}.",
+    "Cruel luck for {ogS} — own goal gifts {Ws} the lead.",
+    "Own goal drama: {W} {wscore} {L} after {ogS}'s misfortune.",
+    "Own goal by {ogS}: {W} {wscore} {L}.",
+    "{ogS} OG: {W} take the points.",
+    "Unlucky {ogS}: own goal decides it."
+   ],
+   "formal": [
+    "An unfortunate own goal from {ogS} proves decisive as {W} edge {L}"
+   ],
+   "punny": [
+    "{ogS} SCORES FOR THE OTHER SIDE! {W} {?TAKE|STEAL|WIN}",
+    "OH NO! {ogS} {?SLICES|DEFLECTS|DIVERTS} {W} into the lead",
+    "OWN GOAL AGONY for {ogS} as {W} win",
+    "OWN GOAL AGONY: {ogS}",
+    "{ogS} {?FINDS THE WRONG NET|SCORES AT THE WRONG END}",
+    "OOPS! {ogS} HELPS {W}"
+   ],
+   "fanW": [
+    "{ogS} scoring for us? {?Thanks, mate.|Not complaining.|Lucky? Absolutely. Take it.} {myScore}. [tail_win]",
+    "Thanks, {ogS}! {myScore}. {?We'll take it.|Luck is part of the game.} [tail_win]"
+   ],
+   "fanL": [
+    "{ogS} {?own goal|OG}. {?Cruel.|Unreal.|Don't blame him, that was a deflection.} {myScore}. [tail_lose]",
+    "{ogS} OG. {myScore}. {?Don't blame him.|Brutal luck.} [tail_lose]"
+   ],
+   "fanN": [
+    "Own goals: the cruelest part of football. Feel for {ogS}. [tail_neutral]"
+   ],
+   "meme": [
+    "{ogS} when the ball hit him: 🥺 \"I swear I didn't mean it\"",
+    "{ogS}: *scores* {ogS}: *regrets*"
+   ],
+   "radio": [
+    "Caller: \"Not his fault!\" Host: \"Who else's name is on the scoresheet for them, caller?\""
+   ],
+   "vid": [
+    "{ogS} OWN GOAL: unlucky or unforgivable?"
+   ],
+   "tac": [
+    "The own goal came from {W}'s pressure — a cutback that stretched {L}'s line, with {ogS} the unlucky recipient."
+   ]
+  },
+  "sub_hero": {
+   "core": [
+    "SUPER-SUB: {scorerS} comes off the bench and scores for {W} ({min}').",
+    "{scorer} scores within minutes of coming on — {W} {wscore} {L}.",
+    "Bench hero {scorerS} settles it: {W} beat {L} {wscore}.",
+    "{scorerS} off the bench: {W} win {wscore}.",
+    "Super-sub {scorerS} ({min}').",
+    "{scorerS} {?makes the difference|steps up} off the bench."
+   ],
+   "formal": [
+    "Substitute {scorerS} makes a decisive impact as {W} beat {L}"
+   ],
+   "punny": [
+    "BENCH HERO! {scorerS} {?COMES ON|ARRIVES|STEPS UP} and {?WINS IT|SCORES|DECIDES IT}",
+    "SUB-LIME! {scorerS} {?FIRES|STRIKES|NETS} off the bench for {W}",
+    "SUPER-SUB {scorerS}!",
+    "{scorerS} {?COMES ON, SCORES|SUBS IN, SCORES}",
+    "{?BENCH BOSS|SUBSTITUTE SENSATION}: {scorerS}"
+   ],
+   "fanW": [
+    "{scorerS} off the bench and scores. {?Manager's got the golden touch.|Fresh legs, fresh goals.|Subs matter!} [tail_win]",
+    "{scorerS} off the bench to win it. {?Subs are everything.|The manager is a genius.} {myScore}. [tail_win]"
+   ],
+   "fanL": [
+    "Their sub {scorerS} {?changed the game|killed us|won it}. {?Why couldn't we have a bench like that?|Bench depth, sigh.} [tail_lose]",
+    "Their sub {scorerS} killed us. {myScore}. [tail_lose]"
+   ],
+   "fanN": [
+    "{scorerS} off the bench to score — {?impact sub of the weekend|great stuff}. [tail_neutral]"
+   ],
+   "meme": [
+    "Coach: \"Go get us a goal.\" {scorerS}: ✅ in 6 minutes",
+    "Bench warmers: 😪 {scorerS}: ⚽"
+   ],
+   "radio": [
+    "Caller: \"He's too good for the bench.\" Host: \"Evidently the manager disagrees. Until tonight.\""
+   ],
+   "vid": [
+    "SUPER-SUB {scorerS} wins it — fans react"
+   ],
+   "tac": [
+    "{scorerS}'s introduction changed the geometry — a fresh runner against tiring centre-backs."
+   ]
+  }
+ },
+ "MB_OVERLAY": {
+  "derby": [
+   "{derbyName|cap}: bragging rights to {Ws}.",
+   "In {derbyName}, nothing else matters but the result.",
+   "{derbyName|cap} always delivers — this one had everything.",
+   "Local pride on the line in {derbyName}.",
+   "Nobody forgets {derbyName}. Ever.",
+   "{derbyName|cap}: {Ws} take the bragging rights.",
+   "{derbyName|cap} delivered again.",
+   "This was {derbyName}: and it was {?wild|special|unforgettable}."
+  ],
+  "final": [
+   "A {stage} to remember.",
+   "Silverware on the line — and {Ws} delivered.",
+   "Trophy night: {Ws} had the nerve when it mattered.",
+   "{stage}: the stakes were obvious, and so was the quality.",
+   "A {stage} fit for the history books."
+  ],
+  "knockout": [
+   "{stage}: win or go home — {Ws} go through.",
+   "A {stage} tie decided on {?the night|the day}.",
+   "{Ls} are out. {Ws} march on.",
+   "{stage}: {Ws} survive; {Ls} are out.",
+   "{stage} nerves, {stage} drama."
+  ],
+  "streak_win": [
+   "That's {streakN} wins on the bounce for {streakWho}.",
+   "{streakWho} extend their winning run to {streakN}.",
+   "{streakN} straight wins now — {streakWho} look unstoppable.",
+   "{streakWho} are on a {streakN}-game winning run.",
+   "{streakN} straight wins now for {streakWho}."
+  ],
+  "streak_lose": [
+   "{streakWho} have now lost {streakN} in a row.",
+   "A {streakN}-match losing run for {streakWho}. The pressure is mounting.",
+   "{streakN} defeats on the spin: crisis club for {streakWho}.",
+   "{streakWho} have lost {streakN} in a row.",
+   "{streakN} defeats and counting: {streakWho}."
+  ],
+  "streak_unbeaten": [
+   "{streakWho} extend their unbeaten run to {streakN}.",
+   "{streakN} matches without defeat for {streakWho}.",
+   "{streakN} unbeaten now: {streakWho}."
+  ],
+  "streak_winless": [
+   "{streakWho} haven't won in {streakN} matches.",
+   "{streakN} games and counting without a win for {streakWho}.",
+   "{streakN} without a win: {streakWho}."
+  ],
+  "revenge": [
+   "Revenge served: the last meeting went {lastMeeting}.",
+   "Payback for {Ws} — the reverse fixture saw {Ls} win.",
+   "Revenge for the {lastMeeting} defeat last time."
+  ],
+  "cleansheet": [
+   "{Ws} keep a clean sheet.",
+   "Shutout: {gkS} and the defence hold firm.",
+   "Clean sheet: {Ws} didn't concede.",
+   "Not a goal conceded: {Ws}."
+  ],
+  "record": [
+   "Third consecutive meeting won by {Ws}.",
+   "{Ws} have now beaten {Ls} {h2hWins} times in {h2hN} meetings.",
+   "{Ws} now lead the head-to-head: {h2hWins} wins in {h2hN}.",
+   "{Ws} edge ahead in the series with {h2hWins} wins from {h2hN} meetings."
+  ]
+ },
+ "MB_TAILS": {
+  "tail_win": [
+   "{?Up the {myS}!|Come on {myS}!|Proud of every one of them.|Take a bow, lads.|What a team.|Class.|Deserved.}",
+   "{?Different class.|That'll do.|Magnificent.|We go again.|Mood: elite.}",
+   "{?Told you.|Never in doubt.|Sleep well, everyone.|Best day of the week.}",
+   "{?Pure joy.|Football, bloody hell.|Love this club.|Unreal feeling.}",
+   "{?Up the {myS}!|Come on {myS}!|Proud of every one of them.|Take a bow, lads.|What a team.|Class.|Deserved.|{myS} till I die.|Sing it loud.|Let the party begin.|Enjoy tonight.}",
+   "{?Different class.|That'll do.|Magnificent.|We go again.|Mood: elite.|Absolutely buzzing.|Top, top performance.|Bring on the next one.|Footballing perfection.}",
+   "{?Told you.|Never in doubt.|Sleep well, everyone.|Best day of the week.|Nailed it.|The lads delivered.|Everything clicked.}",
+   "{?Pure joy.|Football, bloody hell.|Love this club.|Unreal feeling.|This is why we pay.|Take it all in.|Absolute scenes.|Heart full.}"
+  ],
+  "tail_lose": [
+   "{?Gutted.|Sick of this.|Pain.|It hurts.|Needs sorting.|Not good enough.}",
+   "{?Back to work.|Sack the lot.|We go again, I guess.|Next week, please.}",
+   "{?Going to bed.|Don't talk to me.|Logging off.|Dark times.}",
+   "{?Heartbreaking.|Cruel.|Football hates us.|This season…}",
+   "{?Gutted.|Sick of this.|Pain.|It hurts.|Needs sorting.|Not good enough.|Enough is enough.|Where do we go from here?|Brutal.|I can't.}",
+   "{?Back to work.|Sack the lot.|We go again, I guess.|Next week, please.|Time to bounce back.|Heads must roll.|Let's regroup.|Deep breaths.}",
+   "{?Going to bed.|Don't talk to me.|Logging off.|Dark times.|Let me sulk in peace.|See you on Monday.|I need a minute.|Muting this account for a day.}",
+   "{?Heartbreaking.|Cruel.|Football hates us.|This season…|Every. Single. Time.|Another one for the pain archive.|It's a cruel game.}"
+  ],
+  "tail_draw": [
+   "{?Fine.|Meh.|Take it.|Could've been better.|Could've been worse.}",
+   "{?On to the next one.|A point is a point.|Honours even.}",
+   "{?Mixed feelings.|Bittersweet.|Frustrating.}",
+   "{?Fine.|Meh.|Take it.|Could've been better.|Could've been worse.|Fair enough.|Honest result.|Not terrible.}",
+   "{?On to the next one.|A point is a point.|Honours even.|Positives to take.|We'll take it.|Onwards.}",
+   "{?Mixed feelings.|Bittersweet.|Frustrating.|Two points dropped or one gained?|Neither here nor there.|Decent, I suppose.}"
+  ],
+  "tail_neutral": [
+   "{?Great stuff.|Love football.|Entertainment.|Classic football.}",
+   "{?Fair result.|What a weekend.|Back for more tomorrow.}",
+   "{?Football, eh?|The league is wild this year.|Don't blink.}",
+   "{?Great stuff.|Love football.|Entertainment.|Classic football.|Football is wild.|Football, eh?|Not bad at all.}",
+   "{?Fair result.|What a weekend.|Back for more tomorrow.|Good watch.|Worth the time.|Plenty to chew on.|One to remember.}",
+   "{?Football, eh?|The league is wild this year.|Don't blink.|This season is something else.|Table is going to be mad.|Strap in, folks.}"
+  ],
+  "bn_prefix": [
+   "🚨 BREAKING:",
+   "🚨 JUST IN:",
+   "⚡ NEWS:",
+   "🔴 UPDATE:",
+   "📢 LATEST:",
+   "🟥 ALERT:",
+   "🔔 NOW:",
+   "📰 DEVELOPING:",
+   "‼️ FLASH:",
+   "🧨 BIG ONE:",
+   "📡 WIRE:",
+   "🆕 FRESH:",
+   "🔊 REPORT:",
+   "⏱️ OFFICIAL:"
+  ],
+  "desk_win": [
+   "FULL TIME: {W} {wscore} {L}. {?Three points in the bag.|What a performance, lads.|Thank you for the support.|Proud of that.} {?🔥|💪|🙌|✊}",
+   "✅ Final whistle: {W} {wscore} {L}. {?Brilliant from everyone.|The fans were incredible.|One for the dressing room.}",
+   "FT | {W} {wscore} {L}. {?Big win.|That's how it's done.|Onwards.|Great effort, team.}",
+   "That's a wrap: {wscore} to {Ws}. {?Well played, everyone.|Superb.|See you at the next one.} {?⚽|🙌|👏}",
+   "Three points secured ✅ {W} {wscore} {L}. {?Players' player ratings coming soon.|Highlights in the app.}",
+   "It's a WIN! {Ws} {wscore} {Ls}. {?Take a bow, lads.|What a team.|The best fans in the world.} {?💙|❤️|🖤|⚪}",
+   "Matchday done. {wscore}. {?Rest up, recover, repeat.|On to the next.|Boss's verdict in the mixed zone shortly.}",
+   "Result: {W} {wscore} {L}. {?Quality all over the pitch.|A night to remember.|Relentless.}",
+   "Full-time: {wscore} to us. {?Players and fans together.|Thank you to everyone who travelled.|Unreal atmosphere.} {?🎉|🥳|⭐}",
+   "We take it. {Ws} {wscore} {Ls}. {?Next one, now.|Recover well, lads.}",
+   "Job done: {W} {wscore} {L}. {?Highlights and reaction on our channels.|Post-match reaction to follow.}",
+   "Winners. {wscore}. {Ws}. {?🔥🔥🔥|👏👏👏|💪💪💪}"
+  ],
+  "desk_draw": [
+   "FULL TIME: {H} {score} {A}. {?A point to take away.|We go again.|On to the next one.} {?🤝|💙|⚽}",
+   "FT | {H} {score} {A}. {?Reaction soon.|Thank you for the support.|Positives to take.}",
+   "All square at the final whistle: {Hs} {score} {As}. {?We move on.|Heads up, lads.}",
+   "Point earned: {score}. {?Match report and highlights in the app.|Back to work tomorrow.}",
+   "{H} {score} {A}. {?A hard-fought point.|Both sides had their moments.|A good battle.} {?⚽|💪}",
+   "The whistle goes: {score}. {?Plenty to build on.|Plenty to analyse.}",
+   "Final score: {Hs} {score} {As}. {?Thank you to the fans.|Rest, recover, repeat.}",
+   "Draw. {score}. {?Thanks for the support.|We will be back stronger.}"
+  ],
+  "desk_lose": [
+   "FULL TIME: {H} {score} {A}. {?We go again.|Not the result we wanted — we will be back.|Thanks to the fans who travelled.|Heads up. Work starts tomorrow.}",
+   "FT | {H} {score} {A}. {?Disappointed, but not defeated.|We take it on the chin.|We must be better.}",
+   "Not our night. {score}. {?Thank you for the support.|We'll learn and move on.|Back in training tomorrow.}",
+   "{Hs} {score} {As}. {?A tough one to take.|We owe the fans better.|The response starts now.}",
+   "Full-time. {?That one hurts.|We have to look at ourselves.|We'll be back.} {?💙|❤️|🖤|⚪}",
+   "Result: {score}. {?The squad know it wasn't good enough.|Standards weren't met tonight.|We stay united.}",
+   "Defeat. {score}. {?We keep fighting.|Thank you to the loyal fans.|On to the next one.}",
+   "We didn't deliver. {score}. {?Apologies to the fans.|Work to do.|Response required.}",
+   "Tough night. {score}. {?We'll review and react.|The group stays together.}",
+   "Final whistle: {score}. {?The next game is already on our minds.|We'll bounce back.}"
+  ],
+  "var_red": [
+   "{?VAR check:|Officials:|Decision review:|Law watch:} {red} ({redTeam}) sent off in the {redMin}th minute. {?The right call — clear and obvious.|Debatable, but within the laws.|A harsh sanction in my view.|Verdict: red card stands.}",
+   "Law 12 explainer: {redS}'s challenge on the {redMin}th minute — {?reckless and excessive|studs up, no contact needed|serious foul play, plain and simple|a borderline call}. {?Red is fair.|Yellow would be generous.}",
+   "{redTeam} down to ten: {redS} walks at {redMin}'. {?Excessive force.|Last-man situation.|Second yellow territory.} {?Right call.|Debate to come.}",
+   "Red card review — {redS}, {redMin}'. {?Nothing for VAR to do.|VAR confirmed on-field decision.|A tough sanction, but within protocol.}",
+   "Technical read: {redS}'s sending-off hinged on {?point of contact|speed of approach|intent|studs}. {?The right call.|Arguably yellow.}",
+   "{redTeam} reduced to ten at {redMin}'. {?Clear red.|No complaints.|A harsh one.} Verdict: {?stands|upheld}.",
+   "Referee's decision on {redS}: {?red, no doubt|red, on balance|red, a bit unlucky}. The {redMin}th-minute call changed the game.",
+   "In-game ruling on {redS}: {?correct under the laws|probably harsh|inevitable after the first booking}."
+  ],
+  "poll_motm": [
+   "Your Man of the Match? Vote below 👇",
+   "Who gets your MOTM vote?",
+   "Pick your Player of the Match: 🗳️",
+   "Man of the Match — you decide.",
+   "Rate it: who was the best on the pitch?",
+   "Poll time ✋ Best performer today?",
+   "Who should take the match ball? Vote below.",
+   "Your Player of the Match, no arguing (ok, a little arguing):",
+   "Winner of the 'who was best' debate, you decide 👇",
+   "Quick vote: standout player?",
+   "Our MOTM is in. What's yours?",
+   "Best player on the pitch: three candidates, one vote 👇"
+  ],
+  "tab_lead_w": [
+   "{?Scenes at {stadium}!|You could not make it up.|Talk about a night to remember.|What a night.|Pandemonium.|Unreal stuff.} {W} {?came out on top|won it|were the better side|took the points} against {L}, {wscore}.",
+   "{?Fans were left breathless.|The place went wild.|Chaos, joy and misery, all in one.} {W} beat {L} {wscore}.",
+   "It was {?a night of|a day of|an afternoon of} {?pure drama|fierce competition|raw emotion} as {W} beat {L} {wscore}.",
+   "{W} did it. {wscore} over {L}. {?Nobody saw that coming.|Not a lot of arguments.|The fans will talk about it for days.}",
+   "{L} {?were left shell-shocked|were beaten fair and square|had no answers} as {W} won {wscore}.",
+   "{?What a game.|Some match.|The football gods were busy.} {W} {?come out on top|win it|edge it} {wscore}.",
+   "{?It had everything.|It was a rollercoaster.|It didn't disappoint.} {W} v {L} ended {wscore}.",
+   "{?Hearts were broken, hearts were mended.|Joy at one end, despair at the other.} {W} {wscore} {L}.",
+   "The {Ws} fans {?won't forget this in a hurry|will be singing for days}. {W} {wscore} {L}.",
+   "{?A statement win.|A very good win.|A significant win.} {W} {wscore} {L}."
+  ],
+  "tab_lead_d": [
+   "{?Neither side could find a winner.|It was all square at the end.|Nothing to separate them.|A fair share of the spoils.} {H} and {A} {?share the points|finish level|draw}: {score}.",
+   "{?Plenty of drama, no winner.|Two sides, one point each.|A frustrating night for both.} {H} {score} {A}.",
+   "{?No winner, plenty of talk.|Honours even.|A stalemate with spice.} {H} {score} {A}.",
+   "{?It ended level.|The final whistle brought no winner.|Spoils shared.} {H} {score} {A}.",
+   "{?An absorbing draw.|A cagey draw.|A dramatic draw.} {H} and {A} cancel each other out: {score}.",
+   "{?Fans left debating.|Neither bench happy.|A point each.} {H} {score} {A}."
+  ],
+  "tab_mid": [
+   "{?On target for {W}:|The goals:|Scorers:|Who scored:} {scorers}.",
+   "{?Goals came from|The scoresheet read:|It was settled by} {scorers}.",
+   "{?The match report:|How it unfolded:|Key moments:} {scorers}.",
+   "{?The goals went like this:|The scoring order:} {scorers}.",
+   "{?Net-bulgers:|The ones that counted:} {scorers}.",
+   "{?Goal log:|From the scoresheet:} {scorers}."
+  ],
+  "tab_mid_none": [
+   "Not a single goal to show for it.",
+   "{?Nul points, zero goals.|No goals, plenty of grumbles.|The scoreboard stayed blank.}",
+   "{?Goalless — and not for the want of trying.|A goalless slog.}"
+  ],
+  "tab_tail_motm": [
+   "{?The man of the match? {motmS}.|{motmS} was {?brilliant|unplayable|simply the best} on the night.|{motmS} {?stole the show|ran the game|left everyone talking}.|If you want a name: {motmS}.|{motmS}: {?class|unstoppable|the difference}.} {?Fans will talk about this for weeks.|Wait till you see the reaction.|Nobody will forget it quickly.}",
+   "{?Star turn:|Standout:|Hero of the hour:} {motmS}. {?The fans will remember it.|Nobody else came close.|A performance for the ages.}",
+   "{motmS} {?takes the headlines|takes the credit|takes the match ball}. {?Wait for the reaction.|The internet agrees.}",
+   "{?All eyes on|Everyone's talking about|The name on every lip:} {motmS}. {?Brilliant.|Different class.|Frightening form.}"
+  ],
+  "tab_tail_red": [
+   "{redS} {?will want to forget his night|saw red|made headlines for the wrong reasons|walked, and it changed everything}.",
+   "{?Red card drama:|A red card changed it:|Sent off:} {redS}. {?An expensive moment.|It cost his side.|The turning point.}",
+   "{redS}'s dismissal {?swung the match|made the difference|was the turning point}."
+  ],
+  "tab_tail_gen": [
+   "{?Fans will talk about this for weeks.|Wait till you see the reaction.|It's all anybody's talking about.|Expect a lively debate tomorrow.|The internet is already in meltdown.}",
+   "{?More to follow.|Full reaction coming.|Plenty to unpack.}",
+   "{?Our panel will have a field day.|The pundits will love it.}",
+   "{?Expect big headlines tomorrow.|Buckle up for the reaction.|It will dominate the weekend.}"
+  ],
+  "broad_p1_w": [
+   "{W} won {wscore} in the {comp}{stageTxt}, with {motmS} setting the tone. {shW} shots to {shL} and {possW}% of the possession were part of the picture, and the xG ({xgW} to {xgL}) suggests the margin {xgVerdict}.",
+   "In the {comp}{stageTxt}, {W} beat {L} {wscore}. {motmS} {?led from the front|pulled the strings|proved decisive}, and while {L} {?had spells|created chances}, the xG ({xgW} to {xgL}) {xgSupport}.",
+   "{W} made the best of {?a tight|a lively|a one-sided} afternoon, winning {wscore}{stageTxt}. {possW}% of the ball and {shW} attempts weren't the whole story; {motmS}'s influence was, and the xG ({xgW}–{xgL}) {xgSupport}.",
+   "A {wscore} win for {W}{stageTxt} over {L}. The numbers ({shW}–{shL} on shots, {possW}% possession) are only part of it: with xG at {xgW} to {xgL}, the margin {xgVerdict}.",
+   "{W} found a way — {wscore} over {L}{stageTxt} — with {motmS} the {?outstanding performer|difference|creative spark}. By xG ({xgW}–{xgL}) the margin {xgVerdict}.",
+   "It finished {wscore} in {W}'s favour{stageTxt}, a result built on {?control|pressing|set pieces|efficiency}. {shW} shots to {shL} and {possW}% of the ball add context; the xG ({xgW}–{xgL}) {xgSupport}.",
+   "{L} {?pushed|tested|ran} {W} at times, but {wscore} was the final verdict{stageTxt}. {motmS} was {?excellent|decisive|outstanding}, and the xG ({xgW}–{xgL}) {xgSupport}.",
+   "{W}'s {wscore} victory over {L}{stageTxt} was {?a lesson in efficiency|a model of control|full of detail}: {shW}–{shL} on shots, {possW}% possession, and {motmS} at the heart of it. The xG ({xgW}–{xgL}) {xgSupport}."
+  ],
+  "broad_p1_d": [
+   "{H} and {A} drew {score} in the {comp}. With {xgH} xG to {xgA} and {shH} shots to {shA}, neither side could claim to have been the better team.",
+   "A {score} draw in the {comp} between {H} and {A} was, by xG ({xgH}–{xgA}), {?an even contest|a fair result|close to deserved}. Shots were {shH}–{shA}; possession {possH}%–{possA}%.",
+   "{H} and {A} shared the points ({score}). {?Both will have regrets.|Neither will be entirely satisfied.|It was hard to split them.} xG: {xgH}–{xgA}.",
+   "{score}: the final scoreline for {H} v {A}. The possession split ({possH}%–{possA}%) and shot count ({shH}–{shA}) suggest {?a balanced game|a game of fine margins}.",
+   "A draw ({score}) that {?will keep both sets of supporters talking|leaves the table unchanged|says more about the defences than the attacks}. {H} had {xgH} xG, {A} {xgA}.",
+   "{H} v {A} in the {comp} ended {score}. {?The numbers are nearly identical.|It could have gone either way.|Chances were shared fairly evenly.} ({shH}–{shA} shots.)"
+  ],
+  "broad_comeback": [
+   "{W} had to come from {deficit} down, a {?display of resilience|testament to their squad depth|sign of a team that never gives up|reminder of their mentality}.",
+   "Going {deficit} behind did not break {W}; {?they adjusted and rallied|they never panicked}.",
+   "The scoreline spoke of {?a famous comeback|a hard-won turnaround}: {deficit} down, {W} ended up winners."
+  ],
+  "broad_red": [
+   "{redS}'s dismissal in the {redMin}th minute changed the shape of the afternoon for {redTeam}.",
+   "The red card ({redS}, {redMin}') {?redefined|reshaped|decided} the {?contest|match}: {redTeam} {?had to defend|never recovered}.",
+   "{redTeam} played the rest of the match with ten after {redS} saw red at {redMin}'."
+  ],
+  "broad_streak": [
+   "{streakWho} now have {streakN} {streakTxt} to their name.",
+   "{streakN} {streakTxt} for {streakWho}: {?a trend or a blip?|the mood is shifting.}",
+   "The run for {streakWho} extends to {streakN} {streakTxt}."
+  ],
+  "broad_prev": [
+   "The previous meeting between the sides ended {lastMeeting}.",
+   "Last time they met, it finished {lastMeeting}.",
+   "{?History:|Head-to-head:} the last meeting ended {lastMeeting}."
+  ],
+  "broad_gen": [
+   "{?The manager will take positives from the performance.|Both managers will have plenty to analyse.|The details of the second half will keep analysts busy.|Questions remain for both dugouts.|Neither dressing room will be dull tomorrow.}",
+   "{?Fixtures arrive quickly; recovery will matter.|The calendar leaves little room for reflection.|The schedule offers no rest.}",
+   "{?It sets up an interesting run-in.|The table will look different tomorrow.|Plenty of storylines will carry forward.}",
+   "{?Supporters will want answers to the early-game questions.|The post-mortem will be long.|The debate will rage on.}"
+  ],
+  "stat_xg": [
+   "{H} {xgH} xG – {xgA} xG {A}. Shots {shH}-{shA}, possession {possH}%-{possA}%.",
+   "xG: {Hs} {xgH}, {As} {xgA}. Shots on the day: {shH}–{shA}. Share of the ball: {possH}%–{possA}%.",
+   "Numbers: {H} {score} {A} | xG {xgH}–{xgA} | shots {shH}–{shA} | possession {possH}%–{possA}%.",
+   "{H} v {A} by the data: xG {xgH}–{xgA}, shots {shH}–{shA}.",
+   "Expected goals: {xgH} for {Hs}, {xgA} for {As}. Final: {score}.",
+   "The xG timeline says {?it was close|one side edged it|chances were traded}: {xgH}–{xgA}."
+  ],
+  "stat_derby": [
+   "{derbyName|cap}: {H} {score} {A}. {h2hTxt}",
+   "{derbyName|cap} result: {score}. {h2hTxt}",
+   "{h2hTxt} {derbyName|cap} ended {score}."
+  ],
+  "stat_scorer": [
+   "{topName} has scored {topN} in this match — involved in {involvePct}% of the match's goals.",
+   "{topName}: {topN} goals today, {involvePct}% of the match total.",
+   "Multi-goal night for {topName}: {topN} goals — the match produced {tot}."
+  ],
+  "stat_streak": [
+   "{streakWho}: {streakN} {streakTxt}.",
+   "{streakWho} {?extend|continue|now have} {streakN} {streakTxt}.",
+   "Run check — {streakWho}: {streakN} {streakTxt}."
+  ],
+  "stat_win": [
+   "Decisive goal: {winGoalS} at {winGoalMin}'. {W} went on to win {wscore}.",
+   "Winning moment: {winGoalS}, {winGoalMin}'. {W} {wscore} {L}.",
+   "The goal that decided it: {winGoalS} ({winGoalMin}'). Final: {wscore}."
+  ],
+  "stat_gk": [
+   "{gk}: {saves} saves — the most in the match.",
+   "Save count: {gkS} {saves}. {?Best of the day.|Top of the board.}",
+   "{gkS} made {saves} saves, more than anyone else."
+  ],
+  "tv_pre_open": [
+   "Welcome to the build-up: {H} v {A} in the {comp}.",
+   "Good evening — it's the big one: {H} v {A}.",
+   "We're live ahead of {H} v {A}, and the studio is buzzing.",
+   "All eyes on {H} v {A} tonight. The panel is ready.",
+   "Kick-off is approaching: {H} v {A} in the {comp}.",
+   "Welcome to the Kickoff Show. Tonight: {H} v {A}."
+  ],
+  "tv_pre_close": [
+   "{?Our panel has made its predictions.|Let us hear what the studio thinks.|The panel is split.|Predictions, coming right up.}",
+   "{?Who will it be?|Which side will blink first?|Who has the edge?}",
+   "{?We'll be with you throughout.|Stay with us.|Don't go anywhere.}",
+   "{?The studio has opinions.|There is no consensus on the sofa.}"
+  ],
+  "pre_body1": [
+   "{H} ({fmH}, {styleH}) meet {A} ({fmA}, {styleA}). {formLine} {keyLine}",
+   "Shape check: {H} in a {fmH}, {A} in a {fmA}. {formLine}",
+   "{H}'s {styleH} approach meets {A}'s {styleA}. {formLine}",
+   "Preview: {H} ({formH}) v {A} ({formA}). {keyLine}",
+   "{H} and {A} line up in a {fmH} and a {fmA}. {keyLine}"
+  ],
+  "pre_body2": [
+   "{?The key question is who controls midfield.|Set pieces and second balls may decide it.|Whoever scores first changes the complexion of the game.|Space in behind could be the story.|Pressing triggers will matter.|Transition speed could be the difference.|Whoever handles the first 15 minutes wins the day.|Discipline out of possession will decide it.} {missLine}",
+   "{?Look out for the wide areas.|Look out for turnovers in midfield.|Look out for fouls near the box.} {missLine}",
+   "{?Expect pressure at the start.|Expect a tight first half.|Expect chances after the break.} {missLine}",
+   "{?This could be a tactical chess match.|This could be an open, end-to-end contest.} {missLine}"
+  ],
+  "tr_body_g1": [
+   "{team} are {trophy} champions and the celebrations have already started.",
+   "{team} WIN IT! The {trophy} belongs to the {teamS} faithful.",
+   "It's official: {team} are {trophy} winners.",
+   "{team}: {trophy} champions. {?Say it again.|Pinch yourself.|Frame the headline.}",
+   "The {trophy} is heading to {team}. {?Fans are going wild.|Streets are in party mode.}"
+  ],
+  "tr_body_g2": [
+   "{?Fans poured onto the streets.|The squad celebrated long into the night.|The cabinet has a new occupant.|The city is painted in club colours.|Flares, songs and tears all night.}",
+   "{?The parade is planned.|The open-top bus is being washed.|Taxi drivers are on a free-for-all.}",
+   "{?Legends were made tonight.|It's a season they'll talk about forever.|Years of waiting, over.}"
+  ],
+  "tr_body_m1": [
+   "{team} have won the {trophy}, a triumph built on {?consistency|pressing and patience|squad depth|a settled XI|collective nerve|defensive solidity|attacking fluency}.",
+   "The {trophy} goes to {team} after a campaign defined by {?control|nerve|rotation done right|clarity of purpose}.",
+   "{team}'s {trophy} win has been coming: {?a steady build|stable structure|consistent selection} told its own story.",
+   "{team}, {trophy} champions. The foundation: {?an unflappable defence|a relentless midfield|a clear identity}."
+  ],
+  "tr_body_m2": [
+   "{?Their manager has carved out a team in his own image.|The question now is whether the core can stay together.|Rivals will study the blueprint.|The next challenge is sustaining this level.|The margins were small, the process huge.}",
+   "{?Expect copycats.|Expect envy.|Expect a long summer of celebrations.}",
+   "{?The squad has the spine to repeat.|Nobody should be surprised.|It will be remembered fondly.}"
+  ],
+  "tr_pan_analyst": [
+   "{team} earned this: structure, depth and a coach who made the right changes at the right time.",
+   "Look at the metrics — {teamS} were the best side across the season. Structure won this.",
+   "{team} took the {trophy} through control, not luck. The data was clear for months.",
+   "Consistency, set-piece organisation and a clear game model — that's why {teamS} won.",
+   "There was never a collapse, never a crisis. That's the sign of a well-built side."
+  ],
+  "tr_pan_attacker": [
+   "I loved watching {teamS} this season — fearless, fluent, fun. Champions!",
+   "{team} played football with a smile. That's what wins hearts AND trophies.",
+   "Pure joy, that team. Attack, attack, attack — and {teamS} win. Take a bow!",
+   "Beautiful football, beautiful result. {team}, champions.",
+   "You want to know why {teamS} won? Because they weren't afraid to play."
+  ],
+  "tr_pan_oldschool": [
+   "Winners everywhere you look. That dressing room has proper characters.",
+   "{team}: leaders on the pitch, steel in the middle, a manager who set standards. Champions.",
+   "You can't buy that togetherness. {teamS} earned every point of it.",
+   "They suffered together, they won together. That's what makes champions.",
+   "No egos, no excuses — {teamS} deserve it."
+  ],
+  "tr_tv_line": [
+   "Lights, trophy, flares — {team} are the {trophy} champions.",
+   "The {trophy} is lifted and the stadium is shaking.",
+   "{team} step up to collect the {trophy}. {?Scenes.|Unforgettable.|What a moment.}",
+   "And there it is: the {trophy}, held aloft by {team}.",
+   "Celebrations are in full swing: {team} are champions."
+  ],
+  "aw_body1": [
+   "{winner} has been named {award} winner after a campaign that {?never let up|set the standard|defined the season|dazzled and delivered}.",
+   "The {award} for {year} goes to {winner} — {?a fitting reward|a popular choice|a decision few argued with}.",
+   "{winner} ({team}) takes the {award}: {statLine}.",
+   "It's {winner}'s year: {award} winner, {statLine}.",
+   "{award} {year}: {winner}. {?Statistically superb.|Quietly dominant.|Unanimous in many eyes.}"
+  ],
+  "aw_body2_runner": [
+   "{runner} was the closest challenger and many will feel {runnerS} deserved more.",
+   "{runner} pushed {winnerS} all the way. {?Close, very close.|A year of fine margins.}",
+   "{runnerS}'s season was also special: some fans think {runnerS} should have won.",
+   "The debate will rage: {winnerS} or {runnerS}? {?We'll never agree.|Pick a side.}"
+  ],
+  "aw_body2_none": [
+   "The vote was widely seen as {?deserved|a formality|one of the clearest in years|an easy call}.",
+   "Few argued with the winner. {?An easy call.|Deserved.|Unanimous in the room.}",
+   "There was little controversy — {?a worthy winner|the stats said it all}."
+  ],
+  "aw_pan_analyst": [
+   "{winnerS} was the standout on the numbers, no argument from me.",
+   "{statLine} — that's the kind of output you can't ignore. {winnerS} deserved it.",
+   "Checking the data: {winnerS} led in nearly every category that matters. Deserved.",
+   "The metrics favoured {winnerS} all season, simple as that."
+  ],
+  "aw_pan_attacker": [
+   "Joyful, brilliant, decisive — {winnerS} earned it. Absolutely!",
+   "Every time {winnerS} got the ball I leaned forward. That's the sign of a star.",
+   "I loved every minute of {winnerS}'s season. Take a bow!",
+   "Magic. Pure magic. {winnerS}, take it home."
+  ],
+  "aw_pan_hardman_r": [
+   "{runnerS} might feel hard done by but {winnerS} did it when it mattered.",
+   "Fine margins between {winnerS} and {runnerS}, but {winnerS} stood up in the big moments.",
+   "{winnerS} — deserved. {runnerS} should keep fighting."
+  ],
+  "aw_pan_hardman_n": [
+   "{winnerS} stood up when it counted. Deserved.",
+   "{winnerS} did the dirty work and the brilliant stuff. Deserved.",
+   "No arguments. {winnerS} was the best."
+  ],
+  "aw_tv_line": [
+   "{winner} takes home the {award} for {year}.",
+   "The {award} winner: {winner}. {?What a year.|Take a bow.}",
+   "And the {award} goes to… {winner}.",
+   "{award}: {winner}. {?The room erupts.|A popular choice.}"
+  ],
+  "ss_asc": [
+   "🎙️ Season preview: {league} — {favs} the ones to beat.",
+   "📺 The new season is here: {league}. {favs} start as favourites.",
+   "🔥 {league} is back. {favs} lead the pack; {dark} lurk.",
+   "📡 Season starts. {league}: favourites {favs}.",
+   "🏟️ New season, new stories: {league} — keep an eye on {dark}."
+  ],
+  "ss_fan": [
+   "New season, same plan: win the {league}. {?No pressure.|Believe.|Not a drop of doubt.|Bring it on.}",
+   "{league}, new season. {?I'm already nervous.|I can't wait.|Big hopes this year.} {?Up the {favS}!|Come on!}",
+   "Fresh start in the {league}: {?this is our year.|it's going to be a long one.|let the chaos begin.}",
+   "Season opener energy: {?we've got this.|please let us stay fit.|just no early losses.}",
+   "A whole new {league} season. {?Everyone is a champion in August.|Hope is free.|Bring on the drama.}",
+   "{league} is back. {?Football is back.|Life has meaning again.|My weekends are booked.}"
+  ],
+  "ctx_title_fan": [
+   "{?Title race is ON.|Nerves already.|Every single point matters now.|This is getting tense.|I can't breathe.} {leadS} {?lead the way|are setting the pace|are in front}, but {secondS} {?will not go away|are right behind|are hunting them down}.",
+   "{leadS} v {secondS} for the {league}? {?Please let it go to the last day.|I'm not ready for this.|Bring the drama.}",
+   "{?Marking my calendar|Keeping my diary clear} for {leadS} and {secondS}: the {league} could go either way.",
+   "Tight at the top: {leadS} and {secondS}. {?Don't blink.|Every game is a final.|Heart rates, please.}",
+   "The {league} is heading to a thriller: {leadS} first, {secondS} second. {?Epic.|Buckle up.}",
+   "{?Mark my words:|Prediction:} {?it comes down to goal difference.|it goes to the final day.|someone cracks.}"
+  ],
+  "sw_body1": [
+   "{team} have lost {n} in a row and the pressure on {mgrS} is growing.",
+   "{n} defeats on the spin: {team} are {?slipping|spiralling|in a tailspin} and {mgrS} is feeling the heat.",
+   "{mgrS} is {?under scrutiny|facing hard questions|being asked about his future} after {n} straight losses.",
+   "{team}'s losing streak ({n}) has fans {?restless|angry|divided}."
+  ],
+  "sw_body2": [
+   "{?Supporters are split between patience and demands for change.|The board is said to be watching closely.|The next fixture looks pivotal.|Insiders suggest the dressing room is still behind the boss.|Calls for change are growing.|A reaction is demanded.}",
+   "{?The data suggests a drop in intensity.|Injuries haven't helped.|The schedule is relentless.}",
+   "{?Pressure is mounting.|Time is running out.|The mood around the club is tense.}"
+  ],
+  "sw_fact": [
+   "{tg} goals in {n} matches ({avg} per game).",
+   "{n} games, {tg} goals — an average of {avg} each.",
+   "Goal count: {tg} from {n} matches ({avg}/game).",
+   "{avg} goals per match across {n} fixtures this round ({tg} total)."
+  ]
+ },
+ "MB_MOOD": {
+  "optimist": {
+   "win": [
+    "Told you we'd win it. {?Title race? Why not.|Believe!|The sky's the limit.}",
+    "This is the start of something special.",
+    "Another one. {?Believe!|This season is going places.|I'm so excited.}"
+   ],
+   "lose": [
+    "Just a blip. {?We bounce back.|Onwards and upwards.|I still believe.}",
+    "One bad day. Next week we go again, and win.",
+    "We'll {?bounce back|come back stronger|learn from this}. {?Trust.|Stay positive.}"
+   ],
+   "draw": [
+    "A point is progress. {?Onwards.|Positive signs.}",
+    "We'll look back on this as a point that mattered.",
+    "Positive step. {?We keep going.|Onwards.}"
+   ]
+  },
+  "doomer": {
+   "win": [
+    "Don't get carried away. {?We're a mess.|It won't last.|We'll lose next week.}",
+    "Won but I'm still worried about the defence.",
+    "Don't celebrate yet. {?It won't last.|We'll slip up soon.}"
+   ],
+   "lose": [
+    "Same old story. {?This club.|I knew it.|Of course.}",
+    "I'm prepared for the worst. And the worst usually comes.",
+    "Told you. {?It's coming.|It always happens.}"
+   ],
+   "draw": [
+    "We'll regret those dropped points. Mark my words.",
+    "A draw feels like a loss when you've been hurt this many times.",
+    "Sure, a point. We'll regret not winning."
+   ]
+  },
+  "delusional": {
+   "win": [
+    "{?Invincibles 2.0.|Quadruple on.|Easy league win.|We are cruising to the title.} Count the trophies.",
+    "Best team in the world. Fight me.",
+    "We're winning EVERYTHING. {?Triple crown.|Double and the invincibles.}"
+   ],
+   "lose": [
+    "We were robbed. {?Ref's a disgrace.|That's not a loss, that's a conspiracy.|Still the better team.}",
+    "xG says we won. Nobody can tell me otherwise.",
+    "That's a scam. {?We won on vibes.|Robbery.}"
+   ],
+   "draw": [
+    "Two points dropped, but we still played better. Heads high.",
+    "We won that in every way except the scoreline.",
+    "We were better. {?Everyone knows.|Ask anyone.}"
+   ]
+  },
+  "banter": {
+   "win": [
+    "Cheers for the three points, {oppS}. {?See you at the next one.|Enjoy the trip home.}",
+    "{oppS} fans, how's the weather out there? 🌧️",
+    "{oppS} fans: {?hope you enjoyed it.|how's the mood?|sleep well.} 😘"
+   ],
+   "lose": [
+    "Enjoy it while it lasts, {oppS} fans. We'll be back.",
+    "Fair play {oppS}. See you next time, plenty of banter to come.",
+    "Enjoy it, {oppS}. {?We'll talk next week.|Don't get used to it.}"
+   ],
+   "draw": [
+    "Both sides rubbish, the draw was fair. 🤝",
+    "I'll take the point and the banter.",
+    "You can have the point, {oppS} — we'll keep the pride."
+   ]
+  },
+  "tactician": {
+   "win": [
+    "Key moment: the shape change on 60'. {?Midfield overloaded and it flipped.|Pressing triggers worked beautifully.}",
+    "The way we moved the ball through the half-spaces was a joy.",
+    "The pressing triggers worked. {?Great shape.|Smart positioning.}"
+   ],
+   "lose": [
+    "Tactically we were second best. {?Too wide.|No width.|No midfield control.} Questions for the manager.",
+    "We lost the second balls. And the game with it.",
+    "Tactically outwitted. {?We were too predictable.|Rigid.}"
+   ],
+   "draw": [
+    "Fine margins: both sides cancelled each other out. {?Wide overloads weren't enough.|Midfield stalemate.}",
+    "A tactical draw, honestly.",
+    "Both shapes cancelled out. {?A chess match.|Clean sheets.}"
+   ]
+  },
+  "stat": {
+   "win": [
+    "{shW} shots, {possW}% of the ball, {xgW} xG. {?Numbers back it up.|Result matches process.}",
+    "{xgW} xG to {xgL}. Process, not luck.",
+    "{xgW} xG, {shW} shots. {?The numbers are what they are.|Take the numbers however you like.}"
+   ],
+   "lose": [
+    "{xgL} xG for them, {xgW} for us. {?Data doesn't lie.|Hard to argue.}",
+    "{shL} shots against us. That's how you lose.",
+    "{xgL} xG against. {?Deserved.|Sigh.}"
+   ],
+   "draw": [
+    "{xgW}-{xgL} xG. A draw is fair on the data.",
+    "Possession {possW}-{possL}. Nobody dominated.",
+    "{xgW} v {xgL} xG: draw was fair."
+   ]
+  },
+  "wholesome": {
+   "win": [
+    "Beautiful to watch. Thank you, lads. 💛",
+    "Love this team, love this club, love this game.",
+    "Beautiful. {?So proud.|Thank you, lads.}"
+   ],
+   "lose": [
+    "Proud of the effort regardless. We stick together. 💙",
+    "Lost, but I'd still choose this club every time.",
+    "Heads high. {?We love you.|Stay strong.}"
+   ],
+   "draw": [
+    "A point shared and a good game of football. 🤝",
+    "Good match, good fans, good day. Onwards.",
+    "Good effort. {?Nice atmosphere.|Fun day.}"
+   ]
+  },
+  "angry": {
+   "win": [
+    "Won, but I'm still livid about that first half. {?Defend!|Sort it out!}",
+    "Three points but the performance was shocking.",
+    "Won, but that first half was ROUGH."
+   ],
+   "lose": [
+    "That is NOT acceptable. {?Heads should roll.|Board take note.|Wake up!}",
+    "I'm done with excuses. Fix it.",
+    "Unacceptable! {?Sort it out.|Wake up.}"
+   ],
+   "draw": [
+    "Dropped points AGAIN. {?Infuriating.|Pathetic.|Sick of it.}",
+    "A draw is not good enough and everyone knows it.",
+    "Not good enough, AGAIN."
+   ]
+  }
+ },
+ "MB_REPLY": {
+  "agree": [
+   "Exactly this.",
+   "100%.",
+   "Couldn't have said it better.",
+   "This. All of this.",
+   "Spot on.",
+   "Facts.",
+   "Nailed it.",
+   "Said it better than I could.",
+   "This is the way.",
+   "No notes.",
+   "Absolutely.",
+   "Yes yes yes."
+  ],
+  "disagree": [
+   "Respectfully, no.",
+   "Watch the game again.",
+   "Bold take. Wrong, but bold.",
+   "Not convinced at all.",
+   "Hard disagree.",
+   "That's a stretch.",
+   "Not sure about that one.",
+   "Strong opinion, weak evidence.",
+   "I'd argue the opposite.",
+   "Hmm, no.",
+   "Controversial.",
+   "Take it back."
+  ],
+  "joke": [
+   "💀💀💀",
+   "I'm in tears 😭",
+   "The way I just laughed out loud 😂",
+   "Not me reading this at 3am 🤡",
+   "Call the police 🚨",
+   "Disgusting behaviour 😂",
+   "I can't 😭",
+   "Me too, and I wasn't even there 😂",
+   "Comedy gold 🏆",
+   "Not the typo 💀",
+   "Delete this.",
+   "Who's laughing now? 😂"
+  ],
+  "stat": [
+   "The xG tells a different story, though.",
+   "Shots: {shW}-{shL}. That says it all.",
+   "Possession {possW}% → {possL}% — context matters.",
+   "Fun fact: the last meeting went {lastMeeting}.",
+   "Possession was only {possW}%, remember.",
+   "{shW} shots to {shL} says something.",
+   "xG: {xgW} v {xgL}. Make of that what you will.",
+   "It finished {score}. That's the stat."
+  ],
+  "banter": [
+   "Cry about it 😘",
+   "See you in the return fixture 😏",
+   "Not a bad team, but not THAT good.",
+   "Enjoy the points while you can.",
+   "This aged well. 🍷",
+   "You'll be back in the replies next week, I'm sure.",
+   "We'll see about that. 😏",
+   "That's a bold claim for a {oppS} fan.",
+   "Enjoy it while it lasts."
+  ],
+  "shock": [
+   "I can't believe this.",
+   "Are you KIDDING me?",
+   "What a game.",
+   "Wow. Just wow.",
+   "Honestly speechless.",
+   "Did that just happen?!",
+   "I need to sit down.",
+   "This is insane.",
+   "Unbelievable stuff."
+  ]
+ },
+ "MB_PUNDIT": {
+  "hardman": {
+   "win": [
+    "{W} wanted it more. Simple as that. {L} didn't win enough second balls.",
+    "Won every duel that mattered. That's how you beat {L}.",
+    "{W} had more bite. {L} didn't get a foot in.",
+    "I'd rather play with {W}'s lot. Tough, competitive, together."
+   ],
+   "draw": [
+    "Both sides too nice. Nobody wanted to put a foot in. A point apiece is generous.",
+    "I'd have kicked someone in the first ten minutes. That's all I'm saying.",
+    "Neither side had a real enforcer. That's why it's a draw."
+   ],
+   "bore": [
+    "Nobody got stuck in. Nil-nil because nobody had the bottle.",
+    "Where was the edge? Where was the snarl? Dire."
+   ],
+   "thrash": [
+    "{L} had no spine. {wscore}? They got bullied.",
+    "That's what happens when you don't show up for the fight. Beaten by {ls} goals to {ws}.",
+    "{L} were bullied. Plain and simple. {ws} goals? That's pride lost."
+   ],
+   "comeback": [
+    "{L} switched off. You go {deficit} up and you close it out. No excuses.",
+    "Character from {W}. {L} should be ashamed of that collapse.",
+    "{W} dug in when it mattered. That's what a comeback is: pride."
+   ],
+   "late": [
+    "{min}th minute and {L} still hadn't dealt with the long ball. Lesson learned. Hopefully.",
+    "You never switch off for 90. {scorerS} proved it.",
+    "You never stop till the whistle. {scorerS} proved it at {min}'."
+   ],
+   "upset": [
+    "{W} showed {L} what hunger looks like. {L}'s big names didn't want the fight.",
+    "Underdogs with teeth. {L} got bitten.",
+    "{W} fought for every ball. The favourites didn't."
+   ],
+   "hat": [
+    "Three goals? The defenders were scared of him. Where was the first tackle?",
+    "{scorerS} could've been stopped. He just wasn't touched.",
+    "{scorerS} {?feasted|ate them alive}. The centre-backs didn't lay a finger on him."
+   ],
+   "red": [
+    "{redS} is a fool. You can't put your team in that position. Red every day.",
+    "I'd have {redS} in the manager's office. Stupid, stupid challenge.",
+    "{redS} lost his head. You can't do that. Red is red."
+   ],
+   "keeper": [
+    "{gkS} stood up when it mattered. That's what a keeper's for.",
+    "Best player on the pitch was in goal. Says it all about the defence in front of him.",
+    "Goalkeepers like {gkS} are why you build from the back. Brave, solid."
+   ],
+   "xgrob": [
+    "xG doesn't win games. Goals do. {W} were hungrier in the box.",
+    "Stats are nice. {W} took chances. {L} didn't. Done.",
+    "Don't talk to me about xG. Put the ball in the net."
+   ],
+   "pre": [
+    "{fav} by two. It'll be physical. Whoever wins the midfield wins it.",
+    "I'm not predicting a score, I'm predicting bruises. {fav} edges it."
+   ]
+  },
+  "analyst": {
+   "win": [
+    "{W}'s structure out of possession was the key — they funnelled {L} wide and dominated the half-spaces.",
+    "{W} controlled the central lanes ({possW}% possession). {L} never solved the press.",
+    "{W} owned the half-spaces and {L} never found their shape.",
+    "It's about the spacing: {W} kept the right distance between the lines."
+   ],
+   "draw": [
+    "Neither side could create overloads. {possW}-{possL} possession tells you it was a balanced, cautious game.",
+    "A draw is a fair reflection: both sides defended their principles.",
+    "{possH}-{possA} possession and {shH}-{shA} on shots: the game was balanced."
+   ],
+   "bore": [
+    "Two compact blocks, almost no vertical passing — a game without space is a game without goals.",
+    "Shots {shW}-{shL}. Neither team broke the lines. A tactical stalemate."
+   ],
+   "thrash": [
+    "{L}'s high line was exposed repeatedly. {W} found the space behind and punished it {ws} times.",
+    "{wscore} isn't random — {W} identified the weakness early and kept exploiting it.",
+    "{L}'s rest-defence was poor and {W} exploited the space. {ws} goals followed."
+   ],
+   "comeback": [
+    "{W} changed shape at half-time, stretched {L} wide and found the half-spaces — a proper tactical turnaround.",
+    "{L} sat too deep once ahead. {W} dictated the tempo and the turnaround was inevitable.",
+    "{W}'s change at half-time created overloads out wide. A clear tactical swing."
+   ],
+   "late": [
+    "{W}'s late pressure came from structural changes: an extra runner, a higher press. {scorerS} was the reward.",
+    "The {ord}-minute goal had been coming — {W}'s xG rose 40% after the 70th.",
+    "{scorerS}'s goal at {min}' came from a pattern: second-phase attacks after set pieces."
+   ],
+   "upset": [
+    "{W} didn't park the bus — they pressed in specific triggers. {L} had no answer.",
+    "Underdog gameplan executed perfectly: compact shape, quick transitions, clinical finishing.",
+    "{W}'s block was disciplined, with clear triggers. {L} had no penetration."
+   ],
+   "hat": [
+    "{scorerS} attacked three different zones — near post, back post, penalty spot. A hat-trick built on movement.",
+    "Positionally, {scorerS} was always one step ahead of {L}'s back line.",
+    "{scorerS}'s runs in behind exploited a high line. Three similar patterns, three goals."
+   ],
+   "red": [
+    "After {redS}'s red, {redTeam} dropped to a 4-4-1 — structurally compact but offered no outlet.",
+    "Numerical disadvantage changes pressing structures; {redTeam} dropped into a 4-4-1."
+   ],
+   "keeper": [
+    "{gkS}'s {saves} saves covered for defensive lapses. The underlying numbers were not as flattering.",
+    "{gkS}'s {saves} saves speak to the quality of shots he faced; high xG, many from central areas."
+   ],
+   "xgrob": [
+    "{L} created {xgL} xG to {W}'s {xgW}. In the long run, {L} win that more often than not.",
+    "{L}'s {xgL} xG vs {W}'s {xgW}: process favoured {L}; luck favoured {W}."
+   ],
+   "pre": [
+    "{H} vs {A}: possession against transition. {favS} have the structural edge but {dogS} have the speed to hurt them."
+   ]
+  },
+  "attacker": {
+   "win": [
+    "That's what I want to see! {W} played with freedom — they smiled, they attacked, they won!",
+    "{motmS} was a joy to watch. Football should always be like that.",
+    "{W} looked like they were enjoying themselves! That's contagious. {motmS}, wow.",
+    "That's what attacking football looks like when everyone buys in."
+   ],
+   "draw": [
+    "A draw? Too cautious for me. Somebody take a risk next time!",
+    "Both teams had the quality — just not the courage to win it. Go for it!",
+    "Too timid. Both sides had the players to win it. Be brave!"
+   ],
+   "bore": [
+    "No goals, no joy. Where was the ambition? Football's supposed to be fun!",
+    "I wanted to leave at half-time. Somebody dribble!"
+   ],
+   "thrash": [
+    "Beautiful football! {W} attacked in waves and {L} had no idea what hit them.",
+    "{wscore}?! That's the kind of game I'd have paid triple to watch.",
+    "Wow, wow, wow. {ws} goals! If you love football, you loved that."
+   ],
+   "comeback": [
+    "THAT'S football! From {deficit} down to winning — pure heart and pure quality!",
+    "I loved every minute of {W}'s comeback. Brave, bold, brilliant.",
+    "That's why you never leave early! {W} never stopped believing."
+   ],
+   "late": [
+    "{scorerS} in the {ord}! You can't write it. This is why we love the game!",
+    "Late winner, crowd erupting — nothing beats it!",
+    "{scorerS} — at {min}'! The crowd must have gone through the roof."
+   ],
+   "upset": [
+    "Underdogs with flair! {W} attacked fearlessly and {L} couldn't cope.",
+    "Never write off a side with nothing to lose. {W} played like it.",
+    "{W} played without fear. That's how you beat the big names."
+   ],
+   "hat": [
+    "{scorerS} with a hat-trick — that's a striker's dream night. Pure instinct!",
+    "Take the ball home, {scorerS}! You earned every touch.",
+    "A hat-trick! I felt every one of those goals. {scorerS} is a joy."
+   ],
+   "red": [
+    "A silly red card, {redS}. It killed the game. We want ELEVEN against ELEVEN!",
+    "Don't send a man off and ruin the game, {redS}!",
+    "A red ruins the spectacle. I want ELEVEN a side!"
+   ],
+   "keeper": [
+    "{gkS} stole the show — and good for them. But I came for goals!",
+    "Great saves, sure. But I want to see the net bulge!",
+    "Great keeping, sure, but I want goals! Let them shoot!"
+   ],
+   "xgrob": [
+    "{L} did everything but score. Finishing, finishing, finishing — that's the game!",
+    "{W} took their chances. That's the art of striking.",
+    "{L} had the chances — missed. That's the art. {W} took theirs."
+   ],
+   "pre": [
+    "{H} v {A}: I want goals! {fav} 3-2 and everyone goes home happy.",
+    "I'm backing the attacking side. {fav}, 2-1 in a thriller."
+   ]
+  },
+  "oldschool": {
+   "win": [
+    "{W} had leaders out there. You need characters — and they had them.",
+    "{W} fit, focused, together. {L} looked like strangers.",
+    "{W} had backbone. {L} didn't have the heart.",
+    "Good sides know how to win ugly. {W} did."
+   ],
+   "draw": [
+    "Fair enough. Nobody took charge. You need someone to pick the side up by the scruff of the neck.",
+    "A point each; in my day a draw was a draw.",
+    "A draw suits nobody. Where are the leaders?"
+   ],
+   "bore": [
+    "Back in my day we'd have gone for the throat. No leaders on either side, no fight."
+   ],
+   "thrash": [
+    "Disgraceful from {L}. No mentality, no fitness, no pride. {wscore}!",
+    "That's a team that's lost the dressing room. Plain as day.",
+    "You'd never get that in my day. {L} showed no fight at all."
+   ],
+   "comeback": [
+    "Mentality. Fitness. Belief. {W} had all three, {L} none. That's why they won.",
+    "You can't teach that kind of heart.",
+    "That's a dressing room with a spine. {W} wouldn't be beaten."
+   ],
+   "late": [
+    "{min} minutes in and the winner arrives — that's fitness. The better-conditioned side wins late.",
+    "Conditioning won that — {W} had more left in the tank."
+   ],
+   "upset": [
+    "{W} had the mentality of winners. {L}'s big names? Not a clue.",
+    "That's what happens when you coast. {L} thought it was easy.",
+    "{L} thought it was a formality. {W} didn't read the script."
+   ],
+   "hat": [
+    "{scorerS} is a proper striker. Doesn't need fancy tricks — just instinct and fitness.",
+    "{scorerS} is a throwback — all instinct. No fuss."
+   ],
+   "red": [
+    "{redS} lost his head. A captain would've calmed him. Where was the leadership?",
+    "{redS} let his side down. Discipline starts in the head."
+   ],
+   "keeper": [
+    "Great keepers are leaders. {gkS} bossed that defence all night.",
+    "Proper keepers command the box. {gkS} did."
+   ],
+   "xgrob": [
+    "Stats? In my day we looked at the scoreboard. {W} won. That's all that matters.",
+    "We never had xG. We had goals. {W} had more."
+   ],
+   "pre": [
+    "{fav} will win because they've got the experience. {dog} will fight, but fight alone doesn't win."
+   ]
+  },
+  "data": {
+   "win": [
+    "The model gave {W} a {winP}% win probability pre-match — a fair outcome. Process and result matched.",
+    "{W}: {shW} shots, {xgW} xG vs {xgL}. Efficient and deserved.",
+    "{W}'s win probability rose sharply after the opener. The result matched the model's expectation."
+   ],
+   "draw": [
+    "Our simulation of this fixture gives a draw about 26% of the time — this was an entirely ordinary result.",
+    "xG {xgW}-{xgL}: the draw sits right in the expected distribution.",
+    "Draw probability at kick-off was about {pD}%. This is a perfectly normal outcome."
+   ],
+   "bore": [
+    "xG total: {xgTot}. A low-event game — roughly the 15th percentile of this season's matches."
+   ],
+   "thrash": [
+    "A {margin}-goal margin occurs in roughly 1 in 20 matches. {W}'s xG of {xgW} says it wasn't entirely luck.",
+    "A {margin}-goal margin is rare. xG ({xgW}–{xgL}) says dominance wasn't an accident."
+   ],
+   "comeback": [
+    "{W}'s win probability dipped to under 10% at the low point. This type of comeback happens about once in 25 times.",
+    "{W}'s in-game win probability bottomed out near single digits. Heroic."
+   ],
+   "late": [
+    "A winner after the 85th minute has roughly a 6% chance in any given game. {scorerS} beat the odds.",
+    "Goals after the 85th minute account for roughly 12% of all goals. {scorerS} got a rare one."
+   ],
+   "upset": [
+    "{L} were pre-match favourites at {favP}%. {W}'s win was a roughly 1-in-{upsetOdds} outcome.",
+    "{L} were {favP}% favourites. {W}'s win was a roughly 1-in-{upsetOdds} event."
+   ],
+   "hat": [
+    "A hat-trick from {scorerS} outperformed his xG significantly — expect some regression.",
+    "Three goals from one player in a match happens in under 2% of fixtures. Enjoy it."
+   ],
+   "red": [
+    "Red cards reduce a team's win probability by about 30-40 percentage points on average. {redTeam} lost it from the moment {redS} walked.",
+    "Data suggests the red card cut {redTeam}'s expected goals by roughly 35%."
+   ],
+   "keeper": [
+    "{gkS} saved {saves} shots. Post-shot xG suggests he saved around {psx} more goals than average.",
+    "{gkS}: {saves} saves. That's top-percentile output."
+   ],
+   "xgrob": [
+    "{L}: {xgL} xG, 0.8 expected points more than the actual. {W} overperformed by roughly {xgDiff} goals.",
+    "Overperformance: {W} scored more than their xG implied. Regression is coming."
+   ],
+   "pre": [
+    "Our model: {pH}% {H}, {pD}% draw, {pA}% {A}. Most likely scoreline: {pred}."
+   ]
+  },
+  "keeper": {
+   "win": [
+    "The back line and keeper were organised. Communication wins games.",
+    "Clean positioning in the box; {W}'s keeper dealt with everything."
+   ],
+   "draw": [
+    "A draw: nobody made a keeper's mistake. Good concentration all round."
+   ],
+   "bore": [
+    "Sat through 90 minutes without being tested. A keeper's dream — and nightmare."
+   ],
+   "thrash": [
+    "{L}'s keeper had no chance behind that defence. Poor protection."
+   ],
+   "comeback": [
+    "When a team's behind, the keeper's distribution sets the tone. {W} got it right at the break."
+   ],
+   "late": [
+    "Keepers hate stoppage-time goals. {scorerS} wins it and the keeper gets no help."
+   ],
+   "upset": [
+    "The giants' keeper was exposed — the defence hung him out to dry."
+   ],
+   "hat": [
+    "{scorerS}'s hat-trick? The keeper was left alone three times. That's a defensive failure, not just a save issue."
+   ],
+   "red": [
+    "The red card left {redTeam} exposed at the back. A keeper's nightmare — more crosses, more pressure."
+   ],
+   "keeper": [
+    "{gkS}: {saves} saves. That's not luck — that's positioning, reflexes and nerve. Textbook."
+   ],
+   "xgrob": [
+    "{L} had the shots; {W}'s keeper didn't blink. That's goalkeeping."
+   ],
+   "pre": [
+    "Goalkeeping duel: {gkH} vs {gkA}. Whoever blinks first loses this one."
+   ]
+  },
+  "host": {
+   "win": [
+    "Well, that was something. {W} get the win — we'll dissect it after the break.",
+    "{W} victorious, {L} licking their wounds. Let's hear from the panel."
+   ],
+   "draw": [
+    "Honours even. Let's see how our panel sees it."
+   ],
+   "bore": [
+    "Not one for the highlights reel. Let's find something to talk about."
+   ],
+   "thrash": [
+    "A statement from {W}. {L} will want to forget that one."
+   ],
+   "comeback": [
+    "Drama! {W} turn it around — what do we make of that?"
+   ],
+   "late": [
+    "Unbelievable finish! {scorerS} the hero. Let's hear it from the panel."
+   ],
+   "upset": [
+    "A seismic result. Who saw that coming?"
+   ],
+   "hat": [
+    "{scorerS} with the match ball. What a performance!"
+   ],
+   "red": [
+    "A red card changed everything. Was it the right decision?"
+   ],
+   "keeper": [
+    "{gkS} on form. Let's look at those saves."
+   ],
+   "xgrob": [
+    "The stats say one thing; the scoreboard another. Let's discuss."
+   ],
+   "pre": [
+    "Big game on the horizon. Let's get the panel's predictions."
+   ]
+  }
+ },
+ "MB_TV": {
+  "open": [
+   "Good evening, and welcome to Match Night Live.",
+   "We're live at Apex Sports Centre — and what a night of football.",
+   "Welcome back. It's full time and there is a lot to unpack.",
+   "Right, strap in — the panel has plenty to say.",
+   "Good evening football fans, the results are in.",
+   "Good evening and welcome to a very busy night of football.",
+   "We're live, and the matches have given us plenty to talk about.",
+   "Welcome to the show. Let's get into it.",
+   "If you've just joined us — what a night.",
+   "Tonight's results have changed the picture. Let's dig in."
+  ],
+  "intro_win": [
+   "{W} have beaten {L} {wscore}, and {motmS} was at the heart of it.",
+   "A big result for {W}: {wscore} over {L} in the {comp}.",
+   "{W} have beaten {L} {wscore}, and {motmS} was the difference.",
+   "It finished {wscore} in {W}'s favour. {L} have questions to answer.",
+   "{W} {wscore} {L}: a result with consequences."
+  ],
+  "intro_draw": [
+   "{H} and {A} finished {score} — a result that leaves both sides with questions.",
+   "It ended {score} at {stadium}, and nobody can quite agree who got the better of it.",
+   "{H} and {A} couldn't be separated: {score}.",
+   "A draw at {stadium}: {H} {score} {A}.",
+   "A point each: {H} {score} {A}."
+  ],
+  "intro_drama": [
+   "Drama at {stadium}: {scorerS} with the goal that changed everything.",
+   "You could not have scripted this. {W} {wscore} {L}.",
+   "Drama, drama, drama at {stadium}: {W} {wscore} {L}.",
+   "{scorerS} with the goal that changed everything at {stadium}.",
+   "You could not have scripted that: {W} {wscore} {L}."
+  ],
+  "intro_shock": [
+   "A real shock tonight: {W} have stunned {L}.",
+   "The form book has been torn up at {stadium}.",
+   "Shock result: {W} stun {L} {wscore}.",
+   "Not many saw that coming: {W} {wscore} {L}.",
+   "The favourites fall: {W} beat {L} {wscore}."
+  ],
+  "close": [
+   "That's all from the studio. Back after the break.",
+   "Plenty more to come, don't go anywhere.",
+   "More analysis after this. Stay with us.",
+   "We'll have all the reaction coming up.",
+   "We'll be right back with more reaction.",
+   "More analysis after the break.",
+   "Stay with us, there's more to come.",
+   "Don't touch that dial."
+  ],
+  "banner_result": [
+   "FULL TIME",
+   "MATCH REPORT",
+   "RESULT",
+   "STUDIO ANALYSIS",
+   "HEADLINE RESULT",
+   "WHAT A RESULT"
+  ],
+  "banner_drama": [
+   "LATE DRAMA",
+   "SCENES AT FULL TIME",
+   "UNBELIEVABLE FINISH",
+   "BREAKING",
+   "LATE SHOW",
+   "SCENES",
+   "DRAMATIC FINISH",
+   "UNBELIEVABLE"
+  ],
+  "banner_shock": [
+   "SHOCK RESULT",
+   "UPSET ALERT",
+   "GIANT-KILLERS",
+   "SENSATION",
+   "SHOCK",
+   "UPSET",
+   "GIANT KILLED"
+  ],
+  "banner_pre": [
+   "MATCH PREVIEW",
+   "KICK-OFF COUNTDOWN",
+   "BIG GAME BUILD-UP",
+   "THE KICKOFF SHOW",
+   "BUILD-UP",
+   "COUNTDOWN",
+   "BIG GAME LIVE",
+   "KICK-OFF SPECIAL"
+  ],
+  "banner_news": [
+   "BREAKING NEWS",
+   "TRANSFER WATCH",
+   "NEWS DESK",
+   "LIVE UPDATE"
+  ],
+  "banner_award": [
+   "AWARDS NIGHT",
+   "THE BIG NIGHT",
+   "GOLDEN MOMENT",
+   "CEREMONY LIVE"
+  ],
+  "banner_champs": [
+   "CHAMPIONS",
+   "TITLE WON",
+   "PARTY TIME",
+   "TROPHY NIGHT"
+  ],
+  "show_post": [
+   "Match Night Live",
+   "The Late Kickoff",
+   "Full Time Show",
+   "Studio 90",
+   "Full Time Live",
+   "Match Night Special",
+   "Post-Match Lounge",
+   "Matchday Report"
+  ],
+  "show_pre": [
+   "The Kickoff Show",
+   "Match Preview Live",
+   "Countdown to Kickoff",
+   "Kick-Off Countdown",
+   "The Build-Up",
+   "Pre-Match Lounge"
+  ],
+  "show_wk": [
+   "The Weekend Debate",
+   "Football Daily",
+   "The Big Table"
+  ]
+ },
+ "MB_PRE": {
+  "core": [
+   "MATCH PREVIEW: {H} host {A} in the {comp}. {stakes}",
+   "{Hf} {H} v {A} {Af} — {comp}, {when}. {formLine}",
+   "Kick-off approaching: {H} take on {A}. {keyLine}",
+   "TEAM NEWS to follow as {H} prepare for {A} in the {comp}.",
+   "Next up: {H} v {A} ({comp}). {stakes}",
+   "{Hf} {H} take on {A} {Af}. {formLine} {stakes}",
+   "Fixture alert: {H} v {A}, {comp}. {keyLine}",
+   "LOOKING AHEAD: {H} v {A}. {formLine}",
+   "Prediction time: {H} v {A} in the {comp}. {stakes}",
+   "Match week: {H} v {A}. {stakes}"
+  ],
+  "stakes_title": [
+   "Title race on the line.",
+   "A potential title decider.",
+   "Both sides eyeing the top spot.",
+   "{leadS} can open up a gap.",
+   "Top-of-the-table tension.",
+   "The title race could swing tonight.",
+   "Pressure at the summit."
+  ],
+  "stakes_europe": [
+   "A fight for European places.",
+   "Champions League qualification at stake.",
+   "Every point counts in the race for Europe.",
+   "The race for European places hangs on this one.",
+   "Continental qualification is the prize."
+  ],
+  "stakes_relegation": [
+   "Relegation fears for {dropS}.",
+   "A potential six-pointer at the bottom.",
+   "Survival is at stake.",
+   "A game at the wrong end of the table.",
+   "Survival points at stake.",
+   "Nerves at the bottom."
+  ],
+  "stakes_cup": [
+   "{stage}: win or go home.",
+   "A cup tie with a place in the next round on the line.",
+   "One match, one place in the next round.",
+   "{stage}: one chance, no second leg.",
+   "{stage}: everything on one match.",
+   "{stage}: survive and advance."
+  ],
+  "stakes_derby": [
+   "{derbyName|cap} — bragging rights, pride, everything.",
+   "{derbyName|cap} always throws up the unexpected."
+  ],
+  "stakes_generic": [
+   "An intriguing contest on paper.",
+   "Both sides will be eyeing three points.",
+   "A game with plenty at stake for both.",
+   "Neither side can afford to slip.",
+   "A match with plenty at stake for both sides.",
+   "Both sides are chasing momentum.",
+   "A game that could shape the next few weeks."
+  ],
+  "formLine": [
+   "{H}: {formH}. {A}: {formA}.",
+   "Form guide — {H} {formH}, {A} {formA}.",
+   "{H} come in on {formH}; {A} on {formA}.",
+   "Form: {H} {formH}, {A} {formA}.",
+   "Last five — {Hs}: {formH}; {As}: {formA}.",
+   "{H} {formH} v {A} {formA}: the recent picture."
+  ],
+  "keyLine": [
+   "Key men: {keyH} for {Hs}, {keyA} for {As}.",
+   "Watch for {keyH} and {keyA}.",
+   "{keyH} v {keyA} could decide it.",
+   "Key battle: {keyH} v {keyA}.",
+   "Players to watch: {keyH}, {keyA}.",
+   "{keyH} and {keyA} are the headline acts."
+  ],
+  "gaffe": [
+   "BIG GAME BARNEY: {H} v {A} — {?who'll blink first?|it's all kicking off!|buckle up, football fans!}",
+   "{keyH} v {keyA}: THE DUEL EVERYONE'S TALKING ABOUT",
+   "{H} {?FACE THE MUSIC|SQUARE UP|GO TOE-TO-TOE} with {A} — {?no prisoners|everything to play for|and we can't wait}",
+   "WHO WINS? {H} or {A} — we asked 12 fans and got 12 different answers",
+   "{H} v {A}: {?THE BIG ONE|THE BATTLE OF THE WEEK|THE ONE WE'VE ALL BEEN WAITING FOR}",
+   "{keyH} {?WARNS|THREATENS|PROMISES} {A}: \"WE'RE COMING!\"",
+   "{A} {?FEAR|DREAD|RESPECT} {keyH} — {H} v {A} {?PREVIEWED|SIZED UP}",
+   "EXCLUSIVE: {H} v {A} — what the players REALLY think",
+   "{H} {?TOO HOT|TOO STRONG|TOO CONFIDENT}? {A} {?READY TO SPOIL|SET TO UPSET}"
+  ],
+  "meridian": [
+   "{H} v {A}: the tactical questions that will decide it",
+   "Preview: {style} duel as {H} meet {A}",
+   "{H} and {A} go head to head — what to watch for",
+   "How {H} and {A} match up: shapes, styles and key battles",
+   "{H} v {A}: how the shapes could interact",
+   "{A}'s plan for {H}: three things to watch",
+   "Why {H} v {A} matters more than it looks",
+   "Tactical preview: {H}'s {styleH} meets {A}'s {styleA}",
+   "The {H}-{A} equation: who has the edge?"
+  ],
+  "fanH": [
+   "{H} v {A} today. {?Feeling confident.|Nervous but ready.|Home advantage — let's use it.|Bring it on.} {?Up the {Hs}!|Come on {Hs}!|Let's go {Hs}!}",
+   "Matchday. {?Wake me at full-time.|Can't focus on anything else.|The anticipation is killing me.} {?Prediction: {pred}.|I say {pred}.|Calling {pred}.}",
+   "{keyH} is going to {?score today|decide this|be the difference}. Calling it. {pred}.",
+   "{H} fans, what's the prediction? I'm going {pred}. {?Confidence: 7/10.|Nerves: 10/10.}",
+   "Home day. {?Don't let us down.|Fingers crossed.|Believe!} {pred}. {?Up the {Hs}!|Let's go!}",
+   "Packed stadium, loud crowd, {?need three points.|time to turn it on.} {pred}.",
+   "{keyH} to {?score|make it happen|be the difference}. {pred}. {H} fans, shout it.",
+   "Matchday vibes are {?immaculate|nervous|unmatched}. {pred}."
+  ],
+  "fanA": [
+   "{A} away at {H}. {?Tough one.|Underestimated again.|Let's go and take three.|Just play your game, lads.} {?Up the {As}!|Come on {As}!}",
+   "Travelling to {H}. {?Fingers crossed.|Hope we turn up.|Time to silence the home end.} {pred}.",
+   "{keyA} to {?step up|shut them up|do what he does}. {pred}. {?Let's go!|Bring it home!}",
+   "{A} fans: {?Who's travelling?|Anyone going?|Predictions below.} Mine's {pred}.",
+   "{A} on the road: {?time to show them.|let's go and get it.|take the points.} {pred}.",
+   "Travelling {A} fans: {?see you there.|bring the noise.|let's be loud.} {pred}.",
+   "Away day. {?Heart rate: high.|Pre-match pint: done.|Predictions: optimistic.} {pred}.",
+   "{keyA} to {?stand up|be the difference|do it} at {H}. {pred}."
+  ],
+  "fanN": [
+   "{H} v {A} is the one to watch today. {?Popcorn ready.|Pull up a chair.|My money's on goals.} Prediction: {pred}.",
+   "{H} v {A}: {?I'm giving this a 2-2.|Could be anything.|This could go either way.} What's your prediction?",
+   "Unpopular opinion: {dog} will {?cause a problem|pinch something|get a result} today. {pred}.",
+   "Neutral prediction: {H} v {A} — {pred}. {?Unless the VAR gets involved.|Unless the weather does.}",
+   "{H} v {A} is the one I'm clearing my evening for. {pred}.",
+   "Hot take: {keyH} or {keyA} scores first. {pred}.",
+   "Honestly, I can't call {H} v {A}. {?Coin toss.|50/50.} {pred}."
+  ],
+  "meme": [
+   "{H} fans before the game: 😎. After the game: 🤷‍♂️ (we'll find out)",
+   "{H} v {A} predictions: 80% of you are going to be wrong and I'm one of them 🫠",
+   "Me: \"I'm calm about {H} v {A}.\" My heart rate: 📈📈📈",
+   "Me preparing for {H} v {A}: 🧘 My heart rate: 🎢",
+   "{H} fans: \"we'll win comfortably\" Also {H} fans: *checks injury list*",
+   "{A} fans every time {H} is mentioned: 😬",
+   "Pre-match prediction chart: 📉📈📉📈📉 (I changed my mind 12 times)"
+  ],
+  "radio": [
+   "The phone lines are open for {H} v {A}. Early callers say {favS} win it. Don't @ us.",
+   "Caller says {H} v {A} \"is the biggest game of the year.\" Host asks him which year.",
+   "Lines open for {H} v {A}. Predictions range from \"easy win\" to \"call my solicitor\".",
+   "Caller says {keyH} will score. Caller says he'll miss. Caller says he'll miss and then score.",
+   "Phone-in topic: {H} v {A}. Caller 1: \"obvious.\" Caller 2: \"obviously wrong.\"",
+   "Pre-match chat: who's the underdog in {H} v {A}? Spoiler: nobody agrees."
+  ],
+  "vid": [
+   "{H} v {A}: FULL PREVIEW with fan predictions",
+   "WHO WINS? {H} v {A} FAN PANEL",
+   "{keyH} vs {keyA}: THE BATTLE TO WATCH",
+   "{H} v {A}: PREDICTIONS from every fan we could find",
+   "Matchday morning: {H} fans' honest hopes (and fears)",
+   "{A} fans' last-minute thoughts before {H} v {A}",
+   "Who wins {H} v {A}? We asked the pub"
+  ],
+  "tac": [
+   "{H} ({fmH}, {styleH}) v {A} ({fmA}, {styleA}): the question is who controls the tempo.",
+   "Matchup: {styleH} meets {styleA}. {tacHook}",
+   "Pressing triggers: expect {Hs} to {pressH}; {As} will {pressA}.",
+   "{H} v {A}: the key space will be between {keyH}'s zone and the opposition's midfield.",
+   "{styleH} v {styleA}: look for who breaks the first press.",
+   "Watch the fullbacks. {H} v {A} could be decided in wide areas.",
+   "Plan A for both sides is clear; plan B will decide it."
+  ],
+  "tacHook": [
+   "Whoever wins the midfield wins the game.",
+   "Space behind will decide it.",
+   "Set pieces could be the difference.",
+   "The first goal matters more than usual."
+  ],
+  "pressH": [
+   "press high from the first whistle",
+   "sit compact and counter",
+   "keep the ball and wait for gaps",
+   "go long early and fight for second balls"
+  ],
+  "pressA": [
+   "try to catch them on the break",
+   "keep the ball and slow it down",
+   "press selectively in midfield",
+   "hit them directly behind the line"
+  ],
+  "teamnews": [
+   "TEAM NEWS: {missLine}",
+   "{missLine} A late call is expected.",
+   "INJURY UPDATE ahead of {H} v {A}: {missLine}",
+   "UPDATE: {missLine}",
+   "TEAM NEWS: {missLine} {H} v {A} is on.",
+   "BEFORE KICK-OFF: {missLine}"
+  ],
+  "var": [
+   "Referee for {H} v {A}: {ref}. {refNote}",
+   "Officials named: {ref} takes the whistle for {H} v {A}. {refNote}"
+  ],
+  "refNote": [
+   "A strict one on fouls.",
+   "Known for letting the game flow.",
+   "Quick with the cards, usually.",
+   "Handled a derby recently without drama.",
+   "Expect VAR to be busy.",
+   "Fewest cards in the league so far.",
+   "Rarely uses the book. Likes a chat.",
+   "Quick with cards in tough games.",
+   "Known for letting football flow.",
+   "Not afraid of a VAR check."
+  ],
+  "odds": [
+   "StatBook model — {H} {pH}% · Draw {pD}% · {A} {pA}%. Most likely score: {pred}.",
+   "Win probability: {H} {pH}%, draw {pD}%, {A} {pA}%. Most common scoreline: {pred}.",
+   "Pre-match numbers: {H} {pH}% / {pD}% / {pA}% {A}. xG model expects {xgPredH}-{xgPredA}.",
+   "Model says: {H} {pH}% · Draw {pD}% · {A} {pA}%. Likeliest: {pred}.",
+   "Pre-match probabilities — {H} {pH}%, draw {pD}%, {A} {pA}%. xG model: {xgPredH}–{xgPredA}.",
+   "StatBook model for {H} v {A}: {pred} most common scoreline. {pH}/{pD}/{pA}."
+  ],
+  "poll_q": [
+   "Who wins {H} v {A}?",
+   "Your prediction for {H} v {A}?",
+   "{H} v {A}: how does it end?",
+   "Your call: {H} v {A}?",
+   "Pick one: {H} v {A}",
+   "{H} v {A} — what's your prediction?"
+  ]
+ },
+ "MB_RUMOR": {
+  "ferrante": [
+   [
+    "{to} are {?monitoring|tracking|keeping tabs on} {player}. Early stage, no talks yet. {?Watch this space.|Scouts have been present.}",
+    "{to} have {?internally discussed|added to the shortlist} {player} as a {?potential target|summer option}. Nothing concrete yet.",
+    "{to} have {?noted|recorded|logged} {player}'s {?recent form|performances}. Early interest only. No contact yet.",
+    "{player} is on {to}'s {?radar|list|longlist}. Nothing advanced, nothing agreed.",
+    "{to} {?are keeping an eye on|have a scout on} {player}. {?Nothing close yet.|Early days.}"
+   ],
+   [
+    "{to} {?have opened talks|have made contact} for {player}. {from} {?are not in a rush to sell|want a big fee}. Fee talk starts around {fee}.",
+    "Conversations ongoing between {to} and {from} over {player}. Initial valuation: {fee}. More to follow.",
+    "{player}: {to} {?have made an enquiry|are in contact}. {from} {?listening|not rushing}.",
+    "Talks: {to} sound out {from} for {player}. Opening position at {fee}. Early days.",
+    "{to} {?have asked about|are exploring} a deal for {player}. {from} {?want more than {fee}|are open to offers}."
+   ],
+   [
+    "{player} to {to}: talks {?advancing|moving in the right direction}. {from} open to the deal at {fee}. Personal terms {?looking good|being finalised}.",
+    "{to} close in on {player} — {from} expected to accept {fee}. Sources suggest an announcement {?soon|shortly}.",
+    "{player} to {to}: advanced talks. {fee} close to the agreed {?valuation|level}. Personal terms {?almost sorted|being finalised}.",
+    "{to} and {from} {?agree on the structure|are nearly there} for {player}. Fee: {fee}.",
+    "{?Understand|Sources confirm} {to} {?lead the race|are the favourites} for {player}. {fee}."
+   ],
+   [
+    "HERE WE GO! 🚨 {player} to {to}, {fee}. Medical booked. {?Documents ready.|Contract signed.} {from} confirmed.",
+    "DONE DEAL: {player} joins {to} from {from}. {fee}. Deal sealed — official announcement coming.",
+    "HERE WE GO: {player} signs for {to}. {fee} ({from}). Medical done, contracts signed. 🚨",
+    "{player} to {to} — DONE DEAL. {fee}. {from} confirm. {?Announcement imminent.|Photos coming.}",
+    "DONE: {player} joins {to}. {fee} fee. Medical passed; paperwork complete."
+   ]
+  ],
+  "gaffe": [
+   "{player} TO {to}?! {?Bombshell|Shock} move for {from} star — {fee} on the table!",
+   "{to} SET TO {?SNATCH|SIGN|PINCH} {player} — {from} {?FUMING|STUNNED|PANICKING}",
+   "EXCLUSIVE: {player} {?SNUBS|DUMPS|WANTS OUT OF} {from}! {to} {?READY TO POUNCE|LEADING THE RACE|CIRCLING}",
+   "{player} {?SHOCK|BOMBSHELL}: {to} {?WANT|DEMAND|LAUNCH A BID FOR} {from} STAR",
+   "{from} {?REEL|PANIC|FUME}: {to} {?SNIFF|CIRCLE} {player}",
+   "{player} AND {to}: IT'S ON! {fee} {?ON THE TABLE|ON THE NOSE}"
+  ],
+  "deny": [
+   "{from} {?categorically deny|firmly dismiss|reject} reports linking {player} with a move: \"he is not for sale.\"",
+   "Not true: {from} {?refute|rubbish|dismiss} {player} transfer speculation.",
+   "{from} issue a short statement: {player} is part of our plans. No offers received.",
+   "{from} on {player}: \"not for sale, not interested, end of.\"",
+   "{from} {?slam|shoot down|brush off} the {player} rumours: \"fiction.\"",
+   "Club statement: {player} remains a valued member of {from}. {?No bids received.|End of story.}"
+  ],
+  "fan_from": [
+   "If {player} leaves {fromS} I'm done. {?Absolutely not.|Don't sell.|Over my dead body.}",
+   "{fromS} would be insane to sell {player}. Keep him. {?Whatever the fee.|Build around him.}",
+   "Not selling {player}. I'll chain myself to the training ground if I have to.",
+   "{player} is {?our best player|the heartbeat of the team|why we've been winning}. Don't you dare. {?Stay.|Keep him.}",
+   "Not selling {player}. {?Ever.|At any price.|End of.}",
+   "If {player} goes, so does my season ticket. {?Joke. Maybe.|Not joking.}"
+  ],
+  "fan_to": [
+   "{player} to {toS}?? {?YES PLEASE.|Make it happen.|Sign him NOW.|The final piece.}",
+   "I'd take {player} at {toS} tomorrow. {?Fee? Pay it.|Class act.|A major upgrade.}",
+   "Please let {player} to {toS} be real. {?I'm begging.|My heart can't take the tease.}",
+   "{player} would be {?perfect|a dream|fantastic} for {toS}. {?Get it done.|Make it happen.}",
+   "{toS} NEED {player}. {?Yesterday.|Right now.|Sign him!}",
+   "{player} in {toS} colours? {?Yes please.|I'd buy the shirt right away.}"
+  ],
+  "meme": [
+   "{player} to {toS}: 🧍➡️✍️  {fromS} fans: 🏃‍♂️💨",
+   "{toS} fans refreshing the transfer page for the 40th time: 🔄🔄🔄",
+   "{player} to {toS}: 📱🔔 Me refreshing every 4 seconds: 🔄",
+   "Transfer news at 3am: {?\"HERE WE GO\"|\"advanced talks\"} Me: 🛌➡️🪑",
+   "{fromS} fans reading {player} rumours: 😰"
+  ],
+  "radio": [
+   "Caller thinks {player} will end up at {toS}. Host says his sources say Mars. Line two disagrees.",
+   "Caller says {player} is \"definitely going to {toS}\". Host says \"definitely\" is doing a lot of work.",
+   "Phone-in: {player}'s future. Caller: \"he's staying\". Caller 2: \"he's gone\". Host: \"we'll see\"."
+  ],
+  "fees": [
+   "€35m",
+   "€48m",
+   "€55m",
+   "€62m",
+   "€70m",
+   "€85m",
+   "€95m",
+   "€110m",
+   "€130m",
+   "€150m"
+  ],
+  "windowOpen": [
+   "The transfer window is open. Expect agents, rumours and bin-bags of bluster.",
+   "Window open: {n} clubs reportedly circling stars across the {leagueSet}.",
+   "Transfer silly season is here — and Ferrante has already been awake for 14 hours.",
+   "The transfer window is open. {?Phones are ringing.|Agents are stretching.|Chaos is warming up.}",
+   "Window open: {n} clubs reportedly looking to strengthen. {?Expect noise.|Expect fireworks.}",
+   "It's window season: {?speculation is free.|belief is optional.}"
+  ],
+  "windowClose": [
+   "DEADLINE DAY: phones ringing, fax machines jammed, intermediaries sweating. {?Anything can happen.|Brace yourself.}",
+   "TRANSFER WINDOW SLAMS SHUT: who got their man, who did not.",
+   "Final hours of the window: {?it's about to get weird.|it's chaos in the corridors.}",
+   "Deadline day: {?every fax machine is warming up.|the clock is ticking.|chaos incoming.}",
+   "Last-minute dash: who's still waiting on a deal?",
+   "Final day of the window: {?anything can happen.|brace for the unexpected.}"
+  ]
+ },
+ "MB_CRISIS": {
+  "sackwatch": {
+   "gaffe": [
+    "{mgrS} ON THE BRINK: {n} defeats in a row leave {team} boss {?under fire|fighting for his job|hanging by a thread}",
+    "CRISIS AT {team|up}: {mgrS} {?FACES THE AXE|IN THE FIRING LINE|LOSES THE FANS}",
+    "{team} {?IN TURMOIL|IN FREEFALL|IN CRISIS}: {mgrS} {?FACES THE AXE|ON THE BRINK|FIGHTING FOR HIS JOB}",
+    "{n} DEFEATS: IS IT OVER FOR {mgrS|up}?",
+    "BOSS BUST-UP? {team} {?FALLING APART|SPIRALLING}"
+   ],
+   "meridian": [
+    "{team} in freefall: what has gone wrong under {mgrS}?",
+    "Analysis: {team}'s {n}-match losing run and the reasons behind it",
+    "Anatomy of a slump: what's gone wrong at {team}",
+    "{team} and {mgrS}: the limits of patience",
+    "Looking beyond {n} defeats: {team}'s deeper issues"
+   ],
+   "fan": [
+    "{mgrS} out. {?I've seen enough.|It's run its course.|It's time.} {n} defeats.",
+    "Hard to see {mgrS} surviving this. {?The board must act.|One more loss and it's over.}",
+    "{team} need a reset. Whoever's in charge, it isn't working.",
+    "{mgrS} out? {?I'm undecided.|I've seen enough.|I want to believe.} {n} defeats.",
+    "It's not just {mgrS}. It's all of it. {n} losses.",
+    "{n} in a row is {?unacceptable|too many|terrifying}. {?Change something.|Anything.}"
+   ],
+   "defend": [
+    "Give {mgrS} time. {?The squad is thin.|The injuries have hit hard.|Look at the fixtures.} {?Back him.|Support the manager.}",
+    "Sacking managers doesn't fix anything. {?We need patience.|Look at the bigger picture.}",
+    "Let him work. {mgrS} {?has the dressing room|knows what he's doing|deserves time}.",
+    "Changing the manager won't change the results. {?Back him.|Patience.}",
+    "{mgrS} is not the problem. {?Injuries.|Fatigue.|Luck.}"
+   ],
+   "meme": [
+    "{mgrS}: *checks the calendar* \"maybe next week\" 🫣",
+    "{team} fans: 🧍 {mgrS}: 🧍‍♂️ The board: 🔥",
+    "{team} fans: \"it's a blip\" Also {team} fans: {n} defeats 📉",
+    "{mgrS}'s calendar: 📅❌❌❌",
+    "{team}'s results: 😬😬😬"
+   ],
+   "radio": [
+    "Caller: \"{mgrS} has to go.\" Host: \"{n} defeats — I'd say that's a fair view.\"",
+    "Caller: \"He's lost the dressing room.\" Host: \"Which one?\" Caller: \"All of them.\"",
+    "Phone-in about {mgrS}: 62% say he stays. 38% have strong opinions. 100% are on hold."
+   ],
+   "vid": [
+    "SACK {mgrS}? {team} fans give their verdict",
+    "{team} CRISIS: fans react to {n} straight losses",
+    "{team} FANS: SHOULD {mgrS|up} GO?",
+    "{n} STRAIGHT DEFEATS: fans speak out",
+    "{team} CRISIS: the inside story"
+   ]
+  },
+  "injury_crisis": {
+   "core": [
+    "{team} INJURY CRISIS: {n} players out including {names}.",
+    "{team}'s injury list grows: {names} among {n} absentees.",
+    "{team}: {n} players out, including {names}.",
+    "Injury list grows at {team}: {names} among {n} absentees.",
+    "{team}'s fitness issues: {n} out ({names})."
+   ],
+   "meridian": [
+    "{team} are being stretched thin: {n} injured, and a congested schedule ahead",
+    "Why {team} can't stay fit — and what it means for the run-in",
+    "{team}'s treatment room: how the squad got stretched",
+    "Why {team} can't seem to keep players fit",
+    "Depth chart under pressure: {team} and the injury toll"
+   ],
+   "gaffe": [
+    "HOSPITAL PASS: {team} lose {n} stars to injury",
+    "{team}'S TREATMENT ROOM FULL — {names} all out!",
+    "{team} MEDICAL BAY OVERFLOWING: {n} STARS OUT",
+    "{names}: {team}'S INJURY NIGHTMARE",
+    "HOSPITAL WARD OR FOOTBALL CLUB? {team}'S INJURY LIST"
+   ],
+   "fan": [
+    "{team}'s medical team needs a miracle. {n} out. {?Unlucky or cursed?|Send help.|I'm devastated.}",
+    "{names}… all injured. {?How are we even supposed to field a team?|Next man up, I guess.}",
+    "{team}'s {n} injuries: {?just unlucky|looking like a curse|maybe bad conditioning}. {?Praying for returns.|Next man up.}",
+    "{names} out. {?Brutal.|Not ideal.|Please send help.}",
+    "{?Fingers crossed.|Pray for the physio.}"
+   ],
+   "meme": [
+    "{team} physio: 🧍‍♂️🩹🩹🩹🩹🩹 \"just keep going\"",
+    "{team}'s injury list: 📜📜📜 Fans: 🙏🙏🙏"
+   ]
+  }
+ },
+ "MB_MILESTONE": {
+  "goals": [
+   "{player} reaches {n} career goals — {?a landmark|a remarkable achievement|an astonishing tally}.",
+   "MILESTONE: {playerS} bags goal number {n} in the {comp}.",
+   "{n} goals and counting for {playerS}. {?Legend status loading.|The record books are watching.}",
+   "{playerS} reaches {n} career goals. {?A landmark moment.|Another line in the record books.|Eyebrows raised everywhere.}",
+   "{n} and counting for {playerS}. {?Legend status: confirmed.|History in the making.}",
+   "{n}-goal club: {player} joins. {?Congratulations.|Take a bow.}"
+  ],
+  "seasonGoals": [
+   "{playerS} has now scored {n} this season — {?the Golden Boot race is heating up|the top-scorer chart looks very different now}.",
+   "{n} goals for {playerS} this season. {?On course for something special.|At this rate, the record falls.}",
+   "{playerS} hits {n} for the season. {?Golden Boot form.|Mighty form.}",
+   "{n} goals this season for {playerS}: {?a remarkable tally|an eye-catching haul}.",
+   "{playerS}: {n} and the season isn't done. {?Sensational.|Ridiculous.}"
+  ],
+  "apps": [
+   "{player} makes his {n}th appearance — {?loyalty and consistency|a model professional}."
+  ],
+  "fan": [
+   "{playerS}: {n} goals. {?What a servant.|He's a legend.|Just incredible.} 🙌",
+   "Bow down to {playerS}. {n} goals. {?Truly.|Take your time.}",
+   "{playerS}: {n} goals. {?Hall of Fame.|Statue time.|Hero.}",
+   "{n} goals and a smile. {playerS} for president.",
+   "Legend. {playerS}. {n}. {?That's it. That's the post.|No notes.}"
+  ],
+  "meme": [
+   "{playerS}'s goal tally: 📈📈📈 Defenders: 📉📉📉",
+   "{playerS}'s goal count: 📈🚀 Defenders: 🪦",
+   "{playerS} stats: {n} goals. Everyone else: 🥲"
+  ],
+  "stat": [
+   "{player}: {n} career {?goals|strikes} for {team}. {?The milestone list grows.|Another one for the record books.}",
+   "{player}: {n} goals. {?A new personal landmark.|Another round number.|Joining an elite list.}",
+   "{player} hits {n}. {?Milestones matter.|The list is short.}"
+  ]
+ },
+ "MB_INJURY": {
+  "bn": [
+   "INJURY BLOW: {inj} ({injTeam}) {?suffers|picks up|is forced off with} {injType} — out for {injOut} {?matches|games}.",
+   "{injTeam} {?lose|suffer a blow as they lose} {inj} to {injType}. Expected absence: {injOut}.",
+   "BAD NEWS: {inj} will miss the next {injOut} {?games|matches} after {injType}.",
+   "INJURY: {inj} ({injTeam}) — {injType}. Out for {injOut} matches.",
+   "{injTeam} blow: {inj} ruled out with {injType}.",
+   "INJURY NEWS: {inj} sidelined ({injType}). Absence: {injOut}."
+  ],
+  "gaffe": [
+   "{inj} {?LIMPS OFF|IN AGONY|STRETCHERED OFF}: {injTeam} {?DEVASTATED|FUMING|IN SHOCK}",
+   "{injTeam} STAR {inj}: {injType} {?NIGHTMARE|BLOW|HORROR}",
+   "{inj} DOWN! {injTeam} {?PANIC|FEAR THE WORST}",
+   "{inj} {?HURT|CRUMPLES|LIMPS}: {injType}",
+   "{injTeam}'S {?NIGHTMARE|WORST FEAR} COMES TRUE: {inj} INJURED"
+  ],
+  "fan": [
+   "Get well soon, {injS}. {?We need you back.|Heal fast.|Thoughts with you.} 💙",
+   "{injS} out for {injOut}. {?Absolutely sick.|That hurts.|Next man up, I guess.}",
+   "{injS}, get well soon. {?We need you.|Football isn't the same without you.} {?❤️|💙}",
+   "Praying it's not serious. {injS}: {?strong|heal fast}.",
+   "{injS} injured. {?Gutted.|This hurts.|Not again.}"
+  ],
+  "severe": [
+   "SEVERE: {inj} could be out for {injOut} matches with {injType}. {?The season is over for him.|Long road to recovery.}",
+   "{injTeam}'s {inj} faces a lengthy lay-off: {injType}, {injOut} matches.",
+   "{inj}: {injType}. Out for {injOut} matches. {?It's a big blow.|A major setback.}",
+   "SEVERE: {inj} faces a long absence ({injType}, {injOut} matches)."
+  ],
+  "wish": [
+   "Wishing {inj} a full and quick recovery. Football can be cruel.",
+   "From all of us at {outlet}: get well soon, {injS}."
+  ]
+ },
+ "MB_TROPHY": {
+  "bn": [
+   "{team} ARE {trophy|up} CHAMPIONS! {?The trophy is theirs.|History made.|Celebrations begin.} 🏆",
+   "OFFICIAL: {team} win the {trophy}. {?A season to remember.|A triumph for the ages.}",
+   "{team} crowned {trophy} {?champions|winners}. {?Unstoppable.|Deserved.|What a team.}",
+   "{team} CROWNED {trophy|up} CHAMPIONS! {?Pure celebration.|Parade planning begins.}",
+   "OFFICIAL: {team} take the {trophy}. {?A season of dominance.|A reign begins.}",
+   "{team} win the {trophy}. {?Honour and glory.|Deserved glory.}"
+  ],
+  "tv": [
+   "{team} are the {trophy} champions. Scenes of joy as the players lift the trophy.",
+   "It's official: {team} have won the {trophy}. Lights, trophy, flares — the party begins.",
+   "{team} lift the {trophy}. Fireworks over the city.",
+   "And the {trophy} is {team}'s. Celebrations begin."
+  ],
+  "gaffe": [
+   "CHAMPIONS! {team} {?WIN THE {trophy|up}|LIFT THE {trophy|up}|CLAIM THE {trophy|up}} — {?PARTY TIME!|WHAT A SEASON!|CUE THE PARADE!}",
+   "THEY'VE DONE IT! {team} {?TAKE THE CROWN|STORM TO GLORY|CRUSH THE COMPETITION}",
+   "{team} {?SLAY|SMASH|CONQUER} to win the {trophy}!",
+   "{team} WIN THE {trophy|up}! {?PARTY, PARTY, PARTY.|THE CITY'S ON FIRE.}",
+   "CHAMPAGNE MOMENT: {team} {?LIFT|KISS|HOIST} THE {trophy|up}",
+   "{team} {?RULE|REIGN|DOMINATE}: {trophy|up} WINNERS"
+  ],
+  "meridian": [
+   "{team}'s {trophy} triumph: how it was built",
+   "The making of champions: {team} and the {trophy}",
+   "{team} win the {trophy} — a study in consistency and nerve",
+   "{team}'s {trophy}: the story behind the success",
+   "Inside {team}'s title-winning machine",
+   "{trophy} champions {team}: the process and the people"
+  ],
+  "fan": [
+   "CHAMPIONS!!! {?We did it.|Years of waiting, worth every second.|I can't stop crying.|Best day of my life.} 🏆",
+   "{team} are {trophy} CHAMPIONS. {?Tell your mates.|Tell your grandkids.|Tell everyone.} 🏆🎉",
+   "{?My heart.|My voice.|My wallet.} All gone. {team} won the {trophy}. Worth it.",
+   "{team} {?are champions|won it all}. {?I can't stop crying.|I can't stop smiling.|Best day.} 🏆",
+   "Champions!! {team} {?forever|until I die}. {?I love you all.|Thank you.}",
+   "{trophy}: ours. {?Pinch me.|We did it.|Never doubted.} 🏆"
+  ],
+  "rival": [
+   "Congrats to {team}. {?We'll be back.|Enjoy it.|Fair play, you earned it.} 🤝",
+   "Fair play to {team}. {?Deserved.|Class.|Tough to watch, but fair.}",
+   "Respect to {team}. {?Enjoy it.|Well earned.|We'll be back.}",
+   "{team} champions: {?fair play.|can't argue.|tough but fair.}"
+  ],
+  "meme": [
+   "{team} fans after winning the {trophy}: 🍺🍺🍺🍺🍺 Everyone else: 🧍",
+   "{team}: 🏆 The rest of the league: 🥲",
+   "{team} fans: 🍾🎆 Everyone else: 🥲",
+   "{trophy} trophy cabinet: {team} {?adds one more|makes room}"
+  ],
+  "radio": [
+   "Caller: \"{team} are the best side in the land!\" Host: \"You said that in August.\" Caller: \"And I was right.\"",
+   "Caller: \"{team} earned it from start to finish.\" Host: \"Even the bad weeks?\" Caller: \"Especially the bad weeks.\"",
+   "Phone-in tonight: nothing but {team} talk. No complaints."
+  ],
+  "vid": [
+   "{team} PARADE: full celebration coverage!",
+   "FANS GO WILD: {team} win the {trophy}",
+   "Open-top bus: {team} champions parade",
+   "OPEN-TOP BUS: {team} bring the {trophy} home",
+   "FANS CRY, SING, CELEBRATE: {team} {trophy} champions",
+   "BEHIND THE SCENES: {team} win the {trophy}"
+  ],
+  "tac": [
+   "How {team} won the {trophy}: pressing, structure, patience. A blueprint."
+  ],
+  "stat": [
+   "{team}: {trophy} champions. {?Another one for the cabinet.|A season of dominance.|Another golden chapter.}",
+   "{team}: {trophy} champions. {?A historic achievement.|A new chapter.}",
+   "{team}'s {trophy} win: {?a statistical masterpiece.|numbers and nerves.}"
+  ]
+ },
+ "MB_AWARD": {
+  "bn": [
+   "{award|up}: {winner} ({team}) takes the prize. {?Deserved?|A fitting winner.|A landmark season.}",
+   "OFFICIAL: {winner} wins the {award}. {?What a season.|The best in the business.}",
+   "{winner} crowned {award} winner for {year}. {?Celebrations in {teamS}.|Another milestone.}",
+   "{award}: {winner} takes the crown. {?Incredible season.|Rightfully so.}",
+   "OFFICIAL: {winner} ({team}) wins {award}.",
+   "{winner} named {award} winner. {?Fans erupt.|A deserved honour.}"
+  ],
+  "gaffe": [
+   "{winner} WINS THE {award|up}! {?ABOUT TIME|ROBBERY?|WHO ELSE?}",
+   "{award|up}: {winner} {?CLAIMS|SNATCHES|TAKES} THE CROWN",
+   "{winner} {?SHINES|TRIUMPHS} but {?was it deserved?|did the right man win?|are the fans happy?}",
+   "{winner}: {award|up} WINNER! {?THE BEST OF THE BEST|WHO ELSE?}",
+   "{winner} {?TAKES|CLAIMS|GRABS} {award|up}",
+   "{?SNUB ALERT?|FANS DIVIDED?} {winner} WINS {award|up}"
+  ],
+  "meridian": [
+   "{award}: why {winner} deserved it",
+   "{winner} and the {award}: a season in focus",
+   "Reading the vote: the case for {winner}",
+   "The numbers behind {winner}'s {award}",
+   "Why {winner} was the right winner of the {award}",
+   "{award}: an appreciation of {winner}'s season"
+  ],
+  "fan": [
+   "{winner} winning the {award}? {?Obviously.|Well deserved.|Unbelievable season.} 🏆",
+   "Whoever voted for anyone but {winnerS} needs their head checked. {award}.",
+   "{winnerS} {?wins|takes} the {award}. {?Proud.|Unreal.|Legend.}",
+   "{winnerS} wins the {award}! {?Deserved.|Brilliant.|About time.} 🏆",
+   "{winnerS}: {award}. {?Legend.|No arguments.}",
+   "Congrats {winnerS}! {?What a year.|Incredible.}"
+  ],
+  "robbed": [
+   "{runnerS} was ROBBED. {?Look at the stats.|Obvious snub.|No other opinion.}",
+   "{runnerS} should've won it. {?Mark my words.|I said what I said.}",
+   "Snub of the century: {runnerS} over {winnerS}? {?Nope.|Please.}",
+   "{runnerS} deserved it more. {?Fight me.|Look at the numbers.}",
+   "Giving it to {winnerS} over {runnerS}? {?Strange.|Hmm.|Really?}",
+   "{runnerS} {?was robbed|got hard done by}. {?Facts.|Obviously.}"
+  ],
+  "meme": [
+   "{winnerS} gets the {award}: 🥇 {runnerS}: 👀",
+   "{award} winners be like: 😎 Everyone else: 😤",
+   "{award} winner {winnerS}: 🏆 Fans arguing: 💬🔥",
+   "Me: \"{winnerS} deserved it.\" Also me: \"…{runnerS}…\""
+  ],
+  "radio": [
+   "Caller: \"{winnerS}? Not even close.\" Host: \"Who would you have picked?\" Caller: \"…{runnerS}.\"",
+   "Caller: \"{winnerS} didn't deserve it.\" Host: \"Who did?\" Caller: \"…me.\"",
+   "Radio vote: 63% for {winnerS}. The other 37% are in the comments."
+  ],
+  "vid": [
+   "{award} REACTION: fans debate the winner",
+   "WAS IT {winnerS}? Fan panel on the {award}",
+   "{award} CEREMONY: reactions, tears and debate",
+   "WAS {winnerS} THE RIGHT CHOICE? Fans react",
+   "{award} NIGHT: fan panel verdict"
+  ],
+  "stat": [
+   "{winnerS}: {award}. Season stats: {statLine}.",
+   "{winnerS}: {award}. Season: {statLine}.",
+   "{award} winner {winnerS}: {statLine}."
+  ]
+ },
+ "MB_CONTEXT": {
+  "title": [
+   "TITLE RACE: {leadS} lead {league} by {gap} points with {left} to play. {secondS} {?chase|are hunting|refuse to fall away}.",
+   "{leadS} top the {league} on {leadPts} points — {gap} clear of {secondS}.",
+   "{league}: {leadS} {?stretch|extend} their lead to {gap} points. {?The chasing pack is running out of time.|Can anyone stop them?}",
+   "{leadS} top {league}, {gap} clear with {left} to play. {secondS} chase.",
+   "{league}: {leadS} {?stay clear|open the gap|stay ahead} of {secondS} by {gap}.",
+   "{leadS} lead {league}. {secondS} {?hunt|chase}. {gap} between them with {left} left."
+  ],
+  "title_tight": [
+   "ALL TO PLAY FOR: just {gap} points between {leadS} and {secondS} in the {league}.",
+   "{league} title race is a two-horse race: {leadS} lead {secondS} by {gap}.",
+   "{leadS} v {secondS}: the {league} title race goes down to the wire.",
+   "{gap} points: {leadS} v {secondS} in the {league} title race.",
+   "The {league} is a two-horse race: {leadS} lead by {gap}.",
+   "{leadS} and {secondS} locked in the {league}: {gap} apart."
+  ],
+  "relegation": [
+   "RELEGATION BATTLE: {dropS} sit in the drop zone in the {league}. {?Panic is setting in.|Every point is gold dust.}",
+   "{dropS} are in trouble: {gapSafe} points from safety with {left} left to play.",
+   "{league}: the bottom three — {drop3} — look nervously over their shoulders.",
+   "{dropS} in the drop zone: {?time is running out|pressure is mounting}. {league}.",
+   "Relegation battle: {drop3} in the bottom three. {left} to play.",
+   "{dropS} need a miracle: {gapSafe} behind safety."
+  ],
+  "totw": [
+   "TEAM OF THE WEEK ({league}): {names}.",
+   "{league} TEAM OF THE WEEK: {names}.",
+   "{league} TOTW: {names}.",
+   "Best performers ({league}): {names}."
+  ],
+  "scorers": [
+   "TOP SCORERS ({league}): {names}.",
+   "Golden Boot race ({league}): {names}.",
+   "{league} Golden Boot race: {names}.",
+   "Leading scorers ({league}): {names}.",
+   "Top of the goals list: {names}."
+  ],
+  "roundup": [
+   "{league} round-up: {results}.",
+   "FT SCORES ({league}): {results}.",
+   "Scores from the {league}: {results}.",
+   "{league} results: {results}."
+  ],
+  "seasonStart": [
+   "NEW SEASON: {league} predictions. Favourites: {favs}. Dark horses: {dark}.",
+   "The {league} is back. Pick your champions: {favs} lead the way.",
+   "Season preview ({league}): {favs} start as favourites; {dark} could surprise.",
+   "NEW SEASON: {league} favourites {favs}. Dark horses: {dark}.",
+   "{league} predictions: {favs} to challenge. {dark} could surprise.",
+   "Kick-off: the {league} starts. Eyes on {favs}."
+  ],
+  "seasonEnd": [
+   "SEASON REVIEW: {league} champions {champ}. {?A year of triumph and heartbreak.|The year in numbers, drama and chaos.}",
+   "{league} ends with {champ} on top. {?A campaign to remember.|Great season, well deserved.}",
+   "SEASON REVIEW: {league} champions {champ}. A year to remember.",
+   "{league}: {champ} on top. {?A memorable campaign.|Rivals will remember.}",
+   "{champ} end the {league} season at the summit."
+  ],
+  "calendar": {
+   "August": [
+    "New season, new hope. Optimism hits maximum capacity.",
+    "August: the 'we're winning the league' month.",
+    "Start of the new campaign. {?Optimism levels dangerously high.|Everyone's a contender.}"
+   ],
+   "September": [
+    "The first international break arrives. Everyone holds their breath for injuries.",
+    "Early-season form tables mean nothing. And everything.",
+    "International break: the annual injury lottery."
+   ],
+   "October": [
+    "The nights are drawing in and the tension is rising.",
+    "October: when the contenders separate from the pretenders.",
+    "Nights getting darker, race getting tighter."
+   ],
+   "November": [
+    "Fixture congestion bites. Squad depth is about to matter.",
+    "November: a tough month for the thin squads.",
+    "Fixture congestion: squads tested."
+   ],
+   "December": [
+    "The festive fixture list. Rotation, injuries, chaos.",
+    "December is where leagues are won or lost.",
+    "Festive fixtures: chaos, cheer, and rotation."
+   ],
+   "January": [
+    "Transfer window open. Expect the circus.",
+    "Mid-season reset. Resolutions? We'll see.",
+    "The window's open: gossip season."
+   ],
+   "February": [
+    "Run-in preview: who has the legs for it?",
+    "February: the knockout rounds loom.",
+    "Knockouts loom. Legs matter."
+   ],
+   "March": [
+    "Spring has sprung — so has the tension.",
+    "March: the business end begins.",
+    "The business end approaches."
+   ],
+   "April": [
+    "Squeaky-bum time. Every point suddenly heavy.",
+    "April: titles, relegation, European places all hang in the balance.",
+    "Squeaky-bum time. Every point counts."
+   ],
+   "May": [
+    "The final weeks of the season. Everything's on the line.",
+    "May: legends are made, jobs are lost.",
+    "Final weeks. Everything's on the line."
+   ]
+  },
+  "debate": [
+   "DEBATE: who's the best player in the world right now — {a} or {b}? {?Vote below.|Poll below.}",
+   "Hot take: {a} is overrated. {?Fight me.|Change my mind.|Discuss.}",
+   "Who's better: {a} or {b}? {?Settle it.|Explain.}",
+   "DEBATE: who's the better striker — {a} or {b}? Vote below.",
+   "Hot take: {a} is better than {b}. {?Fight me.|Discuss.}",
+   "Which would you rather have: {a} or {b}?",
+   "Who's better this season: {a} or {b}? Settle it."
+  ],
+  "statWave": [
+   "STAT OF THE MATCHDAY: {fact}",
+   "StatBook: {fact}",
+   "Did you know? {fact}",
+   "Matchday stat: {fact}"
+  ]
+ },
+ "MB_STUDIO": {
+  "title_race": [
+   "The title race: {leadS} lead by {gap}. How many mistakes can {secondS} afford?",
+   "Our panel is split: {leadS} for the title, or {secondS} to catch them?"
+  ],
+  "sack": [
+   "{mgrS} is under pressure. Our panel weighs in on whether he should stay.",
+   "{team} are in a crisis. What can they do?"
+  ],
+  "transfer": [
+   "Transfer buzz around {player}: {?is he worth {fee}?|will he move?|how would he fit at {to}?}"
+  ],
+  "champs": [
+   "{team} are the champions. Let's take a look at how they did it.",
+   "A season of triumph — {team} have won it all."
+  ],
+  "awards": [
+   "Tonight: the awards. Who deserved it, who was snubbed?",
+   "A night of glory for {winnerS}. But was it the right choice?"
+  ]
+ },
+ "GEN": {
+  "core_w": [
+   "{Wf} {W} {wscore} {L} {Lf} | {comp} | {scorers}",
+   "RESULT: {W} win {wscore} against {L}. {scorerS} ({min}') had a big say.",
+   "{W} take all three points at {L}'s expense — {wscore} in the {comp}.",
+   "Match report: {W} {wscore} {L}. {motmS} the standout, {shW} shots to {shL}.",
+   "{L} go down {wscore} to {W}. {scorers}.",
+   "It finishes {wscore} to {W}. {Ls} left to reflect.",
+   "{W} win it. {wscore}. {?Comfortably enough.|With something to spare.|Without any real alarms.|After a few nervy moments.}",
+   "{W} {wscore} {L}: {motmS} {?pulls the strings|leads the way|stars|steals the show} and {W} {?collect|bank|pocket} the points.",
+   "{tag} | FT {wscore} ({W}). Scorers: {scorers}.",
+   "📋 {W} beat {L} {wscore}. xG: {xgW}–{xgL}. Possession: {possW}%.",
+   "{ws} for {W}, {ls} for {L}. {W} take the spoils in the {comp}.",
+   "{Ls} fall short against {Ws}: {wscore} the final score.",
+   "{W} do the job: {wscore} over {L}. {?Next up, the rest of the week.|On to the next one.|Another win in the bank.}",
+   "{scorerS} ({min}') {?the pick of the goals|on target|among the scorers} as {W} win {wscore}.",
+   "Full-time report: {W} {?outlast|outplay|outscore|get the better of} {L}, {wscore}.",
+   "{L} {?couldn't live with|had no answer to|never found a way past} {W} — {wscore}.",
+   "{W} {wscore} {L}. The {comp} picture looks different after that one.",
+   "{W}: {ws} goals, {shW} shots, {possW}% of the ball. {L}: {ls}. Enough said.",
+   "Round-up: {W} {wscore} {L}. {motm} named best on the pitch.",
+   "Three more points for {W}. {L} {?empty-handed|sent home with nothing|left to regroup}.",
+   "{W} {?march on|keep it rolling|keep pace} with a {wscore} win over {L}.",
+   "A {wscore} win for {W} in the {comp}. {scorerS} {?netted|struck} at {min}'.",
+   "Done and dusted: {W} {wscore} {L}.",
+   "{Wf} {Ws} {ws}-{ls} {Ls} {Lf} — {?result confirmed|that's full time|the whistle goes}."
+  ],
+  "core_d": [
+   "{Hf} {H} {score} {A} {Af} | {comp} | {scorers}",
+   "Honours even: {H} and {A} draw {score}.",
+   "{H} {score} {A}. One point each in the {comp}.",
+   "Neither side could find a winner — {score} at the final whistle.",
+   "It ends {score}. {?A fair result, probably.|Both sides will feel they could have had more.|Hard to separate them.}",
+   "Draw: {H} {score} {A}. {tag}",
+   "{H} and {A} {?settle for|take away|share} a point.",
+   "FT: {H} {score} {A}. xG {xgH}–{xgA}, shots {shH}–{shA}.",
+   "Points shared in the {comp}: {H} {score} {A}.",
+   "Stalemate broken only by {scorers}. Final: {score}.",
+   "The {comp} fixture between {H} and {A} finishes level, {score}.",
+   "{H} {score} {A}: {?an even contest|a game of small margins|nobody blinks}.",
+   "{Hs} {score} {As} — spoils shared.",
+   "📋 {H} v {A}: {score}. Possession {possH}%–{possA}%.",
+   "Level at the end: {H} {score} {A}.",
+   "One apiece… or more: {H} {score} {A} finishes all square."
+  ],
+  "formal_w": [
+   "{W} deliver a {?measured|assured|resolute|disciplined} {wscore} win over {L}",
+   "{L} {?undone|outmanoeuvred|found wanting} as {W} take {comp} points",
+   "How {W} found the answers to beat {L} {wscore}",
+   "{motmS} {?inspires|anchors|drives} {W} to {wscore} victory against {L}",
+   "Patience rewarded as {W} edge past {L}",
+   "{W} {?outlast|outthink|outwork} {L} in {comp} meeting",
+   "{wscore}: {W} make the key moments count against {L}",
+   "A win built on structure: {W} {wscore} {L}",
+   "{W} stay {?composed|patient|ruthless} to see off {L}",
+   "Analysis: why {L} could not stop {W}",
+   "{W} {?strengthen their hand|climb the ladder|gather momentum} with {wscore} win",
+   "{Ws} {wscore} {Ls}: the details that decided it",
+   "A {?quietly authoritative|hard-earned|deserved} win for {W} against {L}",
+   "{L} {?pay for|are punished for} missed chances as {W} win {wscore}"
+  ],
+  "formal_d": [
+   "{H} and {A} {?cancel each other out|trade blows without a winner|settle for a point} in {score} draw",
+   "Shared spoils: {H} {score} {A}, and why neither side can complain",
+   "{H}-{A}: a {score} draw that raises more questions than it answers",
+   "A point apiece as {H} and {A} {?split a closely fought contest|fail to find a decisive edge}",
+   "Balanced, tense, unresolved: {H} {score} {A}",
+   "What the {score} draw means for {H} and {A}",
+   "{Hs} and {As} {?stay locked together|go home even}: {score}",
+   "Fine margins at {stadium}: {H} {score} {A}",
+   "The {comp} meeting of {H} and {A} ends level",
+   "A draw that suits nobody entirely: {H} {score} {A}"
+  ],
+  "punny_w": [
+   "{W} {?FIRE|FLATTEN|SHUT OUT|STEAMROLL|SEE OFF} {L} — {wscore}!",
+   "{motmS}'S THE MAN as {W} {?TAKE DOWN|TOP|PIP|PASS} {L}",
+   "THREE POINTS FOR {Ws}: {L} {?LEFT BEHIND|GO HOME EMPTY-HANDED|HAVE NOTHING TO SHOW}",
+   "{L} {?CRUMBLE|FOLD|FALL APART|COLLAPSE} as {W} win {wscore}",
+   "{W} {?CLAIM|SNATCH|GRAB|BAG} THE SPOILS against {L}",
+   "WIN, WIN, WIN: {W} {wscore} {L}",
+   "{Ws} {?ROAR|RIP THROUGH|ROMP|CRUISE} PAST {L}",
+   "{scorerS} {?SINKS|STINGS|SHAKES|SPOILS} {L} as {W} win",
+   "{L} {?SENT PACKING|BEATEN|BOUNCED|OUTGUNNED} {wscore}",
+   "THE LOT: {W} {wscore} {L} — {?everything to cheer|plenty to talk about}",
+   "{W} {?DEFY|DOWN|DISPATCH|DESPATCH} {L} {wscore}",
+   "{L} {?THROWN|SENT|BOUNCED} OUT OF THE {comp|up} PARTY BY {W}",
+   "{W} PUT {ls|up}... NO, {ws}! {W} {wscore} {L}",
+   "{?HOW|WOW|SCENES}! {W} {wscore} {L}",
+   "{Ls} {?LEFT FUMING|LEFT RUING IT|LEFT TO FIX THE DAMAGE} after {wscore} loss",
+   "{W} FANS {?DANCE|PARTY|SING THEIR HEARTS OUT} after {wscore} win",
+   "{motmS} {?RUNS THE SHOW|LORDS IT|IS THE BOSS} as {W} win",
+   "WHAT A {?WIN|RESULT|PERFORMANCE|NIGHT}: {W} {wscore} {L}"
+  ],
+  "punny_d": [
+   "{H} AND {A}: {score} AND {?NOBODY'S HAPPY|EVERYBODY'S ARGUING|NOBODY WINS}",
+   "{?SQUARE DEAL|DEAD HEAT|ALL EVEN}: {H} {score} {A}",
+   "{H} {score} {A} — {?A POINT EACH|SPOILS SPLIT|DRAW, DRAMA, DEBATE}",
+   "{?TIT FOR TAT|NECK AND NECK|LOCKED}: {H} v {A} ends {score}",
+   "FAIR SHARES! {H} and {A} {?SPLIT THE POINTS|GO HOME HAPPY-ISH}",
+   "WHO BLINKED? NOBODY — {H} {score} {A}",
+   "DEAD EVEN: {H} {score} {A} leaves fans {?scratching heads|torn|arguing}",
+   "{?DRAWN OUT|ALL SQUARE|ONE EACH}! {H} {score} {A}",
+   "{?NO WINNER|TOO CLOSE TO CALL}: {H} {score} {A}",
+   "POINT TAKEN? {H} {score} {A} {?divides opinion|has fans fuming}",
+   "{H} {score} {A}: {?THE DRAW THAT WASN'T BORING|DRAW DRAMA|DRAW DEBATE}",
+   "SPLIT DECISION: {H} {score} {A}"
+  ],
+  "meme_w": [
+   "{W} fans: 😎 {L} fans: 🫠 — {wscore}",
+   "{L} players after {wscore}: *quietly leaves the group chat*",
+   "Me: \"{L} are fine.\" {W}: {wscore}. Me: 🙃",
+   "Scoreboard: {W} {wscore} {L}. Everything else: noise.",
+   "{W} after {wscore}: 📈 Expectations after {wscore}: 🚀🚀🚀",
+   "{L} after the final whistle: 🫥",
+   "Dear {Ls}, {?we regret to inform you|please see the scoreboard|this is a gentle reminder}: {wscore}.",
+   "{W} fans reading the table after {wscore}: 👀📈",
+   "Group chat after {W} {wscore} {L}: \"anyone?\" *crickets* (it was {Ls} fans)",
+   "Nobody: {W}: {wscore}.",
+   "{motmS} to {L}'s defence: \"is this a game of tag?\" 🏃",
+   "{L} fans, {?hourly|every five minutes|constantly}: \"it's just a loss\" 🥲",
+   "{W} manager's face: 🧘 {L} manager's face: 🧍",
+   "{W}'s tactics board: ✅ {L}'s tactics board: ❓",
+   "{W} fans right now: 🕺🕺🕺 {L} fans: 🛌",
+   "Pov: you bet on {L}. {W} said {wscore}. 💸"
+  ],
+  "meme_d": [
+   "{H} fans: 🤝 {A} fans: 🤝 Neutrals: 😴",
+   "{score}: the football equivalent of \"k.\"",
+   "Both managers after {score}: \"we go again\" 🫡",
+   "Me, a neutral: \"that was a draw?\" {H} & {A}: \"yep.\"",
+   "{score} in the {comp}: both teams 'happy' with the point 😅",
+   "{H} and {A} after {score}: 🧍‍♂️🧍‍♂️ \"so… who won?\"",
+   "The table after {score}: 🤷",
+   "{H} v {A} ended {score} and the only winner was the tea I made at half-time ☕",
+   "Draws: the football equivalent of 'it's complicated' 💬",
+   "{H} & {A}, 90 minutes: \"{score}.\" Everyone: \"oh.\""
+  ],
+  "radio": [
+   "Caller number three says it's all down to the manager. Caller number four says it's all down to the referee. Host says it's all down to {comp}.",
+   "Phone-in lit up after {score}: half the callers want change, the other half want a nap.",
+   "Caller from the {Hf} end: \"I haven't been this confused since the offside rule.\"",
+   "Host: \"{H} v {A}, {score}. Your thoughts?\" Caller: \"Three hours of my life.\" Host: \"Next caller!\"",
+   "Line one thinks it was a good game. Line two is wrong. Line three is shouting.",
+   "Caller says {motmS} is \"the new national treasure\". Host says \"calm down\".",
+   "A caller from {Af} is still on the line, still shouting.",
+   "\"I've watched football for fifty years,\" says our caller. \"That… was a match.\"",
+   "Caller insists the {comp} is \"the best league on Earth\". Host asks him to define Earth.",
+   "The {Hs} lines are full, the {As} lines are quiet. Make of that what you will.",
+   "\"The ref was fine,\" said no caller ever. Tonight's exception: one man, line five.",
+   "Today's phone-in is brought to you by caffeine and regret."
+  ],
+  "vid_w": [
+   "{W} {wscore} {L} — FAN REACTION (we lost our voices)",
+   "FULL-TIME SCENES: {W} fans after {wscore}",
+   "{motmS} PLAYER OF THE MATCH? {W} fans debate",
+   "Our honest verdict on {W} {wscore} {L}",
+   "WALKING TO THE TUBE AFTER {W} {wscore} {L} 🎥",
+   "{L} fans react after {wscore} loss — brutal honesty",
+   "{W} v {L}: MATCHDAY VLOG | {wscore}",
+   "Fan cam: {W} players celebrate with the crowd",
+   "The day {W} beat {L} {wscore} (reaction compilation)",
+   "We sat among the {Ws} fans and filmed {wscore}"
+  ],
+  "vid_d": [
+   "{H} v {A} {score}: FANS DEBATE THE DRAW",
+   "{H} v {A} MATCHDAY VLOG — we got a point (maybe)",
+   "{score}! Neutral fans rate {H} v {A}",
+   "Was a draw fair? Fans of {H} and {A} give their view",
+   "Draw or disaster? {H} fans on {score}",
+   "{A} fans on {score} at {H}: honest reaction"
+  ],
+  "tac": [
+   "Heatmap says it all: {W} lived in the half-spaces, {L} stayed narrow. {shW}–{shL} on shots.",
+   "Possession was {possW}%–{possL}% and shots {shW}–{shL}: the story of {W}'s win sits in the details, not the totals.",
+   "Structurally, {L} were a few metres too far apart between the lines. {W} found that gap again and again.",
+   "The decisive pattern: {W}'s fullbacks pinned {L}'s wingers and the overload on the far side did the rest.",
+   "{W}'s press: compact, patient, then explosive. {L} lost the ball in dangerous areas too often.",
+   "xG was {xgW}–{xgL}: that {xgSupport}.",
+   "Set pieces mattered: {W} attacked the first contact, {L} defended the second ball poorly.",
+   "Zone 14 was where it happened — {W}'s No. 10 was free to receive and turn all night.",
+   "{L}'s defensive line sat too high without pressure on the ball. Direct balls punished them.",
+   "Transitions: {W} turned defence into attack in 3–4 seconds, repeatedly. That's a trigger worth studying.",
+   "{W}'s rest-defence was excellent — {L} never got a clean counter.",
+   "Thread 🧵 on how {W} {wscore} {L} was decided in the first 20 minutes — start with the build-up shape."
+  ],
+  "fanW": [
+   "{myScore}. {?Obliterated them.|Handled it.|Right result, right performance.|Rolled over them.|Business done.} [tail_win]",
+   "Count me impressed. {myS} {?looked sharp|looked like a proper team|were the better side everywhere}. [tail_win]",
+   "Home or away, doesn't matter. {myScore}. [tail_win]",
+   "{motmS} for the Player of the Match award and the Player of the Season award, please. [tail_win]",
+   "I said we'd win. Everyone laughed. Who's laughing now? {myScore}. [tail_win]",
+   "Honestly… {?loved|adored|can't stop smiling about} that. {myScore}. [tail_win]",
+   "3pts, clean, tidy. Moving on. {myScore} [tail_win]",
+   "We keep {?stacking|banking|collecting} wins. {opp} the latest victim. [tail_win]",
+   "Is anyone else just sitting here smiling at the table? {myScore}.",
+   "Make some noise for the lads. {myScore}! [tail_win]",
+   "{oppS} came to play. {myS} came to win. {myScore}. [tail_win]",
+   "Pre-match nerves: 9/10. Post-match feelings: 10/10. {myScore}.",
+   "That team talk must have been something. {myScore}. {?Huge.|Brilliant.|Proper.}",
+   "{scorerS} is on a different frequency right now. {myScore}!",
+   "Just a {?great|brilliant|vintage} night for {myS}. {myScore}. [tail_win]",
+   "{myS} fans {?are not okay|are floating|are insufferable tonight} and honestly? Fair. {myScore}.",
+   "Beating {opp} {?never gets old|always tastes sweeter|feels so good}. {myScore}!",
+   "Put the kettle on, we're {?winning the league|dreaming|celebrating}. {myScore}. [tail_win]",
+   "My dog doesn't care about football but she's enjoying this {myScore} too.",
+   "The way we {?closed it out|managed that|saw it off}… {?chef's kiss|class|textbook}. {myScore}.",
+   "{?Full-time. Phew.|Full-time. Wow.|Full-time. Yes!} {myScore}. [tail_win]",
+   "Don't talk to me about {opp}. {myScore}. I'm busy being happy.",
+   "Told my {?mum|mate|boss|neighbour} we'd win. Zero doubt. Some doubt. {myScore}!",
+   "Every goal, every tackle — {myS} {?played with joy|played for the badge}. {myScore}.",
+   "I'll be re-watching those highlights all week. {myScore}.",
+   "That's the kind of performance you frame. {myScore}. [tail_win]",
+   "Up all night to celebrate. Work tomorrow. Worth it. {myScore}. 🥳",
+   "{myScore} — and the best part? {?It wasn't even close.|We still have another gear.|We made it look easy.}",
+   "Thank you, {myS}. {myScore}. [tail_win]",
+   "Don't let anyone tell you it's just three points. It's {myScore} and it's glorious.",
+   "Honestly can't wait for the next one. {myScore}! [tail_win]"
+  ],
+  "fanL": [
+   "{myScore}. {?Rotten.|Wretched.|Dreadful.|No other word for it.|Absolutely lifeless.} [tail_lose]",
+   "I can't watch this team right now. {myScore}. [tail_lose]",
+   "Fifteen minutes of effort in ninety. That's not enough. {myScore}.",
+   "{oppS} {?made it look easy|were miles better|ran the show}. {myScore}. [tail_lose]",
+   "I'm {?speechless|numb|going for a long walk|done}. {myScore}.",
+   "Where do we even start? {myScore}. {?Defence.|Midfield.|Attack.|All of it.} [tail_lose]",
+   "{myScore}. {?Please fix it.|Somebody fix it.|Make it stop.|Same story again.}",
+   "That wasn't a performance. That was a {?cry for help|rehearsal for a disaster|group project nobody prepared for}. {myScore}.",
+   "We were second-best everywhere. {myScore}. [tail_lose]",
+   "Stopped watching after the {?second|third} goal. {myScore}. Don't blame me.",
+   "How can a team with this squad play like that? {myScore}. {?Genuine question.|Answers on a postcard.}",
+   "{myScore}. At least the {?pies|chips|tea} was good. [tail_lose]",
+   "It's the hope that kills you. {myScore}. {?Again.|As always.}",
+   "I've seen enough. I'm out. See you next week. {myScore}. [tail_lose]",
+   "We'll bounce back. We have to. {myScore}.",
+   "{myScore}. Every pass looked like homework. [tail_lose]",
+   "Well, {opp} read us like a book. {myScore}. Respect and rage.",
+   "That one stings in places I didn't know I had. {myScore}.",
+   "{myS} fans deserve more than {?this|that|ninety minutes like that}. {myScore}. [tail_lose]",
+   "Hit the wall. {myScore}. {?Time to regroup.|Time for some honesty.|Time for answers.}",
+   "I'd like to speak to whoever is in charge of {?our defending|our midfield|set pieces|this mess}. {myScore}.",
+   "Pain is temporary. {myScore} is forever. [tail_lose]",
+   "Going to sleep hoping it's a bad dream. {myScore}.",
+   "If {opp} are title contenders I'm a ballerina. They still beat us {myScore}. [tail_lose]",
+   "We wanted it, we just didn't know how. {myScore}.",
+   "Not angry. Just disappointed. And a bit angry. {myScore}.",
+   "{myScore}. Football can do one today.",
+   "Stay strong, {myS} fans. {myScore}. We'll be back. [tail_lose]",
+   "That's what happens when you give a good side time on the ball. {myScore}.",
+   "Sat in silence for ten minutes after the whistle. {myScore}.",
+   "Credit where due to {oppS}, but we were awful. {myScore}. [tail_lose]"
+  ],
+  "fanD": [
+   "{myScore}. {?Frustrating.|Annoying.|Fine.|Typical.|Could've gone either way.} [tail_draw]",
+   "A point's a point. {myScore}. {?I guess.|Don't love it.|Fair enough.}",
+   "Both teams had chances to win it. {myScore}. [tail_draw]",
+   "{myScore}. {?Mixed feelings.|Neither happy nor sad.|Strangely flat.} [tail_draw]",
+   "Did we win a point or lose two? {myScore}. {?I can't tell.|Discuss.}",
+   "{oppS} will be happier with the point than us. {myScore}. [tail_draw]",
+   "Neutral on this one. {myScore}. {?Fair result.|Take it and go.}",
+   "A game of two halves, none of them decisive. {myScore}.",
+   "We'll look back on {myScore} and wonder what could've been. [tail_draw]",
+   "At least we didn't lose. {myScore}. {?Silver lining.|Positive thinking.}",
+   "Should've won. Could've lost. {myScore}. {?Football.|So it goes.}",
+   "{myScore}. {?Meh.|Fine.|It's something.} [tail_draw]",
+   "Neither side deserved to lose, which is the most boring sentence in football. {myScore}.",
+   "Point gained, point lost, sanity unknown. {myScore}.",
+   "Not our best, not our worst. {myScore}. [tail_draw]",
+   "That's another one for the \"could be worse\" folder. {myScore}.",
+   "I'm calling it a good point. In 20 minutes I'll call it a bad one. {myScore}.",
+   "{myScore}. The result nobody wanted and everybody accepted. [tail_draw]",
+   "The point is welcome, the performance less so. {myScore}.",
+   "Take the point, look at the table, take a deep breath. {myScore}. [tail_draw]",
+   "That draw is going to either look good or terrible in May. {myScore}.",
+   "Level at the end: {myScore}. {?We move.|On we go.|Next.}"
+  ],
+  "fanN_w": [
+   "{W} {wscore} {L}. {?Fair play to {Ws}.|Thought {Ls} would offer more.|Strong from {Ws}.|{motmS} impressed me.} [tail_neutral]",
+   "Watched {W} v {L}. {?Deserved winners.|Winners were clinical.|One team showed up.} [tail_neutral]",
+   "Neutral view: {W} were the better side by some distance. {wscore}.",
+   "{wscore} to {W}. {?Quality finish.|Tidy.|Another statement.}",
+   "Anyone else think {Ls} are in trouble? {W} {wscore} {L}.",
+   "{motmS} was the best player on the park for me. {W} {wscore}.",
+   "Great to see {W} {?playing with that confidence|take their chances|show some personality}. {wscore}.",
+   "{W} found the net when it mattered. {wscore}.",
+   "Not sure {L} can complain after that. {W} {wscore}. [tail_neutral]",
+   "Genuinely enjoyed that. {W} {wscore} {L}. {?Quality.|Proper football.}",
+   "{W} look like contenders. {wscore} v {L} says it all.",
+   "Who else watched {W} v {L} and just nodded appreciatively? {wscore}.",
+   "If you want to see how to win a {comp} game, watch {W}'s {wscore} win.",
+   "{Ws} {wscore} {Ls}. The scoreline is fair. The performance is {?impressive|decent|clinical}.",
+   "Wouldn't want to face {W} right now. {wscore}."
+  ],
+  "fanN_d": [
+   "{H} {score} {A}. {?Fair.|Draw felt right.|Entertaining enough.|Nothing between them.} [tail_neutral]",
+   "Neutral verdict on {H} v {A}: {?both sides had their moments|honours even|a bit of everything}. {score}.",
+   "{score} between {H} and {A}. {?I'd have taken a winner.|Fine, I'll accept it.|Fair result.}",
+   "Watched {H} v {A}. {?Draw felt about right.|Both deserved better.|Neither deserved to lose.} {score}.",
+   "{H} {score} {A}: {?the kind of game that makes you appreciate goals.|a point for each and a nap for me.}",
+   "Honestly, {score} is a fair reflection. Good game. [tail_neutral]",
+   "I'll give both sides a B+. {H} {score} {A}.",
+   "A draw in {comp}: {?always interesting|always a talking point|always a debate}. {score}.",
+   "Did anyone else think that was a draw from the first whistle? {H} {score} {A}.",
+   "{H} v {A} finished {score} and I'm {?still thinking about it|not sure how I feel|quite sure nothing else happened}."
+  ]
+ },
+ "MB_X": {
+  "pubcast": {
+   "w": [
+    "Pint #1: {W} {wscore} {L}. Pint #2: arguing about it. Pint #3: {motmS}. Pint #4: still arguing.",
+    "This week on The Pub Podcast: {W} beat {L} {wscore}, a man called Keith has theories, and nobody's driving home.",
+    "Hot take from the back table: {Ws} are \"actually quite good\". Source: {wscore}.",
+    "{L} lost {wscore} and the bar's gone quiet. Mind the gap, lads.",
+    "Barman's verdict on {W} {wscore} {L}: \"fair\". Barman has never been wrong. Barman has been wrong.",
+    "Round's on {Ws} fans tonight. {wscore} in the {comp}. Cheers."
+   ],
+   "d": [
+    "{H} {score} {A}: we bought a round, we ordered a second, we agreed on nothing.",
+    "Draws are just pints that haven't been finished. {H} {score} {A}.",
+    "Regulars split down the middle on {score}. The darts team stayed neutral.",
+    "{score}? Two schools of thought: \"fair\" and \"another pint\"."
+   ],
+   "pre": [
+    "{H} v {A} tonight: tables booked, volume turned up, opinions loaded. Pred: {pred}.",
+    "This week: {keyH} and {keyA}. Bring snacks. Bring bad takes.",
+    "Pub's already full for {H} v {A}. {?Get there early.|We saved you a stool.}",
+    "Over/under on arguments at the bar for {H} v {A}: 4.5. Take the over."
+   ]
+  },
+  "retro": {
+   "w": [
+    "{W} {wscore} {L}: reminds me of the classic nights when {?the ball was heavier|the boots were leather|the pitches were mud}. {?Football's changed. This hasn't.|Same joy.}",
+    "Remember when a {wscore} win wasn't broadcast to 40 countries? {W} would've made the highlights anyway.",
+    "{motmS} would've made any team from the old days. {?Possibly.|Debatable.|Definitely.}",
+    "Back in the day, {W} beating {L} {wscore} would have been front-page news. It still is.",
+    "Nostalgia check: {W} {wscore} {L}. {?The rivalry lives on.|Same noise, new names.|Classic.}",
+    "The way {W} won today: old-school football with new-school legs."
+   ],
+   "d": [
+    "{H} {score} {A}: very 'Saturday afternoon, wet pitch, sausage roll'.",
+    "Draws used to be fine. Now they're an emergency. {H} {score} {A}.",
+    "A {score} draw. The old guard would've called that 'a good point' and gone home.",
+    "Same drama, same chaos, just more cameras: {H} {score} {A}."
+   ],
+   "pre": [
+    "{H} v {A} — reminds me of the classics. {?Hope for goals.|Hope for studs-up tackles (kidding).|Hope for a proper old-fashioned battle.}",
+    "Remember when {keyH} types were just 'the big lad up front'? Football evolves; {H} v {A} doesn't.",
+    "Throwback: {H} v {A} has history. {?Let's make some more.|It never disappoints.}",
+    "Pre-match ritual: pie, programme, prediction. Mine: {pred}."
+   ]
+  },
+  "youth": {
+   "w": [
+    "{W} beat {L} {wscore}. Prospects watch: {motmS} {?again looks the part|keeps raising his floor}.",
+    "In {W}'s {wscore} win, the young talent to follow: {?{motmS}|{scorerS}}. {?Real potential.|High ceiling.|Learning fast.}",
+    "Academy graduates watching {W}'s {wscore}: \"that could be us\". Keep growing.",
+    "Talent note: {scorerS} at {min}' showed composure beyond his years. {?One for the shortlist.|Watch this space.}",
+    "Next generation check: {W}'s {wscore} was built on youthful energy."
+   ],
+   "d": [
+    "{H} {score} {A}: both sides gave minutes to the kids. {?Positives all round.|Plenty to build on.}",
+    "A draw but a development win: {H} and {A}'s young players held their own.",
+    "Draw {score}. Takeaway: academies are working."
+   ],
+   "pre": [
+    "{H} v {A}: young players to watch — {keyH} and {keyA} {?are the headline names|are the ones to see}.",
+    "Prospects alert: {H} v {A} could be a stage for the next big names.",
+    "Who breaks through in {H} v {A}? {keyH}? {keyA}? Someone unexpected?",
+    "Scouts will be in the stands for {H} v {A}. {?Always.|You can bank on it.}"
+   ]
+  },
+  "ultras": {
+   "w": [
+    "Statement: {Ws} fans in full voice tonight. {wscore}. {?Thank you to the 12th man.|The terraces never sleep.|You made the noise, they did the rest.}",
+    "Match report from the stand: {wscore}, flares, songs, a long walk home. {W}.",
+    "We sang louder than {Ls} could hear. {wscore}.",
+    "Tifo, chants, noise. {W} {wscore} {L}. {?Unforgettable.|Worth every mile.}",
+    "The away end was {?empty|quiet|stunned} by the end. {W} {wscore}."
+   ],
+   "d": [
+    "{score}: the stands didn't stop singing. {H} {?and|v} {A}: respect.",
+    "Tonight the terraces earned a draw: {score}. {?Standing proud.|Voices hoarse.}",
+    "{H} fans, {A} fans, one noise. {score}. {?Great atmosphere.|Honest night.}"
+   ],
+   "pre": [
+    "Tonight: all hands to the stand. {H} v {A}. {?Bring the noise.|Bring the colours.|Bring the voice.}",
+    "{A} fans are travelling. {H} fans are ready. {H} v {A}. {?Let's go.|It's on.}",
+    "Atmosphere is half the match. {H} v {A}: make it deafening.",
+    "Tifo's ready. Scarves are on. {H} v {A}. Come on!"
+   ]
+  },
+  "agent": {
+   "w": [
+    "Sources close to {W}: \"the dressing room is flying after {wscore}\". Agents everywhere are paying attention.",
+    "After {wscore}, {motmS}'s representatives are {?quietly pleased|already on the phone}. {?Interest is growing.|Offers will follow.}",
+    "Well-placed contacts say {Ls} are 'reassessing' after {wscore}. {?Changes possible.|Everything is on the table.}",
+    "Agent whispers: that {wscore} will have a {?price tag|bidding war} attached by morning.",
+    "Several clubs noted {scorerS}'s display against {L}. {?We hear no names yet.|Names to follow.}"
+   ],
+   "d": [
+    "After {score}, agents on both sides say it's {?business as usual|noted|fine}. But the phones are still lighting up.",
+    "Neither dressing room is panicking after {score}. Insiders disagree.",
+    "{H}-{A} {score}: whispers of {?squad tweaks|a busy window} on the way."
+   ],
+   "pre": [
+    "Ahead of {H} v {A}, agents are {?watching closely|circling|sitting in the stands}. {keyH} and {keyA} on the radar.",
+    "Scouts everywhere for {H} v {A}. Make of that what you will.",
+    "Talk on the grapevine before {H} v {A}: {?big names, bigger egos|a lot of eyes on one pitch}.",
+    "Quiet word: {keyA} has admirers. {H} v {A} is the shop window."
+   ]
+  },
+  "quiz": {
+   "w": [
+    "Did you know? {W} have now won {ws}-{ls} against {L} — a margin that {?happens about once every 12 matches|isn't unusual, but is always welcome}.",
+    "Stat of the day: {scorerS}'s goal at {min}' means {W} scored first in {?almost|more than} half their wins this year.",
+    "Quiz question: which side posted {shW} shots vs {shL} yesterday? ({W}.)",
+    "Fact: {possW}% possession doesn't guarantee wins — but {W} will take it.",
+    "{W} {wscore} {L}. Fun fact: {comp} has seen {?plenty of|a handful of} results like this recently."
+   ],
+   "d": [
+    "Did you know? A {score} draw happens in roughly 1 in {?6|7|8} {comp} matches.",
+    "Quiz: how many shots did {H} and {A} have between them? ({shH}+{shA}.)",
+    "Fact: {score} — {?a very normal scoreline|more common than you'd think}."
+   ],
+   "pre": [
+    "Quiz: who has the better recent form? {H} ({formH}) or {A} ({formA})?",
+    "Fun fact: {H} v {A} always {?makes noise|has something to say}.",
+    "Pre-match trivia: name {keyH}'s favourite position. (We'll wait.)",
+    "Fact of the week: {H} and {A} have scored in {?most|many} of their recent matches."
+   ]
+  },
+  "physio": {
+   "w": [
+    "Fitness note: {W} looked the sharper side late on. Training load is a theme to watch.",
+    "{W} ran harder after the break. {?Conditioning pays off.|Fitness is a weapon.}",
+    "{L} faded after the hour. {?Legs went.|Fatigue was clear.}",
+    "The treatment room is quiet after {wscore}. {?Good news.|Nobody limped off.}",
+    "Physio take: {W} {wscore} {L} — {?intensity won it|good recovery between matches}."
+   ],
+   "d": [
+    "Hamstrings held, calves complained. {H} {score} {A}: fitness fine; rhythm less so.",
+    "{score}: both sides seemed {?cautious|careful} with legs. Congested schedule?",
+    "No new knocks reported after {score}. {?Relief.|Fingers crossed.}"
+   ],
+   "pre": [
+    "Injury pointer ahead of {H} v {A}: {missLine}",
+    "{H} v {A}: a congested schedule means rotation. Watch for fresh legs.",
+    "Warm-up report: {keyH} looked {?sharp|ready}. {?Good sign.|Promising.}",
+    "Recovery sessions complete. {H} v {A}: {?legs should be fine.|time will tell.}"
+   ]
+  },
+  "sunday": {
+   "w": [
+    "My Sunday League team lost 9-0 today so I'm in no position to criticise, but {L} lost {wscore} and I have notes.",
+    "{W} {wscore}: I managed one shot on target in 90 minutes last week. It was a pass to the ref.",
+    "Sunday league check: {motmS}'s display > anything I've done since 2011.",
+    "{W} won {wscore}. My team's best result this year was a draw by forfeit. We're all learning.",
+    "My knees hurt from watching {W} {wscore} {L}. Not sure how."
+   ],
+   "d": [
+    "{H} {score} {A}: reminds me of our last game: nobody scored and the ref went home early.",
+    "{score}: the exact scoreline my Sunday League team aims for. Zero ambition.",
+    "Draw! My team knows that feeling. Mostly it's \"rain stopped play\"."
+   ],
+   "pre": [
+    "{H} v {A} today. {?I'm the 14th man on my Sunday side.|I'll be on the touchline pretending to be a pundit.} Pred: {pred}.",
+    "Pre-match: stretch, argue, pretend. {H} v {A}.",
+    "Game day for {H} and {A}. Game day for me: five-a-side on a Tuesday. Same energy.",
+    "Fingers crossed for {H} v {A}. My own fingers crossed because I broke the other ones."
+   ]
+  },
+  "chant": {
+   "w": [
+    "New chant doing the rounds: \"{motmS}, {motmS}, {?on the ball|ooh-ah-ooh|he scores a lot}\". Short, sweet, effective. {W} {wscore}.",
+    "{Ws} fans' chant of the night: \"We've got {ws}, you've got {ls}!\" Simple but brutal.",
+    "Tonight's rhyme: \"{scorerS} at {min}', that's all you need to know.\" Poetry.",
+    "Chant corner: {Ls} fans sang through it, {Ws} fans sang over them.",
+    "{wscore} to {W}: the soundtrack was {?relentless|loud|joyous}."
+   ],
+   "d": [
+    "{score}: the chants were louder than the football. {H} v {A}.",
+    "Both ends in full voice. {score}. {?Respect.|Quality.}",
+    "{H} fans sang through the draw. {A} fans sang back. Good night."
+   ],
+   "pre": [
+    "{H} v {A} chant watch: {?old classics at the ready|new songs being rehearsed}. {?Lungs, assemble.|Throats, prepare.}",
+    "{keyH} is getting a new chant tonight. Rumour has it, it's catchy.",
+    "{H} v {A}: the stand's got the lyric sheet. It's chaos but it works.",
+    "Warm up the vocal cords: {H} v {A}."
+   ]
+  }
+ },
+ "MB_LOCAL": {
+  "names": [
+   "Evening Post",
+   "Daily Echo",
+   "Courier",
+   "Chronicle",
+   "Standard",
+   "Herald",
+   "Gazette",
+   "Telegraph",
+   "Mercury",
+   "Sentinel",
+   "Advertiser",
+   "Journal"
+  ],
+  "win": [
+   "{myS} win {myScore}: {?joy across the city|streets alive tonight|neighbours knocking on doors}. {?Chip shop queues stretch around the block.|The pubs are full.}",
+   "Local hero: {scorerS} stars as {my} beat {opp}. {?He's got a statue coming.|Barber shop prices going up.}",
+   "{my} {myScore} {opp}: a {?proud|memorable|noisy} night in town.",
+   "{my} win: {?Pensioners tap-dance, kids cheer.|Even the pigeons look happy.}",
+   "Match report: {my} see off {opp} {myScore}. {?The mayor sent a tweet.|The bus drivers are singing.}"
+  ],
+  "lose": [
+   "{my} fall {myScore} to {opp}: {?a quiet walk home for locals|gloom over the town|sighs echo through the pubs}.",
+   "{opp} leave with the points ({myScore}). {?The pie shop was strangely silent.|The taxi drivers have nothing to say.}",
+   "{my} beaten: {?the town needs to regroup|a Tuesday-feeling Saturday}.",
+   "Locals react: \"We'll bounce back.\" ({myScore} to {opp}). {?Probably.|Hopefully.}",
+   "Heartache for {myS}: {myScore}. {?The weather matched the mood.|Tea is flowing.}"
+  ],
+  "draw": [
+   "{my} and {opp} draw {myScore}: {?a point and a shrug|town divided|the pubs can't decide}.",
+   "Locals say: \"{myScore}? It's a start.\" {?Or a stop.|Hard to tell.}",
+   "{myScore}: {?another one for the local pub debate.|a draw the barber has opinions on.}",
+   "Draw for {my}: {?the pie was good, the football less so.|mixed feelings in the high street.}"
+  ],
+  "pre": [
+   "{H} host {A} on {when}: {?the town is buzzing|tickets are gone|pubs are stocking up}.",
+   "Local preview: {H} v {A}. {keyH} is the name on every lip. {?Pie vendors prepare.|Bus companies add extra services.}",
+   "Matchday in town: {H} v {A}. {?Weather: dry, mostly.|Mood: nervous.}",
+   "Matchday forecast for {H} v {A}: {?hopeful|tense|loud}. {?Bring a scarf.|Bring an umbrella.}"
+  ]
+ },
+ "MEDIA_REF_SURNAMES": [
+  "Abara",
+  "Ballesteros",
+  "Cheung",
+  "Dvorak",
+  "Eriksen",
+  "Fontaine",
+  "Gallagher",
+  "Hartmann",
+  "Ibarra",
+  "Jankowski",
+  "Kovacs",
+  "Laurent",
+  "Moretti",
+  "Nakamura",
+  "Ogunbanjo",
+  "Petrov",
+  "Quintero",
+  "Rinaldi",
+  "Silvestre",
+  "Thornbury",
+  "Ulloa",
+  "Vasquez",
+  "Waterhouse",
+  "Yilmaz"
+ ]
+}
