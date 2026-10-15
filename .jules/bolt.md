@@ -1,0 +1,3 @@
+## 2026-09-24 - Do not blindly run node build.js without checking split chunk sync
+**Learning:** `node build.js` concatenates split source files based on `manifest.json` into `dist/app.js`. However, some split source files in `js/`, `engine/`, `simulation/`, `ai/`, `data/`, and `ui/` may lack updates that were previously made directly to `app.js` or `dist/app.js`. Running `node build.js` without caution can revert direct changes in `dist/app.js` and introduce regressions.
+**Action:** When making changes, update `data/teamDatabase.js` (or relevant split source file), `app.js`, and `dist/app.js` directly and inspect `git diff` carefully before committing.
