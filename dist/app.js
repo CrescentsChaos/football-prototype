@@ -13622,8 +13622,11 @@ const PLAYSTYLE_BEHAVIOR = {
   let _nationalByName = {};
   let _clubByName = {};
 
+  let _playerTeamsMemo = Object.create(null);
+
   function buildPlayerTeamIndexes() {
     if (_playerTeamIndexBuilt) return;
+    _playerTeamsMemo = Object.create(null);
     _nationalById = {}; _clubById = {}; _playerByIdIdx = {};
     _nationalByName = {}; _clubByName = {};
     (teamsData.national || []).forEach(t => {
@@ -13642,6 +13645,7 @@ const PLAYSTYLE_BEHAVIOR = {
     _playerTeamIndexBuilt = true;
   }
   function findPlayerTeams(playerId) {
+    if (_playerTeamsMemo[playerId]) return _playerTeamsMemo[playerId];
     buildPlayerTeamIndexes();
     let national = _nationalById[playerId] || null;
     let club = _clubById[playerId] || null;
@@ -13674,7 +13678,9 @@ const PLAYSTYLE_BEHAVIOR = {
         }
       }
     }
-    return { national, club };
+    const res = { national, club };
+    _playerTeamsMemo[playerId] = res;
+    return res;
   }
 
   function recordStat(type, player, team) {
