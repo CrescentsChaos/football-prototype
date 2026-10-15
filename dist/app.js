@@ -14056,6 +14056,7 @@ const PLAYSTYLE_BEHAVIOR = {
   // recordIndividualAwardsFromAwardsObject() above), which is unaffected.
   function archiveAndResetGlobalAwards(year, category) {
     category = category || 'season-global';
+    try { mediaOnAwardsEve('global'); } catch (e) {}
     const extra = { category, year };
     const type = (category === 'standalone-global' ? 'Awards Round ' + year : 'Season Y' + year) + ' (Global)';
     const topOf = (key) => Object.values(stats[key] || {}).sort((a,b) => b.count - a.count)[0] || null;
@@ -16857,6 +16858,7 @@ const PLAYSTYLE_BEHAVIOR = {
     // pedigree, so the cup just won here needs to already be in it.
     pushTeamTrophy(tName, team, 'Tournament', runExtra);
     pushManagerAward(tName + ' Winning Manager', team, 'Tournament', runExtra);
+    try { mediaOnAwardsEve('tournament'); } catch (e) {}
     assignTournamentAwards();
     recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
     const stageTitle = document.getElementById('tour-stage-title');
@@ -21480,6 +21482,10 @@ const PLAYSTYLE_BEHAVIOR = {
       MB_CONTEXT = {},
       MB_STUDIO = {};
   let GEN = {}, MB_X = {}, MB_LOCAL = {}, MEDIA_REF_SURNAMES = [];
+  // SOCIAL = verified player / club accounts, fanbases, awards hype and debates:
+  // { cfg: {thresholds, weights, handle patterns, outlet specs...}, banks: {name: [templates]} }.
+  // Every word and number the social layer uses lives in media.json -> SOCIAL.
+  let SOCIAL = {};
   const MB = {};   // flattened banks resolved by [bank] references
 
   function mediaApplyData(j) {
@@ -21516,10 +21522,14 @@ const PLAYSTYLE_BEHAVIOR = {
     if (j.MB_X != null) MB_X = j.MB_X;
     if (j.MB_LOCAL != null) MB_LOCAL = j.MB_LOCAL;
     if (j.MEDIA_REF_SURNAMES != null) MEDIA_REF_SURNAMES = j.MEDIA_REF_SURNAMES;
+    if (j.SOCIAL != null) SOCIAL = j.SOCIAL;
     Object.keys(MB).forEach(k => { delete MB[k]; });
     Object.keys(MB_TAILS).forEach(k => { MB[k] = MB_TAILS[k]; });
     Object.keys(MB_REPLY).forEach(k => { MB['reply_' + k] = MB_REPLY[k]; });
     Object.keys(MB_OVERLAY).forEach(k => { MB['ov_' + k] = MB_OVERLAY[k]; });
+    // social banks are addressable as [sx_<name>] from any template
+    Object.keys((SOCIAL && SOCIAL.banks) || {}).forEach(k => { MB['sx_' + k] = SOCIAL.banks[k]; });
+    try { if (typeof mediaSocialApplyCaps === 'function') mediaSocialApplyCaps(); } catch (e) {}
     mediaReady = true;
     return true;
   }
@@ -21547,8 +21557,8 @@ const PLAYSTYLE_BEHAVIOR = {
   //        engine/mediaWorld.js (previews, world events, flush, hooks) ·
   //        ui/mediaUI.js (Media tab).
   // ==========================================================================
-  const MEDIA_CAP_FEED = 320;   // ordinary posts kept
-  const MEDIA_CAP_KEEP = 80;    // landmark posts (trophies, awards, shocks) kept longer
+  let MEDIA_CAP_FEED = 320;   // ordinary posts kept (media.json SOCIAL.cfg.caps can raise these)
+  let MEDIA_CAP_KEEP = 80;    // landmark posts (trophies, awards, shocks) kept longer
   const MEDIA_STORAGE_KEY = 'apexMedia';
 
   let mediaState = null;       // lazily created / loaded
@@ -21560,7 +21570,8 @@ const PLAYSTYLE_BEHAVIOR = {
   const _mRecent = {};         // bank key -> recently used indexes (anti-repeat)
 
   function mediaBlank() {
-    return { v: 1, seq: 0, pid: 0, feed: [], keep: [], h2h: {}, run: {}, lastMonth: null, rumors: {}, tvLast: 0 };
+    // sx = social layer state: match counter, fanbase heat, award hype memory, leaders, debates
+    return { v: 1, seq: 0, pid: 0, feed: [], keep: [], h2h: {}, run: {}, lastMonth: null, rumors: {}, tvLast: 0, sx: { m: 0, heat: {}, hype: {}, lead: {}, debates: [], cy: 0, sy: null, did: 0 } };
   }
   function ensureMedia() {
     if (!mediaState) mediaState = mediaBlank();
@@ -21575,6 +21586,7 @@ const PLAYSTYLE_BEHAVIOR = {
         if (parsed && Array.isArray(parsed.feed)) {
           mediaState = Object.assign(mediaBlank(), parsed);
           mediaState.keep = mediaState.keep || [];
+          mediaState.sx = Object.assign(mediaBlank().sx, parsed.sx || {});
           return;
         }
       }
@@ -21835,6 +21847,8 @@ const PLAYSTYLE_BEHAVIOR = {
     const o = { n: u.n, h: u.h, a: u.a, c: u.c };
     if (u.t) o.t = u.t;
     if (u.v) o.v = 1;
+    if (u.p) o.p = u.p;   // player id (verified player accounts + fanbase accounts point at their player)
+    if (u.k) o.k = u.k;   // account kind: p player, c club, f fan
     return o;
   }
   function mClubDesk(team) {
@@ -21887,7 +21901,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (o.tg && o.tg.length) p.tg = o.tg.filter(Boolean);
     if (o.c) p.c = o.c;
     if (batch.when) p.w = batch.when;
-    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
+    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
     batch.posts.push(p);
     return p;
   }
@@ -22533,6 +22547,7 @@ const PLAYSTYLE_BEHAVIOR = {
     ensureMedia();
     const f = mediaBuildFacts(m);
     mediaUpdateMemory(f);
+    try { mgSocialMemory(f); } catch (e) {}
     _mediaQueue.push(f);
     mediaScheduleFlush();
   }
@@ -22681,6 +22696,7 @@ const PLAYSTYLE_BEHAVIOR = {
       mShuffle(xids).slice(0, mInt(1, 2)).forEach(id => { const b = MB_X[id] && mOk(MB_X[id].pre || [], c); if (b && b.length) mkPost(batch, id, 'take', mx(mFresh(b, 'x:' + id + 'p'), c), Object.assign({}, base, { dt: dtp() })); });
     }
     if (full) mkPost(batch, 'viral', 'meme', mx(mFresh(MB_PRE.meme, 'pre:meme'), c), Object.assign({}, base, { dt: dtp(), v: virality * 1.2 }));
+    try { mgSocialPreview(batch, H, A, c, base, full, kh, ka, derby); } catch (e) { console.warn('Social preview', e); }
     return c;
   }
 
@@ -22736,6 +22752,7 @@ const PLAYSTYLE_BEHAVIOR = {
     mkPost(batch, 'terrace', 'take', mx(mFresh(MB_TROPHY.radio, 'tr:rad'), c), Object.assign({}, base, { dt: mInt(40, 120) }));
     mkPost(batch, 'fanvoices', 'vid', mx(mFresh(MB_TROPHY.vid, 'tr:vid'), c), Object.assign({}, base, { dt: mInt(60, 240), vid: { vw: mInt(200000, 4000000), dur: mInt(5, 20) + ':' + String(mInt(0, 59)).padStart(2, '0') }, v: 1.6 }));
     mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_TROPHY.stat, 'tr:st'), c), Object.assign({}, base, { dt: mInt(20, 60) }));
+    try { mgSocialTrophy(batch, ev, t, c, base); } catch (e) { console.warn('Social trophy', e); }
   }
 
   function mgAward(batch, ev) {
@@ -22745,6 +22762,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const c = { award: ev.name, winner: p.name, winnerS: mSur(p.name), team: p.team ? p.team.replace(/\s+\d{4}.*$/, '') : '', teamS: team ? (team.short || '') : '', year: (ev.extra && ev.extra.year) ? 'Season ' + ev.extra.year : 'the season', runner: ev.runner || '', runnerS: ev.runner ? mSur(ev.runner) : '', statLine: ev.statLine || 'a standout year' };
     const base = { ts: team ? [team.id] : [], tg: [mTag(ev.name.replace(/'/g, '')), '#Awards'], c: ev.name, ph: 'ev', im: major ? 3 : 1 };
     mkPost(batch, 'bn', 'news', mx(mFresh(MB_AWARD.bn, 'aw:bn'), c), Object.assign({}, base, { dt: 0, v: major ? 2 : 1 }));
+    try { mgSocialAward(batch, ev, p, team, c, base); } catch (e) { console.warn('Social award', e); }
     if (!major) { if (team) { const a = mFan(team, 'aw' + mInt(0, 300)); mkPost(batch, a, 'tw', mx(mFresh(MB_AWARD.fan, 'aw:fan'), c), Object.assign({}, base, { dt: mInt(5, 120) })); } return; }
     mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_AWARD.gaffe, 'aw:gf'), c), Object.assign({}, base, { dt: 6, v: 1.4 }));
     const hd = mx(mFresh(MB_AWARD.meridian, 'aw:mer'), c);
@@ -22855,6 +22873,7 @@ const PLAYSTYLE_BEHAVIOR = {
     mkPost(batch, a2, 'tw', mVoice(mx(mFresh(MB_RUMOR.fan_to, 'ru:ft'), c), a2.m), Object.assign({}, base, { dt: mInt(10, 120), v: 1.5 }));
     if (stage < 2 && mChance(0.5)) mkPost(batch, mClubDesk(fromT), 'tw', mx(mFresh(MB_RUMOR.deny, 'ru:d'), c), Object.assign({}, base, { dt: mInt(30, 100) }));
     if (mChance(0.5)) mkPost(batch, 'viral', 'meme', mx(mFresh(MB_RUMOR.meme, 'ru:m'), c), Object.assign({}, base, { dt: mInt(15, 90) }));
+    try { mgSocialRumor(batch, P, fromT, toT, c, stage, base); } catch (e) { console.warn('Social rumor', e); }
   }
   function mgDebate(batch) {
     const top = Object.values((stats && stats.goals) || {}).sort((a, b) => b.count - a.count).slice(0, 4);
@@ -22896,6 +22915,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const bulk = (now - _mediaLastFlushAt) < 2500 && !anyLive;
     _mediaLastFlushAt = now;
     const batch = mBatch(mWhenLabel());
+    sxBudgetReset();
 
     // tiering
     q.sort((a, b) => b.nw - a.nw);
@@ -22908,6 +22928,8 @@ const PLAYSTYLE_BEHAVIOR = {
       else f.tier = 0;
     });
     q.forEach(f => { if (f.tier > 0) { try { mgCoverage(batch, f, f.tier); } catch (e) { console.warn('Media coverage error', e); } } });
+
+    q.forEach(f => { try { mgSocialMatch(batch, f, f.tier || 0); } catch (e) { console.warn('Social match error', e); } });
 
     // world layer
     const byComp = {};
@@ -22922,8 +22944,9 @@ const PLAYSTYLE_BEHAVIOR = {
       teams.forEach(t => { const l = injCount[t.name]; if (l && l.length >= 3 && mChance(0.3)) { try { mgInjuryCrisis(batch, t, l); } catch (e) {} } });
     }
     if (teams.length >= 2 && mChance(bulk ? 0.1 : 0.5)) { try { mgRumor(batch, teams); } catch (e) { console.warn(e); } }
-    if (!bulk && mChance(0.25)) { try { mgDebate(batch); } catch (e) {} }
+    if (!sxOn() && !bulk && mChance(0.25)) { try { mgDebate(batch); } catch (e) {} }
     try { mgCalendar(batch); } catch (e) {}
+    try { mgSocialWorld(batch, teams, bulk); mgAwardsTick(batch); mgDebateTick(batch, q, bulk); } catch (e) { console.warn('Social world error', e); }
     if (!bulk && q.length >= 4 && mChance(0.5)) {
       const tg = q.reduce((s, f) => s + f.tot, 0);
       mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_CONTEXT.statWave, 'cx:sw'), { fact: mx('[sw_fact]', { tg, n: q.length, avg: (tg / q.length).toFixed(2) }) }), { ph: 'wk', dt: 15 });
@@ -23005,19 +23028,1130 @@ const PLAYSTYLE_BEHAVIOR = {
 
 
   // ==========================================================================
+  // APEX MEDIA CENTRE — social layer
+  // --------------------------------------------------------------------------
+  // Verified player and club accounts that post and talk to each other, player
+  // fanbases that heat up and cool down with form, awards hype that runs BEFORE
+  // the trophies are handed out, and fan-vs-fan debates.
+  //
+  // Nothing here is hard-coded content: every sentence, threshold, weight,
+  // handle pattern, follower curve, award list and outlet recipe lives in
+  // media.json -> SOCIAL ({cfg, banks}). This file is only the logic that reads
+  // it. Like the rest of the Media Centre it never touches seededRandom(), so
+  // seeded matches and seasons play out exactly as before.
+  //
+  // Account kinds on a post's `u`:  k:'p' verified player · k:'c' official club
+  // · k:'f' fanbase account (p = the player they follow, t = club).
+  // ==========================================================================
+
+  function sxOn() { return !!(mediaReady && SOCIAL && SOCIAL.cfg && SOCIAL.banks); }
+
+  // cfg lookup by dotted path with a fallback for config that is simply absent
+  function sxCfg(path, d) {
+    let o = SOCIAL && SOCIAL.cfg;
+    const parts = String(path).split('.');
+    for (let i = 0; i < parts.length; i++) {
+      if (o == null || typeof o !== 'object') return d;
+      o = o[parts[i]];
+    }
+    return o == null ? d : o;
+  }
+  function sxNum(path, d) { const v = sxCfg(path, d); return typeof v === 'number' && isFinite(v) ? v : d; }
+
+  function sxSt() {
+    ensureMedia();
+    const s = mediaState.sx || (mediaState.sx = {});
+    s.heat = s.heat || {}; s.hype = s.hype || {}; s.lead = s.lead || {}; s.debates = s.debates || [];
+    s.m = s.m || 0; s.cy = s.cy || 0; s.did = s.did || 0;
+    return s;
+  }
+
+  function mediaSocialApplyCaps() {
+    const c = sxCfg('caps', null);
+    if (!c) return;
+    if (c.feed) MEDIA_CAP_FEED = c.feed;
+    if (c.keep) MEDIA_CAP_KEEP = c.keep;
+  }
+
+  // One line from a social bank. `persona` makes a persona-flavoured sibling
+  // bank (<name>_<persona>) win part of the time when one exists.
+  function sxLine(name, c, persona) {
+    let list = null, key = 'sx:' + name;
+    if (persona && MB['sx_' + name + '_' + persona] && mChance(sxNum('persona.variantChance', 0.7))) {
+      list = MB['sx_' + name + '_' + persona]; key += ':' + persona;
+    }
+    if (!list) list = MB['sx_' + name];
+    if (!list || !list.length) return '';
+    return mx(mFresh(mOk(list, c), key), c);
+  }
+  function sxLineAny(names, c, persona) {
+    for (let i = 0; i < names.length; i++) { const t = sxLine(names[i], c, persona); if (t) return t; }
+    return '';
+  }
+
+  // Per-flush budget so a bulk simulation can't flood the feed.
+  let _sxBudget = { n: 0, max: 80 };
+  function sxBudgetReset() { _sxBudget = { n: 0, max: sxNum('match.maxPerFlush', 80) }; }
+  function sxPost(batch, acct, kind, text, opts) {
+    if (!text || !acct) return null;
+    opts = opts || {};
+    if (_sxBudget.n >= _sxBudget.max && !opts.free) return null;
+    _sxBudget.n++;
+    return mkPost(batch, acct, kind, text, Object.assign({ sx: 1 }, opts));
+  }
+
+  // ---- player / team lookups ----------------------------------------------------------------------------------
+  function sxPlayerRef(id, teamHint) {
+    if (id == null) return null;
+    if (teamHint && teamHint.players) {
+      const pl = teamHint.players.find(p => p.id === id);
+      if (pl) return { player: pl, team: teamHint };
+    }
+    let e = null;
+    try { e = findPlayerAndTeam(id); } catch (err) {}
+    return e && e.player ? { player: e.player, team: e.team } : null;
+  }
+  function sxTopPlayers(team, n, filter) {
+    return ((team && team.players) || []).filter(p => !filter || filter(p)).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, n);
+  }
+  const sxIsGK = p => (p.pos || []).indexOf('GK') !== -1;
+
+  // ---- personas (deterministic per player) ------------------------------------------------------------------------
+  function sxPersonaOf(player) {
+    const ps = sxCfg('personas', []);
+    if (!ps.length) return { id: '', w: 1, post: 1, social: 1, banter: 0.3 };
+    const R = mSeeded(mHash(player.id + '#persona'));
+    const tot = ps.reduce((s, p) => s + (p.w || 1), 0);
+    let r = R() * tot;
+    for (let i = 0; i < ps.length; i++) { r -= (ps[i].w || 1); if (r <= 0) return ps[i]; }
+    return ps[ps.length - 1];
+  }
+
+  // ---- handles ---------------------------------------------------------------------------------------------------------------
+  function sxNameBits(player, team) {
+    const nm = String(player.name || '');
+    const parts = nm.split(/\s+/);
+    const sur = mAscii(mSur(nm)) || mAscii(nm) || 'Player';
+    const first = mAscii(parts[0]) || sur;
+    return {
+      first, sur, initial: (first.charAt(0) || '').toUpperCase(),
+      short: mAscii((team && (team.short || team.name)) || '').slice(0, 4),
+      num: player.num != null ? player.num : '', pos: ((player.pos || [])[0] || '').toLowerCase()
+    };
+  }
+  function sxHandle(player, team) {
+    const pats = sxCfg('player.handles', ['{first}{sur}']);
+    const R = mSeeded(mHash(player.id + '#handle'));
+    const b = sxNameBits(player, team);
+    b.n = 1 + Math.floor(R() * 98);
+    const pat = pats[Math.floor(R() * pats.length)];
+    return '@' + mx(pat, b).replace(/[^A-Za-z0-9_]/g, '');
+  }
+
+  // ---- followers: how big a player's account is ---------------------------------------------------------------------
+  let _sxAchvCache = { n: -1, map: {} };
+  function sxAchv() {
+    const list = (typeof trophies !== 'undefined' && trophies) ? trophies : [];
+    if (_sxAchvCache.n === list.length) return _sxAchvCache.map;
+    const F = sxCfg('player.followers', {});
+    const aw = F.awardWeights || {}, tw = F.trophyWeights || {};
+    const adef = F.awardDefault != null ? F.awardDefault : 0.05, tdef = F.trophyDefault != null ? F.trophyDefault : 0.02;
+    const map = {};
+    list.forEach(t => {
+      if (t.playerId && t.player) map[t.playerId] = (map[t.playerId] || 0) + (aw[t.name] != null ? aw[t.name] : adef);
+      else if (Array.isArray(t.playerIds)) {
+        const w = tw[t.name] != null ? tw[t.name] : tdef;
+        t.playerIds.forEach(id => { map[id] = (map[id] || 0) + w; });
+      }
+    });
+    _sxAchvCache = { n: list.length, map };
+    return map;
+  }
+  function sxFollowers(player, team) {
+    const F = sxCfg('player.followers', {});
+    const R = mSeeded(mHash(player.id + '#fol'));
+    let v = (F.base || 50000) * Math.exp((F.ovrSlope || 0.12) * ((player.ovr || 70) - (F.ovrRef || 75)));
+    v *= 1 + (F.fameWeight || 1.5) * (team ? mFame(team) : 0.3);
+    v *= 1 + (F.jitter || 0.3) * (R() * 2 - 1);
+    const cs = (typeof careerStats !== 'undefined' && careerStats) || {};
+    const cnt = b => (((cs[b] || {})[player.id]) || {}).count || 0;
+    v *= 1 + (F.careerGoal || 0) * cnt('goals') + (F.careerAssist || 0) * cnt('assists') + (F.careerMotm || 0) * cnt('motm');
+    v *= 1 + (sxAchv()[player.id] || 0);
+    v *= 1 + (F.heatWeight || 0) * (sxSt().heat[player.id] || 0);
+    return Math.round(mClamp(v, F.min || 5000, F.max || 150000000));
+  }
+
+  // ---- accounts -------------------------------------------------------------------------------------------------------------------
+  function mPlayerAcct(player, team) {
+    const persona = sxPersonaOf(player);
+    return {
+      n: player.name, h: sxHandle(player, team), a: '⚽', c: (team && team.color) || '#64748b', t: team ? team.id : null,
+      v: (player.ovr || 0) >= sxNum('verify.playerMinOvr', 0) ? 1 : 0, p: player.id, k: 'p', f: sxFollowers(player, team), m: persona.id
+    };
+  }
+  function mClubAcct(team) {
+    const nm = mTeamName(team);
+    const b = { short: mAscii(team.short || nm), team: nm, teamA: mAscii(nm) };
+    const F = sxCfg('club.followers', {});
+    const R = mSeeded(mHash(team.id + '#cf'));
+    return {
+      n: mx(sxCfg('club.name', '{team}'), b), h: '@' + mx(sxCfg('club.handle', '{short}'), b).replace(/[^A-Za-z0-9_]/g, ''),
+      a: team.flag || '⚽', c: team.color || '#64748b', t: team.id, v: sxCfg('verify.clubs', true) ? 1 : 0, k: 'c',
+      f: Math.round((F.base || 400000) + mFame(team) * (F.fameScale || 9000000) * (0.8 + 0.4 * R())), m: 'club'
+    };
+  }
+
+  // ---- fanbases ---------------------------------------------------------------------------------------------------------------------
+  function sxFanbase(player, team) {
+    const f = sxFollowers(player, team);
+    const size = Math.round(f * sxNum('fan.ratio', 0.55));
+    const tiers = sxCfg('fan.tiers', []);
+    let tier = tiers.length ? tiers[0] : { name: 'Fans' };
+    tiers.forEach(t => { if (size >= (t.min || 0)) tier = t; });
+    const bits = sxNameBits(player, team);
+    const R = mSeeded(mHash(player.id + '#fan'));
+    const groups = sxCfg('fan.groups', ['{sur} Army']);
+    const group = mx(groups[Math.floor(R() * groups.length)], bits);
+    const heat = sxSt().heat[player.id] || 0;
+    const th = sxCfg('fan.moodThresholds', { hype: 0.3, crisis: -0.3 });
+    const mood = heat >= th.hype ? 'hype' : heat <= th.crisis ? 'crisis' : 'normal';
+    return { size, tier: tier.name, tierIcon: tier.icon || '', group, tag: '#' + (mAscii(group) || bits.sur), heat, mood };
+  }
+  function sxClubFans(team) {
+    const f = mClubAcct(team).f;
+    const size = Math.round(f * sxNum('fan.clubRatio', 1.4));
+    const nm = mTeamName(team);
+    const group = mx(sxCfg('fan.clubGroup', '{team} fans'), { team: nm, short: team.short || nm });
+    return { size, group, tag: '#' + (mAscii(group) || mAscii(nm)) };
+  }
+  // A fan account that follows one player (deterministic per player + slot).
+  function mPlayerFan(player, team, slot, wantMood) {
+    const R = mSeeded(mHash(player.id + '#pf#' + slot));
+    const b = sxNameBits(player, team);
+    b.fn = mAscii(MEDIA_FIRST[Math.floor(R() * MEDIA_FIRST.length)] || 'Fan');
+    b.noun = MEDIA_NOUN[Math.floor(R() * MEDIA_NOUN.length)] || 'Fan';
+    b.av = MEDIA_AVATAR[Math.floor(R() * MEDIA_AVATAR.length)] || '🙂';
+    b.n = Math.floor(R() * 99);
+    const hp = sxCfg('fan.handles', ['{fn}{sur}{n}']), np = sxCfg('fan.names', ['{fn}']);
+    const mood = wantMood || MEDIA_MOODS[Math.floor(R() * MEDIA_MOODS.length)];
+    return {
+      n: mx(np[Math.floor(R() * np.length)], b), h: '@' + mx(hp[Math.floor(R() * hp.length)], b).replace(/[^A-Za-z0-9_]/g, ''),
+      a: b.av, c: (team && team.color) || '#64748b', t: team ? team.id : null, m: mood, k: 'f', p: player.id,
+      f: Math.round(80 + Math.pow(R(), 2.2) * 40000 * (0.3 + (team ? mFame(team) : 0.3)))
+    };
+  }
+
+  // ---- heat: fanbase mood follows form -----------------------------------------------------------------------------------
+  function sxHeatAdd(pid, d) {
+    if (pid == null || !d) return;
+    const s = sxSt(), cap = sxNum('heat.cap', 1);
+    s.heat[pid] = mClamp(Math.round(((s.heat[pid] || 0) + d) * 1000) / 1000, -cap, cap);
+  }
+  function sxHeatDecay() {
+    const s = sxSt(), k = sxNum('heat.decay', 0.985);
+    Object.keys(s.heat).forEach(id => {
+      s.heat[id] = Math.round(s.heat[id] * k * 1000) / 1000;
+      if (Math.abs(s.heat[id]) < 0.02) delete s.heat[id];
+    });
+    const maxN = sxNum('heat.maxEntries', 400), keys = Object.keys(s.heat);
+    if (keys.length > maxN) keys.sort((a, b) => Math.abs(s.heat[a]) - Math.abs(s.heat[b])).slice(0, keys.length - maxN).forEach(id => { delete s.heat[id]; });
+  }
+  // Called for every finished match (even ones that get no coverage).
+  function mgSocialMemory(f) {
+    if (!sxOn()) return;
+    const s = sxSt(), H = sxCfg('heat', {});
+    s.m++;
+    sxHeatDecay();
+    (f.scorers || []).forEach(sc => sxHeatAdd(sc.id, sc.n >= 3 ? H.hattrick : sc.n === 2 ? H.brace : H.goal));
+    if (f.motm) sxHeatAdd(f.motm.id, H.motm);
+    (f.cards || []).forEach(cd => sxHeatAdd(cd.id, H.red));
+    if (f.gk && f.gk.saves >= sxNum('match.gkSaves', 6)) sxHeatAdd(f.gk.id, H.keeper);
+    ['home', 'away'].forEach(side => {
+      const d = !f.winSide ? 0 : f.winSide === side ? H.win : H.lose;
+      if (!d) return;
+      sxTopPlayers(side === 'home' ? f.H : f.A, H.teamTop || 3).forEach(p => sxHeatAdd(p.id, d));
+    });
+  }
+
+
+  // ==========================================================================
+  // Threads: verified players, clubs and fans replying to each other
+  // ==========================================================================
+  function sxReplyLikes(acct, post) {
+    const base = (acct.f || 300) * (0.002 + mR() * 0.01);
+    return Math.max(0, Math.min(Math.round(base), Math.round((post.l || 100) * 0.6)));
+  }
+  function sxMates(team, author, n) {
+    const minOvr = sxNum('verify.playerMinOvr', 0);
+    const pool = ((team && team.players) || []).filter(p => p.id !== author.id && (p.ovr || 0) >= minOvr);
+    const out = [];
+    const items = pool.map(p => { const pr = sxPersonaOf(p); return { w: Math.pow(Math.max(1, p.ovr || 60) / 60, 3) * (pr.social || 1), v: { player: p, persona: pr } }; });
+    for (let i = 0; i < n && items.length; i++) {
+      const pick = mWeighted(items);
+      out.push(pick);
+      const ix = items.findIndex(x => x.v === pick); if (ix >= 0) items.splice(ix, 1);
+    }
+    return out;
+  }
+  // The opposition player most likely to chirp back.
+  function sxPickRival(oppTeam, trig) {
+    if (!oppTeam) return null;
+    const scoring = sxCfg('thread.keeperRivalTriggers', []).indexOf(trig) !== -1;
+    const p = scoring ? sxTopPlayers(oppTeam, 1, sxIsGK)[0] : sxTopPlayers(oppTeam, 1, x => !sxIsGK(x))[0];
+    return p || sxTopPlayers(oppTeam, 1)[0] || null;
+  }
+
+  // Build the reply thread under a post. `kind` selects the bank family
+  // (pr_mate_<kind>, pr_club_<kind>, pr_rival_<kind>, fx_react_<kind>).
+  function sxBuildThread(post, ref, kind, ctx, o) {
+    o = o || {};
+    const TH = sxCfg('thread', {});
+    const persona = sxPersonaOf(ref.player);
+    const rs = [];
+    const to = post.u && post.u.h;
+    const add = (acct, text) => {
+      if (!text) return null;
+      const r = { u: mUserRef(acct), x: mClean(mVoice(text, acct.m)), l: sxReplyLikes(acct, post), to };
+      rs.push(r); return r;
+    };
+    // teammates
+    const nM = mInt((TH.mates || [1, 2])[0], (TH.mates || [1, 2])[1]);
+    sxMates(ref.team, ref.player, nM).forEach(m => {
+      if (!mChance(mClamp((TH.mateReply == null ? 0.7 : TH.mateReply) * (m.persona.social || 1), 0, 1))) return;
+      const c = Object.assign({}, ctx, { mate: m.player.name, mateS: mSur(m.player.name) });
+      add(mPlayerAcct(m.player, ref.team), sxLineAny(['pr_mate_' + kind, 'pr_mate'], c, m.persona.id));
+    });
+    // the club's official account
+    if (ref.team && mChance(TH.clubReply == null ? 0.55 : TH.clubReply)) {
+      add(mClubAcct(ref.team), sxLineAny(['pr_club_' + kind, 'pr_club'], ctx, ''));
+    }
+    // opposition player chirping back
+    if (o.rival && mChance(mClamp((TH.rivalReply == null ? 0.35 : TH.rivalReply) * (sxPersonaOf(o.rival).banter || 0.5) * 2, 0, 1))) {
+      const rt = o.rivalTeam || null;
+      const c = Object.assign({}, ctx, { rival: o.rival.name, rivalS: mSur(o.rival.name) });
+      add(mPlayerAcct(o.rival, rt), sxLineAny(['pr_rival_' + kind, 'pr_rival'], c, sxPersonaOf(o.rival).id));
+    }
+    // fans of the author (mood follows the fanbase's heat) + the odd rival-fan troll
+    const fb = sxFanbase(ref.player, ref.team);
+    const nF = mInt((TH.fans || [1, 3])[0], (TH.fans || [1, 3])[1]);
+    for (let i = 0; i < nF; i++) {
+      const fan = mPlayerFan(ref.player, ref.team, 't' + mInt(0, 400));
+      add(fan, sxLineAny(['fx_react_' + kind, 'fx_' + fb.mood], ctx, ''));
+    }
+    if (o.rivalTeam && mChance(TH.troll == null ? 0.3 : TH.troll)) {
+      const fan = mFan(o.rivalTeam, 'tr' + mInt(0, 500), 'banter');
+      add(fan, sxLineAny(['fx_troll_' + kind, 'fx_troll'], ctx, ''));
+    }
+    // verified voices first, fans after (keeps the thread readable)
+    rs.sort((a, b) => (b.u.v ? 1 : 0) - (a.u.v ? 1 : 0));
+    // the author answers one of the replies
+    if (rs.length && mChance(mClamp((TH.authorBack == null ? 0.5 : TH.authorBack) * (persona.social || 1), 0, 1))) {
+      const target = rs[Math.floor(mR() * Math.min(rs.length, 3))];
+      const acct = mPlayerAcct(ref.player, ref.team);
+      const c = Object.assign({}, ctx, { them: target.u.n, themH: target.u.h });
+      const txt = sxLineAny(['pr_back_' + kind, 'pr_back'], c, persona.id);
+      if (txt) rs.push({ u: mUserRef(acct), x: mClean(txt), l: sxReplyLikes(acct, post), to: target.u.h });
+    }
+    if (rs.length) { post.r = (post.r || []).concat(rs); post.rp = Math.max(post.rp || 0, post.r.length); }
+    return rs;
+  }
+
+  // A club account thread (club result posts, trophy posts): its players and fans reply.
+  function sxBuildClubThread(post, team, kind, ctx, o) {
+    o = o || {};
+    const TH = sxCfg('thread', {});
+    const rs = [], to = post.u && post.u.h;
+    const add = (acct, text) => { if (text) rs.push({ u: mUserRef(acct), x: mClean(mVoice(text, acct.m)), l: sxReplyLikes(acct, post), to }); };
+    const minOvr = sxNum('verify.playerMinOvr', 0);
+    const pool = (o.players && o.players.length ? o.players : sxTopPlayers(team, 6, p => (p.ovr || 0) >= minOvr)).filter(Boolean);
+    mShuffle(pool).slice(0, mInt((TH.clubPlayers || [1, 2])[0], (TH.clubPlayers || [1, 2])[1])).forEach(p => {
+      const pr = sxPersonaOf(p);
+      if (!mChance(mClamp((TH.mateReply == null ? 0.7 : TH.mateReply) * (pr.social || 1), 0, 1))) return;
+      add(mPlayerAcct(p, team), sxLineAny(['pr_player_' + kind, 'pr_player_club'], Object.assign({}, ctx, { mate: p.name, mateS: mSur(p.name) }), pr.id));
+    });
+    if (o.rivalTeam && mChance(TH.rivalClub == null ? 0.4 : TH.rivalClub)) add(mClubAcct(o.rivalTeam), sxLineAny(['pr_rivalclub_' + kind, 'pr_rivalclub'], ctx, ''));
+    const nF = mInt((TH.clubFans || [1, 3])[0], (TH.clubFans || [1, 3])[1]);
+    for (let i = 0; i < nF; i++) add(mFan(team, 'cf' + mInt(0, 500)), sxLineAny(['fx_club_' + kind, 'fx_club'], ctx, ''));
+    rs.sort((a, b) => (b.u.v ? 1 : 0) - (a.u.v ? 1 : 0));
+    if (rs.length) { post.r = (post.r || []).concat(rs); post.rp = Math.max(post.rp || 0, post.r.length); }
+    return rs;
+  }
+
+  // Post as a verified player, with the thread under it.
+  function sxPlayerPost(batch, ref, trig, bankName, ctx, base, o) {
+    o = o || {};
+    const persona = sxPersonaOf(ref.player);
+    const acct = mPlayerAcct(ref.player, ref.team);
+    if (!acct.v) return null;   // below the verification bar: no account
+    const fb = sxFanbase(ref.player, ref.team);
+    const c = Object.assign({}, ctx, { player: ref.player.name, playerS: mSur(ref.player.name), pteam: mTeamName(ref.team), fanTag: fb.tag, fanGroup: fb.group });
+    const text = sxLine(bankName, c, persona.id);
+    if (!text) return null;
+    const post = sxPost(batch, acct, 'tw', text, Object.assign({}, base, { dt: o.dt != null ? o.dt : mInt(4, 170), v: o.v || 1.1, im: o.im || 0 }));
+    if (!post) return null;
+    if (o.thread !== false) sxBuildThread(post, ref, trig, c, { rival: o.rival, rivalTeam: o.rivalTeam });
+    // a media outlet quotes the post
+    if (o.quote && mChance(o.quote)) {
+      const outlets = sxCfg('match.quoteOutlets', ['bn']);
+      const qtxt = sxLineAny(['md_quote_' + trig, 'md_quote'], c, '');
+      if (qtxt) sxPost(batch, mPick(outlets), 'news', qtxt, Object.assign({}, base, { dt: post.dt + mInt(2, 30), v: 1.3, qt: { u: post.u, x: post.x }, im: 0 }));
+    }
+    // the club quote-posts it
+    if (o.clubQuote && ref.team && mChance(o.clubQuote)) {
+      const ctxt = sxLineAny(['cp_quote_' + trig, 'cp_quote'], c, '');
+      if (ctxt) sxPost(batch, mClubAcct(ref.team), 'tw', ctxt, Object.assign({}, base, { dt: post.dt + mInt(1, 20), v: 1.2, qt: { u: post.u, x: post.x }, im: 0 }));
+    }
+    sxHeatAdd(ref.player.id, o.heat || 0);
+    return post;
+  }
+
+
+  // ==========================================================================
+  // Matches: club results + player reactions
+  // ==========================================================================
+  function sxMatchCandidates(f, tier) {
+    const T = sxCfg('match.triggers', {});
+    const out = [];
+    const seen = {};
+    const add = (trig, id, side, extra) => {
+      const def = T[trig]; if (!def || id == null) return;
+      if (tier === 0 && !def.tier0) return;
+      const k = id + ':' + trig; if (seen[k]) return; seen[k] = 1;
+      out.push(Object.assign({ trig, id, side, w: def.w || 1 }, extra || {}));
+    };
+    const scorerIds = {};
+    (f.scorers || []).forEach(sc => {
+      scorerIds[sc.id] = 1;
+      const trig = sc.n >= 3 ? 'hattrick' : sc.n === 2 ? 'brace' : (f.winGoal && f.winGoal.id === sc.id) ? 'winner' : 'goal';
+      add(trig, sc.id, sc.side, { n: sc.n, min: sc.mins ? sc.mins[sc.mins.length - 1] : '' });
+    });
+    if (f.motm && !scorerIds[f.motm.id]) add('motm', f.motm.id, f.motm.side, { rating: f.motm.rating });
+    (f.cards || []).forEach(cd => add('red', cd.id, cd.side, { min: cd.min }));
+    (f.injuries || []).forEach(i => { if (sxCfg('match.injurySeverity', ['Moderate', 'Severe', 'Major']).indexOf(i.sev) !== -1 || (i.out || 0) >= sxNum('match.injuryMinOut', 4)) add('injury', i.id, i.side, { out: i.out, type: i.type }); });
+    if (f.gk && f.gk.saves >= sxNum('match.gkSaves', 6)) add('keeper', f.gk.id, f.gk.side, { saves: f.gk.saves });
+    if (tier >= 3 || f.isKO || f.derby) {
+      ['home', 'away'].forEach(side => {
+        const t = side === 'home' ? f.H : f.A;
+        const star = sxTopPlayers(t, 1, p => !sxIsGK(p))[0];
+        const oc = mOutcomeFor(f, side);
+        if (star && oc === 'lose') add('lose', star.id, side, {});
+        if (star && oc === 'win') add('win', star.id, side, {});
+      });
+    }
+    return out;
+  }
+
+  function sxClubMatchPost(batch, f, c, base, side, tier) {
+    const CP = sxCfg('match.clubPost', {});
+    const team = side === 'home' ? f.H : f.A, opp = side === 'home' ? f.A : f.H;
+    const oc = mOutcomeFor(f, side);
+    const p = ((CP.tier || [0.1, 0.5, 0.9, 1])[tier] || 0) * (CP[oc] == null ? 1 : CP[oc]);
+    if (!mChance(p)) return null;
+    const px = mPersp(c, f, side);
+    const text = sxLineAny([f.derby ? 'cp_' + oc + '_derby' : '', 'cp_' + oc], px, '');
+    if (!text) return null;
+    const post = sxPost(batch, mClubAcct(team), 'tw', text, Object.assign({}, base, { dt: mInt(3, 30), v: 1 + mFame(team), sc: { h: f.H.id, a: f.A.id, hs: f.hs, as: f.as, pk: c.penScore || null } }));
+    if (!post) return null;
+    const scorers = (f.scorers || []).filter(s => s.side === side).map(s => sxPlayerRef(s.id, team)).filter(Boolean).map(r => r.player);
+    sxBuildClubThread(post, team, oc, px, { players: scorers.length ? scorers : null, rivalTeam: f.derby && oc === 'win' ? opp : null });
+    return post;
+  }
+
+  function mgSocialMatch(batch, f, tier) {
+    if (!sxOn()) return;
+    tier = tier || 0;
+    const c = f.ctx || mediaCtx(f);
+    f.ctx = c;
+    const base = { ts: [f.H.id, f.A.id], mk: f.key, tg: [c.tag, c.ctag], c: f.comp, ph: 'post' };
+    // 1) the two clubs' official accounts
+    ['home', 'away'].forEach(side => { try { sxClubMatchPost(batch, f, c, base, side, tier); } catch (e) { console.warn('club post', e); } });
+    // 2) players reacting to what happened
+    const T = sxCfg('match.triggers', {});
+    const limit = (sxCfg('match.playersPerMatch', [0, 1, 2, 3])[tier]) || 0;
+    if (!limit && tier > 0) return;
+    let cands = sxMatchCandidates(f, tier);
+    const chosen = [];
+    for (let guard = 0; guard < 12 && chosen.length < Math.max(limit, tier === 0 ? 1 : 0) && cands.length; guard++) {
+      const items = cands.map(cd => {
+        const team = cd.side === 'home' ? f.H : f.A;
+        const ref = sxPlayerRef(cd.id, team);
+        if (!ref) return { w: 0, v: cd };
+        const pr = sxPersonaOf(ref.player);
+        return { w: cd.w * (pr.post || 1) * (0.6 + Math.max(0, (ref.player.ovr || 60) - 55) / 40), v: Object.assign(cd, { ref }) };
+      });
+      const pick = mWeighted(items.filter(x => x.w > 0));
+      if (!pick) break;
+      chosen.push(pick);
+      cands = cands.filter(cd => cd.id !== pick.id);
+    }
+    chosen.forEach(cd => {
+      const def = T[cd.trig] || {};
+      const ref = cd.ref, team = ref.team;
+      const opp = cd.side === 'home' ? f.A : f.H;
+      const px = Object.assign(mPersp(c, f, cd.side), { ng: cd.n || '', pmin: cd.min || '', pmin2: cd.min ? mOrd(cd.min) : '', saves: cd.saves || '', psaves: cd.saves || '', out: cd.out || '', injType: cd.type || '', rating: cd.rating ? cd.rating.toFixed(1) : '' });
+      const rival = sxPickRival(opp, cd.trig);
+      try {
+        sxPlayerPost(batch, ref, cd.trig, def.bank || ('pp_' + cd.trig), px, base, {
+          v: 0.6 + (f.nw || 30) / 60, im: def.im || 0, rival, rivalTeam: opp, quote: def.quote, clubQuote: def.clubQuote, heat: 0
+        });
+      } catch (e) { console.warn('player post', e); }
+    });
+    // 3) derby: the winning club needles the losers, the losers answer
+    if (f.derby && f.winSide && tier >= 2 && mChance(sxNum('match.derbyBanter', 0.5))) {
+      const wt = f.winSide === 'home' ? f.H : f.A, lt = f.winSide === 'home' ? f.A : f.H;
+      const px = mPersp(c, f, f.winSide);
+      const a = sxPost(batch, mClubAcct(wt), 'tw', sxLine('cp_derby_banter', px, ''), Object.assign({}, base, { dt: mInt(40, 160), v: 1.6 }));
+      if (a) {
+        const r = sxLine('cp_derby_reply', px, '');
+        if (r) { const acct = mClubAcct(lt); a.r = [{ u: mUserRef(acct), x: r, l: sxReplyLikes(acct, a), to: a.u.h }]; a.rp = Math.max(a.rp || 0, 1); }
+      }
+    }
+  }
+
+  // ---- previews: both clubs and their stars warm up -------------------------------------------------------------------
+  function mgSocialPreview(batch, H, A, c, base, full, kh, ka, derby) {
+    if (!sxOn()) return;
+    const P = sxCfg('pre', {});
+    [[H, A, kh, 'H'], [A, H, ka, 'A']].forEach(arr => {
+      const T = arr[0], O = arr[1], k = arr[2];
+      const px = Object.assign({}, c, { my: mTeamName(T), myS: T.short || mTeamName(T), opp: mTeamName(O), oppS: O.short || mTeamName(O) });
+      if (full && mChance(P.clubPost == null ? 0.6 : P.clubPost)) {
+        const post = sxPost(batch, mClubAcct(T), 'tw', sxLineAny([derby ? 'cp_pre_derby' : '', 'cp_pre'], px, ''), Object.assign({}, base, { dt: -mInt(10, 300), v: 1 + mFame(T) }));
+        if (post) sxBuildClubThread(post, T, 'pre', px, { players: (k && k.key) || null, rivalTeam: derby ? O : null });
+      }
+      const star = k && k.key && k.key[0];
+      if (star && mChance((P.playerPost == null ? 0.35 : P.playerPost) * (derby ? 1.5 : 1) * (full ? 1 : 0.6))) {
+        const ref = sxPlayerRef(star.id, T);
+        if (ref) {
+          const rival = sxPickRival(O, 'pre');
+          sxPlayerPost(batch, ref, 'pre', derby ? 'pp_pre_derby' : 'pp_pre', px, base, { dt: -mInt(10, 300), v: 1.1, rival, rivalTeam: O });
+        }
+      }
+    });
+  }
+
+  // ---- trophies ---------------------------------------------------------------------------------------------------------------------
+  function mgSocialTrophy(batch, ev, t, c, base) {
+    if (!sxOn() || !t) return;
+    const TR = sxCfg('trophy', {});
+    const club = sxPost(batch, mClubAcct(t), 'tw', sxLine('cp_trophy', c, ''), Object.assign({}, base, { dt: 2, v: 2.2, im: 3 }));
+    const stars = sxTopPlayers(t, mInt((TR.players || [2, 4])[0], (TR.players || [2, 4])[1]), p => (p.ovr || 0) >= sxNum('verify.playerMinOvr', 0));
+    if (club) sxBuildClubThread(club, t, 'trophy', c, { players: stars, rivalTeam: sxRivalClub(t) });
+    stars.forEach(p => {
+      const ref = sxPlayerRef(p.id, t); if (!ref) return;
+      const px = Object.assign({}, c, { my: c.team, myS: c.teamS });
+      sxPlayerPost(batch, ref, 'trophy', 'pp_trophy', px, base, { dt: mInt(5, 120), v: 1.8, im: 2, quote: 0.4, heat: sxNum('heat.trophy', 0.3) });
+    });
+    if (mChance(TR.rivalBanter == null ? 0.5 : TR.rivalBanter)) {
+      const rt = sxRivalClub(t);
+      if (rt) sxPost(batch, mClubAcct(rt), 'tw', sxLine('cp_trophy_rival', Object.assign({}, c, { rival: mTeamName(rt), rivalS: rt.short || mTeamName(rt) }), ''), Object.assign({}, base, { dt: mInt(20, 140), v: 1.3, im: 1 }));
+    }
+  }
+  function sxRivalClub(t) {
+    const pool = allTeams.filter(x => x.id !== t.id && x.players && x.players.length && ((x.stadium != null) === (t.stadium != null)));
+    if (!pool.length) return null;
+    const near = pool.filter(x => Math.abs(mTeamOvr(x) - mTeamOvr(t)) <= 4);
+    return mPick(near.length ? near : pool);
+  }
+
+  // ---- rumours, chatter --------------------------------------------------------------------------------------------------
+  function mgSocialRumor(batch, P, fromT, toT, c, stage, base) {
+    if (!sxOn() || !P) return;
+    const R = sxCfg('rumor', {});
+    const ref = sxPlayerRef(P.id, fromT) || { player: P, team: fromT };
+    if (mChance((R.playerReply == null ? 0.5 : R.playerReply) * (stage >= 3 ? 0.5 : 1))) {
+      sxPlayerPost(batch, ref, 'rumor', stage >= 2 ? 'pp_rumor_hot' : 'pp_rumor', c, base, { dt: mInt(15, 140), v: 1.4, im: 0 });
+    }
+    if (stage < 2 && mChance(R.clubStatement == null ? 0.35 : R.clubStatement)) {
+      sxPost(batch, mClubAcct(fromT), 'tw', sxLine('cp_rumor', c, ''), Object.assign({}, base, { dt: mInt(30, 130), v: 1.1 }));
+    }
+  }
+
+  function mgSocialWorld(batch, teams, bulk) {
+    if (!sxOn() || !teams || !teams.length) return;
+    const W = sxCfg('world', {});
+    if (bulk && !mChance(W.bulkChance == null ? 0.2 : W.bulkChance)) return;
+    const n = mInt((W.chat || [0, 2])[0], (W.chat || [0, 2])[1]);
+    for (let i = 0; i < n; i++) {
+      const t = mPick(teams);
+      const pool = sxTopPlayers(t, 8, p => (p.ovr || 0) >= sxNum('verify.playerMinOvr', 0));
+      if (!pool.length) continue;
+      const items = pool.map(p => ({ w: Math.pow(Math.max(1, p.ovr || 60) / 60, 3) * (sxPersonaOf(p).post || 1), v: p }));
+      const p = mWeighted(items);
+      const ref = sxPlayerRef(p.id, t); if (!ref) continue;
+      const px = { my: mTeamName(t), myS: t.short || mTeamName(t) };
+      sxPlayerPost(batch, ref, 'chat', 'pp_chat', px, { ts: [t.id], tg: [mTag(t.short || mTeamName(t))], ph: 'wk' }, { dt: mInt(0, 120), v: 0.9 });
+    }
+  }
+
+
+  // ==========================================================================
+  // Awards hype: the media builds the race BEFORE the trophies are announced
+  // ==========================================================================
+  const SX_RANKERS = {
+    ballon: src => computeBallonRanking(src),
+    gerd: src => computeGerdMullerRanking(src),
+    yashin: src => computeYashinRanking(src),
+    goldenGlove: src => computeGoldenGloveRanking(src),
+    tournamentBall: () => computeTournamentGoldenBallRanking()
+  };
+  function sxAwardList() { return (sxCfg('awards', []) || []).filter(a => a && a.name && a.rank); }
+  function sxAwardById(id) { return sxAwardList().find(a => a.id === id || a.name === id) || null; }
+  function sxScopeActive(aw) {
+    if (aw.scope === 'tournament') return !!(typeof tournament !== 'undefined' && tournament && !tournament.champion);
+    return true;
+  }
+
+  // Normalised top-N for one award, straight from the same rankers that decide it.
+  function sxRank(aw) {
+    let raw = [];
+    try {
+      const tour = aw.scope === 'tournament';
+      if (tour && !tournament) return [];
+      const src = tour ? tournamentStats : stats;
+      if (SX_RANKERS[aw.rank]) raw = SX_RANKERS[aw.rank](src) || [];
+      else if (String(aw.rank).indexOf('stat:') === 0) raw = Object.values((src && src[String(aw.rank).slice(5)]) || {}).sort((x, y) => (y.count || 0) - (x.count || 0));
+    } catch (e) { return []; }
+    const labels = sxCfg('statLabels', {});
+    const n = aw.shortlist || sxNum('hype.shortlist', 5);
+    return raw.slice(0, n).map(r => {
+      const parts = [];
+      Object.keys(labels).forEach(k => {
+        if (typeof r[k] === 'number' && r[k] > 0 && labels[k]) parts.push((k === 'avg' ? r[k].toFixed(1) : Math.round(r[k])) + ' ' + labels[k]);
+      });
+      if (!parts.length && r.count != null && aw.unit) parts.push(r.count + ' ' + aw.unit);
+      return { id: r.id, name: r.name, teamName: r.team, score: r.pts != null ? r.pts : r.avg != null ? r.avg : (r.count || 0), stat: parts.slice(0, 3).join(', ') };
+    });
+  }
+  function sxPrepCands(aw, list) {
+    if (!list.length) return list;
+    const temp = aw.temp || sxNum('hype.temp', 6);
+    const top = Math.max.apply(null, list.map(x => x.score));
+    const ws = list.map(x => Math.exp((x.score - top) / temp));
+    const tot = ws.reduce((a, b) => a + b, 0) || 1;
+    list.forEach((it, i) => {
+      it.p = ws[i] / tot;
+      let team = allTeams.find(t => t.name === it.teamName) || null;
+      let ref = sxPlayerRef(it.id, team);
+      if (!ref) ref = null;
+      it.ref = ref;
+      it.team = (ref && ref.team) || team;
+      it.fans = ref ? sxFanbase(ref.player, ref.team).size : 0;
+    });
+    return list.filter(it => it.ref);
+  }
+
+  function sxAwardCtx(aw, list, extra) {
+    const c = { award: aw.name, awardTag: aw.tag || mTag(aw.name.replace(/'/g, '')), unit: aw.unit || '', n: list.length };
+    ['fav', 'second', 'third', 'fourth', 'fifth'].forEach((k, i) => {
+      const it = list[i]; if (!it) return;
+      c[k] = it.name; c[k + 'S'] = mSur(it.name); c[k + 'Stat'] = it.stat; c[k + 'Pct'] = Math.round(it.p * 100);
+      c[k + 'Team'] = it.team ? mTeamName(it.team) : ''; c[k + 'TeamS'] = it.team ? (it.team.short || mTeamName(it.team)) : '';
+      c[k + 'Fans'] = mFmt(it.fans); c[k + 'Tag'] = it.ref ? sxFanbase(it.ref.player, it.ref.team).tag : '';
+    });
+    if (list[0]) { c.me = c.fav; c.meS = c.favS; c.meStat = c.favStat; c.meTag = c.favTag; c.mePct = c.favPct; c.meTeam = c.favTeam; c.meFans = c.favFans; }
+    c.shortlist = list.map(x => x.name).join(', ');
+    c.sl3 = list.slice(0, 3).map(x => mSur(x.name)).join(', ');
+    if (list.length > 1) { c.gap = Math.round((list[0].score - list[1].score) * 10) / 10; c.favOdds = Math.max(1.1, Math.round(10 / Math.max(0.05, list[0].p)) / 10); c.secondOdds = Math.max(1.1, Math.round(10 / Math.max(0.05, list[1].p)) / 10); }
+    return Object.assign(c, extra || {});
+  }
+  function sxEachVars(c, cands, i) {
+    const it = cands[i], rv = cands[(i + 1) % cands.length];
+    if (it) { c.me = it.name; c.meS = mSur(it.name); c.meTeam = it.team ? mTeamName(it.team) : ''; c.meTeamS = it.team ? (it.team.short || '') : ''; c.meStat = it.stat; c.mePct = Math.round((it.p || 0) * 100); c.meFans = mFmt(it.fans || 0); c.meTag = it.ref ? sxFanbase(it.ref.player, it.ref.team).tag : ''; c.meRank = mOrd(i + 1); }
+    if (rv && rv !== it) { c.riv = rv.name; c.rivS = mSur(rv.name); c.rivStat = rv.stat; c.rivTeam = rv.team ? mTeamName(rv.team) : ''; }
+  }
+
+  // Who a spec says posts: outlet id, or player/club/fan/local of a candidate.
+  const SX_IDX = { fav: 0, second: 1, third: 2, fourth: 3, fifth: 4, a: 0, b: 1 };
+  function sxAcctFor(by, cands, i) {
+    const m = /^(player|club|fan|local):(\w+)$/.exec(by || '');
+    if (!m) return MEDIA_OUTLETS[by] ? { u: by } : null;
+    if (m[2] === 'neutral') return { u: mFan(null, 'sxn' + mInt(0, 500)) };
+    const idx = m[2] === 'each' ? i : SX_IDX[m[2]];
+    const it = cands[idx]; if (!it) return null;
+    if (it.k === 'c') {   // club subject (debates)
+      if (m[1] === 'club') return { u: mClubAcct(it.team), it, ref: null };
+      if (m[1] === 'fan') return { u: mFan(it.team, 'cf' + mInt(0, 500)), it, ref: null };
+      if (m[1] === 'local') return { u: mLocalPaper(it.team), it, ref: null };
+      return null;
+    }
+    const ref = it.ref; if (!ref) return null;
+    if (m[1] === 'player') return { u: mPlayerAcct(ref.player, ref.team), ref, it, persona: sxPersonaOf(ref.player) };
+    if (m[1] === 'club') return ref.team ? { u: mClubAcct(ref.team), ref, it } : null;
+    if (m[1] === 'local') return ref.team ? { u: mLocalPaper(ref.team), ref, it } : null;
+    return { u: mPlayerFan(ref.player, ref.team, 'h' + mInt(0, 500), null), ref, it };
+  }
+
+  // Blend performance odds, fanbase size and a little noise into poll shares.
+  function sxPollShares(cands, n) {
+    const W = sxCfg('hype.pollWeights', { score: 0.55, fans: 0.35, noise: 0.1 });
+    const sc = cands.slice(0, n);
+    const od = sc.map(c => Math.max(0.0001, c.p || 0.0001)), fa = sc.map(c => Math.max(1, c.fans || 1)), no = sc.map(() => mR() + 0.05);
+    const so = od.reduce((a, b) => a + b, 0), sf = fa.reduce((a, b) => a + b, 0), sn = no.reduce((a, b) => a + b, 0);
+    const raw = sc.map((c, i) => W.score * od[i] / so + W.fans * fa[i] / sf + W.noise * no[i] / sn);
+    const rs = raw.reduce((a, b) => a + b, 0);
+    const pct = raw.map(v => Math.round(v / rs * 100));
+    pct[0] += 100 - pct.reduce((a, b) => a + b, 0);
+    return pct;
+  }
+
+  // Emit the posts a phase/debate recipe asks for. Recipes are data (media.json).
+  function sxEmit(batch, specs, ctx, cands, base, o) {
+    o = o || {};
+    const out = [];
+    (specs || []).forEach(sp => {
+      if (sp.tiers && o.tier && sp.tiers.indexOf(o.tier) === -1) return;
+      if (sp.when && !sp.when.every(k => o.flags && o.flags[k])) return;
+      if (sp.unless && sp.unless.some(k => o.flags && o.flags[k])) return;
+      const reps = sp.each ? Math.min(sp.max || 3, cands.length) : 1;
+      for (let i = 0; i < reps; i++) {
+        if (!mChance(sp.chance == null ? 1 : sp.chance)) continue;
+        const who = sxAcctFor(sp.by, cands, sp.each ? i : 0);
+        if (!who) continue;
+        const c = Object.assign({}, ctx);
+        if (sp.each) sxEachVars(c, cands, i);
+        else { const mm = /^\w+:(\w+)$/.exec(sp.by || ''); if (mm && SX_IDX[mm[1]] != null && cands[SX_IDX[mm[1]]]) sxEachVars(c, cands, SX_IDX[mm[1]]); }
+        const persona = who.persona ? who.persona.id : '';
+        const opts = Object.assign({}, base, { dt: sp.dt ? mInt(sp.dt[0], sp.dt[1]) : mInt(0, 90), v: sp.v || 1, im: sp.im || 0 });
+        const kind = sp.kind || 'tw';
+        let post = null;
+        if (kind === 'art') {
+          const head = sxLine(sp.head, c, '');
+          if (!head) continue;
+          const body = (sp.body || []).map(b => sxLine(b, c, '')).filter(Boolean);
+          post = sxPost(batch, who.u, 'art', head, Object.assign(opts, { h: head, b: body, by: mPick(MEDIA_BYLINES[sp.by] || ['Staff']) }));
+        } else if (kind === 'tv') {
+          const byLens = mPundits(), lensPick = sxCfg('hype.lensPick', {}), pn = [];
+          ((sp.panel && sp.panel.lenses) || []).forEach(lens => {
+            const idx = SX_IDX[lensPick[lens]] != null ? SX_IDX[lensPick[lens]] : 0;
+            const it = cands[Math.min(idx, cands.length - 1)] || cands[0];
+            const cc = Object.assign({}, c);
+            if (it) { cc.pick = it.name; cc.pickS = mSur(it.name); cc.pickTeam = it.team ? mTeamName(it.team) : ''; cc.pickStat = it.stat; cc.pickPct = Math.round((it.p || 0) * 100); }
+            const x = sxLineAny([sp.panel.bank + '_' + lens, sp.panel.bank], cc, '');
+            if (x && byLens[lens]) pn.push({ p: byLens[lens], x });
+          });
+          const head = sxLine(sp.head, c, '');
+          if (!head) continue;
+          post = sxPost(batch, who.u, 'tv', head, Object.assign(opts, {
+            ban: sxLine(sp.ban, c, ''), show: sxLine(sp.show, c, ''), an: (sp.an || []).map(b => sxLine(b, c, '')).filter(Boolean),
+            pn, tick: [sxLine(sp.tick, c, '') || head]
+          }));
+        } else if (kind === 'poll') {
+          const q = sxLine(sp.bank, c, '');
+          if (!q) continue;
+          const nopt = Math.min(sp.options || 3, cands.length);
+          if (nopt < 2) continue;
+          const pct = sxPollShares(cands, nopt);
+          post = sxPost(batch, who.u, 'poll', q, Object.assign(opts, { poll: { q: sxLine(sp.question, c, '') || c.award || '', o: cands.slice(0, nopt).map((cd, k) => ({ t: cd.name, v: pct[k] })), n: mInt(8000, 220000) } }));
+        } else if (kind === 'vid') {
+          post = sxPost(batch, who.u, 'vid', sxLine(sp.bank, c, ''), Object.assign(opts, { vid: { vw: mInt(40000, 2500000), dur: mInt(4, 16) + ':' + String(mInt(0, 59)).padStart(2, '0') } }));
+        } else {
+          const text = sxLine(sp.bank, c, persona);
+          if (!text) continue;
+          const t2 = who.u && who.u.m ? mVoice(text, who.u.m) : text;
+          post = sxPost(batch, who.u, kind, t2, opts);
+          if (post && sp.thread && who.ref && who.persona) sxBuildThread(post, who.ref, sp.threadKind || 'award', c, { rival: sp.rival && cands[(i + 1) % cands.length] && cands[(i + 1) % cands.length].ref ? cands[(i + 1) % cands.length].ref.player : null, rivalTeam: cands[(i + 1) % cands.length] ? cands[(i + 1) % cands.length].team : null });
+          if (post && sp.heat && who.ref) sxHeatAdd(who.ref.player.id, sp.heat);
+        }
+        if (post) out.push(post);
+      }
+    });
+    return out;
+  }
+
+  function sxRoundsLeft() {
+    try {
+      if (!season) return null;
+      let best = null;
+      Object.values(season.leagues || {}).forEach(lg => {
+        if (lg.finished) return;
+        const l = (lg.rounds || []).length - (lg.currentRound || 0);
+        best = best == null ? l : Math.max(best, l);
+      });
+      return best;
+    } catch (e) { return null; }
+  }
+  function sxCycleKey() { return season ? 'Y' + season.year : 'S' + (typeof standaloneAwardsRound !== 'undefined' ? standaloneAwardsRound || 0 : 0); }
+
+  // One phase of the hype for one award. phases: race · shortlist · eve (see media.json)
+  function mgAwardsPhase(phase, aw, o) {
+    o = o || {};
+    const ph = sxCfg('hype.phases.' + phase);
+    if (!ph) return false;
+    const list = sxPrepCands(aw, sxRank(aw));
+    if (list.length < sxNum('hype.minCandidates', 2)) return false;
+    const s = sxSt();
+    const own = !o.batch;
+    const batch = o.batch || mBatch(mWhenLabel());
+    const left = sxRoundsLeft();
+    const flags = { close: list.length > 1 && (list[0].score - list[1].score) <= (aw.closeGap != null ? aw.closeGap : sxNum('hype.closeGap', 3)), always: true };
+    const prevLead = s.lead[aw.id];
+    flags.leaderChange = prevLead != null && prevLead !== list[0].id;
+    s.lead[aw.id] = list[0].id;
+    flags.first = prevLead == null;
+    const c = sxAwardCtx(aw, list, { phase, left: left == null ? '' : left, year: season ? 'Y' + season.year : '', cycle: sxCycleKey() });
+    const base = { ts: list.slice(0, 3).map(x => x.team && x.team.id).filter(Boolean), tg: [c.awardTag, '#Awards', list[0].ref ? sxFanbase(list[0].ref.player, list[0].ref.team).tag : ''], c: aw.name, ph: 'aw', aw: aw.id };
+    const posts = sxEmit(batch, ph.specs, c, list, base, { tier: aw.tier || 'major', flags });
+    if (phase !== 'race') s.hype[aw.name] = { fav: list[0].id, favName: list[0].name, ids: list.map(x => x.id), p: Math.round(list[0].p * 100), ph: phase, cy: sxCycleKey(), seq: batch.seq };
+    if (ph.debate && list.length > 1 && mChance(ph.debate)) { try { sxDebateStart(batch, { topic: 'race', cands: list.slice(0, 2), aw }); } catch (e) { console.warn('debate', e); } }
+    if (own) { mCommit(batch); mediaDirty = true; }
+    return posts.length > 0;
+  }
+
+  // Called every flush. Counts matches; posts a rolling "race" update every N,
+  // and the shortlist once the season is in its closing rounds.
+  function mgAwardsTick(batch) {
+    if (!sxOn()) return;
+    const s = sxSt(), R = sxCfg('race', {});
+    const every = R.everyMatches || 10;
+    if (s.m - (s.lastRace || 0) < every) return;
+    s.lastRace = s.m;
+    const active = sxAwardList().filter(a => a.race !== false && sxScopeActive(a));
+    if (!active.length) return;
+    const per = R.perTick || 1;
+    for (let k = 0; k < per; k++) { const aw = active[(s.cy++) % active.length]; try { mgAwardsPhase('race', aw, { batch }); } catch (e) { console.warn('race', e); } }
+    // shortlist
+    const left = sxRoundsLeft(), key = sxCycleKey();
+    let due = false;
+    if (season && left != null && left <= (R.lateRoundsLeft || 6) && s.sy !== key) { s.sy = key; due = true; }
+    else if (!season && s.m - (s.lastShort || 0) >= (R.standaloneShortlistEvery || 40)) { s.lastShort = s.m; due = true; }
+    if (due) sxAwardList().filter(a => a.scope !== 'tournament' && a.tier !== 'minor').forEach(aw => { try { mgAwardsPhase('shortlist', aw, { batch }); } catch (e) { console.warn('shortlist', e); } });
+  }
+
+  // Hook: awards are about to be handed out (season end / tournament end).
+  function mediaOnAwardsEve(scope) {
+    if (!sxOn()) return;
+    try {
+      ensureMedia();
+      const batch = mBatch(mWhenLabel());
+      sxBudgetReset();
+      sxAwardList().filter(a => (a.scope || 'global') === scope && sxCfg('hype.eve', true)).forEach(aw => {
+        try { mgAwardsPhase('eve', aw, { batch }); } catch (e) { console.warn('awards eve', e); }
+      });
+      mCommit(batch);
+      mediaDirty = true;
+      mediaSave();
+      try { if (document.getElementById('view-media') && document.getElementById('view-media').classList.contains('active')) renderMediaView(); } catch (e) {}
+    } catch (e) { console.warn('awards eve failed', e); }
+  }
+
+  // After the announcement: winner, club, nominees and fans react; the media checks its own predictions.
+  function mgSocialAward(batch, ev, p, team, c, base) {
+    if (!sxOn()) return;
+    const s = sxSt(), AW = sxCfg('award', {});
+    const hyped = s.hype[ev.name] || null;
+    const ref = sxPlayerRef(p.id, team);
+    const wasFav = !!(hyped && hyped.fav === p.id), wasListed = !!(hyped && hyped.ids.indexOf(p.id) !== -1);
+    const cx = Object.assign({}, c, { fav: hyped ? hyped.favName : '', favS: hyped ? mSur(hyped.favName) : '', favPct: hyped ? hyped.p : '', wasFav: wasFav ? 1 : '', wasListed: wasListed ? 1 : '', awardTag: mTag(ev.name.replace(/'/g, '')) });
+    const major = MEDIA_MAJOR_AWARDS.indexOf(ev.name) !== -1;
+    if (ref) {
+      const fb = sxFanbase(ref.player, ref.team);
+      cx.fanTag = fb.tag; cx.fanGroup = fb.group;
+      sxPlayerPost(batch, ref, 'award', 'pp_award_win', Object.assign({}, cx, { my: c.team, myS: c.teamS }), base, { dt: mInt(3, 60), v: major ? 2.2 : 1.2, im: major ? 3 : 1, quote: major ? 0.6 : 0.2, clubQuote: major ? 0.7 : 0.3, heat: sxNum('heat.award', 0.6) });
+      sxPost(batch, mClubAcct(ref.team), 'tw', sxLine('cp_award', cx, ''), Object.assign({}, base, { dt: mInt(5, 70), v: 1.5, im: major ? 2 : 0 }));
+    }
+    if (!major) { s.hype && delete s.hype[ev.name]; return; }
+    // the media marks its own homework
+    if (hyped) {
+      const bank = wasFav ? 'hy_called' : wasListed ? 'hy_upset' : 'hy_shock';
+      const outs = sxCfg('award.verdictOutlets', ['statbook', 'bn']);
+      sxPost(batch, mPick(outs), 'news', sxLine(bank, cx, ''), Object.assign({}, base, { dt: mInt(15, 90), v: 1.5, im: 1 }));
+      if (!wasFav && ref) {
+        // the favourite's own fans feel robbed
+        const fav = sxPlayerRef(hyped.fav);
+        if (fav) { const fan = mPlayerFan(fav.player, fav.team, 'rb' + mInt(0, 300), 'angry'); sxPost(batch, fan, 'tw', mVoice(sxLine('fx_robbed', cx, ''), 'angry'), Object.assign({}, base, { dt: mInt(10, 200), v: 1.6 })); }
+      }
+    }
+    // nominees who lost
+    const losers = (hyped ? hyped.ids : []).filter(id => id !== p.id);
+    mShuffle(losers).slice(0, AW.loserReactions == null ? 2 : AW.loserReactions).forEach(id => {
+      const lref = sxPlayerRef(id); if (!lref) return;
+      sxPlayerPost(batch, lref, 'awardlose', 'pp_award_lose', cx, base, { dt: mInt(20, 200), v: 1.3, thread: mChance(0.6) });
+    });
+    // the winner's fans celebrate
+    if (ref) { for (let i = 0; i < (AW.fanPosts == null ? 2 : AW.fanPosts); i++) { const fan = mPlayerFan(ref.player, ref.team, 'aw' + mInt(0, 300)); sxPost(batch, fan, 'tw', mVoice(sxLine('fx_award_win', cx, ''), fan.m), Object.assign({}, base, { dt: mInt(5, 150), v: 1.7 })); } }
+    try { sxDebateResolve(batch, ev.name, p, cx, base); } catch (e) { console.warn('debate resolve', e); }
+    delete s.hype[ev.name];
+  }
+
+
+  // ==========================================================================
+  // Debates: fanbase vs fanbase
+  // ==========================================================================
+  function sxPlayerStatLine(id) {
+    const parts = [];
+    (sxCfg('debate.statBuckets', []) || []).forEach(sb => {
+      const e = ((stats && stats[sb.b]) || {})[id];
+      if (e && e.count) parts.push(e.count + ' ' + sb.label);
+    });
+    return parts.slice(0, 3).join(', ');
+  }
+  function sxSubjectFromPlayer(ref, stat, score, pctOverride) {
+    return { k: 'p', id: ref.player.id, name: ref.player.name, ref, team: ref.team, stat: stat || sxPlayerStatLine(ref.player.id), score: score || 0, p: pctOverride, fans: sxFanbase(ref.player, ref.team).size };
+  }
+  function sxSubjectFromClub(team, stat, score) {
+    return { k: 'c', id: team.id, name: mTeamName(team), ref: null, team, stat: stat || '', score: score || 0, fans: sxClubFans(team).size };
+  }
+  function sxDebateSubjects(tp, o) {
+    o = o || {};
+    if (tp.via === 'award') {
+      let cands = o.cands;
+      if (!cands) {
+        const aws = sxAwardList().filter(a => a.scope !== 'tournament' && (!tp.awards || tp.awards.indexOf(a.id) !== -1));
+        if (!aws.length) return null;
+        const aw = mPick(aws);
+        cands = sxPrepCands(aw, sxRank(aw)); o.aw = aw;
+      }
+      if (!cands || cands.length < 2) return null;
+      return cands.slice(0, 2).map(cd => sxSubjectFromPlayer(cd.ref, cd.stat, cd.score, cd.p));
+    }
+    if (tp.via === 'stat') {
+      const arr = Object.values((stats && stats[tp.bucket]) || {}).sort((x, y) => (y.count || 0) - (x.count || 0)).slice(0, 4);
+      const refs = arr.map(r => ({ r, ref: sxPlayerRef(r.id, allTeams.find(t => t.name === r.team)) })).filter(x => x.ref);
+      if (refs.length < 2) return null;
+      const two = mShuffle(refs.slice(0, 3)).slice(0, 2);
+      return two.map(x => sxSubjectFromPlayer(x.ref, null, x.r.count));
+    }
+    if (tp.via === 'career') {
+      const W = sxCfg('debate.careerWeights', { goals: 1, assists: 0.7, motm: 1.5 }), cs = careerStats || {};
+      const sc = {};
+      Object.keys(W).forEach(b => Object.values(cs[b] || {}).forEach(e => { (sc[e.id] = sc[e.id] || { id: e.id, name: e.name, team: e.team, v: 0 }).v += (e.count || 0) * W[b]; }));
+      const arr = Object.values(sc).sort((x, y) => y.v - x.v).slice(0, 5);
+      const refs = arr.map(r => ({ r, ref: sxPlayerRef(r.id, allTeams.find(t => t.name === r.team)) })).filter(x => x.ref);
+      if (refs.length < 2) return null;
+      return mShuffle(refs.slice(0, 4)).slice(0, 2).map(x => sxSubjectFromPlayer(x.ref, null, x.r.v));
+    }
+    if (tp.via === 'clubs') {
+      let two = null;
+      try {
+        const lgs = Object.values((season && season.leagues) || {}).filter(l => l.table && l.table.length > 3 && (l.currentRound || 0) > 2);
+        if (lgs.length) {
+          const tb = sortedTable(mPick(lgs).table);
+          two = [tb[0], tb[1]].map(r => ({ team: r.team, stat: r.pts + ' pts, GD ' + ((r.gf || 0) - (r.ga || 0) >= 0 ? '+' : '') + ((r.gf || 0) - (r.ga || 0)), score: r.pts }));
+        }
+      } catch (e) { two = null; }
+      if (!two && o.pair) two = o.pair.map(t => ({ team: t, stat: '', score: mTeamOvr(t) }));
+      if (!two) return null;
+      return two.map(x => sxSubjectFromClub(x.team, x.stat, x.score));
+    }
+    if (tp.via === 'derby') {
+      if (!o.pair) return null;
+      return o.pair.map(t => sxSubjectFromClub(t, '', mTeamOvr(t)));
+    }
+    return null;
+  }
+  function sxDebateCtx(S, tp, extra) {
+    const a = S[0], b = S[1];
+    const ga = a.k === 'c' ? sxClubFans(a.team) : sxFanbase(a.ref.player, a.ref.team);
+    const gb = b.k === 'c' ? sxClubFans(b.team) : sxFanbase(b.ref.player, b.ref.team);
+    return Object.assign({
+      a: a.name, b: b.name, aS: a.k === 'c' ? (a.team.short || a.name) : mSur(a.name), bS: b.k === 'c' ? (b.team.short || b.name) : mSur(b.name),
+      aTeam: a.team ? mTeamName(a.team) : '', bTeam: b.team ? mTeamName(b.team) : '', aStat: a.stat, bStat: b.stat,
+      aFans: mFmt(a.fans), bFans: mFmt(b.fans), aGroup: ga.group, bGroup: gb.group, aTag: ga.tag, bTag: gb.tag,
+      tag: '#' + (mAscii(a.k === 'c' ? (a.team.short || a.name) : mSur(a.name)) + 'v' + mAscii(b.k === 'c' ? (b.team.short || b.name) : mSur(b.name))),
+      topic: (tp && tp.label) || ''
+    }, extra || {});
+  }
+  function sxFanAcctFor(sub) {
+    return sub.k === 'c' ? mFan(sub.team, 'dbf' + mInt(0, 600)) : mPlayerFan(sub.ref.player, sub.ref.team, 'dbf' + mInt(0, 600));
+  }
+
+  // The fan war under the debate's starter post: heavier fanbase = more voices.
+  function sxFanWar(post, S, ctx, n) {
+    const DB = sxCfg('debate', {});
+    const share = S[0].fans / Math.max(1, S[0].fans + S[1].fans);
+    const p0 = 0.5 + (share - 0.5) * (DB.fanSkew == null ? 0.8 : DB.fanSkew);
+    const rs = [], to = post.u && post.u.h;
+    let last = null;
+    for (let i = 0; i < n; i++) {
+      const side = mChance(p0) ? 0 : 1, me = S[side], opp = S[1 - side];
+      const acct = sxFanAcctFor(me);
+      const cc = Object.assign({}, ctx, { me: me.name, meS: me.k === 'c' ? (me.team.short || me.name) : mSur(me.name), meStat: me.stat, meFans: mFmt(me.fans), opp: opp.name, oppS: opp.k === 'c' ? (opp.team.short || opp.name) : mSur(opp.name), oppStat: opp.stat, oppFans: mFmt(opp.fans) });
+      const bank = mChance(DB.attackChance == null ? 0.45 : DB.attackChance) ? 'db_fan_vs' : 'db_fan_pro';
+      const txt = sxLineAny([bank, 'db_fan_pro'], cc, '');
+      if (!txt) continue;
+      const replyTo = last && last.side !== side && mChance(0.6) ? last.h : to;
+      rs.push({ u: mUserRef(acct), x: mClean(mVoice(txt, acct.m)), l: sxReplyLikes(acct, post), to: replyTo });
+      last = { side, h: acct.h };
+    }
+    const nn = mInt((DB.neutral || [1, 2])[0], (DB.neutral || [1, 2])[1]);
+    for (let i = 0; i < nn; i++) { const fan = mFan(null, 'dbn' + mInt(0, 600), 'banter'); const t = sxLine('db_fan_neutral', ctx, ''); if (t) rs.push({ u: mUserRef(fan), x: mClean(mVoice(t, fan.m)), l: sxReplyLikes(fan, post), to }); }
+    // the players themselves, if their persona is the type to wade in
+    S.forEach((sub, i) => {
+      if (sub.k !== 'p' || !mChance(DB.playerCameo == null ? 0.4 : DB.playerCameo)) return;
+      const pr = sxPersonaOf(sub.ref.player), opp = S[1 - i];
+      const t = sxLineAny(['pr_debate'], Object.assign({}, ctx, { me: sub.name, opp: opp.name, oppS: opp.k === 'c' ? opp.name : mSur(opp.name) }), pr.id);
+      if (t) { const acct = mPlayerAcct(sub.ref.player, sub.ref.team); rs.push({ u: mUserRef(acct), x: mClean(t), l: sxReplyLikes(acct, post), to }); }
+    });
+    rs.sort((x, y) => (y.u.v ? 1 : 0) - (x.u.v ? 1 : 0));
+    post.r = (post.r || []).concat(rs); post.rp = Math.max(post.rp || 0, post.r.length);
+  }
+
+  function sxDebateOpen() { return sxSt().debates.filter(d => d.st === 'open'); }
+
+  function sxDebateStart(batch, o) {
+    if (!sxOn()) return null;
+    o = o || {};
+    const DB = sxCfg('debate', {}), s = sxSt();
+    if (sxDebateOpen().length >= (DB.maxActive || 6)) return null;
+    const topics = (DB.topics || []).filter(t => !o.topic || t.id === o.topic);
+    if (!topics.length) return null;
+    let tp = null, S = null, ox = { cands: o.cands, pair: o.pair, aw: o.aw || null };
+    const items = topics.map(t => ({ w: t.w || 1, v: t }));
+    for (let g = 0; g < 4 && !S; g++) { tp = mWeighted(items); ox.aw = o.aw || null; S = sxDebateSubjects(tp, ox); }
+    if (!S) return null;
+    if (S.some(x => x.p == null)) { const tot = (S[0].score || 0) + (S[1].score || 0); S.forEach(x => { x.p = tot > 0 ? (x.score || 0) / tot : 0.5; }); }
+    const dup = s.debates.find(d => d.st === 'open' && ((d.a.id === S[0].id && d.b.id === S[1].id) || (d.a.id === S[1].id && d.b.id === S[0].id)));
+    if (dup) return null;
+    const ctx = sxDebateCtx(S, tp, { award: ox.aw ? ox.aw.name : '', awardTag: ox.aw ? (ox.aw.tag || '') : '' });
+    const base = { ts: S.map(x => x.team && x.team.id).filter(Boolean), tg: [ctx.tag, ctx.aTag, ctx.bTag, '#Debate'], c: tp.label || 'Debate', ph: 'aw', aw: ox.aw ? ox.aw.id : 'debate' };
+    const posts = sxEmit(batch, tp.specs || DB.specs, ctx, S, base, { tier: 'major' });
+    const starter = posts.find(p => p.k !== 'poll') || posts[0];
+    if (!starter) return null;
+    if (starter) sxFanWar(starter, S, ctx, mInt((DB.fanReplies || [6, 10])[0], (DB.fanReplies || [6, 10])[1]));
+    const poll = posts.find(p => p.poll);
+    const d = {
+      id: ++s.did, seq: batch.seq, topic: tp.id, label: tp.label || '', a: { k: S[0].k, id: S[0].id, n: S[0].name, t: S[0].team ? S[0].team.id : null }, b: { k: S[1].k, id: S[1].id, n: S[1].name, t: S[1].team ? S[1].team.id : null },
+      tag: ctx.tag, votes: poll ? [poll.poll.o[0].v, poll.poll.o[1].v] : [50, 50], n: poll ? poll.poll.n : 0, esc: 0, st: 'open', aw: ox.aw ? ox.aw.name : null, pid: starter.id, born: s.m
+    };
+    S.forEach(x => { if (x.k === 'p') sxHeatAdd(x.id, sxNum('debate.heat', 0.05)); });
+    s.debates.unshift(d);
+    const keep = (DB.keepResolved || 10) + (DB.maxActive || 6);
+    if (s.debates.length > keep) s.debates.length = keep;
+    return d;
+  }
+
+  function sxDebateRebuild(d) {
+    const mk = x => {
+      if (x.k === 'c') { const t = getTeam(x.id); return t ? sxSubjectFromClub(t, '', 0) : null; }
+      const ref = sxPlayerRef(x.id, x.t ? getTeam(x.t) : null);
+      return ref ? sxSubjectFromPlayer(ref, null, 0) : null;
+    };
+    const a = mk(d.a), b = mk(d.b);
+    return a && b ? [a, b] : null;
+  }
+
+  // Periodically: start a new debate, or stoke an open one.
+  function mgDebateTick(batch, q, bulk) {
+    if (!sxOn()) return;
+    const DB = sxCfg('debate', {}), s = sxSt();
+    // age out
+    s.debates.forEach(d => { if (d.st === 'open' && s.m - (d.born || 0) > (DB.ttlMatches || 120)) d.st = 'cooled'; });
+    if (bulk && !mChance(DB.bulkChance == null ? 0.15 : DB.bulkChance)) return;
+    if (mChance(DB.escalateChance == null ? 0.3 : DB.escalateChance)) {
+      const open = sxDebateOpen().filter(d => d.esc < (DB.maxEscalations || 3));
+      if (open.length) {
+        const d = mPick(open), S = sxDebateRebuild(d);
+        if (S) {
+          const tp = (DB.topics || []).find(t => t.id === d.topic) || {};
+          S.forEach(x => { if (x.k === 'p') x.stat = sxPlayerStatLine(x.id) || x.stat; });
+          const ctx = sxDebateCtx(S, tp, { award: d.aw || '', round: d.esc + 1 });
+          const base = { ts: S.map(x => x.team && x.team.id).filter(Boolean), tg: [d.tag, ctx.aTag, ctx.bTag, '#Debate'], c: d.label || 'Debate', ph: 'aw', aw: 'debate' };
+          const posts = sxEmit(batch, DB.escalateSpecs || [], ctx, S, base, { tier: 'major' });
+          const lead = posts.find(p => p.k !== 'poll') || posts[0];
+          if (lead) sxFanWar(lead, S, ctx, mInt((DB.escalateReplies || [4, 7])[0], (DB.escalateReplies || [4, 7])[1]));
+          d.esc++;
+        }
+      }
+    }
+    if (mChance(DB.startChance == null ? 0.3 : DB.startChance)) {
+      // derbies seen this flush make natural debates
+      const derbies = (q || []).filter(f => f.derby);
+      const o = derbies.length && mChance(0.5) ? { topic: 'derby', pair: [derbies[0].H, derbies[0].A] } : {};
+      sxDebateStart(batch, o);
+    }
+  }
+
+  function sxDebateResolve(batch, awardName, winner, cx, base) {
+    const s = sxSt();
+    s.debates.filter(d => d.st === 'open' && d.aw === awardName).forEach(d => {
+      d.st = 'settled'; d.win = winner.id;
+      const wIsA = d.a.id === winner.id, wIsB = d.b.id === winner.id;
+      if (!wIsA && !wIsB) return;
+      const S = sxDebateRebuild(d); if (!S) return;
+      const w = wIsA ? S[0] : S[1], l = wIsA ? S[1] : S[0];
+      const ctx = sxDebateCtx(S, null, { winner: w.name, winnerS: mSur(w.name), loser: l.name, loserS: mSur(l.name), award: awardName });
+      const bs = Object.assign({}, base, { tg: [d.tag, '#Debate'], aw: 'debate' });
+      const fw = mPlayerFan(w.ref.player, w.ref.team, 'dr' + mInt(0, 400)), fl = mPlayerFan(l.ref.player, l.ref.team, 'dr' + mInt(0, 400), 'angry');
+      sxPost(batch, fw, 'tw', mVoice(sxLine('db_won', ctx, ''), fw.m), Object.assign({}, bs, { dt: mInt(5, 140), v: 1.6 }));
+      sxPost(batch, fl, 'tw', mVoice(sxLine('db_lost', ctx, ''), fl.m), Object.assign({}, bs, { dt: mInt(10, 160), v: 1.5 }));
+      sxPost(batch, mPick(sxCfg('debate.verdictOutlets', ['terrace'])), 'take', sxLine('db_verdict', ctx, ''), Object.assign({}, bs, { dt: mInt(30, 120), v: 1.2 }));
+    });
+  }
+
+
+  // ==========================================================================
+  // Read-side helpers for the Media tab (accounts, awards watch, debates)
+  // ==========================================================================
+  function sxAvatarHtml(u) {
+    try {
+      if (u && u.k === 'p' && u.p) { const r = sxPlayerRef(u.p, u.t ? getTeam(u.t) : null); if (r) return playerAvatarMark(r.player); }
+      if (u && u.k === 'c' && u.t) { const t = getTeam(u.t); if (t) return teamAvatarMark(t); }
+    } catch (e) {}
+    return (u && u.a) || '👤';
+  }
+  // Live profile of an account from its post reference (followers recompute from current form).
+  function sxAcctInfo(u) {
+    if (!u || typeof u === 'string') return null;
+    try {
+      if (u.k === 'p' && u.p) {
+        const r = sxPlayerRef(u.p, u.t ? getTeam(u.t) : null); if (!r) return null;
+        const fb = sxFanbase(r.player, r.team);
+        return { kind: 'player', name: r.player.name, handle: u.h, followers: sxFollowers(r.player, r.team), fan: fb, team: r.team, player: r.player, persona: sxPersonaOf(r.player).id };
+      }
+      if (u.k === 'c' && u.t) {
+        const t = getTeam(u.t); if (!t) return null;
+        const ac = mClubAcct(t), fb = sxClubFans(t);
+        return { kind: 'club', name: ac.n, handle: ac.h, followers: ac.f, fan: { size: fb.size, group: fb.group, tag: fb.tag, tier: '', heat: 0, mood: 'normal' }, team: t };
+      }
+    } catch (e) {}
+    return null;
+  }
+  let _sxTopCache = { key: '', v: null };
+  function sxTopAccounts(nPlayers, nClubs) {
+    const key = (mediaState ? sxSt().m : 0) + ':' + ((typeof trophies !== 'undefined' && trophies) ? trophies.length : 0) + ':' + nPlayers + ':' + nClubs;
+    if (_sxTopCache.key === key) return _sxTopCache.v;
+    let flat = [];
+    try { flat = getAllPlayersFlat(); } catch (e) { flat = []; }
+    const pre = flat.slice().sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0)).slice(0, sxNum('accounts.prefilter', 300));
+    const players = pre.map(e => ({ player: e.player, team: e.team, f: sxFollowers(e.player, e.team) })).sort((a, b) => b.f - a.f).slice(0, nPlayers);
+    const clubs = allTeams.filter(t => t.players && t.players.length).map(t => ({ team: t, f: mClubAcct(t).f })).sort((a, b) => b.f - a.f).slice(0, nClubs);
+    const v = { players, clubs };
+    _sxTopCache = { key, v };
+    return v;
+  }
+  let _sxRankCache = { key: '', v: {} };
+  function sxAwardsWatch() {
+    const key = (mediaState ? sxSt().m : 0) + ':' + (tournament ? 1 : 0);
+    if (_sxRankCache.key !== key) _sxRankCache = { key, v: {} };
+    const out = [];
+    sxAwardList().forEach(aw => {
+      if (aw.scope === 'tournament' && !(tournament && !tournament.champion)) return;
+      if (!_sxRankCache.v[aw.id]) _sxRankCache.v[aw.id] = sxPrepCands(aw, sxRank(aw));
+      const list = _sxRankCache.v[aw.id];
+      out.push({ aw, list, hype: sxSt().hype[aw.name] || null });
+    });
+    return out;
+  }
+  function sxDebates() { return sxSt().debates; }
+
+
+  // ==========================================================================
   // APEX MEDIA CENTRE — Media tab UI
   // ==========================================================================
   let mediaTabId = 'feed';
   let mediaFilterTeam = '';
   let mediaFilterKind = 'all';
   let mediaFilterTag = '';
+  let mediaFilterAcct = '';   // @handle whose profile + posts are shown
   let mediaShown = 40;
   const mediaOpenThreads = new Set();
   const mediaOpenArticles = new Set();
 
   const MEDIA_KIND_FILTERS = [
     ['all', 'All'], ['scores', 'Scores'], ['previews', 'Previews'], ['news', 'News'],
-    ['social', 'Fans & takes'], ['transfers', 'Transfers'], ['events', 'Awards & trophies']
+    ['social', 'Fans & takes'], ['transfers', 'Transfers'], ['events', 'Awards & trophies'],
+    ['verified', 'Players & clubs'], ['hype', 'Awards hype']
   ];
 
   function mUserView(u) {
@@ -23026,13 +24160,16 @@ const PLAYSTYLE_BEHAVIOR = {
       if (u.indexOf('p:') === 0) { const p = MEDIA_PUNDITS[u.slice(2)]; if (p) return { name: p.name, handle: p.role, avatar: p.icon, color: p.color, verified: true, outlet: true }; }
       return { name: u, handle: '', avatar: '👤', color: '#64748b' };
     }
-    return { name: u.n, handle: u.h, avatar: u.a, color: u.c || '#64748b', verified: !!u.v };
+    return { name: u.n, handle: u.h, avatar: sxAvatarHtml(u), color: u.c || '#64748b', verified: !!u.v, kind: u.k || '' };
   }
+  function mRoleTag(kind) { return kind === 'p' ? '<span class="mp-role" title="Verified player account">⚽ Player</span>' : kind === 'c' ? '<span class="mp-role club" title="Official club account">🏟️ Official</span>' : ''; }
+  function mNameLink(u) { return u.handle && (u.kind === 'p' || u.kind === 'c') ? '<a class="mp-name" onclick="App.mediaAcct(\'' + mEsc(u.handle) + '\')">' + mEsc(u.name) + '</a>' : mEsc(u.name); }
   function mTimeLabel(p) {
     const w = p.w ? p.w + ' · ' : '';
     if (p.ph === 'pre') { const m = Math.abs(p.dt); return w + 'KO −' + (m >= 90 ? Math.round(m / 60) + 'h' : m + 'm'); }
     if (p.ph === 'post') return w + (p.dt <= 0 ? 'FT' : p.dt < 90 ? 'FT +' + p.dt + 'm' : 'FT +' + Math.round(p.dt / 60) + 'h');
     if (p.ph === 'ev') return w + 'Just in';
+    if (p.ph === 'aw') return w + 'Awards watch';
     return w + 'Matchday';
   }
   function mHighlight(esc) {
@@ -23075,14 +24212,17 @@ const PLAYSTYLE_BEHAVIOR = {
     if (p.k === 'tv' && p.ban) {
       extra += '<div class="mp-tvmini"><span class="mp-tv-live">' + mEsc(p.ban) + '</span><span>' + mEsc(p.show || '') + '</span><a onclick="App.mediaTab(\'tv\')">Watch ▸</a></div>';
     }
-    const replies = (open && p.r && p.r.length) ? '<div class="mp-thread">' + p.r.map(r => {
+    if (p.qt) { const qu = mUserView(p.qt.u); extra += '<div class="mp-quote"><div class="mp-av sm" style="background:' + qu.color + '">' + qu.avatar + '</div><div><b>' + mEsc(qu.name) + '</b>' + (qu.verified ? ' <span class="mp-ver">✔</span>' : '') + ' <span class="mp-handle">' + mEsc(qu.handle) + '</span><div>' + mHighlight(mEsc(p.qt.x)) + '</div></div></div>'; }
+    const shownR = (p.r && p.r.length) ? (open ? p.r : (p.sx ? p.r.slice(0, 2) : [])) : [];
+    const moreR = (!open && p.sx && p.r && p.r.length > 2) ? '<div class="mp-more" onclick="App.mediaToggleThread(' + p.id + ')">Show ' + (p.r.length - 2) + ' more replies ▾</div>' : '';
+    const replies = shownR.length ? '<div class="mp-thread">' + shownR.map(r => {
       const ru = mUserView(r.u);
-      return '<div class="mp-reply"><div class="mp-av sm" style="background:' + ru.color + '">' + ru.avatar + '</div><div><div class="mp-rhead"><b>' + mEsc(ru.name) + '</b> <span>' + mEsc(ru.handle) + '</span></div><div>' + mHighlight(mEsc(r.x)) + '</div><div class="mp-ract">❤️ ' + mFmt(r.l || 0) + '</div></div></div>';
-    }).join('') + '</div>' : '';
+      return '<div class="mp-reply"><div class="mp-av sm" style="background:' + ru.color + '">' + ru.avatar + '</div><div><div class="mp-rhead"><b>' + mNameLink(ru) + '</b>' + (ru.verified ? ' <span class="mp-ver">✔</span>' : '') + mRoleTag(ru.kind) + ' <span>' + mEsc(ru.handle) + '</span>' + (r.to ? ' <span class="mp-to">↩ ' + mEsc(r.to) + '</span>' : '') + '</div><div>' + mHighlight(mEsc(r.x)) + '</div><div class="mp-ract">❤️ ' + mFmt(r.l || 0) + '</div></div></div>';
+    }).join('') + moreR + '</div>' : '';
     const teams = (p.ts || []).slice(0, 2).map(id => mMark(id, 16)).join('');
     return '<article class="mp' + (p.im >= 3 ? ' big' : '') + (compact ? ' compact' : '') + '" data-pid="' + p.id + '">' +
       '<div class="mp-av" style="background:' + u.color + '">' + u.avatar + '</div>' +
-      '<div class="mp-main"><div class="mp-head"><b>' + mEsc(u.name) + '</b>' + (u.verified ? ' <span class="mp-ver" title="Verified">✔</span>' : '') +
+      '<div class="mp-main"><div class="mp-head"><b>' + mNameLink(u) + '</b>' + (u.verified ? ' <span class="mp-ver" title="Verified">✔</span>' : '') + mRoleTag(u.kind) +
       ' <span class="mp-handle">' + mEsc(u.handle) + '</span><span class="mp-time">· ' + mEsc(mTimeLabel(p)) + '</span>' + (p.c ? '<span class="mp-comp">' + mEsc(p.c) + '</span>' : '') + '<span class="mp-teams">' + teams + '</span></div>' +
       '<div class="mp-text">' + (p.k === 'vid' ? '🎥 ' : '') + ((p.k === 'tv' || (p.k === 'art' && p.h)) ? '' : text) + '</div>' + extra +
       '<div class="mp-acts"><span onclick="App.mediaToggleThread(' + p.id + ')" class="mp-act' + (p.r && p.r.length ? ' has' : '') + '">💬 ' + mFmt(p.rp) + '</span><span class="mp-act">🔁 ' + mFmt(p.rt) + '</span><span class="mp-act">❤️ ' + mFmt(p.l) + '</span><span class="mp-act">📊 ' + mFmt(p.vw) + '</span></div>' +
@@ -23093,6 +24233,7 @@ const PLAYSTYLE_BEHAVIOR = {
     let list = mediaAllPosts();
     if (mediaFilterTeam) list = list.filter(p => (p.ts || []).indexOf(mediaFilterTeam) !== -1);
     if (mediaFilterTag) list = list.filter(p => (p.tg || []).indexOf(mediaFilterTag) !== -1 || (p.x || '').indexOf(mediaFilterTag) !== -1);
+    if (mediaFilterAcct) list = list.filter(p => p.u && p.u.h === mediaFilterAcct);
     const k = mediaFilterKind;
     if (k === 'scores') list = list.filter(p => p.k === 'res' || p.k === 'poll');
     else if (k === 'previews') list = list.filter(p => p.ph === 'pre');
@@ -23100,6 +24241,8 @@ const PLAYSTYLE_BEHAVIOR = {
     else if (k === 'social') list = list.filter(p => ['tw', 'meme', 'vid', 'take'].indexOf(p.k) !== -1);
     else if (k === 'transfers') list = list.filter(p => p.k === 'rumor');
     else if (k === 'events') list = list.filter(p => p.ph === 'ev');
+    else if (k === 'verified') list = list.filter(p => p.u && (p.u.k === 'p' || p.u.k === 'c'));
+    else if (k === 'hype') list = list.filter(p => p.ph === 'aw' || p.aw);
     return list;
   }
 
@@ -23158,7 +24301,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const teamIds = {}; all.forEach(p => (p.ts || []).forEach(id => { teamIds[id] = (teamIds[id] || 0) + 1; }));
     const opts = Object.keys(teamIds).map(id => { const t = getTeam(id); return t ? { id, n: mTeamName(t) } : null; }).filter(Boolean).sort((a, b) => a.n.localeCompare(b.n));
     const fb = document.getElementById('media-filters');
-    const fKey = opts.map(o => o.id).join(',') + '|' + mediaFilterTeam + '|' + mediaFilterKind + '|' + mediaFilterTag;
+    const fKey = opts.map(o => o.id).join(',') + '|' + mediaFilterTeam + '|' + mediaFilterKind + '|' + mediaFilterTag + '|' + mediaFilterAcct;
     if (fb && fb.dataset.fkey !== fKey) {
       fb.dataset.fkey = fKey;
       fb.innerHTML = '<select onchange="App.mediaFilter(\'team\',this.value)" aria-label="Filter by team"><option value="">All teams</option>' + opts.map(o => '<option value="' + mEsc(o.id) + '"' + (o.id === mediaFilterTeam ? ' selected' : '') + '>' + mEsc(o.n) + '</option>').join('') + '</select>' +
@@ -23169,19 +24312,79 @@ const PLAYSTYLE_BEHAVIOR = {
     if (mediaTabId === 'tv') html = mTvHtml();
     else if (mediaTabId === 'news') html = mNewsHtml();
     else if (mediaTabId === 'trending') html = mSideColumn();
+    else if (mediaTabId === 'awards' && sxOn()) html = mAwardsHtml();
+    else if (mediaTabId === 'debates' && sxOn()) html = mDebatesHtml();
+    else if (mediaTabId === 'accounts' && sxOn()) html = mAccountsHtml();
     else {
       const list = mFilteredPosts();
       html = list.length
-        ? '<div class="mc-layout"><div class="mc-feed">' + list.slice(0, mediaShown).map(p => mPostHtml(p)).join('') +
+        ? '<div class="mc-layout"><div class="mc-feed">' + (mediaFilterAcct && sxOn() ? mAcctCardHtml(mediaFilterAcct) : '') + list.slice(0, mediaShown).map(p => mPostHtml(p)).join('') +
           (list.length > mediaShown ? '<div style="text-align:center;margin:14px"><button class="btn btn-secondary btn-sm" onclick="App.mediaMore()">Load more</button></div>' : '') + '</div>' + mSideColumn() + '</div>'
         : '<div class="empty-state"><div class="icon">📡</div><p>' + (all.length ? 'Nothing matches these filters.' : 'The news desk is quiet. Play or simulate a match — headlines, fan reactions, TV and transfer gossip appear here.') + '</p></div>';
     }
     el.innerHTML = html;
   }
 
+
+  // ---- verified accounts, fanbases, awards watch, debates ----------------------------------------------------------
+  function mHeatMeter(heat) {
+    const pct = Math.round((heat + 1) / 2 * 100);
+    return '<span class="mx-heat" title="Fanbase mood"><i style="width:' + pct + '%;background:' + (heat > 0.3 ? 'var(--green,#22c55e)' : heat < -0.3 ? 'var(--red,#ef4444)' : 'var(--gold,#f0c14b)') + '"></i></span>';
+  }
+  function mAcctCardHtml(handle) {
+    const post = mediaAllPosts().find(p => p.u && typeof p.u === 'object' && p.u.h === handle);
+    const info = post ? sxAcctInfo(post.u) : null;
+    if (!info) return '<div class="card mc-card mx-acct"><b>' + mEsc(handle) + '</b> <a class="mc-link" onclick="App.mediaAcct(\'\')">✕ Close</a><p class="mc-empty">No posts from this account yet.</p></div>';
+    const u = mUserView(post.u), fb = info.fan;
+    const n = mediaAllPosts().filter(p => p.u && p.u.h === handle).length;
+    return '<div class="card mc-card mx-acct"><div class="mx-acct-top"><div class="mp-av lg" style="background:' + u.color + '">' + u.avatar + '</div><div><div class="mx-acct-name"><b>' + mEsc(info.name) + '</b> <span class="mp-ver">✔</span>' + mRoleTag(u.kind) + '</div><div class="mp-handle">' + mEsc(handle) + '</div></div><a class="mc-link" onclick="App.mediaAcct(\'\')">✕ Close</a></div>' +
+      '<div class="mx-stats"><div><b>' + mFmt(info.followers) + '</b><small>Followers</small></div><div><b>' + mFmt(fb.size) + '</b><small>' + mEsc((fb.tierIcon || '') + ' ' + (fb.tier || 'Fanbase')) + '</small></div><div><b>' + n + '</b><small>Posts</small></div></div>' +
+      '<div class="mx-fan"><span>' + mEsc(fb.group || '') + '</span> <span class="mp-tag" onclick="App.mediaTag(\'' + mEsc(fb.tag || '') + '\')">' + mEsc(fb.tag || '') + '</span> ' + (info.kind === 'player' ? 'Fan mood ' + mHeatMeter(fb.heat || 0) : '') + '</div></div>';
+  }
+  function mAwardsHtml() {
+    const w = sxAwardsWatch();
+    const left = sxRoundsLeft();
+    let h = '<div class="mx-banner">' + (season ? 'Season Y' + season.year + (left != null ? ' · ' + left + ' league round' + (left === 1 ? '' : 's') + ' left' : '') : 'Standalone cycle · awards are handed out when the season ends') + ' — the media is already picking winners.</div><div class="mx-grid">';
+    const shown = w.filter(x => x.list.length);
+    if (!shown.length) return '<div class="empty-state"><div class="icon">🏆</div><p>No award race yet — play some matches and the leaders appear here.</p></div>';
+    shown.forEach(x => {
+      const hypePosts = mediaAllPosts().filter(p => p.aw === x.aw.id && p.ph === 'aw').length;
+      h += '<div class="card mc-card mx-award"><div class="mx-award-h"><b>🏆 ' + mEsc(x.aw.name) + '</b><span class="mx-chip">' + (x.aw.scope === 'tournament' ? 'Tournament' : 'Season') + '</span>' + (x.hype ? '<span class="mx-chip hot">Media favourite: ' + mEsc(mSur(x.hype.favName)) + ' ' + x.hype.p + '%</span>' : '') + '</div>';
+      x.list.forEach((it, i) => {
+        const pct = Math.round(it.p * 100);
+        h += '<div class="mx-row"><span class="mx-pos">' + (i + 1) + '</span>' + (it.team ? teamMark(it.team, 20) : '') + '<div class="mx-who"><b>' + mEsc(it.name) + '</b><small>' + mEsc(it.stat || '') + ' · ' + mFmt(it.fans) + ' fans</small></div><div class="mx-bar"><i style="width:' + pct + '%"></i></div><b class="mx-pct">' + pct + '%</b></div>';
+      });
+      h += '<div class="mx-foot"><a class="mc-link" style="float:none" onclick="App.mediaFilter(\'kind\',\'hype\');App.mediaTab(\'feed\')">' + hypePosts + ' hype posts ▸</a></div></div>';
+    });
+    return h + '</div>';
+  }
+  function mDebatesHtml() {
+    const ds = sxDebates();
+    if (!ds.length) return '<div class="empty-state"><div class="icon">🗣️</div><p>No fan wars yet — rival fanbases start arguing once the season heats up.</p></div>';
+    const all = mediaAllPosts();
+    return ds.map(d => {
+      const post = all.find(p => p.id === d.pid);
+      const fa = d.a.k === 'c' ? getTeam(d.a.id) : null, fb = d.b.k === 'c' ? getTeam(d.b.id) : null;
+      return '<div class="card mc-card mx-debate"><div class="mx-award-h"><b>🗣️ ' + mEsc(d.a.n) + ' vs ' + mEsc(d.b.n) + '</b><span class="mx-chip">' + mEsc(d.label || d.topic) + '</span><span class="mx-chip ' + (d.st === 'open' ? 'hot' : '') + '">' + (d.st === 'open' ? 'Live' : d.st === 'settled' ? 'Settled' : 'Cooled') + '</span></div>' +
+        '<div class="mx-split"><span>' + (fa ? teamMark(fa, 18) : '') + mEsc(mSur(d.a.n)) + ' <b>' + d.votes[0] + '%</b></span><div class="mx-bar wide"><i style="width:' + d.votes[0] + '%"></i></div><span><b>' + d.votes[1] + '%</b> ' + mEsc(mSur(d.b.n)) + (fb ? teamMark(fb, 18) : '') + '</span></div>' +
+        (d.win ? '<div class="mc-empty">Winner: ' + mEsc(d.win === d.a.id ? d.a.n : d.b.n) + '</div>' : '') +
+        (post ? mPostHtml(post, true) : '<p class="mc-empty">The opening post has scrolled out of the feed.</p>') + '</div>';
+    }).join('');
+  }
+  function mAccountsHtml() {
+    const top = sxTopAccounts(20, 10);
+    const row = (u, name, handle, f, extra, mark) => '<div class="mx-row click" onclick="App.mediaAcct(\'' + mEsc(handle) + '\')">' + mark + '<div class="mx-who"><b>' + mEsc(name) + '</b> <span class="mp-ver">✔</span><small>' + mEsc(handle) + (extra ? ' · ' + extra : '') + '</small></div><b>' + mFmt(f) + '</b></div>';
+    return '<div class="mx-grid"><div class="card mc-card"><div class="card-title" style="font-size:0.95rem">⚽ Biggest player accounts</div>' +
+      top.players.map(e => { const a = mPlayerAcct(e.player, e.team), fb = sxFanbase(e.player, e.team); return row(a, e.player.name, a.h, e.f, mEsc(fb.group) + ' · ' + mEsc(fb.tier), teamMark(e.team, 20)); }).join('') + '</div>' +
+      '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">🏟️ Biggest club accounts</div>' +
+      top.clubs.map(e => { const a = mClubAcct(e.team); return row(a, a.n, a.h, e.f, '', teamMark(e.team, 20)); }).join('') + '</div></div>' +
+      '<p class="mc-empty" style="margin-top:8px">Tap an account to see its posts. Players with posts in the feed open a full profile card.</p>';
+  }
+
   function mediaTab(id) { mediaTabId = id; mediaShown = 40; renderMediaView(); }
   function mediaFilter(kind, v) { if (kind === 'team') mediaFilterTeam = v; else mediaFilterKind = v; mediaShown = 40; renderMediaView(); }
-  function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (mediaTabId === 'trending') mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
+  function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (['trending', 'awards', 'debates', 'accounts'].indexOf(mediaTabId) !== -1) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
+  function mediaAcct(handle) { mediaFilterAcct = handle || ''; mediaShown = 40; if (handle) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
   function mediaMore() { mediaShown += 40; renderMediaView(); }
   function mediaToggleThread(id) { if (mediaOpenThreads.has(id)) mediaOpenThreads.delete(id); else mediaOpenThreads.add(id); renderMediaView(); }
   function mediaToggleArticle(id) { if (mediaOpenArticles.has(id)) mediaOpenArticles.delete(id); else mediaOpenArticles.add(id); renderMediaView(); }
@@ -23246,7 +24449,7 @@ const PLAYSTYLE_BEHAVIOR = {
     renderHospitalList, searchHospital, filterHospitalSeverity, sortHospital,
     setCareerTeam, clearCareerTeam, findCareerFixtureDue,
     manualSubstitute, toggleCareerPanel, applyUserTactic, applyUserFormation, confirmUserSub,
-    renderMediaView, mediaTab, mediaFilter, mediaTag, mediaMore, mediaToggleThread, mediaToggleArticle, mediaClear
+    renderMediaView, mediaTab, mediaFilter, mediaTag, mediaMore, mediaToggleThread, mediaToggleArticle, mediaClear, mediaAcct
   };
 })();
 
