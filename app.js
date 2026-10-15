@@ -73,7 +73,27 @@
   // callers multiply by whatever weight they need for their own formula.
   // (power > 1 is deliberately "convex": it flattens the middle of the
   // scale and steepens the extremes — the opposite of a flat multiplier.)
+  // Pre-computed Lookup Tables for common baseline/span combinations to bypass
+  // Math.pow() / Math.sign() calculations during hot match simulation loops.
+  const _CURVE_LUT_70_29 = new Float64Array(101);
+  const _CURVE_LUT_75_24 = new Float64Array(101);
+  for (let _i = 0; _i <= 100; _i++) {
+    let _r70 = (_i - 70) / 29; _r70 = Math.max(-1, Math.min(1, _r70));
+    _CURVE_LUT_70_29[_i] = Math.sign(_r70) * Math.pow(Math.abs(_r70), 1.6);
+
+    let _r75 = (_i - 75) / 24; _r75 = Math.max(-1, Math.min(1, _r75));
+    _CURVE_LUT_75_24[_i] = Math.sign(_r75) * Math.pow(Math.abs(_r75), 1.6);
+  }
+
   function curvedStat(value, baseline, span, power) {
+    if (typeof value === 'number' && value >= 0 && value <= 100 && (value | 0) === value) {
+      if ((baseline == null || baseline === 70) && (span == null || span === 29) && (power == null || power === 1.6)) {
+        return _CURVE_LUT_70_29[value];
+      }
+      if (baseline === 75 && span === 24 && (power == null || power === 1.6)) {
+        return _CURVE_LUT_75_24[value];
+      }
+    }
     baseline = baseline != null ? baseline : 70;
     span = span != null ? span : (99 - baseline);
     power = power != null ? power : 1.6;
