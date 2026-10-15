@@ -379,8 +379,8 @@
   // formation's own x-coordinates rather than a fixed per-position
   // assumption (a back-three's wide centre-back and a back-four's
   // winger can both be "wide" or not depending on the actual shape).
-  function halfSpaceOf(p) {
-    const ctx = playerSideData(p);
+  function halfSpaceOf(p, sideCtx) {
+    const ctx = sideCtx !== undefined ? sideCtx : playerSideData(p);
     if (!ctx) return 'central';
     const formationKey = ctx.side.squad && ctx.side.squad.formation;
     const formation = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
