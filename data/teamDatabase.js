@@ -69,7 +69,23 @@
 /*@CHUNK:c0066:END*/
 
 /*@CHUNK:c0067:START*/
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
+  // O(1) team lookup cache using Map, invalidated when allTeams reference or length changes.
+  // Reduces getTeam() lookup time from O(N) array scan (~328 teams) to O(1) Map.get.
+  let _teamByIdMap = null;
+  function getTeam(id) {
+    if (!id) return null;
+    if (!_teamByIdMap || _teamByIdMap._allTeamsRef !== allTeams || _teamByIdMap._allTeamsLength !== allTeams.length) {
+      _teamByIdMap = new Map();
+      _teamByIdMap._allTeamsRef = allTeams;
+      _teamByIdMap._allTeamsLength = allTeams.length;
+      for (let i = 0; i < allTeams.length; i++) {
+        if (allTeams[i] && allTeams[i].id) {
+          _teamByIdMap.set(allTeams[i].id, allTeams[i]);
+        }
+      }
+    }
+    return _teamByIdMap.get(id) || null;
+  }
 
 /*@CHUNK:c0067:END*/
 
