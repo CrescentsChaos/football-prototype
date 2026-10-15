@@ -69,8 +69,18 @@
 /*@CHUNK:c0066:END*/
 
 /*@CHUNK:c0067:START*/
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
-
+  // O(1) team lookup using a cached Map indexed by team id.
+  let _teamByIdMap = null;
+  function getTeam(id) {
+    if (!id) return null;
+    if (!_teamByIdMap || _teamByIdMap.size !== allTeams.length) {
+      _teamByIdMap = new Map();
+      for (let i = 0; i < allTeams.length; i++) {
+        _teamByIdMap.set(allTeams[i].id, allTeams[i]);
+      }
+    }
+    return _teamByIdMap.get(id) || null;
+  }
 /*@CHUNK:c0067:END*/
 
 /*@CHUNK:c0068:START*/

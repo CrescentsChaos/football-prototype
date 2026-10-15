@@ -332,12 +332,11 @@
       });
       // Bonus if player is a striker on roster
       Object.values(scores).forEach(s => {
-        let isST = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
+        const found = findPlayerAndTeam(s.id);
+        const pl = found ? found.player : null;
+        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) {
+          s.pts += 2;
         }
-        if (isST) s.pts += 2;
       });
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
@@ -388,12 +387,11 @@
       });
       // Bonus if the player is actually a defender on their roster (CB/RB/LB/RWB/LWB).
       Object.values(scores).forEach(s => {
-        let isDef = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) { isDef = true; break; }
+        const found = findPlayerAndTeam(s.id);
+        const pl = found ? found.player : null;
+        if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) {
+          s.pts += 3;
         }
-        if (isDef) s.pts += 3;
       });
       const data = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧱</div><p>No defensive stats yet.</p></div>'; return; }
