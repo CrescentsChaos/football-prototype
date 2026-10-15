@@ -69,7 +69,24 @@
 /*@CHUNK:c0066:END*/
 
 /*@CHUNK:c0067:START*/
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
+  // Bolt Optimization: Cache team lookups in a Map for O(1) performance instead of O(N) array search.
+  // Map index is invalidated automatically if `allTeams` array reference or length changes.
+  let _teamByIdMap = null;
+  let _teamByIdMapRef = null;
+  let _teamByIdCount = -1;
+
+  function getTeam(id) {
+    if (!_teamByIdMap || _teamByIdMapRef !== allTeams || _teamByIdCount !== allTeams.length) {
+      _teamByIdMap = new Map();
+      _teamByIdMapRef = allTeams;
+      _teamByIdCount = allTeams.length;
+      for (let i = 0; i < allTeams.length; i++) {
+        const t = allTeams[i];
+        if (t && t.id !== undefined && t.id !== null) _teamByIdMap.set(t.id, t);
+      }
+    }
+    return _teamByIdMap.get(id);
+  }
 
 /*@CHUNK:c0067:END*/
 
