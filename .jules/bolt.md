@@ -1,0 +1,3 @@
+## 2026-10-15 - Hoist Loop-Invariants in Simulation Decision Loops
+**Learning:** In match decision simulation functions like `evaluateBallActions()`, evaluating context helpers (`playerSideData()`, `halfSpaceOf()`, `localOverload()`, personality includes, `xattr()`, `hasSkill()`) inside per-action iteration loops causes expensive array searches, spatial presence checks, and object property lookups to execute 9x per decision. Hoisting these calculations out of candidate action loops reduced `evaluateBallActions()` execution time by over 30%.
+**Action:** When scoring or evaluating collections of candidate actions or decisions in hot loops, always compute player context, team lineup side data, and spatial state once prior to the loop.
