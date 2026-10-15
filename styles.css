@@ -2852,3 +2852,25 @@ select.ss-native {
 .tv-ticker-in { display: inline-block; padding: 7px 0; animation: tvscroll 60s linear infinite; } .tv-ticker-in span { margin: 0 24px; font-size: 0.82rem; color: var(--gold); }
 @keyframes tvscroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .tv-prev { padding: 8px 0; border-top: 1px solid var(--border); font-size: 0.88rem; color: var(--text-2); } .tv-prev b { margin: 0 4px; color: var(--text); }
+
+/* Social layer: verified accounts, awards watch, debates */
+.mp-name { cursor: pointer; color: inherit; } .mp-name:hover { text-decoration: underline; }
+.mp-role { background: var(--bg-3); color: var(--text-2); border-radius: 10px; padding: 0 6px; font-size: 0.65rem; margin-left: 2px; } .mp-role.club { color: var(--gold); }
+.mp-av { overflow: hidden; } .mp-av.lg { width: 56px; height: 56px; min-width: 56px; font-size: 1.5rem; }
+.mp-to { color: var(--text-3); font-size: 0.7rem; }
+.mp-more { color: var(--gold); font-size: 0.78rem; cursor: pointer; padding: 4px 0; }
+.mp-quote { display: flex; gap: 8px; margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--bg-1); font-size: 0.88rem; }
+.mx-acct-top { display: flex; align-items: center; gap: 12px; } .mx-acct-top .mc-link { margin-left: auto; }
+.mx-stats { display: flex; gap: 22px; margin: 10px 0; } .mx-stats div { display: flex; flex-direction: column; } .mx-stats b { font-size: 1.15rem; } .mx-stats small { color: var(--text-3); }
+.mx-fan { font-size: 0.85rem; color: var(--text-2); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mx-heat { display: inline-block; width: 70px; height: 7px; border-radius: 4px; background: var(--bg-3); vertical-align: middle; overflow: hidden; } .mx-heat i { display: block; height: 100%; }
+.mx-banner { padding: 10px 14px; margin-bottom: 12px; border-left: 3px solid var(--gold); background: var(--bg-1); border-radius: 6px; color: var(--text-2); font-size: 0.9rem; }
+.mx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.mx-award-h { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.mx-chip { background: var(--bg-3); border-radius: 10px; padding: 1px 8px; font-size: 0.7rem; color: var(--text-2); } .mx-chip.hot { background: rgba(240,193,75,0.18); color: var(--gold); }
+.mx-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 0.88rem; } .mx-row.click { cursor: pointer; } .mx-row.click:hover { background: var(--bg-2); }
+.mx-pos { width: 16px; color: var(--text-3); } .mx-who { flex: 1; display: flex; flex-direction: column; min-width: 0; } .mx-who small { color: var(--text-3); font-size: 0.72rem; }
+.mx-bar { width: 80px; height: 7px; background: var(--bg-3); border-radius: 4px; overflow: hidden; } .mx-bar i { display: block; height: 100%; background: var(--blue); } .mx-bar.wide { flex: 1; width: auto; } .mx-pct { width: 36px; text-align: right; }
+.mx-split { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; font-size: 0.88rem; }
+.mx-foot { margin-top: 6px; }
+.mx-debate { margin-bottom: 14px; }

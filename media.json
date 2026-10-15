@@ -4245,5 +4245,1603 @@
   "Vasquez",
   "Waterhouse",
   "Yilmaz"
- ]
+ ],
+ "SOCIAL": {
+  "_comment": "Social layer: verified player/club accounts, fanbases, awards hype, debates. cfg = numbers, patterns and outlet recipes; banks = template lines (same {var}/{?a|b}/[bank] syntax; banks named x_<persona> are persona variants). Edit freely.",
+  "cfg": {
+   "caps": {
+    "feed": 440,
+    "keep": 100
+   },
+   "verify": {
+    "playerMinOvr": 70,
+    "clubs": true
+   },
+   "persona": {
+    "variantChance": 0.7
+   },
+   "personas": [
+    {
+     "id": "humble",
+     "w": 3,
+     "post": 0.9,
+     "social": 1.1,
+     "banter": 0.3
+    },
+    {
+     "id": "cocky",
+     "w": 2,
+     "post": 1.2,
+     "social": 0.9,
+     "banter": 0.8
+    },
+    {
+     "id": "joker",
+     "w": 2,
+     "post": 1.1,
+     "social": 1.3,
+     "banter": 0.9
+    },
+    {
+     "id": "intense",
+     "w": 2,
+     "post": 1.0,
+     "social": 0.7,
+     "banter": 0.5
+    },
+    {
+     "id": "wholesome",
+     "w": 2,
+     "post": 1.0,
+     "social": 1.2,
+     "banter": 0.2
+    },
+    {
+     "id": "quiet",
+     "w": 1,
+     "post": 0.5,
+     "social": 0.5,
+     "banter": 0.1
+    }
+   ],
+   "player": {
+    "handles": [
+     "{first}{sur}",
+     "{initial}{sur}{n}",
+     "{sur}{num}",
+     "{first}_{sur}",
+     "{sur}{pos}{n}",
+     "{initial}_{sur}",
+     "{sur}Official"
+    ],
+    "followers": {
+     "base": 400000,
+     "ovrRef": 75,
+     "ovrSlope": 0.14,
+     "fameWeight": 2.2,
+     "jitter": 0.35,
+     "careerGoal": 0.003,
+     "careerAssist": 0.002,
+     "careerMotm": 0.008,
+     "heatWeight": 0.25,
+     "min": 8000,
+     "max": 120000000,
+     "awardDefault": 0.05,
+     "awardWeights": {
+      "Ballon d'Or": 0.8,
+      "Golden Ball": 0.35,
+      "Golden Boot": 0.25,
+      "Gerd Müller Award": 0.3,
+      "Yashin Trophy": 0.3,
+      "Puskás Award": 0.2,
+      "Golden Glove": 0.2
+     },
+     "trophyDefault": 0.02,
+     "trophyWeights": {
+      "World Cup": 0.5,
+      "European Championship": 0.3,
+      "Copa América": 0.25,
+      "Champions League": 0.3,
+      "Premier League": 0.1,
+      "La Liga": 0.1,
+      "Serie A": 0.1,
+      "Bundesliga": 0.1,
+      "Ligue 1": 0.08
+     }
+    }
+   },
+   "club": {
+    "handle": "{short}Official",
+    "name": "{team}",
+    "followers": {
+     "base": 400000,
+     "fameScale": 9000000
+    }
+   },
+   "fan": {
+    "ratio": 0.55,
+    "clubRatio": 1.4,
+    "clubGroup": "{team} fans",
+    "moodThresholds": {
+     "hype": 0.3,
+     "crisis": -0.3
+    },
+    "tiers": [
+     {
+      "min": 0,
+      "name": "Supporters",
+      "icon": "🙌"
+     },
+     {
+      "min": 400000,
+      "name": "Fan Club",
+      "icon": "🎽"
+     },
+     {
+      "min": 2000000,
+      "name": "Fan Army",
+      "icon": "🛡️"
+     },
+     {
+      "min": 8000000,
+      "name": "Global Legion",
+      "icon": "🌍"
+     },
+     {
+      "min": 25000000,
+      "name": "Worldwide Cult",
+      "icon": "👑"
+     }
+    ],
+    "groups": [
+     "{sur} Army",
+     "Team {sur}",
+     "{sur} Nation",
+     "The {sur} Faithful",
+     "{sur} Squad",
+     "{sur} Kingdom"
+    ],
+    "handles": [
+     "{fn}{sur}{n}",
+     "{sur}Army{n}",
+     "{sur}Stan{n}",
+     "{fn}_{sur}",
+     "{sur}{noun}{n}",
+     "Team{sur}{n}"
+    ],
+    "names": [
+     "{fn} ({sur} Army)",
+     "{sur} Daily {av}",
+     "{fn} {av}",
+     "{sur} Fan Page",
+     "{fn} 🔰 {sur}"
+    ]
+   },
+   "heat": {
+    "goal": 0.08,
+    "brace": 0.18,
+    "hattrick": 0.4,
+    "motm": 0.1,
+    "red": -0.3,
+    "keeper": 0.15,
+    "win": 0.02,
+    "lose": -0.03,
+    "teamTop": 3,
+    "trophy": 0.3,
+    "award": 0.6,
+    "decay": 0.985,
+    "cap": 1,
+    "maxEntries": 400
+   },
+   "thread": {
+    "mates": [
+     1,
+     2
+    ],
+    "mateReply": 0.75,
+    "clubReply": 0.5,
+    "rivalReply": 0.4,
+    "fans": [
+     1,
+     3
+    ],
+    "troll": 0.3,
+    "authorBack": 0.5,
+    "clubPlayers": [
+     1,
+     2
+    ],
+    "clubFans": [
+     1,
+     3
+    ],
+    "rivalClub": 0.4,
+    "keeperRivalTriggers": [
+     "goal",
+     "brace",
+     "hattrick",
+     "winner"
+    ]
+   },
+   "match": {
+    "maxPerFlush": 80,
+    "gkSaves": 6,
+    "injuryMinOut": 4,
+    "injurySeverity": [
+     "Moderate",
+     "Severe",
+     "Major"
+    ],
+    "quoteOutlets": [
+     "bn",
+     "gaffe",
+     "ftl"
+    ],
+    "derbyBanter": 0.5,
+    "clubPost": {
+     "tier": [
+      0.06,
+      0.45,
+      0.85,
+      1
+     ],
+     "win": 1,
+     "draw": 0.6,
+     "lose": 0.5
+    },
+    "playersPerMatch": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "triggers": {
+     "hattrick": {
+      "w": 12,
+      "bank": "pp_hattrick",
+      "tier0": true,
+      "quote": 0.8,
+      "clubQuote": 0.8,
+      "im": 2
+     },
+     "brace": {
+      "w": 6,
+      "bank": "pp_brace",
+      "quote": 0.3
+     },
+     "winner": {
+      "w": 5,
+      "bank": "pp_winner",
+      "quote": 0.3,
+      "clubQuote": 0.3
+     },
+     "goal": {
+      "w": 3,
+      "bank": "pp_goal"
+     },
+     "motm": {
+      "w": 4,
+      "bank": "pp_motm"
+     },
+     "keeper": {
+      "w": 4,
+      "bank": "pp_keeper",
+      "quote": 0.3
+     },
+     "red": {
+      "w": 8,
+      "bank": "pp_red",
+      "tier0": true,
+      "quote": 0.6
+     },
+     "injury": {
+      "w": 5,
+      "bank": "pp_injury",
+      "tier0": true,
+      "clubQuote": 0.4
+     },
+     "lose": {
+      "w": 2,
+      "bank": "pp_lose"
+     },
+     "win": {
+      "w": 2,
+      "bank": "pp_win"
+     }
+    }
+   },
+   "pre": {
+    "clubPost": 0.6,
+    "playerPost": 0.4
+   },
+   "trophy": {
+    "players": [
+     2,
+     4
+    ],
+    "rivalBanter": 0.5
+   },
+   "rumor": {
+    "playerReply": 0.5,
+    "clubStatement": 0.35
+   },
+   "world": {
+    "chat": [
+     0,
+     2
+    ],
+    "bulkChance": 0.2
+   },
+   "award": {
+    "loserReactions": 2,
+    "fanPosts": 2,
+    "verdictOutlets": [
+     "statbook",
+     "bn"
+    ]
+   },
+   "accounts": {
+    "prefilter": 300
+   },
+   "statLabels": {
+    "goals": "goals",
+    "assists": "assists",
+    "motm": "MOTM",
+    "saves": "saves",
+    "clean": "clean sheets",
+    "avg": "avg rating"
+   },
+   "race": {
+    "everyMatches": 10,
+    "perTick": 1,
+    "lateRoundsLeft": 6,
+    "standaloneShortlistEvery": 40
+   },
+   "awards": [
+    {
+     "id": "ballon",
+     "name": "Ballon d'Or",
+     "scope": "global",
+     "rank": "ballon",
+     "tier": "major",
+     "shortlist": 5,
+     "temp": 12,
+     "tag": "#BallonDor",
+     "closeGap": 6
+    },
+    {
+     "id": "gerd",
+     "name": "Gerd Müller Award",
+     "scope": "global",
+     "rank": "gerd",
+     "tier": "major",
+     "shortlist": 4,
+     "temp": 8,
+     "tag": "#GerdMuller",
+     "closeGap": 4
+    },
+    {
+     "id": "yashin",
+     "name": "Yashin Trophy",
+     "scope": "global",
+     "rank": "yashin",
+     "tier": "major",
+     "shortlist": 4,
+     "temp": 10,
+     "tag": "#YashinTrophy",
+     "closeGap": 5
+    },
+    {
+     "id": "assists",
+     "name": "Top Assists",
+     "scope": "global",
+     "rank": "stat:assists",
+     "tier": "minor",
+     "shortlist": 3,
+     "temp": 2,
+     "unit": "assists",
+     "race": false,
+     "closeGap": 1
+    },
+    {
+     "id": "motm",
+     "name": "Most MOTM",
+     "scope": "global",
+     "rank": "stat:motm",
+     "tier": "minor",
+     "shortlist": 3,
+     "temp": 1.5,
+     "unit": "MOTM awards",
+     "race": false,
+     "closeGap": 1
+    },
+    {
+     "id": "clean",
+     "name": "Clean Sheet King",
+     "scope": "global",
+     "rank": "stat:cleanSheets",
+     "tier": "minor",
+     "shortlist": 3,
+     "temp": 2,
+     "unit": "clean sheets",
+     "race": false,
+     "closeGap": 1
+    },
+    {
+     "id": "puskas",
+     "name": "Puskás Award",
+     "scope": "global",
+     "rank": "stat:puskas",
+     "tier": "minor",
+     "shortlist": 3,
+     "temp": 1,
+     "unit": "wonder goals",
+     "race": false,
+     "closeGap": 1
+    },
+    {
+     "id": "gboot",
+     "name": "Golden Boot",
+     "scope": "tournament",
+     "rank": "stat:goals",
+     "tier": "major",
+     "shortlist": 4,
+     "temp": 1.5,
+     "unit": "goals",
+     "tag": "#GoldenBoot",
+     "closeGap": 1
+    },
+    {
+     "id": "gball",
+     "name": "Golden Ball",
+     "scope": "tournament",
+     "rank": "tournamentBall",
+     "tier": "major",
+     "shortlist": 4,
+     "temp": 0.25,
+     "tag": "#GoldenBall",
+     "closeGap": 0.15
+    },
+    {
+     "id": "gglove",
+     "name": "Golden Glove",
+     "scope": "tournament",
+     "rank": "goldenGlove",
+     "tier": "major",
+     "shortlist": 3,
+     "temp": 8,
+     "tag": "#GoldenGlove",
+     "closeGap": 4
+    }
+   ],
+   "hype": {
+    "eve": true,
+    "shortlist": 5,
+    "minCandidates": 2,
+    "temp": 6,
+    "closeGap": 3,
+    "pollWeights": {
+     "score": 0.55,
+     "fans": 0.35,
+     "noise": 0.1
+    },
+    "lensPick": {
+     "analyst": "fav",
+     "attacker": "second",
+     "oldschool": "fav",
+     "data": "fav",
+     "hardman": "third"
+    },
+    "phases": {
+     "race": {
+      "debate": 0.2,
+      "specs": [
+       {
+        "by": "statbook",
+        "kind": "stat",
+        "bank": "hy_race_stat",
+        "tiers": [
+         "major"
+        ],
+        "v": 1.1,
+        "im": 1
+       },
+       {
+        "by": "bn",
+        "kind": "news",
+        "bank": "hy_race_change",
+        "when": [
+         "leaderChange"
+        ],
+        "v": 1.6,
+        "im": 1
+       },
+       {
+        "by": "terrace",
+        "kind": "take",
+        "bank": "hy_race_take",
+        "chance": 0.45,
+        "tiers": [
+         "major"
+        ]
+       },
+       {
+        "by": "fan:fav",
+        "kind": "tw",
+        "bank": "fx_campaign",
+        "chance": 0.7,
+        "v": 1.3
+       },
+       {
+        "by": "fan:second",
+        "kind": "tw",
+        "bank": "fx_campaign",
+        "chance": 0.5,
+        "v": 1.2
+       },
+       {
+        "by": "player:fav",
+        "kind": "tw",
+        "bank": "pp_race",
+        "chance": 0.35,
+        "thread": true,
+        "tiers": [
+         "major"
+        ],
+        "v": 1.3
+       }
+      ]
+     },
+     "shortlist": {
+      "debate": 0.5,
+      "specs": [
+       {
+        "by": "bn",
+        "kind": "news",
+        "bank": "hy_shortlist_bn",
+        "v": 2,
+        "im": 2
+       },
+       {
+        "by": "meridian",
+        "kind": "art",
+        "head": "hy_art_head",
+        "body": [
+         "hy_art_body1",
+         "hy_art_body2"
+        ],
+        "tiers": [
+         "major"
+        ],
+        "dt": [
+         20,
+         60
+        ]
+       },
+       {
+        "by": "gaffe",
+        "kind": "news",
+        "bank": "hy_gaffe",
+        "tiers": [
+         "major"
+        ],
+        "v": 1.4
+       },
+       {
+        "by": "statbook",
+        "kind": "stat",
+        "bank": "hy_odds",
+        "v": 1.2
+       },
+       {
+        "by": "ftl",
+        "kind": "poll",
+        "bank": "hy_poll_q",
+        "question": "hy_poll_question",
+        "options": 3,
+        "tiers": [
+         "major"
+        ]
+       },
+       {
+        "by": "player:each",
+        "each": true,
+        "max": 3,
+        "kind": "tw",
+        "bank": "pp_shortlist",
+        "chance": 0.7,
+        "thread": true,
+        "rival": true,
+        "threadKind": "shortlist",
+        "v": 1.5,
+        "heat": 0.1
+       },
+       {
+        "by": "club:each",
+        "each": true,
+        "max": 3,
+        "kind": "tw",
+        "bank": "cp_shortlist",
+        "chance": 0.5,
+        "v": 1.2
+       },
+       {
+        "by": "fan:each",
+        "each": true,
+        "max": 3,
+        "kind": "tw",
+        "bank": "fx_campaign",
+        "chance": 0.8,
+        "v": 1.4
+       },
+       {
+        "by": "terrace",
+        "kind": "take",
+        "bank": "hy_terrace",
+        "chance": 0.6,
+        "tiers": [
+         "major"
+        ]
+       },
+       {
+        "by": "viral",
+        "kind": "meme",
+        "bank": "hy_meme",
+        "chance": 0.6,
+        "tiers": [
+         "major"
+        ]
+       }
+      ]
+     },
+     "eve": {
+      "debate": 0.85,
+      "specs": [
+       {
+        "by": "bn",
+        "kind": "news",
+        "bank": "hy_eve_bn",
+        "v": 2.2,
+        "im": 2
+       },
+       {
+        "by": "asc",
+        "kind": "tv",
+        "head": "hy_tv_head",
+        "ban": "hy_tv_banner",
+        "show": "hy_tv_show",
+        "an": [
+         "hy_tv_open",
+         "hy_tv_close"
+        ],
+        "panel": {
+         "lenses": [
+          "analyst",
+          "attacker",
+          "hardman"
+         ],
+         "bank": "hy_pan"
+        },
+        "tick": "hy_tv_tick",
+        "tiers": [
+         "major"
+        ],
+        "v": 2,
+        "im": 2
+       },
+       {
+        "by": "meridian",
+        "kind": "art",
+        "head": "hy_art_head",
+        "body": [
+         "hy_art_body1",
+         "hy_art_body2"
+        ],
+        "tiers": [
+         "major"
+        ],
+        "dt": [
+         20,
+         60
+        ]
+       },
+       {
+        "by": "gaffe",
+        "kind": "news",
+        "bank": "hy_gaffe",
+        "tiers": [
+         "major"
+        ],
+        "v": 1.5
+       },
+       {
+        "by": "statbook",
+        "kind": "stat",
+        "bank": "hy_odds",
+        "v": 1.3
+       },
+       {
+        "by": "ftl",
+        "kind": "poll",
+        "bank": "hy_poll_q",
+        "question": "hy_poll_question",
+        "options": 3,
+        "tiers": [
+         "major"
+        ],
+        "v": 1.4
+       },
+       {
+        "by": "fanvoices",
+        "kind": "vid",
+        "bank": "hy_vid",
+        "tiers": [
+         "major"
+        ],
+        "chance": 0.8
+       },
+       {
+        "by": "player:each",
+        "each": true,
+        "max": 3,
+        "kind": "tw",
+        "bank": "pp_shortlist",
+        "chance": 0.75,
+        "thread": true,
+        "rival": true,
+        "threadKind": "shortlist",
+        "v": 1.6,
+        "heat": 0.1
+       },
+       {
+        "by": "club:each",
+        "each": true,
+        "max": 3,
+        "kind": "tw",
+        "bank": "cp_shortlist",
+        "chance": 0.6,
+        "v": 1.3
+       },
+       {
+        "by": "fan:each",
+        "each": true,
+        "max": 3,
+        "kind": "tw",
+        "bank": "fx_campaign",
+        "chance": 0.85,
+        "v": 1.5
+       },
+       {
+        "by": "local:fav",
+        "kind": "news",
+        "bank": "hy_local",
+        "chance": 0.7,
+        "tiers": [
+         "major"
+        ]
+       },
+       {
+        "by": "terrace",
+        "kind": "take",
+        "bank": "hy_terrace",
+        "chance": 0.7,
+        "tiers": [
+         "major"
+        ]
+       },
+       {
+        "by": "viral",
+        "kind": "meme",
+        "bank": "hy_meme",
+        "chance": 0.7,
+        "tiers": [
+         "major"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "debate": {
+    "maxActive": 6,
+    "keepResolved": 10,
+    "ttlMatches": 120,
+    "startChance": 0.3,
+    "escalateChance": 0.3,
+    "bulkChance": 0.15,
+    "maxEscalations": 3,
+    "fanReplies": [
+     6,
+     10
+    ],
+    "escalateReplies": [
+     4,
+     7
+    ],
+    "neutral": [
+     1,
+     2
+    ],
+    "attackChance": 0.45,
+    "fanSkew": 0.8,
+    "playerCameo": 0.4,
+    "heat": 0.05,
+    "verdictOutlets": [
+     "terrace",
+     "viral"
+    ],
+    "careerWeights": {
+     "goals": 1,
+     "assists": 0.7,
+     "motm": 1.5
+    },
+    "statBuckets": [
+     {
+      "b": "goals",
+      "label": "goals"
+     },
+     {
+      "b": "assists",
+      "label": "assists"
+     },
+     {
+      "b": "motm",
+      "label": "MOTM"
+     },
+     {
+      "b": "cleanSheets",
+      "label": "clean sheets"
+     }
+    ],
+    "topics": [
+     {
+      "id": "race",
+      "label": "Award race",
+      "via": "award",
+      "awards": [
+       "ballon",
+       "gerd",
+       "yashin"
+      ],
+      "w": 2
+     },
+     {
+      "id": "striker",
+      "label": "Striker showdown",
+      "via": "stat",
+      "bucket": "goals",
+      "w": 2
+     },
+     {
+      "id": "legend",
+      "label": "Greatest of the era",
+      "via": "career",
+      "w": 1
+     },
+     {
+      "id": "clubs",
+      "label": "Title talk",
+      "via": "clubs",
+      "w": 1.5
+     },
+     {
+      "id": "derby",
+      "label": "Bragging rights",
+      "via": "derby",
+      "w": 2
+     }
+    ],
+    "specs": [
+     {
+      "by": "terrace",
+      "kind": "take",
+      "bank": "db_starter",
+      "v": 1.5,
+      "im": 1
+     },
+     {
+      "by": "viral",
+      "kind": "meme",
+      "bank": "db_meme",
+      "chance": 0.5
+     },
+     {
+      "by": "ftl",
+      "kind": "poll",
+      "bank": "db_poll_q",
+      "question": "db_poll_question",
+      "options": 2,
+      "v": 1.4
+     },
+     {
+      "by": "fan:a",
+      "kind": "tw",
+      "bank": "db_fan_pro",
+      "v": 1.3
+     },
+     {
+      "by": "fan:b",
+      "kind": "tw",
+      "bank": "db_fan_pro",
+      "v": 1.3
+     },
+     {
+      "by": "statbook",
+      "kind": "stat",
+      "bank": "db_stats",
+      "chance": 0.7
+     }
+    ],
+    "escalateSpecs": [
+     {
+      "by": "viral",
+      "kind": "take",
+      "bank": "db_escalate",
+      "v": 1.6,
+      "im": 1
+     },
+     {
+      "by": "statbook",
+      "kind": "stat",
+      "bank": "db_stats",
+      "chance": 0.6
+     },
+     {
+      "by": "fan:a",
+      "kind": "tw",
+      "bank": "db_fan_vs",
+      "v": 1.3
+     },
+     {
+      "by": "fan:b",
+      "kind": "tw",
+      "bank": "db_fan_vs",
+      "v": 1.3
+     }
+    ]
+   }
+  },
+  "banks": {
+   "pp_goal": [
+    "{?Got|Grabbed|Bagged} one against {opp} {?🙌|⚽|🔥}. Team win is what matters. {?Onto the next.|Thank you all.|Proud of the boys.}",
+    "{pmin2} minute, right place, right time. {?Dream job.|Love this game.|Never gets old.} {myS} {?till I die|all day|forever}",
+    "{?Scored|Found the net} and the {?lads|boys|team} did the rest. {?Big night for {myS}.|On we go.}",
+    "{?Sweet|Clean|Pure} connection. {?Thanks for the pass.|Thanks for the support.} {fanTag}",
+    "Goal for {myS} 🔥 {?Now we go again.|Eyes on the next one.}"
+   ],
+   "pp_goal_cocky": [
+    "Another one in the book. {?Easy game.|You know the drill.|Same time next week.} 😎",
+    "{pmin2} minute. {?Never in doubt.|Who else?|Called it.} {fanTag}"
+   ],
+   "pp_goal_humble": [
+    "Just glad I could help the team today 🙏 Great work from everyone.",
+    "All credit to the lads for the build-up. I just had to finish it. {myS} 💪"
+   ],
+   "pp_goal_joker": [
+    "Scored with my {?good|weaker|other} foot. Don't tell the gaffer which one 😂",
+    "{opp}? Thanks for the {?space|gift|invitation} 😅⚽"
+   ],
+   "pp_brace": [
+    "Two! {?Good day at the office.|Happy with that.|Dream afternoon.} {myScore} to {myS} 🔥",
+    "A brace against {opp} {?🙌|⚽⚽|😍}. Thank you fans, you pushed us all game.",
+    "{?Doubled up|Twice on the scoresheet}. Now give me a day off 😄"
+   ],
+   "pp_hattrick": [
+    "HAT-TRICK 🎩⚽⚽⚽ {?Pinch me.|Unreal night.|Cannot stop smiling.} Ball is going home with me.",
+    "Three goals against {opp}. {?Dreams do come true.|What a feeling.} Thank you {fanGroup} ❤️",
+    "{?Hat-trick|Treble} done. {?The match ball is mine|Somebody tell the kit man I'm keeping this ball} 😂🎩",
+    "Special night. {?Three|3} goals, {myScore}, and {myS} fans singing. {fanTag}"
+   ],
+   "pp_hattrick_cocky": [
+    "Hat-trick. {?Did anyone doubt it?|Was there ever a question?|Write that down.} 🎩 {fanTag}"
+   ],
+   "pp_winner": [
+    "That winner against {opp} {?will stay with me|means everything|was worth the wait} ❤️ {?Late drama!|What a feeling!}",
+    "{pmin2} minute winner! {?Sorry not sorry.|Scenes.|Unreal scenes.} {myS} 🔵🔴"
+   ],
+   "pp_motm": [
+    "Man of the Match, but really it's the whole team's win. {?Thanks to my teammates.|Big three points.} 🙏",
+    "{?Happy with the performance|Good day} and the three points. {?On to the next.|Keep pushing.}",
+    "MOTM {?🏅|⭐}. Appreciate all the messages! {fanTag}"
+   ],
+   "pp_keeper": [
+    "{psaves} saves today. {?That's what I'm here for.|Happy to help the team.|Defence deserves the credit too.} 🧤",
+    "{?Wall|Fortress} up against {opp} 🧤 Big win for the group."
+   ],
+   "pp_red": [
+    "Disappointed with the red. {?Let the lads down.|Sorry to the fans.|Learning from it.} {?We go again.|Will be back stronger.}",
+    "{?My bad.|Shouldn't have gone in like that.} Apologies to my teammates and to {myS} fans 🙏",
+    "I'm not happy with the decision. {?That's all I'll say.|We move on.} Thanks for the support."
+   ],
+   "pp_red_joker": [
+    "Early shower. {?Left some hot water for you lot|Nobody tell my mum} 😬🙏"
+   ],
+   "pp_injury": [
+    "Not the news I wanted. {?Going for tests.|Will work hard to come back.} Thank you for all the messages ❤️",
+    "{injType}. {?Hurts to miss time.|Frustrating.} {?Back soon.|Will be cheering from the stands.} {myS} 🙏"
+   ],
+   "pp_lose": [
+    "Not good enough today. {?We owe the fans a reaction.|We take responsibility.|Back to work.} 💔",
+    "Tough one against {opp}. {?Heads up, we go again.|We'll learn from it.} Thank you for the support."
+   ],
+   "pp_lose_cocky": [
+    "We'll bounce back. {?You know it.|Count on it.} Not the end of the road 😤"
+   ],
+   "pp_lose_intense": [
+    "Unacceptable. {?Training tomorrow will be tough.|We need more from everyone, starting with me.}"
+   ],
+   "pp_win": [
+    "{?Big|Huge} win against {opp} {?💪|🔥}. {?Everyone gave everything.|The group was brilliant.} {myS}!",
+    "Three points. {?Proud of this team.|Keep the momentum going.} 🙌"
+   ],
+   "pp_pre": [
+    "Matchday ⚽ {?Ready for {opp}.|{myS} v {oppS} tonight.|Let's get this done.} {?Bring the noise.|See you there.}",
+    "{?Big one|Important one} against {oppS}. {?Feeling good.|Everyone's focused.} 💪",
+    "Game day. {?Let's go {myS}!|Come on!} 🔥"
+   ],
+   "pp_pre_cocky": [
+    "{oppS} {?had better bring everything|are in for a long day}. Matchday 😎"
+   ],
+   "pp_pre_derby": [
+    "Derby day. {?Nothing else matters.|Everything on the line.|Bragging rights.} {myS} 🔥",
+    "{derbyName}. {?Can't wait.|Born for this.|The atmosphere will be unreal.} Be loud 📣"
+   ],
+   "pp_trophy": [
+    "CHAMPIONS 🏆 {?Dream come true.|Unreal.|So proud of this group.} Thank you to everyone at {myS}!",
+    "{trophy} {?winners|champions} 🏆 {?Can't put it into words.|Worth every drop of sweat.}"
+   ],
+   "pp_rumor": [
+    "{?Focused on {myS}.|Not worried about talk.} {?Nothing to say.|Back to training.} 🤐",
+    "I read the papers too 😂 {?Totally focused on {myS}.|Nothing to add.}"
+   ],
+   "pp_rumor_hot": [
+    "{?No comment.|Enjoying my football.} {?Let's see what happens.|Time will tell.} 🤫",
+    "{?Lots of noise.|Interesting reading.} I'll let my football speak."
+   ],
+   "pp_chat": [
+    "{?Good session today.|Training done.|Recovery day.} {?Back at it tomorrow.|Feeling sharp.} 💪",
+    "{?Appreciate the love from the fans.|You lot are incredible.} Can't wait for the next one {myS} ❤️",
+    "{?Coffee, film, early night.|Rest, recover, repeat.} {?Big week coming.|Matchday soon.}",
+    "{?New week, new goals.|Back to work.} {?Who's coming to the next home game?|See you all soon.}"
+   ],
+   "pp_chat_joker": [
+    "Just beat the gaffer at table tennis. He says it doesn't count 🏓😂",
+    "Today's training mood: {?cones are my enemy|rondo, rondo, rondo} 😅"
+   ],
+   "pp_chat_wholesome": [
+    "Visited the kids' ward with some of the lads today. Smiles all round 💙",
+    "Thank you for every message this week. You make it all worth it ❤️"
+   ],
+   "pp_award_win": [
+    "{award} {?🏆|✨}. {?I'm lost for words.|Thank you to my team-mates, my family and every one of you.} {fanTag}",
+    "Honoured to win the {award}. {?This belongs to {myS} too.|Couldn't have done it without my teammates.} 🙏",
+    "{award}! {?Dreams do come true.|Hard work pays off.} Thank you {fanGroup} ❤️"
+   ],
+   "pp_award_win_cocky": [
+    "{award}. {?Never in doubt.|Deserved.|You all knew.} 😎🏆 {fanTag}"
+   ],
+   "pp_award_win_humble": [
+    "I don't know what to say. Thank you to everyone who helped me get here 🙏 {award}."
+   ],
+   "pp_award_lose": [
+    "Congratulations to {winner} on the {award}. {?Well deserved.|A great year.} I'll keep working 💪",
+    "Not this time. {?Proud of my season.|Thank you for the support.} Congrats {winnerS}.",
+    "Wasn't meant to be. {?On to next year.|We go again.} {fanTag} ❤️"
+   ],
+   "pp_award_lose_intense": [
+    "Disappointed, I won't pretend otherwise. I'll come back harder. Congrats to {winnerS}."
+   ],
+   "pp_award_lose_cocky": [
+    "{?Interesting result.|Strange year for voting.} Doesn't change what happened on the pitch 😏"
+   ],
+   "pp_shortlist": [
+    "{?Honoured|Humbled|Proud} to be on the {award} shortlist {?🏆|✨}. {?Thank you to my teammates.|Thank you fans.}",
+    "Nominated for the {award}. {?Whatever happens, proud of this season.|It's been quite a year.} {meTag}",
+    "{?Just the start of the {award} conversation, I hope.|Thanks for the votes.} {?Back to work.|Focused on the next game.}"
+   ],
+   "pp_shortlist_cocky": [
+    "{award} shortlist? {?Obviously.|Of course.|Not a surprise.} {?See you at the ceremony.|Clear space on the shelf.} 😎"
+   ],
+   "pp_shortlist_humble": [
+    "Honoured to be shortlisted for the {award} alongside {rivS}. Wherever it lands, I'm grateful 🙏"
+   ],
+   "pp_shortlist_joker": [
+    "On the {award} shortlist. Mum says she's voting twice 😂"
+   ],
+   "pp_shortlist_intense": [
+    "The {award} is not the goal. The next match is. Focus."
+   ],
+   "pp_race": [
+    "{?Not thinking about {award}.|Heads down.} {?Only the next match counts.|Team first.}",
+    "Seeing the {award} talk. {?Flattering, but the team comes first.|Focused on {myS}.}"
+   ],
+   "pr_mate": [
+    "{?Legend|Machine|Class|Unbelievable} {?🔥|👏|💪}",
+    "{?Proud of you|Love it}, {?brother|mate}. {?Keep going.|Onwards.}",
+    "{?That's my guy|Let's gooo} 🙌",
+    "{?Special|Top} player, {?top|great} guy ❤️"
+   ],
+   "pr_mate_goal": [
+    "{?What a finish|Class finish|Unreal}, {playerS} {?🔥|👏}",
+    "{?Told you|Knew} you'd get one today 😄",
+    "Assist me next time 😂 {?Great goal|Class}!",
+    "{?Clinical|Ruthless|Cold} 🥶"
+   ],
+   "pr_mate_hattrick": [
+    "Ball's mine tonight 😂🎩 {?Incredible|Unreal}!",
+    "Three! {?Class|Unbelievable} {playerS} 🔥🔥",
+    "{?Sign him up|Give him the keys to the city} 🎩"
+   ],
+   "pr_mate_winner": [
+    "{?That goal!|Scenes!} {?Hero|Big man} 🙌",
+    "Late winner merchant 😤🔥"
+   ],
+   "pr_mate_motm": [
+    "Deserved, {playerS} {?👏|🙌}",
+    "{?Best on the pitch|Unplayable today}"
+   ],
+   "pr_mate_keeper": [
+    "{?Wall|Spider-man|Cat} 🧤🧤",
+    "{?Saved us again|What a stop}, {playerS}"
+   ],
+   "pr_mate_red": [
+    "We're with you, {playerS} ❤️",
+    "{?Head up|Shake it off}. {?We win together, we lose together.}",
+    "{?Tough one|Harsh}. {?We've got you.}"
+   ],
+   "pr_mate_injury": [
+    "{?Get well soon|Come back strong}, {playerS} ❤️🙏",
+    "{?We'll miss you|Miss you already} on the pitch. {?Rest up.}",
+    "{?Strong|Warrior}. {?See you soon.}"
+   ],
+   "pr_mate_lose": [
+    "{?We go again|Head up}. {?Together.}",
+    "{?Back to work|Next game}. {?We'll fix it.}"
+   ],
+   "pr_mate_pre": [
+    "{?Let's go|Ready} 🔥",
+    "{?Win it for the fans|Big night ahead}"
+   ],
+   "pr_mate_trophy": [
+    "CHAMPIONS!! 🏆🏆 {?Love you boys|Family}",
+    "{?We did it|Pinch me}. {?Unreal group.}"
+   ],
+   "pr_mate_award": [
+    "{?Deserved|Well earned}, {playerS} 🏆👏",
+    "{?Best in the world|Mate}. {?So happy for you.}"
+   ],
+   "pr_mate_awardlose": [
+    "{?Still the best in my eyes|Robbed, if you ask me} 🤝",
+    "{?Next year|Your time will come}, {playerS} 💪"
+   ],
+   "pr_mate_shortlist": [
+    "{?Deserved|Well deserved|About time} 👏",
+    "{?You've earned it|Top of the list for me}, {playerS}. {?Go win it.}",
+    "{?Shortlisted. Dinner's on you.|Free tickets to the ceremony?} 😂"
+   ],
+   "pr_mate_chat": [
+    "{?Same|Facts} 😂",
+    "{?Enjoy|Love this}. {?See you tomorrow.}"
+   ],
+   "pr_mate_rumor": [
+    "{?Not going anywhere.|Staying put, right?} 👀",
+    "{?Don't believe it.|Fake news.} 😂"
+   ],
+   "pr_club": [
+    "{?Proud of you|Well played}, {playerS}. {?Our captain on the pitch.|One of our own.} 💙",
+    "{?Class act|What a talent}. {?Keep it up.}"
+   ],
+   "pr_club_goal": [
+    "{?Goal of the season contender?|Clinical.} {playerS} ⚽",
+    "{?Another one|Magic} from {playerS} 🔥"
+   ],
+   "pr_club_hattrick": [
+    "HAT-TRICK HERO 🎩 {playerS} is now in the {myS} history books."
+   ],
+   "pr_club_injury": [
+    "{?Get well soon|We are with you}, {playerS} ❤️ {?Our medical team will give you the best support.}"
+   ],
+   "pr_club_red": [
+    "{?We'll review the incident.|Staying united as a group.} Support for {playerS}."
+   ],
+   "pr_club_award": [
+    "{?We are so proud|Congratulations}, {playerS}. {?Well deserved.}"
+   ],
+   "pr_club_trophy": [
+    "{?Champions!|History made!} 🏆 Thank you all."
+   ],
+   "pr_club_shortlist": [
+    "{?Proud|So proud} of {playerS}. {?Good luck.|Go and get it.}"
+   ],
+   "pr_club_rumor": [
+    "{playerS} is a {myS} player and happy here. {?Nothing to see.|Next question.} 🔴"
+   ],
+   "pr_rival": [
+    "{?Nice one, but wait until the rematch|Enjoy it while it lasts} 😏",
+    "{?Respect|Fair play}, {playerS}. {?You earned that one.}",
+    "{?See you next time|Next time we're ready.} 😤"
+   ],
+   "pr_rival_goal": [
+    "{?That one got past me, well played|My mistake}, {playerS} 😅",
+    "{?Good finish. It won't happen twice.}"
+   ],
+   "pr_rival_red": [
+    "{?Unlucky|Harsh}, {playerS}. {?Football.}",
+    "{?Seen worse tackles|Take a lap} 😬"
+   ],
+   "pr_rival_shortlist": [
+    "{?Honour to be on the list with you|See you at the ceremony}, {playerS} 🤝",
+    "{?Let the best man win|May the best player win}. {?It's me.} 😏"
+   ],
+   "pr_rival_pre": [
+    "{?See you out there|Looking forward to it}, {playerS}. {?May the best team win.}"
+   ],
+   "pr_back": [
+    "{?Thank you|Cheers|Appreciate it}, {?mate|brother|everyone} {?🙏|❤️}",
+    "{?Haha|😂} {?Always.|Love you.}",
+    "{?You're the best|Means a lot}. {?Thank you for the support.}"
+   ],
+   "pr_back_cocky": [
+    "{?Obviously.|Of course.|You know it.} 😎"
+   ],
+   "pr_back_joker": [
+    "{?Send help|I'll put it on my CV} 😂"
+   ],
+   "pr_player_club": [
+    "{?Proud of this club|Love this team} {?❤️|🔥}",
+    "{?Let's go|Together|One team}!"
+   ],
+   "pr_player_trophy": [
+    "{?CHAMPIONS|WE DID IT}! 🏆🏆🏆",
+    "{?Best fans in the world.|Thank you, fans.} {?We love you.}"
+   ],
+   "pr_player_pre": [
+    "{?Ready|Let's go}! 🔥",
+    "{?Everyone's focused|We're ready}."
+   ],
+   "pr_player_win": [
+    "{?What a team!|Brilliant, all of us.}",
+    "{?Proud|So proud} of every one of you 👏"
+   ],
+   "pr_player_lose": [
+    "{?We go again|Heads up}. {?Together.}"
+   ],
+   "pr_player_draw": [
+    "{?One point and a lesson.|Not enough, but we move on.}"
+   ],
+   "pr_rivalclub": [
+    "{?Congratulations|Respect}. {?See you in the next one.}",
+    "{?Enjoy it. We'll be back.} 😏"
+   ],
+   "pr_rivalclub_trophy": [
+    "{?Well played, champions.|Respect.} 👏"
+   ],
+   "pr_debate": [
+    "{?Not getting involved in this one.|Love the passion, fans.} {?Respect to {oppS}.}",
+    "{?Stats don't lie, but I'd rather let my football talk.}",
+    "{?I'll leave this one to the fans.|You lot are wild.} 😂"
+   ],
+   "pr_debate_cocky": [
+    "{?Easy answer, really.|Not even close.} 😎",
+    "{?You know who the best is.}"
+   ],
+   "pr_debate_humble": [
+    "{oppS} is a brilliant player. Respect to them and to every fan 🙏"
+   ],
+   "fx_hype": [
+    "{?{playerS} is ON FIRE 🔥|Form of his life!|Unstoppable right now}. {fanTag}",
+    "{?Best player in the league right now|Elite}. {?Fight me.}",
+    "{?Pure class|Another day, another show} 😍 {fanTag}"
+   ],
+   "fx_normal": [
+    "{?Solid|Good} from {playerS} {?👏|💪}",
+    "{?Always delivers|Our guy}. {fanTag}",
+    "{?Proud of him|Love this lad}. {myS}!"
+   ],
+   "fx_crisis": [
+    "{?Needs to step up|Where is the form}, {playerS}...",
+    "{?Still backing him|Hang in there}, {playerS}. {?Better days ahead.}",
+    "{?The media will pile on. We stay loyal.} {fanTag}"
+   ],
+   "fx_react_hattrick": [
+    "THREE GOALS 🎩🎩🎩 {fanTag} {?GOAT behaviour|Unreal}",
+    "{?Frame this night|Legendary}. {playerS} {?is different.}"
+   ],
+   "fx_react_red": [
+    "{?That's harsh|Never a red}. {?Referee ruined it.}",
+    "{?Silly challenge|Not ideal}, but we ride with you."
+   ],
+   "fx_react_injury": [
+    "{?Please be ok|Get well soon}, {playerS} 🙏 {fanTag}",
+    "{?Come back stronger}. {?We'll be waiting.}"
+   ],
+   "fx_react_lose": [
+    "{?Don't blame {playerS}|Not his fault}. {?Whole team was off.}",
+    "{?Rough one|Painful}. {?Still love you.}"
+   ],
+   "fx_react_award": [
+    "{?DESERVED|He deserved every vote} 🏆 {fanTag}",
+    "{?Best in the world|Cannot be argued} {?😍|👑}"
+   ],
+   "fx_troll": [
+    "{?Overrated|Hype}. {?Any day.} 😂",
+    "{?Cute|Is that all?} 🤡",
+    "{?Wait till he plays a real team.}"
+   ],
+   "fx_troll_red": [
+    "{?Classic|As usual} 😂 {?Early bath.}"
+   ],
+   "fx_club": [
+    "{?COME ON|Up the club} {myS}! {?❤️|🔥}",
+    "{?Best club in the world|Proud to be a fan} 🙌",
+    "{?What a squad|Love this team}!"
+   ],
+   "fx_club_trophy": [
+    "CHAMPIONS!! 🏆 {?Cry with joy|I can't stop shaking}",
+    "{?We waited for this|History} 😭🏆"
+   ],
+   "fx_club_pre": [
+    "{?Can't wait|Ready}. {myS} {?till I die|all day} 🔥"
+   ],
+   "fx_robbed": [
+    "{favS} {?was robbed|deserved it}. {?Don't @ me.|I said what I said.}",
+    "{?This vote was a joke|Embarrassing}. {favS} had the {?season|numbers}.",
+    "{award}? {?Not even close|Unbelievable}. {favS} {?clear|obvious} winner. {fanTag}"
+   ],
+   "fx_award_win": [
+    "{winnerS} wins the {award}! {?Told you|Called it} 🏆 {fanTag}",
+    "{?We knew|Never doubted}. {winner} {?is the best|deserves it all} 🏆❤️",
+    "{?DESERVED|Take a bow}, {winnerS} 👑"
+   ],
+   "fx_campaign": [
+    "{?Vote|Back|Support} {me} for the {award} 🏆 {meTag}",
+    "{meS} has {meStat}. {award} {?isn't even a debate.|should be a formality.}",
+    "{?Nobody|No one} this season is {?close|touching} {meS}. {award} {?🏆|👑}",
+    "{?Pin this|Remember this tweet}: {meS} wins the {award}."
+   ],
+   "cp_win": [
+    "FULL TIME ✅ {my} {myScore} {opp}. {?Three points!|What a win!|Brilliant from the lads.} {myS}",
+    "{?Victory!|Winners.} {myScore} against {opp} {?🙌|🔥}. {?Thank you for the support.}"
+   ],
+   "cp_win_derby": [
+    "WE WON THE DERBY 🔥 {myScore}. {?Bragging rights are ours.|Enjoy the walk home.}"
+   ],
+   "cp_draw": [
+    "FULL TIME ⏱️ {my} {myScore} {opp}. {?A point apiece.|We go again.}",
+    "Honours even. {?On to the next one.|We'll take the point.} {myS}"
+   ],
+   "cp_lose": [
+    "FULL TIME ⏱️ {my} {myScore} {opp}. {?Not our day.|We'll bounce back.} {?Thank you for the support.}",
+    "Defeat. {?We'll review and move on.|We go again.} {myS}"
+   ],
+   "cp_pre": [
+    "MATCHDAY 🔥 {my} v {opp}, {comp}. {?Be loud.|Come on {myS}!|All set at the {?stadium|ground}.}",
+    "{?Tonight|Today}: {my} v {opp}. {?Starting XI at the next post.|Team news coming up.} 📋"
+   ],
+   "cp_pre_derby": [
+    "DERBY DAY 🔥 {my} v {opp}. {?Everything on the line.|Win it for the fans.} {derbyName}"
+   ],
+   "cp_trophy": [
+    "{trophy} CHAMPIONS 🏆 {?What a season.|Thank you to every fan.|History made.}",
+    "WE ARE THE CHAMPIONS 🏆 {team} win the {trophy}! {?Parade details to follow.|Congratulations to everyone.}"
+   ],
+   "cp_trophy_rival": [
+    "Congratulations to {rival} on the {trophy}. {?Well played.|See you next season.}",
+    "{?Respect|Hats off} to {rival}. {?We'll be ready.} 🤝"
+   ],
+   "cp_award": [
+    "{winner} wins the {award} 🏆 {?Everyone at {team} is proud.|Congratulations from all of us.} {?Our player, our pride.}",
+    "{award}: {winnerS}. {?Superb season.|Deserved.} 👏"
+   ],
+   "cp_shortlist": [
+    "{meS} is on the {award} shortlist 🏆 {?Proud of him.|Good luck.} {meTag}",
+    "{?We're proud|All of us are proud}: {me} shortlisted for the {award}."
+   ],
+   "cp_derby_banter": [
+    "Three points, bragging rights. {?See you in the next one.|Enjoy the weekend, neighbours.} 😏",
+    "{myS} {?1|win}, {oppS} {?0|nil}. {?Silence is golden.} 🤫"
+   ],
+   "cp_derby_reply": [
+    "{?We'll be back.|Enjoy it while it lasts.} 👀",
+    "{?Noted.|Respect for the win. Revenge is coming.}"
+   ],
+   "cp_rumor": [
+    "{player} is a {myS} player. {?We are not commenting on speculation.|Not for sale.} 🔴"
+   ],
+   "cp_quote": [
+    "{?Hero|Our man}. {?What a performer.|Class.} {playerS} 🔥"
+   ],
+   "cp_quote_hattrick": [
+    "HAT-TRICK HERO 🎩 {playerS} {?is simply special.|writes his name in the history books.}"
+   ],
+   "cp_quote_award": [
+    "{?Well deserved|Superb}, {playerS} 🏆"
+   ],
+   "cp_quote_injury": [
+    "{?Wishing {playerS} a speedy recovery.|We are all behind you, {playerS}.} ❤️"
+   ],
+   "md_quote": [
+    "{playerS} {?reacts|responds} after {myScore} against {oppS}."
+   ],
+   "md_quote_hattrick": [
+    "HAT-TRICK HERO: {playerS} {?celebrates|reacts} after {?a perfect night|three goals against {oppS}}.",
+    "{playerS}'s {?reaction|post} {?goes viral|lights up social media} after the hat-trick."
+   ],
+   "md_quote_red": [
+    "{playerS} {?breaks silence|responds} after sending-off against {oppS}."
+   ],
+   "md_quote_winner": [
+    "{playerS} on his winner: {?'what a feeling'|'dreams come true'}."
+   ],
+   "md_quote_keeper": [
+    "{playerS} {?reacts|speaks} after {psaves}-save heroics."
+   ],
+   "md_quote_award": [
+    "{playerS} {?reacts|speaks out} after winning the {award}."
+   ],
+   "hy_race_stat": [
+    "{award} race: 1) {fav} {favStat} 2) {second} {secondStat} 3) {third} {thirdStat} {awardTag}",
+    "{award} watch 📊 {fav} leads ({favPct}% likelihood). {second} chasing on {secondPct}%. {awardTag}"
+   ],
+   "hy_race_change": [
+    "NEW LEADER in the {award} race: {fav} {?overtakes|moves past} {second}. {awardTag}",
+    "{award} race flips 🔄 {fav} now ahead of {second}. {awardTag}",
+    "{fav} {?takes the lead|moves top} in the {award} race. {awardTag}"
+   ],
+   "hy_race_take": [
+    "If {fav} keeps this up, the {award} is {?his|a formality}. {?Others can forget it.}",
+    "{second} {?has to be better|needs more}. {fav} {?is miles ahead|looks the part} for the {award}."
+   ],
+   "hy_shortlist_bn": [
+    "BREAKING: {award} shortlist {?revealed|confirmed}: {shortlist}. {awardTag}",
+    "{award} SHORTLIST 🏆 {shortlist}. {fav} {?is the favourite|leads the way} at {favOdds}. {awardTag}"
+   ],
+   "hy_eve_bn": [
+    "{?TONIGHT|ANNOUNCEMENT IMMINENT}: the {award} will be handed out. {fav} ({favPct}%) vs {second} ({secondPct}%). {awardTag}",
+    "All eyes on the {award}. {fav} favourite, {second} closing. {awardTag} {?Who wins?}"
+   ],
+   "hy_art_head": [
+    "The case for {fav}: why the {award} is {?his to lose|within reach}",
+    "Who deserves the {award}? {fav} {?leads|edges} {second}, but {third} {?isn't done|has a case}",
+    "{award} preview: {fav}, {second} and {third} in a {?three-horse race|tense fight}"
+   ],
+   "hy_art_body1": [
+    "{fav} ({favTeam}) has {favStat}. For many neutrals, that is enough: the {award} has rarely gone to a player with a gap like {gap} points.",
+    "The numbers favour {fav}: {favStat}. Yet {second} ({secondTeam}) offers {secondStat}, and that is why this race matters."
+   ],
+   "hy_art_body2": [
+    "Fans are split. {fav}'s {favFans} followers believe it's his, while {second}'s {secondFans} are not conceding. Voting day will tell.",
+    "Experts will weigh {fav}'s consistency against {second}'s moments. If form decides it, {fav} wins; if narrative does, {second} sneaks it."
+   ],
+   "hy_gaffe": [
+    "{fav} {?CONFIDENT|ALREADY CELEBRATING} ahead of {award}, says {?pal|source}. {second} 'can't sleep' ahead of the {award}!",
+    "{award} SHOCK? Dressing room split over {fav} vs {second}. {awardTag}",
+    "{fav} {?practising his speech|clears shelf space} as {award} looms 😏"
+   ],
+   "hy_odds": [
+    "{award} odds: {fav} {favOdds}, {second} {secondOdds}. {fav} {favPct}% likelihood. {awardTag}",
+    "Model says {fav} has a {favPct}% chance at the {award}. Next: {second} {secondPct}%. {awardTag}"
+   ],
+   "hy_poll_q": [
+    "Who will win the {award}? 🗳️ {awardTag}",
+    "Your {award} pick? {?Vote now.|Poll open.} {awardTag}"
+   ],
+   "hy_poll_question": [
+    "Who wins the {award}?"
+   ],
+   "hy_terrace": [
+    "Phone lines are on fire about the {award}. {?Most callers want {fav}|Half of you say {fav}, half {second}}. Settle it tonight!",
+    "{award}? {fav}, and don't tell me otherwise. {second} had a good year, {fav} had THE year."
+   ],
+   "hy_meme": [
+    "{fav} and {second} fans before {award} announcement: 😬😬",
+    "Me waiting for the {award} winner to be announced: 🍿 {awardTag}",
+    "{award} fans: {fav} 'it's obvious' / {second} fans 'robbery already' 🤡"
+   ],
+   "hy_vid": [
+    "Predicting the {award} winner: {fav} or {second}? Full breakdown",
+    "{award}: the case for {fav} (and why {second} might still win)"
+   ],
+   "hy_local": [
+    "{favTeam}'s {fav} {?on the {award} shortlist|up for the {award}}: the whole city is behind him.",
+    "{?Pride|Hope} in town as {fav} {?chases|is tipped for} the {award}."
+   ],
+   "hy_tv_head": [
+    "{award} special: {fav} v {second} for the crown"
+   ],
+   "hy_tv_banner": [
+    "{award} LIVE",
+    "{award} COUNTDOWN"
+   ],
+   "hy_tv_show": [
+    "{award} Night Special",
+    "Awards Watch Live"
+   ],
+   "hy_tv_open": [
+    "Tonight the {award} is decided, and the debate is fierce: {fav}, {second}, {third}."
+   ],
+   "hy_tv_close": [
+    "Our panel disagrees, as ever. Back after the break with the results."
+   ],
+   "hy_tv_tick": [
+    "{award}: {fav} favourite ({favPct}%)"
+   ],
+   "hy_pan": [
+    "I'm backing {pick}. {pickStat}, you can't argue.",
+    "{pick} for me, {pickPct}% in the model. It's the numbers."
+   ],
+   "hy_pan_analyst": [
+    "It's {pick}. {pickStat} tells you most of the story."
+   ],
+   "hy_pan_attacker": [
+    "{pick}, for the moments. You remember what he did this season."
+   ],
+   "hy_pan_hardman": [
+    "{pick} for me. Plays when it matters. Not the flashy pick, the right one."
+   ],
+   "hy_called": [
+    "As predicted: {winner} wins the {award}. The pre-vote favourite ({favPct}%) delivers. {awardTag}",
+    "CALLED IT ✅ {winnerS} was the {award} favourite and he's won it. {awardTag}"
+   ],
+   "hy_upset": [
+    "{winnerS} {?beats the favourite|upsets the odds} to win the {award}! {fav} was favourite ({favPct}%). {awardTag}",
+    "Close but not the favourite: {winner} takes the {award}. {?Pundits wrong-footed.}"
+   ],
+   "hy_shock": [
+    "SHOCK: {winner} wins the {award}, not shortlisted-favourite {fav}. {?Nobody predicted this.} {awardTag}",
+    "{award} SURPRISE 😱 {winnerS} takes it, {fav} ({favPct}% favourite) misses out."
+   ],
+   "db_starter": [
+    "{a} or {b}? {?Phones are lit.|The fans are at war.} {?{aGroup} vs {bGroup}.} {tag}",
+    "{topic}: {a} ({aStat}) vs {b} ({bStat}). {?Settle it.|Who's better?} {tag}",
+    "Today's big argument: {a} vs {b}. {aFans} fans on one side, {bFans} on the other. {tag}"
+   ],
+   "db_meme": [
+    "{aGroup} vs {bGroup} {tag} 🤝⚔️",
+    "Me scrolling the {a} v {b} debate: 🍿 {tag}"
+   ],
+   "db_poll_q": [
+    "{a} or {b}? 🗳️ {tag}"
+   ],
+   "db_poll_question": [
+    "Who's better, {a} or {b}?"
+   ],
+   "db_stats": [
+    "{a}: {aStat}. {b}: {bStat}. {?Numbers don't lie.|Draw your own conclusions.} {tag}",
+    "Side by side 📊 {aS} {aStat} | {bS} {bStat} {tag}"
+   ],
+   "db_escalate": [
+    "The {a} v {b} fan war {?rages on|shows no sign of calming}. {aGroup} {aFans}, {bGroup} {bFans}. {tag}",
+    "Round {round} of {a} v {b}: {?stats|numbers} back in the spotlight. {tag}"
+   ],
+   "db_fan_pro": [
+    "{meS} {?is miles ahead|is the best|is on another level}. {meStat}. {opp}? {?Not close.|Come on.}",
+    "{?{meS} has {meStat}|{meS}: {meStat}}. {?Case closed.|End of debate.}",
+    "{?As a {meS} fan, I can't believe this is a debate.|Respect to {oppS}, but {meS} is on another level.}"
+   ],
+   "db_fan_vs": [
+    "{oppS} {?overrated|fraud}, {meS} {?only|always} does it when it counts. {meStat} vs {oppStat}.",
+    "{oppS} fans: {?please|stop} {?be quiet|calm down}. {meStat} speaks for itself.",
+    "{?Imagine picking {oppS} over {meS}|Hot take: {oppS} isn't even in the same conversation} 😂",
+    "{oppStat} for {oppS}? {?That's not elite|That's fine}. {meStat} for {meS} {?is elite|is better}."
+   ],
+   "db_fan_neutral": [
+    "{?Both are great|Love both}. {?Not choosing.|This is fun to watch.} {tag}",
+    "{?Popcorn time|Grabbing snacks} 🍿 {tag}",
+    "{aS} vs {bS}: {?both brilliant|stats say close}. {?Let the games decide.}"
+   ],
+   "db_won": [
+    "{winnerS} wins the {award}. {?End of debate.|Told you.} {loserS} fans, {?take a seat|respect} 😌",
+    "{winnerS} {?took it|did it}. {?What a result.|Debate settled.} 🏆"
+   ],
+   "db_lost": [
+    "{award} to {winnerS}? {loserS} {?was robbed|deserved it}. {?Voting is a joke.|Not accepting this.}",
+    "{?Respect to {winnerS}, but {loserS} had the {?season|numbers}.}"
+   ],
+   "db_verdict": [
+    "{winner} wins the {award}, and the {winner}-{loser} debate? {?Settled, for now.|It goes on.} Plenty of text messages on this one!",
+    "{winnerS} vs {loserS}: the {award} gave the answer, but you know fans don't accept it. Round 2 next season."
+   ]
+  }
+ }
 }
