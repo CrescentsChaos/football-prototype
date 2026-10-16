@@ -2855,7 +2855,7 @@ select.ss-native {
 
 /* Social layer: verified accounts, awards watch, debates */
 .mp-name { cursor: pointer; color: inherit; } .mp-name:hover { text-decoration: underline; }
-.mp-role { background: var(--bg-3); color: var(--text-2); border-radius: 10px; padding: 0 6px; font-size: 0.65rem; margin-left: 2px; } .mp-role.club { color: var(--gold); }
+.mp-role { background: var(--bg-3); color: var(--text-2); border-radius: 10px; padding: 0 6px; font-size: 0.65rem; margin-left: 2px; } .mp-role.club { color: var(--gold); } .mp-role.mgr { color: #7dd3fc; } .mp-role.jn { color: #2dd4bf; }
 .mp-av { overflow: hidden; } .mp-av.lg { width: 56px; height: 56px; min-width: 56px; font-size: 1.5rem; }
 .mp-to { color: var(--text-3); font-size: 0.7rem; }
 .mp-more { color: var(--gold); font-size: 0.78rem; cursor: pointer; padding: 4px 0; }
