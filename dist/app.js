@@ -5275,7 +5275,11 @@ const PLAYSTYLE_BEHAVIOR = {
       }
 
       // media.json — optional; powers the Media tab (news, TV, social posts).
-      if (mediaJson) mediaApplyData(mediaJson);
+      if (mediaJson) {
+        mediaApplyData(mediaJson);
+        // media-voices.json — optional layer: player/manager voices, journalists, injury & team news
+        try { const voicesJson = await fetchFirstJson(urlSet('media-voices.json'), 'media voices'); if (voicesJson) mediaVoicesApply(voicesJson); } catch (e) {}
+      }
 
       loadStats();
       loadPersistedGameState();
@@ -21901,7 +21905,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (o.tg && o.tg.length) p.tg = o.tg.filter(Boolean);
     if (o.c) p.c = o.c;
     if (batch.when) p.w = batch.when;
-    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
+    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db', 'nw'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
     batch.posts.push(p);
     return p;
   }
@@ -22096,6 +22100,7 @@ const PLAYSTYLE_BEHAVIOR = {
     f.careerInvolved = !!(typeof careerTeamId !== 'undefined' && careerTeamId && (H.id === careerTeamId || A.id === careerTeamId));
     f.isKO = /final|round of|quarter|semi|knockout|playoff/i.test(f.stage || '');
     f.isFinal = /^final$/i.test(f.stage || '');
+    try { f.sel = vxOn() ? vxBuildSelection(m, f) : null; } catch (e) { f.sel = null; }
     mPickStory(f);
     return f;
   }
@@ -22332,6 +22337,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function mFanText(f, c, side, acct, forceNeutral) {
     const outcome = forceNeutral ? 'neutral' : mOutcomeFor(f, side);
     const px = forceNeutral ? Object.assign({}, c, { my: c.H, myS: c.Hs, opp: c.A, oppS: c.As, myScore: c.score }) : mPersp(c, f, side);
+    if (vxOn() && mChance(vxCfg('fanArchComposeChance', 0.8))) { const vt = vxFanComment(acct, vxMatchFanCtx(f, c, side, forceNeutral), forceNeutral ? 'neutral' : outcome); if (vt) return mVoice(vt, acct.m); }
     let bank = outcome === 'win' ? mS(f, 'fanW', px) : outcome === 'lose' ? mS(f, 'fanL', px) : outcome === 'draw' ? mS(f, 'fanD', px) : mS(f, 'fanN', px);
     if (!bank.length) bank = mS(f, 'fanN', px);
     if (!bank.length) bank = MS.win.fanN;
@@ -22355,7 +22361,7 @@ const PLAYSTYLE_BEHAVIOR = {
       const team = kind === 'N' ? null : kind === 'R' ? null : (side === 'home' ? f.H : f.A);
       const acct = mFan(team, 'r' + mInt(0, 999), kind === 'R' ? 'banter' : null);
       let text;
-      if (mChance(0.55)) {
+      if (mChance(vxOn() ? 0.15 : 0.55)) {
         const tone = mPick(['agree', 'disagree', 'joke', 'joke', 'stat', 'banter', 'shock']);
         text = mx(mFresh(mOk(MB['reply_' + tone], c), 'rp:' + tone), mPersp(c, f, side));
       } else text = mFanText(f, c, side, acct, kind === 'N' || kind === 'R');
@@ -22843,6 +22849,7 @@ const PLAYSTYLE_BEHAVIOR = {
     mkPost(batch, 'viral', 'meme', mx(mFresh(MB_CRISIS.sackwatch.meme, 'cr:meme'), c), Object.assign({}, base, { dt: mInt(10, 80), v: 1.3 }));
     mkPost(batch, 'terrace', 'take', mx(mFresh(MB_CRISIS.sackwatch.radio, 'cr:rad'), c), Object.assign({}, base, { dt: mInt(40, 100) }));
     mkPost(batch, 'fanvoices', 'vid', mx(mFresh(MB_CRISIS.sackwatch.vid, 'cr:vid'), c), Object.assign({}, base, { dt: mInt(60, 160), vid: { vw: mInt(50000, 900000), dur: mInt(5, 14) + ':' + String(mInt(0, 59)).padStart(2, '0') } }));
+    try { vxSackNews(batch, t, n); } catch (e) { console.warn('Social sack news', e); }
   }
   function mgInjuryCrisis(batch, t, list) {
     const nm = mTeamName(t), c = { team: nm, n: list.length, names: list.slice(0, 3).map(p => p.playerName).join(', ') };
@@ -22850,6 +22857,7 @@ const PLAYSTYLE_BEHAVIOR = {
     mkPost(batch, 'bn', 'news', mx(mFresh(MB_CRISIS.injury_crisis.core, 'ic:c'), c), Object.assign({}, base, { dt: 5, v: 1.1 }));
     mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_CRISIS.injury_crisis.gaffe, 'ic:g'), c), Object.assign({}, base, { dt: 20 }));
     const a = mFan(t, 'ic' + mInt(0, 300)); mkPost(batch, a, 'tw', mVoice(mx(mFresh(MB_CRISIS.injury_crisis.fan, 'ic:f'), c), a.m), Object.assign({}, base, { dt: mInt(10, 120) }));
+    try { vxCrisisNews(batch, t, list); } catch (e) { console.warn('Social crisis news', e); }
   }
   function mgRumor(batch, teams) {
     const pool = teams.filter(t => t && t.players && t.players.length);
@@ -22866,7 +22874,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const keys = Object.keys(mediaState.rumors); if (keys.length > 150) delete mediaState.rumors[keys[0]];
     const c = { player: P.name, playerS: mSur(P.name), from: mTeamName(fromT), fromS: fromT.short || mTeamName(fromT), to: mTeamName(toT), toS: toT.short || mTeamName(toT), fee: mPick(MB_RUMOR.fees) };
     const base = { ts: [fromT.id, toT.id], tg: [mTag(c.playerS), '#TransferNews'], ph: 'wk' };
-    mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.ferrante[stage], 'ru:f' + stage), c), Object.assign({}, base, { dt: 0, v: 1.8 + stage * 0.3, im: stage === 3 ? 3 : 1 }));
+    if (!vxTransferNews(batch, P, fromT, toT, c, stage, base)) mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.ferrante[stage], 'ru:f' + stage), c), Object.assign({}, base, { dt: 0, v: 1.8 + stage * 0.3, im: stage === 3 ? 3 : 1 }));
     mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_RUMOR.gaffe, 'ru:g'), c), Object.assign({}, base, { dt: 12, v: 1.2 }));
     const a1 = mFan(fromT, 'ru' + mInt(0, 300)), a2 = mFan(toT, 'ru' + mInt(0, 300));
     mkPost(batch, a1, 'tw', mVoice(mx(mFresh(MB_RUMOR.fan_from, 'ru:ff'), c), a1.m), Object.assign({}, base, { dt: mInt(10, 120), v: 1.5 }));
@@ -22890,7 +22898,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (mediaState.lastMonth === mo) return;
     const prev = mediaState.lastMonth; mediaState.lastMonth = mo;
     const line = MB_CONTEXT.calendar[mo]; if (!line) return;
-    mkPost(batch, mChance(0.5) ? 'asc' : 'viral', 'news', '📅 ' + mo + ': ' + mPick(line), { tg: ['#' + mo], ph: 'wk', dt: 0 });
+    mkPost(batch, mChance(0.5) ? 'asc' : 'viral', 'news', '📅 ' + mo + ': ' + mx(mPick(line), {}), { tg: ['#' + mo], ph: 'wk', dt: 0 });
     if (mo === 'August' || mo === 'January') mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.windowOpen, 'ru:wo'), { n: mInt(6, 14), leagueSet: 'top five leagues' }), { tg: ['#TransferWindow'], ph: 'wk', dt: 3, v: 1.8, im: 1 });
     if ((mo === 'September' || mo === 'February') && prev) mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.windowClose, 'ru:wc'), {}), { tg: ['#DeadlineDay'], ph: 'wk', dt: 3, v: 2, im: 2 });
   }
@@ -22947,6 +22955,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (!sxOn() && !bulk && mChance(0.25)) { try { mgDebate(batch); } catch (e) {} }
     try { mgCalendar(batch); } catch (e) {}
     try { mgSocialWorld(batch, teams, bulk); mgAwardsTick(batch); mgDebateTick(batch, q, bulk); } catch (e) { console.warn('Social world error', e); }
+    try { vxInjuryReturns(batch); } catch (e) { console.warn('Social returns', e); }
     if (!bulk && q.length >= 4 && mChance(0.5)) {
       const tg = q.reduce((s, f) => s + f.tot, 0);
       mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_CONTEXT.statWave, 'cx:sw'), { fact: mx('[sw_fact]', { tg, n: q.length, avg: (tg / q.length).toFixed(2) }) }), { ph: 'wk', dt: 15 });
@@ -23077,8 +23086,10 @@ const PLAYSTYLE_BEHAVIOR = {
   // bank (<name>_<persona>) win part of the time when one exists.
   function sxLine(name, c, persona) {
     let list = null, key = 'sx:' + name;
-    if (persona && MB['sx_' + name + '_' + persona] && mChance(sxNum('persona.variantChance', 0.7))) {
-      list = MB['sx_' + name + '_' + persona]; key += ':' + persona;
+    if (persona && mChance(sxNum('persona.variantChance', 0.7))) {
+      const cand = [persona]; const lg = (typeof vxLegacy === 'function') ? vxLegacy(persona) : '';
+      if (lg && lg !== persona) cand.push(lg);
+      for (let i = 0; i < cand.length && !list; i++) if (MB['sx_' + name + '_' + cand[i]]) { list = MB['sx_' + name + '_' + cand[i]]; key += ':' + cand[i]; }
     }
     if (!list) list = MB['sx_' + name];
     if (!list || !list.length) return '';
@@ -23091,7 +23102,7 @@ const PLAYSTYLE_BEHAVIOR = {
 
   // Per-flush budget so a bulk simulation can't flood the feed.
   let _sxBudget = { n: 0, max: 80 };
-  function sxBudgetReset() { _sxBudget = { n: 0, max: sxNum('match.maxPerFlush', 80) }; }
+  function sxBudgetReset() { _sxBudget = { n: 0, max: sxNum('match.maxPerFlush', 80) }; if (typeof vxBudgetReset === 'function') vxBudgetReset(); }
   function sxPost(batch, acct, kind, text, opts) {
     if (!text || !acct) return null;
     opts = opts || {};
@@ -23118,6 +23129,7 @@ const PLAYSTYLE_BEHAVIOR = {
 
   // ---- personas (deterministic per player) ------------------------------------------------------------------------
   function sxPersonaOf(player) {
+    if (vxOn()) { const vp = vxProfile(player); if (vp) return { id: vp.arch, w: 1, post: vp.post, social: vp.social, banter: vp.banter }; }
     const ps = sxCfg('personas', []);
     if (!ps.length) return { id: '', w: 1, post: 1, social: 1, banter: 0.3 };
     const R = mSeeded(mHash(player.id + '#persona'));
@@ -23319,7 +23331,7 @@ const PLAYSTYLE_BEHAVIOR = {
     sxMates(ref.team, ref.player, nM).forEach(m => {
       if (!mChance(mClamp((TH.mateReply == null ? 0.7 : TH.mateReply) * (m.persona.social || 1), 0, 1))) return;
       const c = Object.assign({}, ctx, { mate: m.player.name, mateS: mSur(m.player.name) });
-      add(mPlayerAcct(m.player, ref.team), sxLineAny(['pr_mate_' + kind, 'pr_mate'], c, m.persona.id));
+      add(mPlayerAcct(m.player, ref.team), (vxOn() && mChance(0.85) && vxMateReply(m.player, ref.player.name, ref.team, vxKindSent(kind), c)) || sxLineAny(['pr_mate_' + kind, 'pr_mate'], c, m.persona.id));
     });
     // the club's official account
     if (ref.team && mChance(TH.clubReply == null ? 0.55 : TH.clubReply)) {
@@ -23336,11 +23348,14 @@ const PLAYSTYLE_BEHAVIOR = {
     const nF = mInt((TH.fans || [1, 3])[0], (TH.fans || [1, 3])[1]);
     for (let i = 0; i < nF; i++) {
       const fan = mPlayerFan(ref.player, ref.team, 't' + mInt(0, 400));
-      add(fan, sxLineAny(['fx_react_' + kind, 'fx_' + fb.mood], ctx, ''));
+      add(fan, (vxOn() && mChance(vxCfg('fanArchComposeChance', 0.8)) && vxFanComment(fan, vxFanCtx(ctx, ref), vxKindSent(kind))) || sxLineAny(['fx_react_' + kind, 'fx_' + fb.mood], ctx, ''));
     }
     if (o.rivalTeam && mChance(TH.troll == null ? 0.3 : TH.troll)) {
       const fan = mFan(o.rivalTeam, 'tr' + mInt(0, 500), 'banter');
       add(fan, sxLineAny(['fx_troll_' + kind, 'fx_troll'], ctx, ''));
+    }
+    if (vxOn() && ref.team && ref.team.manager && ['goal', 'hattrick', 'winner', 'motm', 'brace', 'keeper', 'award', 'trophy'].indexOf(kind) !== -1 && mChance(vxCfg('mgrReplyChance', 0.35))) {
+      const ma = vxMgrAcct(ref.team); if (ma) add(ma, vxMgrLine(ref.team, 'praise', Object.assign({}, ctx, { playerS: mSur(ref.player.name) })));
     }
     // verified voices first, fans after (keeps the thread readable)
     rs.sort((a, b) => (b.u.v ? 1 : 0) - (a.u.v ? 1 : 0));
@@ -23367,11 +23382,11 @@ const PLAYSTYLE_BEHAVIOR = {
     mShuffle(pool).slice(0, mInt((TH.clubPlayers || [1, 2])[0], (TH.clubPlayers || [1, 2])[1])).forEach(p => {
       const pr = sxPersonaOf(p);
       if (!mChance(mClamp((TH.mateReply == null ? 0.7 : TH.mateReply) * (pr.social || 1), 0, 1))) return;
-      add(mPlayerAcct(p, team), sxLineAny(['pr_player_' + kind, 'pr_player_club'], Object.assign({}, ctx, { mate: p.name, mateS: mSur(p.name) }), pr.id));
+      add(mPlayerAcct(p, team), (vxOn() && mChance(0.85) && vxMateReply(p, '', team, vxKindSent(kind), ctx)) || sxLineAny(['pr_player_' + kind, 'pr_player_club'], Object.assign({}, ctx, { mate: p.name, mateS: mSur(p.name) }), pr.id));
     });
     if (o.rivalTeam && mChance(TH.rivalClub == null ? 0.4 : TH.rivalClub)) add(mClubAcct(o.rivalTeam), sxLineAny(['pr_rivalclub_' + kind, 'pr_rivalclub'], ctx, ''));
     const nF = mInt((TH.clubFans || [1, 3])[0], (TH.clubFans || [1, 3])[1]);
-    for (let i = 0; i < nF; i++) add(mFan(team, 'cf' + mInt(0, 500)), sxLineAny(['fx_club_' + kind, 'fx_club'], ctx, ''));
+    for (let i = 0; i < nF; i++) { const cfan = mFan(team, 'cf' + mInt(0, 500)); add(cfan, (vxOn() && mChance(vxCfg('fanArchComposeChance', 0.8)) && vxFanComment(cfan, vxFanCtx(ctx, null, team), vxKindSent(kind))) || sxLineAny(['fx_club_' + kind, 'fx_club'], ctx, '')); }
     rs.sort((a, b) => (b.u.v ? 1 : 0) - (a.u.v ? 1 : 0));
     if (rs.length) { post.r = (post.r || []).concat(rs); post.rp = Math.max(post.rp || 0, post.r.length); }
     return rs;
@@ -23385,7 +23400,8 @@ const PLAYSTYLE_BEHAVIOR = {
     if (!acct.v) return null;   // below the verification bar: no account
     const fb = sxFanbase(ref.player, ref.team);
     const c = Object.assign({}, ctx, { player: ref.player.name, playerS: mSur(ref.player.name), pteam: mTeamName(ref.team), fanTag: fb.tag, fanGroup: fb.group });
-    const text = sxLine(bankName, c, persona.id);
+    let text = vxOn() ? vxPlayerText(bankName, c, ref) : '';
+    if (!text) { text = sxLine(bankName, c, persona.id); if (text && vxOn()) text = vxStyle(text, vxProfile(ref.player, ref.team), true); }
     if (!text) return null;
     const post = sxPost(batch, acct, 'tw', text, Object.assign({}, base, { dt: o.dt != null ? o.dt : mInt(4, 170), v: o.v || 1.1, im: o.im || 0 }));
     if (!post) return null;
@@ -23463,6 +23479,8 @@ const PLAYSTYLE_BEHAVIOR = {
     const c = f.ctx || mediaCtx(f);
     f.ctx = c;
     const base = { ts: [f.H.id, f.A.id], mk: f.key, tg: [c.tag, c.ctag], c: f.comp, ph: 'post' };
+    try { vxTeamNewsAfterMatch(batch, f, c, tier, base); } catch (e) { console.warn('Social team news', e); }
+    try { vxMgrMatch(batch, f, c, base, tier); } catch (e) { console.warn('Social managers', e); }
     // 1) the two clubs' official accounts
     ['home', 'away'].forEach(side => { try { sxClubMatchPost(batch, f, c, base, side, tier); } catch (e) { console.warn('club post', e); } });
     // 2) players reacting to what happened
@@ -23489,6 +23507,7 @@ const PLAYSTYLE_BEHAVIOR = {
       const ref = cd.ref, team = ref.team;
       const opp = cd.side === 'home' ? f.A : f.H;
       const px = Object.assign(mPersp(c, f, cd.side), { ng: cd.n || '', pmin: cd.min || '', pmin2: cd.min ? mOrd(cd.min) : '', saves: cd.saves || '', psaves: cd.saves || '', out: cd.out || '', injType: cd.type || '', rating: cd.rating ? cd.rating.toFixed(1) : '' });
+      { const gl = (f.goals || []).find(g => g.id === cd.id && g.assist); if (gl) { px.ast = gl.assist; px.astS = mSur(gl.assist); } }
       const rival = sxPickRival(opp, cd.trig);
       try {
         sxPlayerPost(batch, ref, cd.trig, def.bank || ('pp_' + cd.trig), px, base, {
@@ -23512,6 +23531,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function mgSocialPreview(batch, H, A, c, base, full, kh, ka, derby) {
     if (!sxOn()) return;
     const P = sxCfg('pre', {});
+    try { vxPreviewNews(batch, H, A, c, base, full); vxMgrPre(batch, H, A, c, base, full); vxMgrPre(batch, A, H, c, base, full); } catch (e) { console.warn('Social voices preview', e); }
     [[H, A, kh, 'H'], [A, H, ka, 'A']].forEach(arr => {
       const T = arr[0], O = arr[1], k = arr[2];
       const px = Object.assign({}, c, { my: mTeamName(T), myS: T.short || mTeamName(T), opp: mTeamName(O), oppS: O.short || mTeamName(O) });
@@ -24087,6 +24107,7 @@ const PLAYSTYLE_BEHAVIOR = {
     try {
       if (u && u.k === 'p' && u.p) { const r = sxPlayerRef(u.p, u.t ? getTeam(u.t) : null); if (r) return playerAvatarMark(r.player); }
       if (u && u.k === 'c' && u.t) { const t = getTeam(u.t); if (t) return teamAvatarMark(t); }
+      if (u && u.k === 'm' && u.t) { const t = getTeam(u.t); if (t && t.manager) return managerAvatarMark(t.manager, 36); }
     } catch (e) {}
     return (u && u.a) || '👤';
   }
@@ -24097,7 +24118,13 @@ const PLAYSTYLE_BEHAVIOR = {
       if (u.k === 'p' && u.p) {
         const r = sxPlayerRef(u.p, u.t ? getTeam(u.t) : null); if (!r) return null;
         const fb = sxFanbase(r.player, r.team);
-        return { kind: 'player', name: r.player.name, handle: u.h, followers: sxFollowers(r.player, r.team), fan: fb, team: r.team, player: r.player, persona: sxPersonaOf(r.player).id };
+        return { kind: 'player', name: r.player.name, handle: u.h, followers: sxFollowers(r.player, r.team), fan: fb, team: r.team, player: r.player, persona: sxPersonaOf(r.player).id, voice: vxOn() ? vxProfile(r.player, r.team) : null };
+      }
+      if (u.k === 'm' && u.t) {
+        const t = getTeam(u.t); if (!t) return null;
+        const ma = vxMgrAcct(t); if (!ma) return null;
+        const MA = VX.MARCH[ma.m] || {};
+        return { kind: 'manager', name: ma.n, handle: ma.h, followers: ma.f, fan: { size: Math.round(ma.f * 0.6), group: MA.blurb || '', tag: '', tier: MA.label || 'Manager', heat: 0, mood: 'normal' }, team: t, voice: { label: MA.label, blurb: MA.blurb } };
       }
       if (u.k === 'c' && u.t) {
         const t = getTeam(u.t); if (!t) return null;
@@ -24137,6 +24164,644 @@ const PLAYSTYLE_BEHAVIOR = {
 
 
   // ==========================================================================
+  // APEX MEDIA CENTRE — voices layer
+  // --------------------------------------------------------------------------
+  // Gives every player, manager and fan a distinct, stable voice and adds the
+  // real-world newsroom: journalists, injury stories (new -> diagnosis ->
+  // return), benching / rotation / recall news, suspensions and team news.
+  // All wording lives in media-voices.json (loaded after media.json). Like the
+  // rest of the Media Centre it never touches seededRandom().
+  // ==========================================================================
+  let VX = {};
+  const _vxProf = {}, _vxMgr = {}, _vxLeague = {};
+  let _vxRing = [];
+  const _vxShort = [];
+
+  function vxOn() { return !!(mediaReady && VX && VX.ARCH); }
+  function vxCfg(k, d) { const v = VX && VX.CFG ? VX.CFG[k] : null; return v == null ? d : v; }
+  function vxTnCfg(k, d) { const o = VX && VX.CFG && VX.CFG.teamNews; return o && o[k] != null ? o[k] : d; }
+
+  function mediaVoicesApply(j) {
+    if (!j || typeof j !== 'object' || !j.ARCH || !j.JOURNOS) return false;
+    VX = j;
+    Object.keys(_vxProf).forEach(k => { delete _vxProf[k]; });
+    Object.keys(_vxMgr).forEach(k => { delete _vxMgr[k]; });
+    Object.keys(_vxLeague).forEach(k => { delete _vxLeague[k]; });
+    // journalists are real accounts in the outlet table (ids j_<key>), so posts/UI treat them like any outlet
+    Object.keys(j.JOURNOS).forEach(id => {
+      const o = j.JOURNOS[id];
+      MEDIA_OUTLETS['j_' + id] = { name: o.name, handle: o.handle, kind: 'journalist', icon: o.icon || '✍️', color: o.color || '#14b8a6', followers: o.followers || 500000, verified: o.verified !== false, bio: o.bio || '', journo: 1 };
+    });
+    return true;
+  }
+
+  // the voices layer posts from its own budget so it can never starve the original match/awards/world systems
+  let _vxBudget = { n: 0, max: 70 };
+  function vxBudgetReset() { _vxBudget = { n: 0, max: vxCfg('budgetPerFlush', 70) }; }
+  function vxPost(batch, acct, kind, text, opts) {
+    opts = opts || {};
+    if (!text || !acct) return null;
+    if (_vxBudget.n >= _vxBudget.max && !opts.free) return null;
+    _vxBudget.n++;
+    return mkPost(batch, acct, kind, text, Object.assign({ sx: 1 }, opts));
+  }
+  function vxSt() {
+    ensureMedia();
+    const s = mediaState.vx || (mediaState.vx = {});
+    s.inj = s.inj || {}; s.sel = s.sel || {}; s.n = s.n || 0;
+    return s;
+  }
+
+  // ---- player profile (deterministic) ---------------------------------------------------------------------------------
+  function vxEra(team) {
+    const m = /(\d{4})/.exec((team && team.name) || '');
+    return m ? +m[1] : 2026;
+  }
+  function vxLegacy(id) { const a = VX && VX.ARCH && VX.ARCH[id]; return a ? a.legacy : ''; }
+
+  function vxProfile(p, team) {
+    if (!p) return null;
+    if (_vxProf[p.id]) return _vxProf[p.id];
+    const R = mSeeded(mHash(p.id + '#vx'));
+    const ea = p.expandedAttrs || {};
+    const sc = {};
+    Object.keys(VX.ARCH).forEach(a => { sc[a] = 0.3 + R() * 2.4; });
+    sc.pro += 0.3;
+    (ea.personality || []).forEach(t => { const m = VX.TRAIT_MAP[t]; if (m) Object.keys(m).forEach(a => { if (sc[a] != null) sc[a] += m[a]; }); });
+    let styles = ea.playstyle || p.playstyle || [];
+    if (typeof styles === 'string') styles = [styles];
+    styles.forEach(t => { const m = VX.STYLE_MAP[t]; if (m) Object.keys(m).forEach(a => { if (sc[a] != null) sc[a] += m[a]; }); });
+    const pos = (p.pos || [])[0] || '';
+    if (pos === 'GK') sc.wall += 3.5;
+    else if (/^(CB|LB|RB|LWB|RWB)$/.test(pos)) { sc.wall += 0.3; sc.grafter += 0.3; sc.captain += 0.4; }
+    else if (/^(ST|CF|LW|RW)$/.test(pos)) { sc.poacher += 0.6; sc.showman += 0.5; sc.icon += 0.3; }
+    else sc.nerd += 0.1;
+    const age = p.age || ea.age || 0;
+    if (age && age <= 20) sc.prodigy += 3.2;
+    if (age >= 34) sc.veteran += 3; else if (age >= 31) sc.veteran += 1;
+    if ((p.ovr || 0) >= 93) sc.icon += 2;
+    const ranked = Object.keys(sc).sort((a, b) => sc[b] - sc[a]);
+    const sig = VX.SIG[p.name] || null, lite = VX.SIG_LITE[p.name] || null;
+    let arch = sig ? sig.a : lite ? lite[0] : ranked[0];
+    if (!VX.ARCH[arch]) arch = ranked[0];
+    const arch2 = ranked.find(a => a !== arch);
+    const A = VX.ARCH[arch];
+    let hobby = sig ? sig.h : lite ? lite[1] : '';
+    if (!hobby || !VX.CHAT_HOBBY[hobby]) {
+      let pool = (A.hobbies || []).filter(h => VX.CHAT_HOBBY[h]);
+      if (vxEra(team) < 2003) { const old = pool.filter(h => ['golf', 'fishing', 'family', 'cooking', 'music', 'chess', 'books', 'wine', 'dogs', 'charity'].indexOf(h) !== -1); pool = old.length ? old : ['retro']; }
+      hobby = pool.length ? pool[Math.floor(R() * pool.length)] : 'family';
+    }
+    const pr = { arch, arch2, hobby, sig, emo: (sig && sig.e) || A.emo || [], k: (sig && sig.k) || [], post: A.post, social: A.social, banter: A.banter, label: A.label, blurb: A.blurb };
+    _vxProf[p.id] = pr;
+    return pr;
+  }
+
+  // light voice dressing: archetype opener/closer (only on borrowed text), catchphrase, emoji kit
+  function vxStyle(text, pr, wrap) {
+    if (!text || !pr) return text;
+    let t = text;
+    if (wrap && mChance(vxCfg('wrapChance', 0.3))) {
+      const A = VX.ARCH[pr.arch];
+      if (A) {
+        const o = (A.open || []).filter(Boolean), cl = (A.close || []).filter(Boolean);
+        if (o.length && mChance(0.5)) t = mPick(o) + ' ' + t; else if (cl.length) t = t + ' ' + mPick(cl);
+      }
+    }
+    if (pr.k && pr.k.length && mChance(vxCfg('catchChance', 0.18))) { const k = mPick(pr.k); if (t.indexOf(k) === -1) t = mChance(0.5) ? k + ' ' + t : t + ' ' + k; }
+    if (!/\p{Extended_Pictographic}/u.test(t) && pr.emo && pr.emo.length && mChance(0.4)) t += ' ' + mPick(pr.emo);
+    return mClean(t);
+  }
+
+  // ---- anti-repeat across the whole feed --------------------------------------------------------------------------------
+  function vxNorm(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9\u00c0-\u024f ]+/g, ' ').split(/\s+/).filter(w => w.length > 2); }
+  function vxNovel(t) {
+    const a = new Set(vxNorm(t));
+    if (a.size < 4) return _vxShort.indexOf(String(t).toLowerCase()) === -1;
+    const thr = (VX.CFG && VX.CFG.dedupe && VX.CFG.dedupe.jaccard) || 0.72;
+    for (let i = 0; i < _vxRing.length; i++) {
+      const b = _vxRing[i]; let inter = 0; a.forEach(w => { if (b.has(w)) inter++; });
+      const uni = a.size + b.size - inter;
+      if (uni && inter / uni >= thr) return false;
+    }
+    return true;
+  }
+  function vxRemember(t) {
+    const s = new Set(vxNorm(t));
+    if (s.size < 4) { _vxShort.push(String(t).toLowerCase()); while (_vxShort.length > 40) _vxShort.shift(); return; }
+    _vxRing.push(s);
+    const max = (VX.CFG && VX.CFG.dedupe && VX.CFG.dedupe.ring) || 140;
+    while (_vxRing.length > max) _vxRing.shift();
+  }
+  function vxFresh(gen) {
+    const tries = (VX.CFG && VX.CFG.dedupe && VX.CFG.dedupe.tries) || 5;
+    let t = '';
+    for (let i = 0; i < tries; i++) { t = gen(); if (!t || vxNovel(t)) break; }
+    if (t) vxRemember(t);
+    return t;
+  }
+  function vxBank(list, c, key) { return list && list.length ? mx(mFresh(mOk(list, c), key), c) : ''; }
+
+  // ---- player text -------------------------------------------------------------------------------------------------------------
+  function vxPlayerCtx(c, ref) {
+    const x = Object.assign({}, c), p = ref.player, t = ref.team;
+    try {
+      const g = ((typeof stats !== 'undefined' && stats && stats.goals) || {})[p.id], a = ((typeof stats !== 'undefined' && stats && stats.assists) || {})[p.id];
+      const cg = ((typeof careerStats !== 'undefined' && careerStats && careerStats.goals) || {})[p.id];
+      if (g && g.count) x.pg = g.count; if (a && a.count) x.pa = a.count; if (cg && cg.count) x.cg = cg.count;
+    } catch (e) {}
+    x.pteamS = t ? (t.short || mTeamName(t)) : '';
+    if (t && t.manager && t.manager.name) x.mgrS = mSur(t.manager.name);
+    return x;
+  }
+  const VX_FALL = { icon: ['fire', 'showman'], showman: ['joker', 'icon'], ice: ['captain', 'icon'], captain: ['pro', 'ice'], grafter: ['captain', 'fire'], fire: ['icon', 'grafter'], joker: ['showman', 'prodigy'], prodigy: ['joker', 'family'], veteran: ['captain', 'ice'], poacher: ['icon', 'fire'], wall: ['captain', 'ice'], family: ['captain', 'prodigy'], nerd: ['ice', 'captain'], quiet: ['ice'], pro: ['captain', 'ice'] };
+  // returns '' when the voices layer has nothing for this trigger (caller falls back to the classic banks)
+  function vxPlayerText(bankName, c, ref) {
+    if (!vxOn() || !ref || !ref.player) return '';
+    const trig = String(bankName).replace(/^pp_/, '');
+    const pr = vxProfile(ref.player, ref.team); if (!pr) return '';
+    const cx = vxPlayerCtx(c, ref);
+    return vxFresh(() => {
+      let text = '';
+      if (trig === 'chat') {
+        const hb = VX.CHAT_HOBBY[pr.hobby];
+        if (hb && mChance(0.8)) text = vxBank(hb, cx, 'vx:hobby:' + pr.hobby);
+      }
+      if (!text && pr.sig && pr.sig.l && pr.sig.l[trig] && mChance(vxCfg('sigChance', 0.45))) text = vxBank(pr.sig.l[trig], cx, 'vx:sig:' + ref.player.id + trig);
+      if (!text && VX.PP[trig]) {
+        const T = VX.PP[trig];
+        let arch = (pr.arch2 && T[pr.arch2] && mChance(vxCfg('secondaryChance', 0.2))) ? pr.arch2 : pr.arch;
+        if (!T[arch]) arch = (VX_FALL[pr.arch] || []).find(a => T[a]) || '';
+        const bank = arch ? T[arch] : null;
+        if (bank) text = vxBank(bank, cx, 'vx:' + trig + ':' + arch);
+      }
+      if (text && VX.RIDER && VX.RIDER[trig] && mChance(vxCfg('riderChance', 0.35))) {
+        const rd = vxBank(VX.RIDER[trig], cx, 'vxr:' + trig);
+        if (rd && text.length < 140 && text.indexOf(rd) === -1) text = text.replace(/\s+$/, '') + ' ' + rd;
+      }
+      return text ? vxStyle(text, pr, false) : '';
+    });
+  }
+
+  // ---- teammates / manager / fan replies ---------------------------------------------------------------------------------------
+  function vxKindSent(kind) {
+    return ({ lose: 'lose', red: 'lose', awardlose: 'lose', injury: 'injury', bench: 'bench', return: 'back', rumor: 'rumor', pre: 'pre', draw: 'draw' })[kind] || 'win';
+  }
+  function vxMateSent(sent) {
+    return ({ win: 'pos', recall: 'pos', pre: 'pos', rumor: 'pos', draw: 'pos', neutral: 'pos', tn: 'pos', lose: 'neg', sus: 'neg', mgr: 'neg', injury: 'hurt', bench: 'bench', rest: 'bench', back: 'back' })[sent] || 'pos';
+  }
+  function vxMateReply(mate, authorName, team, sent, ctx) {
+    if (!vxOn()) return '';
+    const pr = vxProfile(mate, team); if (!pr) return '';
+    let bank = (VX.MATE[pr.arch] || VX.MATE.pro || {})[vxMateSent(sent)];
+    if (bank && !authorName) bank = bank.filter(t => t.indexOf('{authorS}') === -1);
+    if (!bank || !bank.length) return '';
+    const c = Object.assign({}, ctx, { authorS: mSur(authorName || ''), author: authorName || '' });
+    return vxFresh(() => vxStyle(vxBank(bank, c, 'vxm:' + pr.arch + sent), pr, false));
+  }
+
+  function vxFanArchOf(acct) {
+    const keys = Object.keys(VX.FANARCH);
+    const R = mSeeded(mHash(String(acct.h || acct.n) + '#fa'));
+    const tot = keys.reduce((s, k) => s + (VX.FANARCH[k].w || 1), 0);
+    let r = R() * tot;
+    for (let i = 0; i < keys.length; i++) { r -= (VX.FANARCH[keys[i]].w || 1); if (r <= 0) return keys[i]; }
+    return keys[keys.length - 1];
+  }
+  function vxFanComment(acct, c, sent) {
+    if (!vxOn() || !acct) return '';
+    const fa = vxFanArchOf(acct), A = VX.FANARCH[fa];
+    return vxFresh(() => {
+      let text = '';
+      const full = VX.FULL[fa] && VX.FULL[fa][sent];
+      if (full && mChance(0.35)) text = vxBank(full, c, 'vxf:' + fa + sent);
+      if (!text) {
+        const subj = vxBank(VX.SUBJ[sent] || VX.SUBJ.win, c, 'vxs:' + sent);
+        if (!subj) return '';
+        const dress = !(A.skip && A.skip.indexOf(sent) !== -1);
+        let open = dress && mChance(0.55) ? vxBank(A.open, c, 'vxo:' + fa) : '';
+        const close = dress && mChance(0.4) ? vxBank(A.close, c, 'vxc:' + fa) : '';
+        if (open && /[A-Za-z0-9)]$/.test(open)) open += (fa === 'kid' ? ',' : '.');
+        text = [open, subj, close].filter(Boolean).join(' ');
+      }
+      return mClean(text);
+    });
+  }
+  // fan-comment context for player / club threads (adds the names the subject lines expect)
+  function vxFanCtx(ctx, ref, team) {
+    const x = Object.assign({}, ctx), t = ref ? ref.team : team, p = ref && ref.player;
+    if (p) { x.player = x.player || p.name; x.playerS = x.playerS || mSur(p.name); x.inj = x.inj || p.name; x.injS = x.injS || mSur(p.name); }
+    if (t) { const ts = t.short || mTeamName(t); x.teamS = x.teamS || ts; x.injTeamS = x.injTeamS || ts; x.myS = x.myS || ts; if (t.manager && t.manager.name) x.mgrS = x.mgrS || mSur(t.manager.name); }
+    if (x.out && !x.outW) x.outW = vxW(+x.out || 1, 'match', 'matches');
+    return x;
+  }
+  function vxMatchFanCtx(f, c, side, neutral) {
+    const x = neutral ? Object.assign({}, c, { my: c.H, myS: c.Hs, opp: c.A, oppS: c.As, myScore: c.score }) : mPersp(c, f, side);
+    const home = side !== 'away', mt = home ? f.H : f.A, ot = home ? f.A : f.H;
+    x.xgMy = home ? c.xgH : c.xgA; x.xgOpp = home ? c.xgA : c.xgH;
+    if (!neutral) { const oc = mOutcomeFor(f, side); if ((oc === 'win' || oc === 'lose') && parseFloat(x.xgMy) <= parseFloat(x.xgOpp)) { x.xgMy = ''; x.xgOpp = ''; } }
+    x.mgrMyS = mt.manager ? mSur(mt.manager.name) : ''; x.mgrOppS = ot.manager ? mSur(ot.manager.name) : '';
+    return x;
+  }
+
+  // generic reply thread (journalist / manager / club posts)
+  function vxThread(post, team, sent, ctx, o) {
+    o = o || {};
+    if (!post || !vxOn()) return [];
+    const rs = [], to = post.u && post.u.h;
+    const add = (acct, text) => { if (text) rs.push({ u: mUserRef(acct), x: mClean(mVoice(text, acct.m)), l: sxReplyLikes(acct, post), to }); };
+    if (team && o.mates) {
+      const pool = sxTopPlayers(team, 8, p => (p.ovr || 0) >= sxNum('verify.playerMinOvr', 0) && p.id !== o.exclude);
+      mShuffle(pool).slice(0, o.mates).forEach(p => { if (mChance(0.7)) add(mPlayerAcct(p, team), vxMateReply(p, o.authorName || '', team, sent, ctx)); });
+    }
+    for (let i = 0; i < (o.fans || 0); i++) {
+      const fan = team ? mFan(team, 'vt' + mInt(0, 500)) : mFan(null, 'vn' + mInt(0, 500));
+      add(fan, vxFanComment(fan, ctx, sent));
+    }
+    if (o.rivalTeam && mChance(0.35)) { const fan = mFan(o.rivalTeam, 'vr' + mInt(0, 500), 'banter'); add(fan, vxFanComment(fan, ctx, o.rivalSent || 'win')); }
+    rs.sort((a, b) => (b.u.v ? 1 : 0) - (a.u.v ? 1 : 0));
+    if (rs.length) { post.r = (post.r || []).concat(rs); post.rp = Math.max(post.rp || 0, post.r.length); }
+    return rs;
+  }
+
+
+  // ==========================================================================
+  // Managers: archetype, account, posts
+  // ==========================================================================
+  function vxMgrArch(team) {
+    const m = team && team.manager;
+    if (!m || !m.name || !vxOn()) return null;
+    const key = team.id + '|' + m.name;
+    if (_vxMgr[key]) return _vxMgr[key];
+    let a = VX.MSIG[m.name];
+    if (!a) {
+      const d = m.dna || {}, ovr = m.ovr || 75;
+      const press = ((d.pressing || 0.5) + (d.counterpressing || 0.5) + (d.tempo || 0.5)) / 3;
+      if (ovr >= 90 && (d.matchManagement || 0) >= 0.85 && (d.risk == null ? 0.5 : d.risk) <= 0.45) a = 'patriarch';
+      else if (press >= 0.72) a = 'firebrand';
+      else if ((d.positionalFreedom || 0) >= 0.7 && (d.directness == null ? 0.5 : d.directness) <= 0.5) a = 'professor';
+      else if ((d.compactness || 0) >= 0.8 && (d.risk == null ? 0.5 : d.risk) <= 0.35) a = 'pragmatist';
+      else if ((d.risk || 0) >= 0.7 && ovr >= 85) a = 'mindgamer';
+      else if (ovr < 76) a = 'rookie';
+      else if ((d.matchManagement || 0) >= 0.85) a = 'calm';
+      else { const pool = ['diplomat', 'professor', 'pragmatist', 'calm', 'firebrand', 'diplomat']; a = pool[mHash(m.name) % pool.length]; }
+    }
+    if (!VX.MARCH[a]) a = 'diplomat';
+    _vxMgr[key] = a;
+    return a;
+  }
+  function vxMgrAcct(team) {
+    const m = team && team.manager, arch = vxMgrArch(team);
+    if (!m || !arch) return null;
+    const parts = String(m.name).split(/\s+/);
+    const sur = mAscii(mSur(m.name)) || 'Manager', first = mAscii(parts[0]) || sur;
+    const R = mSeeded(mHash(m.name + '#mh'));
+    const pats = [first + sur, sur + 'Official', 'Coach' + sur, first + '_' + sur, 'TheGaffer' + sur.slice(0, 8)];
+    const fame = mFame(team);
+    const f = Math.round(Math.max(30000, 120000 * Math.exp(0.1 * ((m.ovr || 75) - 75)) * (1 + 1.6 * fame) * (0.8 + 0.4 * R())));
+    return { n: m.name, h: '@' + pats[Math.floor(R() * pats.length)].replace(/[^A-Za-z0-9_]/g, ''), a: '🧥', c: team.color || '#64748b', t: team.id, v: 1, k: 'm', f, m: arch };
+  }
+  function vxMgrLine(team, trig, ctx) {
+    const a = vxMgrArch(team); if (!a) return '';
+    const bank = (VX.MP[trig] || {})[a]; if (!bank) return '';
+    return vxFresh(() => vxBank(bank, ctx, 'vxg:' + trig + a));
+  }
+  function vxMgrPost(batch, team, trig, ctx, base, o) {
+    o = o || {};
+    if (!vxOn() || !team || !team.manager) return null;
+    const arch = vxMgrArch(team);
+    if (!arch) return null;
+    const text = vxMgrLine(team, trig, ctx);
+    if (!text) return null;
+    const mood = VX.MARCH[arch].emo && mChance(0.3) ? ' ' + mPick(VX.MARCH[arch].emo) : '';
+    const acct = vxMgrAcct(team);
+    const post = vxPost(batch, acct, 'tw', mClean(text + (/\p{Extended_Pictographic}/u.test(text) ? '' : mood)), Object.assign({}, base, { dt: o.dt != null ? o.dt : mInt(10, 120), v: o.v || 1.2, im: o.im || 0, nw: o.nw }));
+    if (post) vxThread(post, team, o.sent || 'win', ctx, { mates: o.mates == null ? 1 : o.mates, fans: o.fans == null ? 2 : o.fans, authorName: team.manager.name, rivalTeam: o.rivalTeam });
+    return post;
+  }
+
+  function vxMgrMatch(batch, f, c, base, tier) {
+    if (!vxOn()) return;
+    const P = [0.1, 0.4, 0.75, 1][tier] || 0;
+    ['home', 'away'].forEach(side => {
+      const team = side === 'home' ? f.H : f.A, opp = side === 'home' ? f.A : f.H;
+      const arch = vxMgrArch(team); if (!arch) return;
+      if (!mChance(P * VX.MARCH[arch].post)) return;
+      const oc = mOutcomeFor(f, side);
+      const px = Object.assign(vxMatchFanCtx(f, c, side, false), { mgrS: mSur(team.manager.name) });
+      const redOwn = (f.cards || []).find(cd => cd.side === side);
+      let trig = oc === 'win' && f.derby ? 'derby' : oc;
+      if (redOwn && oc !== 'win' && mChance(0.5)) trig = 'red';
+      vxMgrPost(batch, team, trig, px, base, { dt: mInt(15, 120), v: 1 + mFame(team), sent: oc === 'draw' ? 'draw' : oc, rivalTeam: f.derby && oc === 'win' ? opp : null, nw: 'mgr' });
+    });
+    // derby mind games
+    if (f.derby && f.winSide && tier >= 2) {
+      const wt = f.winSide === 'home' ? f.H : f.A, lt = f.winSide === 'home' ? f.A : f.H;
+      if (vxMgrArch(wt) === 'mindgamer' && mChance(0.6) && lt.manager) {
+        const px = Object.assign(vxMatchFanCtx(f, c, f.winSide, false), { mgrOppS: mSur(lt.manager.name) });
+        vxMgrPost(batch, wt, 'jab', px, base, { dt: mInt(60, 200), v: 1.5, nw: 'mgr' });
+      }
+    }
+  }
+  function vxMgrPre(batch, T, O, c, base, full) {
+    if (!vxOn() || !T.manager) return;
+    const arch = vxMgrArch(T); if (!arch) return;
+    if (!mChance((full ? 0.5 : 0.2) * VX.MARCH[arch].post)) return;
+    const px = Object.assign({}, c, { myS: T.short || mTeamName(T), oppS: O.short || mTeamName(O), my: mTeamName(T), opp: mTeamName(O), mgrS: mSur(T.manager.name), mgrOppS: O.manager ? mSur(O.manager.name) : '' });
+    vxMgrPost(batch, T, 'pre', px, base, { dt: -mInt(10, 240), v: 1.1, sent: 'pre', nw: 'mgr' });
+  }
+
+
+  // ==========================================================================
+  // Journalists & the newsroom (injuries, benching, suspensions, team news)
+  // ==========================================================================
+  const VX_LEAGUES = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1'];
+  function vxNormTeam(n) { return String(n || '').toLowerCase().replace(/\s*\d{4}(?:[-\/]\d{2,4})?\s*$/, '').replace(/[^a-z0-9]/g, ''); }
+  function vxLeagueOf(team) {
+    if (!team) return null;
+    if (_vxLeague[team.id] !== undefined) return _vxLeague[team.id];
+    let lg = null;
+    try {
+      const me = vxNormTeam(team.name);
+      VX_LEAGUES.forEach(L => { if (!lg && ((leaguesData || {})[L] || []).some(n => vxNormTeam(n) === me)) lg = L; });
+    } catch (e) {}
+    _vxLeague[team.id] = lg;
+    return lg;
+  }
+  function vxJournoFor(team, topic) {
+    const lg = vxLeagueOf(team);
+    const items = Object.keys(VX.JOURNOS).map(id => {
+      const J = VX.JOURNOS[id];
+      const beat = J.beats.indexOf('*') !== -1 ? 1 : (lg && J.beats.indexOf(lg) !== -1 ? 4 : 0);
+      return beat ? { w: ((J.w && J.w[topic]) || 1) * beat, v: id } : null;
+    }).filter(Boolean);
+    return 'j_' + (items.length ? mWeighted(items) : 'romano');
+  }
+  function vxIsJourno(id) { return typeof id === 'string' && id.indexOf('j_') === 0; }
+
+  // one news post from a journalist / club / outlet, with a topic bank from media-voices.json -> NEWS
+  function vxNews(batch, topic, who, c, base, o) {
+    o = o || {};
+    const bank = VX.NEWS[topic]; if (!bank) return null;
+    const key = vxIsJourno(who) ? who.slice(2) : who;
+    const list = bank[key];
+    if (!list || !list.length) return null;
+    const text = vxFresh(() => vxBank(list, c, 'vxn:' + topic + key));
+    if (!text) return null;
+    let acct = who;
+    if (who === 'club') acct = o.team ? mClubAcct(o.team) : null;
+    else if (who === 'local') acct = o.team ? mLocalPaper(o.team) : null;
+    if (!acct) return null;
+    const kind = o.kind || (who === 'club' ? 'tw' : 'news');
+    return vxPost(batch, acct, kind, text, Object.assign({}, base, { dt: o.dt != null ? o.dt : mInt(5, 90), v: o.v || 1.2, im: o.im || 0, nw: o.nw, free: o.free }));
+  }
+
+  function vxTeamCtx(team, opp) {
+    return { team: mTeamName(team), teamS: team.short || mTeamName(team), my: mTeamName(team), myS: team.short || mTeamName(team), opp: opp ? mTeamName(opp) : '', oppS: opp ? (opp.short || mTeamName(opp)) : '', mgr: team.manager ? team.manager.name : '', mgrS: team.manager ? mSur(team.manager.name) : '' };
+  }
+  const vxW = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+
+  // ---- selection facts (who started / benched / was left out), built once per match ------------------------------------
+  function vxBuildSelection(m, f) {
+    const out = { home: [], away: [] };
+    const S = vxSt();
+    ['home', 'away'].forEach(side => {
+      const sd = m[side]; if (!sd || !sd.team) return;
+      const team = sd.team, sq = sd.squad || {};
+      const startIds = new Set((sq.starting || []).map(p => p.id)), subIds = new Set((sq.subs || []).map(p => p.id));
+      const ranked = (team.players || []).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+      const maxRank = vxTnCfg('benchStarOvrRank', 7), minOvr = vxTnCfg('benchMinOvr', 70);
+      let rank = 0, gkDone = false;
+      ranked.forEach(p => {
+        const isGK = (p.pos || [])[0] === 'GK';
+        if (isGK) { if (gkDone) return; gkDone = true; } else { rank++; if (rank > maxRank) return; }
+        if ((p.ovr || 0) < minOvr) return;
+        if (injuryBook[p.id] || S.inj[p.id] || isPlayerSuspended(p.id)) return;
+        const e = { id: p.id, name: p.name, rank: isGK ? 0 : rank, ovr: p.ovr || 0, side, gk: isGK };
+        const log = (m.subLog && m.subLog[side] && m.subLog[side][p.id]) || null;
+        if (startIds.has(p.id)) {
+          e.started = true;
+          if (log && typeof log.outMin === 'number' && log.outMin <= 65 && !(f.injuries || []).some(i => i.id === p.id)) { e.hooked = log.outMin; }
+        } else if (subIds.has(p.id)) { e.status = 'bench'; e.used = !!(log && typeof log.inMin === 'number'); }
+        else e.status = 'omit';
+        e.rot = !!sq.rotationProfile;
+        out[side].push(e);
+      });
+    });
+    return out;
+  }
+
+  // ---- after every match ----------------------------------------------------------------------------------------------------------
+  const VX_CUP = /cup|copa|pokal|coupe|coppa|shield|supercup|supercopa|supercoppa|troph/i;
+  function vxReason(e, f, per) {
+    const w = { rotation: 0.35, tactical: 0.25, fresh: 0.2, form: 0.1, fitness: 0.1 };
+    if (VX_CUP.test(f.comp || '')) w.rotation += 0.3;
+    if (e.streak >= 3) { w.form += 0.25; if (per.some(t => ['Selfish', 'Hot-Head', 'Volatile', 'Showboat', 'Provocateur'].indexOf(t) !== -1)) w.frustr = 0.5; }
+    if (e.status === 'omit') w.fitness += 0.2;
+    return mWeighted(Object.keys(w).map(k => ({ w: w[k], v: k })));
+  }
+
+  function vxTeamNewsAfterMatch(batch, f, c, tier, base) {
+    if (!vxOn() || !f.sel) return;
+    const P = [0.3, 0.55, 0.85, 1][tier] || 0.3;
+    (f.injuries || []).forEach(inj => { try { vxInjuryStory(batch, f, inj, P, base); } catch (e) { console.warn('injury story', e); } });
+    try { vxSuspensionStory(batch, f, P, base); } catch (e) { console.warn('suspension story', e); }
+    try { vxSelectionStories(batch, f, c, P, base); } catch (e) { console.warn('selection story', e); }
+  }
+
+  function vxInjuryStory(batch, f, inj, P, base) {
+    const team = inj.side === 'home' ? f.H : f.A, opp = inj.side === 'home' ? f.A : f.H;
+    const ref = sxPlayerRef(inj.id, team); if (!ref) return;
+    const S = vxSt(), rec = injuryBook[inj.id] || {};
+    S.inj[inj.id] = { t: team.id, n: inj.name, out: inj.out };
+    const ks = Object.keys(S.inj); if (ks.length > 120) delete S.inj[ks[0]];
+    const rank = (team.players || []).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).findIndex(p => p.id === inj.id) + 1;
+    const star = rank <= 11 || (ref.player.ovr || 0) >= 80;
+    const sev = inj.out >= sxNum('match.injuryMinOut', 4) || /major|severe/i.test(inj.sev || '');
+    if (!mChance(P * (star ? 1 : 0.5) * (sev ? 1 : 0.75))) return;
+    const c2 = Object.assign(vxTeamCtx(team, opp), {
+      inj: inj.name, injS: mSur(inj.name), player: inj.name, playerS: mSur(inj.name), injTeam: mTeamName(team), injTeamS: team.short || mTeamName(team),
+      injType: (inj.type || 'an injury').toLowerCase(), bodyPart: ((rec.bodyPart && !/^general$/i.test(rec.bodyPart)) ? rec.bodyPart : 'muscle').toLowerCase(), cause: rec.cause || 'picked up a knock',
+      min: rec.minute != null ? rec.minute : '', out: inj.out, outW: vxW(inj.out, 'match', 'matches')
+    });
+    const b = Object.assign({}, base, { ts: [team.id, opp.id] });
+    const im = star && sev ? 2 : 0, fr = star && sev;
+    const jn = vxJournoFor(team, 'injury');
+    const p1 = vxNews(batch, 'inj_new', jn, c2, b, { dt: mInt(3, 30), v: 1.5, im, nw: 'inj', free: fr });
+    if (p1) vxThread(p1, team, 'injury', c2, { fans: 2, mates: star ? 1 : 0, exclude: inj.id, authorName: inj.name });
+    if (mChance(0.85)) vxNews(batch, 'inj_new', 'club', c2, b, { dt: mInt(5, 45), v: 1.3, im, nw: 'inj', team, free: fr });
+    const out1 = mWeighted([{ w: star ? 4 : 2, v: 'bn' }, { w: 3, v: 'gaffe' }, { w: 2, v: 'local' }, { w: 1, v: 'terrace' }]);
+    vxNews(batch, 'inj_new', out1, c2, b, { dt: mInt(10, 60), v: 1.2, nw: 'inj', team });
+    if (vxTnCfg('injuryStages', true)) {
+      const jn2 = mChance(0.5) ? jn : vxJournoFor(team, 'injury');
+      const p2 = vxNews(batch, 'inj_diag', jn2, c2, b, { dt: mInt(80, 260), v: 1.4, im, nw: 'inj', free: fr });
+      if (p2) vxThread(p2, team, 'injury', c2, { fans: 2, mates: star ? 1 : 0, exclude: inj.id, authorName: inj.name });
+      if (mChance(0.85)) vxNews(batch, 'inj_diag', 'club', c2, b, { dt: mInt(100, 280), v: 1.2, nw: 'inj', team, free: fr });
+      vxNews(batch, 'inj_diag', mWeighted([{ w: 3, v: 'bn' }, { w: 2, v: 'statbook' }, { w: 2, v: 'local' }, { w: 2, v: 'gaffe' }]), c2, b, { dt: mInt(120, 300), nw: 'inj', team });
+      if (star && mChance(0.6)) vxMgrPost(batch, team, 'injury', c2, b, { dt: mInt(150, 320), v: 1.2, sent: 'injury', nw: 'inj', mates: 0, fans: 2 });
+    }
+  }
+
+  function vxSuspensionStory(batch, f, P, base) {
+    (f.cards || []).forEach(cd => {
+      const team = cd.side === 'home' ? f.H : f.A, opp = cd.side === 'home' ? f.A : f.H;
+      const ref = sxPlayerRef(cd.id, team); if (!ref) return;
+      const star = (ref.player.ovr || 0) >= 78;
+      if (!mChance(P * (star ? 0.9 : 0.4))) return;
+      const rec = suspensionBook[cd.id], n = rec && rec.matchesLeft > 0 ? rec.matchesLeft : 1;
+      const c2 = Object.assign(vxTeamCtx(team, opp), { player: cd.name, playerS: mSur(cd.name), matches: n, matchesW: vxW(n, 'match', 'matches') });
+      const b = Object.assign({}, base, { ts: [team.id, opp.id] });
+      const p1 = vxNews(batch, 'sus', vxJournoFor(team, 'bench'), c2, b, { dt: mInt(10, 90), v: 1.2, nw: 'sus' });
+      if (p1) vxThread(p1, team, 'sus', c2, { fans: 2, mates: 0 });
+      if (mChance(0.5)) vxNews(batch, 'sus', 'club', c2, b, { dt: mInt(20, 120), nw: 'sus', team });
+      vxNews(batch, 'sus', mWeighted([{ w: 2, v: 'bn' }, { w: 2, v: 'gaffe' }, { w: 1, v: 'local' }, { w: 1, v: 'statbook' }]), c2, b, { dt: mInt(20, 150), nw: 'sus', team });
+    });
+  }
+
+  function vxSelectionStories(batch, f, c, P, base) {
+    const S = vxSt(), max = vxTnCfg('maxPerMatch', 3), recallAfter = vxTnCfg('recallAfter', 2);
+    const stories = [], recalls = [], hooks = [];
+    ['home', 'away'].forEach(side => {
+      (f.sel[side] || []).forEach(e => {
+        const s = S.sel[e.id] || (S.sel[e.id] = { bn: 0, st: 0 });
+        if (e.started) {
+          if (s.bn >= recallAfter) recalls.push({ e, streak: s.bn });
+          s.st++; s.bn = 0;
+          if (e.hooked) hooks.push(e);
+        } else { s.bn++; s.st = 0; e.streak = s.bn; stories.push(e); }
+      });
+    });
+    const keys = Object.keys(S.sel); if (keys.length > 420) keys.slice(0, 120).forEach(k => { delete S.sel[k]; });
+    stories.sort((a, b) => (b.ovr - a.ovr)).slice(0, max).forEach(e => {
+      const team = e.side === 'home' ? f.H : f.A, opp = e.side === 'home' ? f.A : f.H;
+      const nowM = sxSt().m || 0, st0 = S.sel[e.id];
+      if (st0 && st0.last != null && nowM - st0.last < vxTnCfg('cooldown', 6)) return;
+      let p = P * 0.45;
+      if (e.status === 'omit') p *= 0.85; if (e.streak >= 3) p *= 1.3; if (e.used) p *= 0.6;
+      if (!mChance(Math.min(1, p))) return;
+      const ref = sxPlayerRef(e.id, team); if (!ref) return;
+      const per = (ref.player.expandedAttrs && ref.player.expandedAttrs.personality) || [];
+      if (st0) st0.last = nowM;
+      const reason = vxReason(e, f, per);
+      const cx = Object.assign(vxTeamCtx(team, opp), { player: e.name, playerS: mSur(e.name), min: '', n: stories.length, fm: (f.fmH && e.side === 'home' ? f.fmH : f.fmA) || '' });
+      cx.reasonLine = vxBank(VX.REASONS[reason], cx, 'vxr:' + reason);
+      const topic = e.status === 'omit' ? 'bench_omit' : (reason === 'rotation' ? 'bench_rest' : 'bench_drop');
+      const b = Object.assign({}, base, { ts: [team.id, opp.id] });
+      const j = vxNews(batch, topic, vxJournoFor(team, 'bench'), cx, b, { dt: mInt(-30, 20), v: 1.3, im: e.streak >= 3 ? 1 : 0, nw: 'bench', free: e.rank <= 3 });
+      if (j) vxThread(j, team, topic === 'bench_rest' ? 'rest' : 'bench', cx, { fans: 2, mates: 0 });
+      const outs = Object.keys(VX.NEWS[topic] || {}).filter(k => !VX.JOURNOS[k] && k !== 'club');
+      if (outs.length && mChance(0.6)) vxNews(batch, topic, mPick(outs), cx, b, { dt: mInt(-20, 60), nw: 'bench', team });
+      if ((tierOf(P) >= 2 || mChance(0.3)) && reason !== 'frustr') vxMgrPost(batch, team, 'bench', cx, b, { dt: mInt(40, 200), sent: 'bench', nw: 'bench', mates: 0, fans: 2 });
+      const pr = vxProfile(ref.player, team);
+      if (pr && mChance(Math.min(0.8, pr.post * 0.35 + (e.streak >= 3 ? 0.3 : 0) + (reason === 'frustr' ? 0.3 : 0)))) {
+        try { sxPlayerPost(batch, ref, 'bench', 'pp_bench', cx, b, { dt: mInt(60, 260), v: 1.2, rival: null, rivalTeam: null }); } catch (er) {}
+      }
+    });
+    recalls.sort((a, b) => b.e.ovr - a.e.ovr).slice(0, 1).forEach(r => {
+      if (!mChance(P * 0.8)) return;
+      const e = r.e, team = e.side === 'home' ? f.H : f.A, opp = e.side === 'home' ? f.A : f.H;
+      const ref = sxPlayerRef(e.id, team); if (!ref) return;
+      const cx = Object.assign(vxTeamCtx(team, opp), { player: e.name, playerS: mSur(e.name), streak: vxW(r.streak, 'match', 'matches') });
+      const b = Object.assign({}, base, { ts: [team.id, opp.id] });
+      const j = vxNews(batch, 'bench_recall', vxJournoFor(team, 'bench'), cx, b, { dt: mInt(-30, 20), v: 1.2, nw: 'bench' });
+      if (j) vxThread(j, team, 'recall', cx, { fans: 2, mates: 1, exclude: e.id, authorName: e.name });
+      if (mChance(0.5)) vxNews(batch, 'bench_recall', 'club', cx, b, { dt: mInt(-20, 30), nw: 'bench', team });
+    });
+    hooks.slice(0, 1).forEach(e => {
+      if (!mChance(P * 0.3)) return;
+      const team = e.side === 'home' ? f.H : f.A, opp = e.side === 'home' ? f.A : f.H;
+      const cx = Object.assign(vxTeamCtx(team, opp), { player: e.name, playerS: mSur(e.name), min: e.hooked });
+      vxNews(batch, 'hooked', mPick(['tac', 'local', 'gaffe']), cx, Object.assign({}, base, { ts: [team.id, opp.id] }), { dt: mInt(10, 120), nw: 'bench', team });
+    });
+  }
+  function tierOf(P) { return P >= 1 ? 3 : P >= 0.85 ? 2 : P >= 0.55 ? 1 : 0; }
+
+
+  // ==========================================================================
+  // World hooks: injury returns, previews (team news), crises, transfers
+  // ==========================================================================
+  function vxInjuryReturns(batch) {
+    if (!vxOn()) return;
+    const S = vxSt(); let n = 0;
+    Object.keys(S.inj).forEach(pid => {
+      const rec = injuryBook[pid];
+      if (rec && rec.matchesLeft > 0) return;
+      const info = S.inj[pid]; delete S.inj[pid];
+      if (n >= 3) return;
+      const team = getTeam(info.t); if (!team) return;
+      const ref = sxPlayerRef(pid, team); if (!ref) return;
+      const star = (ref.player.ovr || 0) >= 80;
+      if (!mChance(star ? 0.85 : 0.5)) return;
+      n++;
+      const cx = Object.assign(vxTeamCtx(team, null), { player: ref.player.name, playerS: mSur(ref.player.name), outN: vxW(info.out || 1, 'match', 'matches') + ' out' });
+      const b = { ts: [team.id], tg: [mTag(team.short || mTeamName(team))], ph: 'wk' };
+      const j = vxNews(batch, 'inj_back', vxJournoFor(team, 'injury'), cx, b, { dt: mInt(0, 60), v: 1.2, nw: 'inj' });
+      if (j) vxThread(j, team, 'back', cx, { fans: 2, mates: 1, exclude: pid, authorName: ref.player.name });
+      if (mChance(0.7)) vxNews(batch, 'inj_back', 'club', cx, b, { dt: mInt(10, 90), nw: 'inj', team });
+      if (mChance(0.4)) vxNews(batch, 'inj_back', 'local', cx, b, { dt: mInt(20, 120), nw: 'inj', team });
+      if (star && mChance(0.45)) vxMgrPost(batch, team, 'return', cx, b, { dt: mInt(30, 150), sent: 'back', nw: 'inj', mates: 0, fans: 1 });
+      const pr = vxProfile(ref.player, team);
+      if (pr && mChance(Math.min(0.7, pr.post * 0.4))) { try { sxPlayerPost(batch, ref, 'return', 'pp_return', cx, b, { dt: mInt(40, 200), v: 1.1 }); } catch (e) {} }
+    });
+  }
+
+  function vxPreviewNews(batch, H, A, c, base, full) {
+    if (!vxOn()) return;
+    [[H, A], [A, H]].forEach(pair => {
+      const T = pair[0], O = pair[1];
+      const miss = (T.players || []).map(p => ({ p, r: injuryBook[p.id], s: suspensionBook[p.id] })).filter(x => (x.r && x.r.matchesLeft > 0) || (x.s && x.s.matchesLeft > 0))
+        .sort((a, b) => (b.p.ovr || 0) - (a.p.ovr || 0)).slice(0, vxTnCfg('previewMissMax', 3));
+      if (!miss.length) return;
+      const cx = Object.assign(vxTeamCtx(T, O), {
+        missList: miss.map(x => mSur(x.p.name)).join(', '),
+        missLine: miss.map(x => x.p.name + ' (' + ((x.r && x.r.matchesLeft > 0) ? String(x.r.type || 'injured').toLowerCase() : 'suspended') + ')').join(', ') + ' out.',
+        backLine: ''
+      });
+      const b = Object.assign({}, base, { ts: [T.id, O.id] });
+      if (mChance(full ? 0.55 : 0.25)) { const j = vxNews(batch, 'tn_pre', vxJournoFor(T, 'bench'), cx, b, { dt: -mInt(10, 200), v: 1.1, nw: 'tn' }); if (j) vxThread(j, T, 'tn', cx, { fans: 1 }); }
+      if (full && mChance(0.5)) vxNews(batch, 'tn_pre', 'club', cx, b, { dt: -mInt(10, 120), nw: 'tn', team: T });
+      if (full && mChance(0.25)) vxNews(batch, 'tn_pre', 'statbook', cx, b, { dt: -mInt(10, 120), nw: 'tn' });
+    });
+  }
+
+  function vxCrisisNews(batch, t, list) {
+    if (!vxOn() || !VX.CRISIS) return;
+    const names = list.slice(0, 3).map(p => p.playerName).join(', ');
+    const cx = Object.assign(vxTeamCtx(t, null), { names, n: list.length });
+    const b = { ts: [t.id], tg: [mTag(t.short || mTeamName(t)), '#InjuryCrisis'], ph: 'wk', nw: 'inj' };
+    const jid = vxJournoFor(t, 'injury');
+    const text = vxFresh(() => vxBank(VX.CRISIS.j, cx, 'vxc:j'));
+    if (text) { const p = vxPost(batch, jid, 'news', text, Object.assign({}, b, { dt: mInt(5, 60), v: 1.3, free: true })); if (p) vxThread(p, t, 'injury', Object.assign(cx, { injS: mSur(list[0].playerName), injTeamS: cx.teamS, outW: 'weeks', injType: 'injury' }), { fans: 2 }); }
+    if (mChance(0.6)) { const t2 = vxFresh(() => vxBank(VX.CRISIS.club, cx, 'vxc:c')); if (t2) vxPost(batch, mClubAcct(t), 'tw', t2, Object.assign({}, b, { dt: mInt(20, 90) })); }
+    if (mChance(0.5) && vxMgrArch(t)) { const tx = vxFresh(() => vxBank(VX.CRISIS.mgr, cx, 'vxc:m')); if (tx) vxPost(batch, vxMgrAcct(t), 'tw', tx, Object.assign({}, b, { dt: mInt(30, 120), v: 1.1 })); }
+  }
+
+  function vxSackNews(batch, t, n) {
+    if (!vxOn() || !t.manager) return;
+    const cx = Object.assign(vxTeamCtx(t, null), { n });
+    const b = { ts: [t.id], tg: [mTag(t.short || mTeamName(t)), '#SackWatch'], ph: 'wk', nw: 'mgr' };
+    const j = vxNews(batch, 'mgr_press', vxJournoFor(t, 'mgr'), cx, b, { dt: mInt(10, 80), v: 1.4, nw: 'mgr' });
+    if (j) vxThread(j, t, 'mgr', cx, { fans: 3 });
+    if (mChance(0.5)) vxNews(batch, 'mgr_press', 'club', cx, b, { dt: mInt(40, 140), nw: 'mgr', team: t });
+    if (mChance(0.7)) vxMgrPost(batch, t, 'sack', cx, b, { dt: mInt(60, 200), v: 1.3, sent: 'mgr', nw: 'mgr', mates: 0, fans: 2 });
+  }
+
+  // returns the journalist id for a transfer story and posts the stage line; false when voices are off
+  function vxTransferNews(batch, P, fromT, toT, c, stage, base) {
+    if (!vxOn() || !VX.TR) return false;
+    const jid = vxJournoFor(mChance(0.5) ? fromT : toT, 'transfer'), key = jid.slice(2);
+    const ladder = VX.TR[key] || VX.TR.romano;
+    const bank = ladder[Math.min(stage, ladder.length - 1)];
+    const text = vxFresh(() => vxBank(bank, c, 'vxt:' + key + stage));
+    if (!text) return false;
+    const post = vxPost(batch, jid, 'rumor', text, Object.assign({}, base, { dt: 0, v: 1.8 + stage * 0.3, im: stage === 3 ? 3 : 1, nw: 'tr', free: true }));
+    if (post) vxThread(post, mChance(0.5) ? fromT : toT, 'rumor', Object.assign({}, c, { toS: c.toS, fromS: c.fromS, stage: stage + 1 }), { fans: 2 });
+    if (stage >= 1 && mChance(0.4)) vxMgrPost(batch, fromT, 'rumor', Object.assign({}, c, { playerS: c.playerS }), base, { dt: mInt(40, 160), sent: 'rumor', nw: 'tr', mates: 0, fans: 1 });
+    return !!post;
+  }
+
+
+  // ==========================================================================
   // APEX MEDIA CENTRE — Media tab UI
   // ==========================================================================
   let mediaTabId = 'feed';
@@ -24151,19 +24816,19 @@ const PLAYSTYLE_BEHAVIOR = {
   const MEDIA_KIND_FILTERS = [
     ['all', 'All'], ['scores', 'Scores'], ['previews', 'Previews'], ['news', 'News'],
     ['social', 'Fans & takes'], ['transfers', 'Transfers'], ['events', 'Awards & trophies'],
-    ['verified', 'Players & clubs'], ['hype', 'Awards hype']
+    ['verified', 'Players & clubs'], ['journalists', 'Journalists'], ['managers', 'Managers'], ['teamnews', 'Team news & injuries'], ['hype', 'Awards hype']
   ];
 
   function mUserView(u) {
     if (typeof u === 'string') {
-      if (MEDIA_OUTLETS[u]) { const o = MEDIA_OUTLETS[u]; return { name: o.name, handle: o.handle, avatar: o.icon, color: o.color, verified: o.verified, outlet: true }; }
+      if (MEDIA_OUTLETS[u]) { const o = MEDIA_OUTLETS[u]; return { name: o.name, handle: o.handle, avatar: o.icon, color: o.color, verified: o.verified, outlet: true, kind: o.journo ? 'j' : '' }; }
       if (u.indexOf('p:') === 0) { const p = MEDIA_PUNDITS[u.slice(2)]; if (p) return { name: p.name, handle: p.role, avatar: p.icon, color: p.color, verified: true, outlet: true }; }
       return { name: u, handle: '', avatar: '👤', color: '#64748b' };
     }
     return { name: u.n, handle: u.h, avatar: sxAvatarHtml(u), color: u.c || '#64748b', verified: !!u.v, kind: u.k || '' };
   }
-  function mRoleTag(kind) { return kind === 'p' ? '<span class="mp-role" title="Verified player account">⚽ Player</span>' : kind === 'c' ? '<span class="mp-role club" title="Official club account">🏟️ Official</span>' : ''; }
-  function mNameLink(u) { return u.handle && (u.kind === 'p' || u.kind === 'c') ? '<a class="mp-name" onclick="App.mediaAcct(\'' + mEsc(u.handle) + '\')">' + mEsc(u.name) + '</a>' : mEsc(u.name); }
+  function mRoleTag(kind) { return kind === 'm' ? '<span class="mp-role mgr" title="Manager account">🧥 Manager</span>' : kind === 'j' ? '<span class="mp-role jn" title="Journalist">✍️ Journalist</span>' : kind === 'p' ? '<span class="mp-role" title="Verified player account">⚽ Player</span>' : kind === 'c' ? '<span class="mp-role club" title="Official club account">🏟️ Official</span>' : ''; }
+  function mNameLink(u) { return u.handle && (u.kind === 'p' || u.kind === 'c' || u.kind === 'm') ? '<a class="mp-name" onclick="App.mediaAcct(\'' + mEsc(u.handle) + '\')">' + mEsc(u.name) + '</a>' : mEsc(u.name); }
   function mTimeLabel(p) {
     const w = p.w ? p.w + ' · ' : '';
     if (p.ph === 'pre') { const m = Math.abs(p.dt); return w + 'KO −' + (m >= 90 ? Math.round(m / 60) + 'h' : m + 'm'); }
@@ -24241,7 +24906,10 @@ const PLAYSTYLE_BEHAVIOR = {
     else if (k === 'social') list = list.filter(p => ['tw', 'meme', 'vid', 'take'].indexOf(p.k) !== -1);
     else if (k === 'transfers') list = list.filter(p => p.k === 'rumor');
     else if (k === 'events') list = list.filter(p => p.ph === 'ev');
-    else if (k === 'verified') list = list.filter(p => p.u && (p.u.k === 'p' || p.u.k === 'c'));
+    else if (k === 'verified') list = list.filter(p => p.u && (p.u.k === 'p' || p.u.k === 'c' || p.u.k === 'm'));
+    else if (k === 'journalists') list = list.filter(p => vxIsJourno(p.u));
+    else if (k === 'managers') list = list.filter(p => p.u && p.u.k === 'm');
+    else if (k === 'teamnews') list = list.filter(p => p.nw === 'inj' || p.nw === 'bench' || p.nw === 'sus' || p.nw === 'tn');
     else if (k === 'hype') list = list.filter(p => p.ph === 'aw' || p.aw);
     return list;
   }
@@ -24339,7 +25007,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const n = mediaAllPosts().filter(p => p.u && p.u.h === handle).length;
     return '<div class="card mc-card mx-acct"><div class="mx-acct-top"><div class="mp-av lg" style="background:' + u.color + '">' + u.avatar + '</div><div><div class="mx-acct-name"><b>' + mEsc(info.name) + '</b> <span class="mp-ver">✔</span>' + mRoleTag(u.kind) + '</div><div class="mp-handle">' + mEsc(handle) + '</div></div><a class="mc-link" onclick="App.mediaAcct(\'\')">✕ Close</a></div>' +
       '<div class="mx-stats"><div><b>' + mFmt(info.followers) + '</b><small>Followers</small></div><div><b>' + mFmt(fb.size) + '</b><small>' + mEsc((fb.tierIcon || '') + ' ' + (fb.tier || 'Fanbase')) + '</small></div><div><b>' + n + '</b><small>Posts</small></div></div>' +
-      '<div class="mx-fan"><span>' + mEsc(fb.group || '') + '</span> <span class="mp-tag" onclick="App.mediaTag(\'' + mEsc(fb.tag || '') + '\')">' + mEsc(fb.tag || '') + '</span> ' + (info.kind === 'player' ? 'Fan mood ' + mHeatMeter(fb.heat || 0) : '') + '</div></div>';
+      '<div class="mx-fan"><span>' + mEsc(fb.group || '') + '</span> <span class="mp-tag" onclick="App.mediaTag(\'' + mEsc(fb.tag || '') + '\')">' + mEsc(fb.tag || '') + '</span> ' + (info.kind === 'player' ? 'Fan mood ' + mHeatMeter(fb.heat || 0) : '') + '</div>' + (info.voice && info.voice.label ? '<div class="mx-fan"><b>' + mEsc(info.voice.label) + '</b> · ' + mEsc(info.voice.blurb || '') + '</div>' : '') + '</div>';
   }
   function mAwardsHtml() {
     const w = sxAwardsWatch();
@@ -24378,9 +25046,18 @@ const PLAYSTYLE_BEHAVIOR = {
       top.players.map(e => { const a = mPlayerAcct(e.player, e.team), fb = sxFanbase(e.player, e.team); return row(a, e.player.name, a.h, e.f, mEsc(fb.group) + ' · ' + mEsc(fb.tier), teamMark(e.team, 20)); }).join('') + '</div>' +
       '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">🏟️ Biggest club accounts</div>' +
       top.clubs.map(e => { const a = mClubAcct(e.team); return row(a, a.n, a.h, e.f, '', teamMark(e.team, 20)); }).join('') + '</div></div>' +
+      (vxOn() ? mVoicesAccountsHtml(row) : '') +
       '<p class="mc-empty" style="margin-top:8px">Tap an account to see its posts. Players with posts in the feed open a full profile card.</p>';
   }
 
+  function mVoicesAccountsHtml(row) {
+    const mgrs = allTeams.filter(t => t.manager && t.manager.name && t.players && t.players.length).map(t => ({ t, a: vxMgrAcct(t) })).filter(x => x.a).sort((x, y) => y.a.f - x.a.f).slice(0, 10);
+    const jn = Object.keys(VX.JOURNOS).map(id => ({ id, o: MEDIA_OUTLETS['j_' + id] })).filter(x => x.o).sort((x, y) => y.o.followers - x.o.followers);
+    return '<div class="mx-grid" style="margin-top:10px"><div class="card mc-card"><div class="card-title" style="font-size:0.95rem">🧥 Biggest manager accounts</div>' +
+      mgrs.map(x => row(x.a, x.a.n, x.a.h, x.a.f, mEsc((VX.MARCH[x.a.m] || {}).label || ''), teamMark(x.t, 20))).join('') + '</div>' +
+      '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">✍️ Journalists</div>' +
+      jn.map(x => '<div class="mx-row"><span style="font-size:1.2rem;margin-right:8px">' + x.o.icon + '</span><div class="mx-who"><b>' + mEsc(x.o.name) + '</b> <span class="mp-ver">✔</span><small>' + mEsc(x.o.handle) + ' · ' + mEsc(x.o.bio) + '</small></div><b>' + mFmt(x.o.followers) + '</b></div>').join('') + '</div></div>';
+  }
   function mediaTab(id) { mediaTabId = id; mediaShown = 40; renderMediaView(); }
   function mediaFilter(kind, v) { if (kind === 'team') mediaFilterTeam = v; else mediaFilterKind = v; mediaShown = 40; renderMediaView(); }
   function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (['trending', 'awards', 'debates', 'accounts'].indexOf(mediaTabId) !== -1) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
