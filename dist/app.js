@@ -14072,6 +14072,7 @@ const PLAYSTYLE_BEHAVIOR = {
     pushIndividualTrophy('Yashin Trophy', computeYashinRanking(stats)[0] || null, type, extra);
     const ballon = computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
+    try { mediaLegacySeason(year, category, stats); } catch (e) {}
     // Only the season-scoped `stats` leaderboard bucket resets here — it's
     // what feeds each new season's Ballon d'Or/Gerd Müller/Yashin race from
     // zero. `careerStats` (a player's lifetime totals, shown on the Players
@@ -15211,6 +15212,7 @@ const PLAYSTYLE_BEHAVIOR = {
           pushTeamTrophy('World Cup', worldCup.champion, 'World Cup (Y' + worldCup.year + ')', extra);
           pushManagerAward('World Cup Winning Manager', worldCup.champion, 'World Cup (Y' + worldCup.year + ')', extra);
           recordIndividualAwardsFromAwardsObject(assignCompAwards(worldCup), 'World Cup (Y' + worldCup.year + ')', extra);
+          try { mediaLegacyComp('World Cup', worldCup.year, worldCup.stats, 'tournament'); } catch (e) {}
         }
       } else {
         worldCup.knockoutRound = buildKnockoutFromWinners(winners);
@@ -16865,6 +16867,7 @@ const PLAYSTYLE_BEHAVIOR = {
     try { mediaOnAwardsEve('tournament'); } catch (e) {}
     assignTournamentAwards();
     recordIndividualAwardsFromAwardsObject(tournament.awards, tName + ' Tournament', runExtra);
+    try { if (!tournament._legacyDone) { tournament._legacyDone = true; mediaLegacyTournament(tName, tournamentStats); } } catch (e) {}
     const stageTitle = document.getElementById('tour-stage-title');
     if (stageTitle) stageTitle.innerHTML = 'Champions: ' + teamMark(team, 20) + ' ' + team.name;
     renderTournamentPodium();
@@ -18956,6 +18959,7 @@ const PLAYSTYLE_BEHAVIOR = {
       pushTeamTrophy(comp.name, comp.champion, 'League (Y' + year + ')', extra);
       pushManagerAward(comp.name + ' Manager of the Season', comp.champion, 'League (Y' + year + ')', extra);
       recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
+      try { mediaLegacyComp(comp.name, year, comp.stats, 'league'); } catch (e) {}
     }
   }
 
@@ -19092,6 +19096,7 @@ const PLAYSTYLE_BEHAVIOR = {
         pushTeamTrophy('Champions League', champ, 'Season (Y' + year + ')', extra);
         pushManagerAward('Champions League Winning Manager', champ, 'Season (Y' + year + ')', extra);
         recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), 'Champions League (Y' + year + ')', extra);
+        try { mediaLegacyComp('Champions League', year, comp.stats, 'tournament'); } catch (e) {}
       }
     }
     currentSeasonComp = null;
@@ -19326,6 +19331,7 @@ const PLAYSTYLE_BEHAVIOR = {
         pushTeamTrophy(comp.name, comp.champion, 'Cup (Y' + year + ')', extra);
         pushManagerAward(comp.name + ' Winning Manager', comp.champion, 'Cup (Y' + year + ')', extra);
         recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
+        try { mediaLegacyComp(comp.name, year, comp.stats, 'tournament'); } catch (e) {}
       }
     } else {
       comp.rounds.push(buildKnockoutFromWinners(winners).fixtures);
@@ -21614,7 +21620,9 @@ const PLAYSTYLE_BEHAVIOR = {
     } catch (e) { return false; }
   }
   function mediaClearAll() {
+    const keepLg = mediaState && mediaState.sx && mediaState.sx.lg;   // the legacy ledger is history, not feed
     mediaState = mediaBlank();
+    if (keepLg) mediaState.sx.lg = keepLg;
     _mediaQueue = []; _mediaEventQueue = [];
     mediaSave();
     try { renderMediaView(); } catch (e) {}
@@ -21905,7 +21913,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (o.tg && o.tg.length) p.tg = o.tg.filter(Boolean);
     if (o.c) p.c = o.c;
     if (batch.when) p.w = batch.when;
-    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db', 'nw'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
+    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db', 'nw', 'rc'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
     batch.posts.push(p);
     return p;
   }
@@ -22863,7 +22871,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const pool = teams.filter(t => t && t.players && t.players.length);
     if (pool.length < 2) return;
     const fromT = mPick(pool);
-    const star = (fromT.players || []).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, 4);
+    const star = (sxOn() ? sxRepSort(fromT.players || []) : (fromT.players || []).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0))).slice(0, 4);
     const P = mPick(star); if (!P) return;
     const candidates = pool.filter(t => t.id !== fromT.id && mTeamOvr(t) >= mTeamOvr(fromT) - 2);
     const toT = candidates.length ? mPick(candidates) : mPick(pool.filter(t => t.id !== fromT.id));
@@ -22872,7 +22880,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const stage = Math.min(3, (mediaState.rumors[P.id] || 0));
     mediaState.rumors[P.id] = stage >= 3 ? 0 : stage + 1;
     const keys = Object.keys(mediaState.rumors); if (keys.length > 150) delete mediaState.rumors[keys[0]];
-    const c = { player: P.name, playerS: mSur(P.name), from: mTeamName(fromT), fromS: fromT.short || mTeamName(fromT), to: mTeamName(toT), toS: toT.short || mTeamName(toT), fee: mPick(MB_RUMOR.fees) };
+    const c = { player: P.name, playerS: mSur(P.name), from: mTeamName(fromT), fromS: fromT.short || mTeamName(fromT), to: mTeamName(toT), toS: toT.short || mTeamName(toT), fee: (sxOn() && sxTransferFee(P, fromT, toT, stage)) || mPick(MB_RUMOR.fees) };
     const base = { ts: [fromT.id, toT.id], tg: [mTag(c.playerS), '#TransferNews'], ph: 'wk' };
     if (!vxTransferNews(batch, P, fromT, toT, c, stage, base)) mkPost(batch, 'ferrante', 'rumor', mx(mFresh(MB_RUMOR.ferrante[stage], 'ru:f' + stage), c), Object.assign({}, base, { dt: 0, v: 1.8 + stage * 0.3, im: stage === 3 ? 3 : 1 }));
     mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_RUMOR.gaffe, 'ru:g'), c), Object.assign({}, base, { dt: 12, v: 1.2 }));
@@ -22954,7 +22962,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (teams.length >= 2 && mChance(bulk ? 0.1 : 0.5)) { try { mgRumor(batch, teams); } catch (e) { console.warn(e); } }
     if (!sxOn() && !bulk && mChance(0.25)) { try { mgDebate(batch); } catch (e) {} }
     try { mgCalendar(batch); } catch (e) {}
-    try { mgSocialWorld(batch, teams, bulk); mgAwardsTick(batch); mgDebateTick(batch, q, bulk); } catch (e) { console.warn('Social world error', e); }
+    try { mgSocialWorld(batch, teams, bulk); mgAwardsTick(batch); mgDebateTick(batch, q, bulk); if (!bulk || mChance(0.35)) mgLegacyTick(batch); } catch (e) { console.warn('Social world error', e); }
     try { vxInjuryReturns(batch); } catch (e) { console.warn('Social returns', e); }
     if (!bulk && q.length >= 4 && mChance(0.5)) {
       const tg = q.reduce((s, f) => s + f.tot, 0);
@@ -22968,6 +22976,8 @@ const PLAYSTYLE_BEHAVIOR = {
       try {
         if (ev.kind === 'trophy') mgTrophy(batch, ev);
         else if (ev.kind === 'award') mgAward(batch, ev);
+        else if (ev.kind === 'record') mgRecord(batch, ev);
+        else if (ev.kind === 'legacy') mgLegacyEvent(batch, ev);
         else if (ev.kind === 'seasonStart') mgSeasonStart(batch);
         else if (ev.kind === 'seasonEnd') mgSeasonEnd(batch);
       } catch (e) { console.warn('Media event error', e); }
@@ -23123,7 +23133,7 @@ const PLAYSTYLE_BEHAVIOR = {
     return e && e.player ? { player: e.player, team: e.team } : null;
   }
   function sxTopPlayers(team, n, filter) {
-    return ((team && team.players) || []).filter(p => !filter || filter(p)).slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, n);
+    return sxRepSort(((team && team.players) || []).filter(p => !filter || filter(p))).slice(0, n);
   }
   const sxIsGK = p => (p.pos || []).indexOf('GK') !== -1;
 
@@ -23179,16 +23189,15 @@ const PLAYSTYLE_BEHAVIOR = {
     _sxAchvCache = { n: list.length, map };
     return map;
   }
+  // Followers follow what a player has DONE: output, honours, records, form (see sxRepInfo). The overall
+  // rating is only a small prior that fades as minutes pile up, so a prolific 70-rated striker out-draws a
+  // quiet 85-rated one once the save has some history.
   function sxFollowers(player, team) {
     const F = sxCfg('player.followers', {});
     const R = mSeeded(mHash(player.id + '#fol'));
-    let v = (F.base || 50000) * Math.exp((F.ovrSlope || 0.12) * ((player.ovr || 70) - (F.ovrRef || 75)));
+    let v = (F.base || 50000) * Math.pow(1 + sxRepTotal(player) / (F.repRef || 20), F.repSlope || 1.3);
     v *= 1 + (F.fameWeight || 1.5) * (team ? mFame(team) : 0.3);
     v *= 1 + (F.jitter || 0.3) * (R() * 2 - 1);
-    const cs = (typeof careerStats !== 'undefined' && careerStats) || {};
-    const cnt = b => (((cs[b] || {})[player.id]) || {}).count || 0;
-    v *= 1 + (F.careerGoal || 0) * cnt('goals') + (F.careerAssist || 0) * cnt('assists') + (F.careerMotm || 0) * cnt('motm');
-    v *= 1 + (sxAchv()[player.id] || 0);
     v *= 1 + (F.heatWeight || 0) * (sxSt().heat[player.id] || 0);
     return Math.round(mClamp(v, F.min || 5000, F.max || 150000000));
   }
@@ -23198,7 +23207,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const persona = sxPersonaOf(player);
     return {
       n: player.name, h: sxHandle(player, team), a: '⚽', c: (team && team.color) || '#64748b', t: team ? team.id : null,
-      v: (player.ovr || 0) >= sxNum('verify.playerMinOvr', 0) ? 1 : 0, p: player.id, k: 'p', f: sxFollowers(player, team), m: persona.id
+      v: sxVerified(player) ? 1 : 0, p: player.id, k: 'p', f: sxFollowers(player, team), m: persona.id
     };
   }
   function mClubAcct(team) {
@@ -23294,10 +23303,9 @@ const PLAYSTYLE_BEHAVIOR = {
     return Math.max(0, Math.min(Math.round(base), Math.round((post.l || 100) * 0.6)));
   }
   function sxMates(team, author, n) {
-    const minOvr = sxNum('verify.playerMinOvr', 0);
-    const pool = ((team && team.players) || []).filter(p => p.id !== author.id && (p.ovr || 0) >= minOvr);
+    const pool = ((team && team.players) || []).filter(p => p.id !== author.id && sxVerified(p));
     const out = [];
-    const items = pool.map(p => { const pr = sxPersonaOf(p); return { w: Math.pow(Math.max(1, p.ovr || 60) / 60, 3) * (pr.social || 1), v: { player: p, persona: pr } }; });
+    const items = pool.map(p => { const pr = sxPersonaOf(p); return { w: sxRepWeight(p) * (pr.social || 1), v: { player: p, persona: pr } }; });
     for (let i = 0; i < n && items.length; i++) {
       const pick = mWeighted(items);
       out.push(pick);
@@ -23377,8 +23385,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const TH = sxCfg('thread', {});
     const rs = [], to = post.u && post.u.h;
     const add = (acct, text) => { if (text) rs.push({ u: mUserRef(acct), x: mClean(mVoice(text, acct.m)), l: sxReplyLikes(acct, post), to }); };
-    const minOvr = sxNum('verify.playerMinOvr', 0);
-    const pool = (o.players && o.players.length ? o.players : sxTopPlayers(team, 6, p => (p.ovr || 0) >= minOvr)).filter(Boolean);
+    const pool = (o.players && o.players.length ? o.players : sxTopPlayers(team, 6, p => sxVerified(p))).filter(Boolean);
     mShuffle(pool).slice(0, mInt((TH.clubPlayers || [1, 2])[0], (TH.clubPlayers || [1, 2])[1])).forEach(p => {
       const pr = sxPersonaOf(p);
       if (!mChance(mClamp((TH.mateReply == null ? 0.7 : TH.mateReply) * (pr.social || 1), 0, 1))) return;
@@ -23399,13 +23406,13 @@ const PLAYSTYLE_BEHAVIOR = {
     const acct = mPlayerAcct(ref.player, ref.team);
     if (!acct.v) return null;   // below the verification bar: no account
     const fb = sxFanbase(ref.player, ref.team);
-    const c = Object.assign({}, ctx, { player: ref.player.name, playerS: mSur(ref.player.name), pteam: mTeamName(ref.team), fanTag: fb.tag, fanGroup: fb.group });
+    const c = Object.assign(lgVars(ref.player, ref.team), ctx, { player: ref.player.name, playerS: mSur(ref.player.name), pteam: mTeamName(ref.team), fanTag: fb.tag, fanGroup: fb.group });
     let text = vxOn() ? vxPlayerText(bankName, c, ref) : '';
     if (!text) { text = sxLine(bankName, c, persona.id); if (text && vxOn()) text = vxStyle(text, vxProfile(ref.player, ref.team), true); }
     if (!text) return null;
     const post = sxPost(batch, acct, 'tw', text, Object.assign({}, base, { dt: o.dt != null ? o.dt : mInt(4, 170), v: o.v || 1.1, im: o.im || 0 }));
     if (!post) return null;
-    if (o.thread !== false) sxBuildThread(post, ref, trig, c, { rival: o.rival, rivalTeam: o.rivalTeam });
+    if (o.thread !== false) { sxBuildThread(post, ref, trig, c, { rival: o.rival, rivalTeam: o.rivalTeam }); try { lgThreadHistory(post, ref, trig, c); } catch (e) {} }
     // a media outlet quotes the post
     if (o.quote && mChance(o.quote)) {
       const outlets = sxCfg('match.quoteOutlets', ['bn']);
@@ -23495,7 +23502,7 @@ const PLAYSTYLE_BEHAVIOR = {
         const ref = sxPlayerRef(cd.id, team);
         if (!ref) return { w: 0, v: cd };
         const pr = sxPersonaOf(ref.player);
-        return { w: cd.w * (pr.post || 1) * (0.6 + Math.max(0, (ref.player.ovr || 60) - 55) / 40), v: Object.assign(cd, { ref }) };
+        return { w: cd.w * (pr.post || 1) * (0.6 + Math.min(2.4, sxRepTotal(ref.player) / 25)), v: Object.assign(cd, { ref }) };
       });
       const pick = mWeighted(items.filter(x => x.w > 0));
       if (!pick) break;
@@ -23554,8 +23561,9 @@ const PLAYSTYLE_BEHAVIOR = {
   function mgSocialTrophy(batch, ev, t, c, base) {
     if (!sxOn() || !t) return;
     const TR = sxCfg('trophy', {});
+    c = Object.assign(lgClubVars(t, ev && ev.name), c);
     const club = sxPost(batch, mClubAcct(t), 'tw', sxLine('cp_trophy', c, ''), Object.assign({}, base, { dt: 2, v: 2.2, im: 3 }));
-    const stars = sxTopPlayers(t, mInt((TR.players || [2, 4])[0], (TR.players || [2, 4])[1]), p => (p.ovr || 0) >= sxNum('verify.playerMinOvr', 0));
+    const stars = sxTopPlayers(t, mInt((TR.players || [2, 4])[0], (TR.players || [2, 4])[1]), p => sxVerified(p));
     if (club) sxBuildClubThread(club, t, 'trophy', c, { players: stars, rivalTeam: sxRivalClub(t) });
     stars.forEach(p => {
       const ref = sxPlayerRef(p.id, t); if (!ref) return;
@@ -23594,9 +23602,9 @@ const PLAYSTYLE_BEHAVIOR = {
     const n = mInt((W.chat || [0, 2])[0], (W.chat || [0, 2])[1]);
     for (let i = 0; i < n; i++) {
       const t = mPick(teams);
-      const pool = sxTopPlayers(t, 8, p => (p.ovr || 0) >= sxNum('verify.playerMinOvr', 0));
+      const pool = sxTopPlayers(t, 8, p => sxVerified(p));
       if (!pool.length) continue;
-      const items = pool.map(p => ({ w: Math.pow(Math.max(1, p.ovr || 60) / 60, 3) * (sxPersonaOf(p).post || 1), v: p }));
+      const items = pool.map(p => ({ w: sxRepWeight(p) * (sxPersonaOf(p).post || 1), v: p }));
       const p = mWeighted(items);
       const ref = sxPlayerRef(p.id, t); if (!ref) continue;
       const px = { my: mTeamName(t), myS: t.short || mTeamName(t) };
@@ -23870,6 +23878,14 @@ const PLAYSTYLE_BEHAVIOR = {
       sxPlayerPost(batch, ref, 'award', 'pp_award_win', Object.assign({}, cx, { my: c.team, myS: c.teamS }), base, { dt: mInt(3, 60), v: major ? 2.2 : 1.2, im: major ? 3 : 1, quote: major ? 0.6 : 0.2, clubQuote: major ? 0.7 : 0.3, heat: sxNum('heat.award', 0.6) });
       sxPost(batch, mClubAcct(ref.team), 'tw', sxLine('cp_award', cx, ''), Object.assign({}, base, { dt: mInt(5, 70), v: 1.5, im: major ? 2 : 0 }));
     }
+    if (ref && major) {
+      const wins = (lgHonours(p.id, 'aw').find(h => h.name === ev.name) || {}).n || 0;
+      if (wins >= 2) {
+        const hx = Object.assign(lgVars(ref.player, ref.team), cx, { nth: mOrd(wins), winner: ref.player.name, winnerS: mSur(ref.player.name), award: ev.name, fanTag: sxFanbase(ref.player, ref.team).tag });
+        const t = lgLine(['md_award_history'], hx); if (t) sxPost(batch, 'statbook', 'stat', t, Object.assign({}, base, { dt: mInt(10, 80), v: 1.4, free: true }));
+        const f = lgLine(['fx_award_history'], hx); if (f) { const fan = mPlayerFan(ref.player, ref.team, 'ah' + mInt(0, 300)); sxPost(batch, fan, 'tw', mVoice(f, fan.m), Object.assign({}, base, { dt: mInt(5, 120), v: 1.5 })); }
+      }
+    }
     if (!major) { s.hype && delete s.hype[ev.name]; return; }
     // the media marks its own homework
     if (hyped) {
@@ -24140,7 +24156,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (_sxTopCache.key === key) return _sxTopCache.v;
     let flat = [];
     try { flat = getAllPlayersFlat(); } catch (e) { flat = []; }
-    const pre = flat.slice().sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0)).slice(0, sxNum('accounts.prefilter', 300));
+    const pre = flat.map(e => ({ e, s: sxRepTotal(e.player) })).sort((a, b) => b.s - a.s).slice(0, sxNum('accounts.prefilter', 300)).map(x => x.e);
     const players = pre.map(e => ({ player: e.player, team: e.team, f: sxFollowers(e.player, e.team) })).sort((a, b) => b.f - a.f).slice(0, nPlayers);
     const clubs = allTeams.filter(t => t.players && t.players.length).map(t => ({ team: t, f: mClubAcct(t).f })).sort((a, b) => b.f - a.f).slice(0, nClubs);
     const v = { players, clubs };
@@ -24161,6 +24177,657 @@ const PLAYSTYLE_BEHAVIOR = {
     return out;
   }
   function sxDebates() { return sxSt().debates; }
+
+
+  // ==========================================================================
+  // APEX MEDIA CENTRE — legacy ledger · records · reputation · market value
+  // --------------------------------------------------------------------------
+  // What the social accounts KNOW about a player's past:
+  //   * Legacy ledger  - every finished season / awards round / league / cup /
+  //     tournament is snapshotted (top performers' lines) into
+  //     mediaState.sx.lg, so accounts can talk about Y1, Y2, Y3... and about
+  //     each World Cup / Champions League run, not just the current campaign.
+  //   * Records        - per competition family and per scope (single season,
+  //     single league season, single tournament) the best 5 totals ever are
+  //     kept for goals, assists, G+A, MOTM, clean sheets, saves and average
+  //     rating. Passing the top mark (live, mid-season, or when the season is
+  //     archived) is a featured "record broken" story.
+  //   * Reputation     - followers / verification / who gets talked about are
+  //     driven by what a player has DONE (output, honours, records, form).
+  //     The overall rating is only a small bootstrap prior for a brand new
+  //     save and fades as the player accumulates minutes.
+  //   * Market value   - a transfer fee that starts from ability but is
+  //     scaled by recent performance (weighted over the last seasons) and by
+  //     honours / records. Rumours quote this fee instead of a random one.
+  //
+  // Wording and every number live in media.json -> SOCIAL (cfg.legacy, cfg.rep,
+  // cfg.value, banks). Like the rest of the Media Centre nothing here touches
+  // the seeded sim RNG. Older saves load fine: the ledger starts empty and
+  // fills from the next archived season/tournament; honours are read
+  // retroactively from the existing trophy case.
+  // ==========================================================================
+
+  function lgNum(path, d) { return sxNum('legacy.' + path, d); }
+
+  function lgSt() {
+    const s = sxSt();
+    const L = s.lg || (s.lg = {});
+    L.pl = L.pl || {};      // playerId -> { n: name, h: [history rows] }
+    L.rec = L.rec || {};    // "scope|name" -> { s, n, st: { statId: [top entries] } }
+    L.log = L.log || [];    // record-broken log (newest last)
+    L.ms = L.ms || {};      // milestone memory   "pid:bucket" -> highest level announced
+    L.rb = L.rb || {};      // live record flags  (pruned)
+    L.tc = L.tc || {};      // tournament run counter per name
+    L.n = L.n || 0;         // bump on every ledger change (cache key)
+    return L;
+  }
+
+  const LG_KEYS = ['g', 'a', 'm', 'cs', 'sv'];
+
+  // ---- raw rows out of a stats-shaped object -----------------------------------------------------------------
+  function lgRows(src) {
+    const rows = {};
+    const ens = e => rows[e.id] || (rows[e.id] = { id: e.id, n: e.name, t: e.team, g: 0, a: 0, m: 0, cs: 0, sv: 0, r: 0, ap: 0 });
+    const pull = (bucket, key) => Object.values((src && src[bucket]) || {}).forEach(e => { if (e && e.id != null) ens(e)[key] = e.count || 0; });
+    pull('goals', 'g'); pull('assists', 'a'); pull('motm', 'm'); pull('cleanSheets', 'cs'); pull('saves', 'sv');
+    Object.values((src && src.ratings) || {}).forEach(e => { if (e && e.id != null) { const r = ens(e); r.r = e.avg || 0; r.ap = e.count || 0; } });
+    return rows;
+  }
+  function lgRowPts(r) {
+    const W = sxCfg('legacy.rowPts', { g: 3, a: 2, m: 3, cs: 1.5, sv: 0.1, rate: 0.3 });
+    let v = (r.g || 0) * W.g + (r.a || 0) * W.a + (r.m || 0) * W.m + (r.cs || 0) * W.cs + (r.sv || 0) * W.sv;
+    if (r.r && r.ap) v += (r.r - 6.5) * Math.min(r.ap, 30) * W.rate;
+    return v;
+  }
+  // value of one stat definition (legacy.stats[]) on a row, or null when it doesn't apply
+  function lgStatOf(r, st) {
+    if (st.derive === 'goals+assists') return (r.g || 0) + (r.a || 0);
+    const key = { goals: 'g', assists: 'a', motm: 'm', cleanSheets: 'cs', saves: 'sv', ratings: 'r' }[st.bucket];
+    if (!key) return null;
+    const v = r[key] || 0;
+    return st.dec ? Math.round(v * Math.pow(10, st.dec)) / Math.pow(10, st.dec) : v;
+  }
+  function lgFmtV(v, st) { return st && st.dec ? Number(v).toFixed(st.dec) : String(Math.round(v)); }
+
+  // ---- honours (read from the permanent trophy case, so they are retroactive) ---------------------------------------
+  let _lgHon = { n: -1, map: {} };
+  function lgHonourMap() {
+    const list = (typeof trophies !== 'undefined' && trophies) ? trophies : [];
+    if (_lgHon.n === list.length) return _lgHon.map;
+    const map = {};
+    const ens = id => map[id] || (map[id] = { aw: {}, tr: {} });
+    list.forEach(t => {
+      if (t.playerId && t.player) { const m = ens(t.playerId); m.aw[t.name] = (m.aw[t.name] || 0) + 1; }
+      else if (Array.isArray(t.playerIds) && !t.manager) t.playerIds.forEach(id => { const m = ens(id); m.tr[t.name] = (m.tr[t.name] || 0) + 1; });
+    });
+    _lgHon = { n: list.length, map };
+    return map;
+  }
+  // [{name, n}] biggest honour first
+  function lgHonours(pid, kind) {
+    const m = lgHonourMap()[pid]; if (!m) return [];
+    const W = sxCfg('player.followers.' + (kind === 'tr' ? 'trophyWeights' : 'awardWeights'), {});
+    return Object.keys(m[kind === 'tr' ? 'tr' : 'aw']).map(k => ({ name: k, n: m[kind === 'tr' ? 'tr' : 'aw'][k], w: W[k] != null ? W[k] : 0 }))
+      .sort((a, b) => (b.w * b.n) - (a.w * a.n) || b.n - a.n);
+  }
+
+  // ---- history rows ---------------------------------------------------------------------------------------------------
+  function lgPushHistory(L, r, scope, name, label, year) {
+    const e = L.pl[r.id] || (L.pl[r.id] = { n: r.n, h: [] });
+    e.n = r.n;
+    const key = scope + '|' + name;
+    if (e.h.some(x => x.c === key && x.l === label)) return;
+    const row = { c: key, l: label, y: year, t: r.t };
+    LG_KEYS.forEach(k => { if (r[k]) row[k] = r[k]; });
+    if (r.r) { row.r = Math.round(r.r * 10) / 10; row.ap = r.ap; }
+    e.h.push(row);
+    const isSeason = x => x.c.indexOf('season|') === 0;
+    const trim = (test, cap) => {
+      const idx = []; e.h.forEach((x, i) => { if (test(x)) idx.push(i); });
+      if (idx.length > cap) { const drop = {}; idx.slice(0, idx.length - cap).forEach(i => { drop[i] = 1; }); e.h = e.h.filter((x, i) => !drop[i]); }
+    };
+    trim(isSeason, lgNum('histSeason', 20));
+    trim(x => !isSeason(x), lgNum('histComp', 14));
+  }
+  function lgHistory(pid) { const e = lgSt().pl[pid]; return e ? e.h : []; }
+  function lgSeasonRows(pid) { return lgHistory(pid).filter(x => x.c.indexOf('season|') === 0).sort((a, b) => (a.y || 0) - (b.y || 0)); }
+
+  // ---- records ----------------------------------------------------------------------------------------------------------
+  function lgUpdateRecords(L, scope, name, label, year, list) {
+    const key = scope + '|' + name;
+    const cat = L.rec[key] || (L.rec[key] = { s: scope, n: name, st: {} });
+    const keep = lgNum('recordsKeep', 5);
+    const minC = sxNum('legacy.minCount.' + scope, 5);
+    const evs = [];
+    (sxCfg('legacy.stats', []) || []).forEach(st => {
+      const cand = [];
+      list.forEach(r => {
+        const v = lgStatOf(r, st); if (v == null || !(v >= (st.min || 1))) return;
+        if (st.rate && (r.ap || 0) < minC) return;
+        cand.push({ r, v });
+      });
+      if (!cand.length) return;
+      cand.sort((a, b) => b.v - a.v);
+      const arr = cat.st[st.id] || (cat.st[st.id] = []);
+      const had = arr.length > 0;
+      const prevTop = arr[0] ? Object.assign({}, arr[0]) : null;
+      let best = null;
+      cand.slice(0, keep).forEach(c => {
+        if (arr.some(e => e.id === c.r.id && e.l === label)) return;
+        if (arr.length >= keep && !(c.v > arr[arr.length - 1].v)) return;
+        const entry = { v: c.v, id: c.r.id, n: c.r.n, t: c.r.t, l: label, y: year };
+        arr.push(entry); arr.sort((x, y) => y.v - x.v);
+        if (arr.length > keep) arr.length = keep;
+        if (!best && arr.indexOf(entry) !== -1) best = entry;
+      });
+      if (!best || !had || !prevTop) return;
+      const type = best.v > prevTop.v ? 'broken' : (best.v === prevTop.v ? 'equalled' : '');
+      if (!type) return;
+      evs.push({ type, final: true, scope, cat: name, catKey: key, stat: st.id, statLabel: st.label, unit: st.unit, icon: st.icon || '', dec: st.dec || 0,
+        v: best.v, id: best.id, name: best.n, team: best.t, label, year, prev: prevTop });
+    });
+    return evs;
+  }
+
+  // ---- snapshots (called from the season / tournament engines) --------------------------------------------------
+  function lgSnapshot(scope, name, label, year, src, o) {
+    if (!sxOn() || !src) return [];
+    o = o || {};
+    const L = lgSt();
+    const rows = lgRows(src);
+    const list = Object.values(rows);
+    if (!list.length) return [];
+    const cap = lgNum(scope === 'season' ? 'linesSeason' : 'linesComp', 30);
+    list.forEach(r => { r.pts = lgRowPts(r); });
+    list.slice().sort((a, b) => b.pts - a.pts).slice(0, cap).forEach(r => { if (r.pts > 0) lgPushHistory(L, r, scope, name, label, year); });
+    const evs = lgUpdateRecords(L, scope, name, label, year, list);
+    L.n++;
+    evs.forEach(ev => {
+      L.log.push({ type: ev.type, catKey: ev.catKey, stat: ev.stat, v: ev.v, id: ev.id, n: ev.name, t: ev.team, l: label, y: year, pv: ev.prev ? ev.prev.v : null, pn: ev.prev ? ev.prev.n : '' });
+      while (L.log.length > lgNum('logKeep', 40)) L.log.shift();
+      mediaOnRecord(ev);
+    });
+    if (o.recap) mediaOnLegacy({ sub: 'recap', scope, cat: name, label, year, ids: list.slice().sort((a, b) => b.pts - a.pts).slice(0, o.recap).filter(r => r.pts > 0).map(r => ({ id: r.id, team: r.t })) });
+    return evs;
+  }
+  // season-wide global leaderboard, just before it is wiped
+  function mediaLegacySeason(year, category, src) {
+    try {
+      if (!sxOn()) return;
+      const standalone = category === 'standalone-global';
+      lgSnapshot('season', sxCfg('legacy.allName', 'All competitions'), (standalone ? 'Round ' : 'Y') + year, year, src, { recap: lgNum('recapPlayers', 3) });
+      mediaSave();
+    } catch (e) { console.warn('Legacy season', e); }
+  }
+  // a league / the season's Champions League / the season's World Cup
+  function mediaLegacyComp(name, year, src, kind) {
+    try {
+      if (!sxOn()) return;
+      lgSnapshot(kind === 'league' ? 'league' : 'tournament', name, 'Y' + year, year, src, { recap: kind === 'league' ? 0 : lgNum('recapTournament', 2) });
+      mediaSave();
+    } catch (e) { console.warn('Legacy comp', e); }
+  }
+  // a standalone tournament run (World Cup / Champions League / league cups ...)
+  function mediaLegacyTournament(name, src) {
+    try {
+      if (!sxOn()) return;
+      const L = lgSt();
+      L.tc[name] = (L.tc[name] || 0) + 1;
+      lgSnapshot('tournament', name, '#' + L.tc[name], L.tc[name], src, { recap: lgNum('recapTournament', 2) });
+      mediaSave();
+    } catch (e) { console.warn('Legacy tournament', e); }
+  }
+  function mediaOnRecord(ev) {
+    if (!mediaReady) return;
+    ensureMedia();
+    _mediaEventQueue.push(Object.assign({ kind: 'record' }, ev));
+    mediaScheduleFlush();
+  }
+  function mediaOnLegacy(ev) {
+    if (!mediaReady) return;
+    ensureMedia();
+    _mediaEventQueue.push(Object.assign({ kind: 'legacy' }, ev));
+    mediaScheduleFlush();
+  }
+
+
+  // ==========================================================================
+  // Reputation: what a player has done, not what the game rates him
+  // ==========================================================================
+  let _lgRep = { key: '', map: {}, recMap: null, recN: -1 };
+  function lgRepKey() {
+    return (sxSt().m || 0) + ':' + (((typeof trophies !== 'undefined' && trophies) ? trophies.length : 0)) + ':' + lgSt().n;
+  }
+  function lgRecordMap() {
+    const L = lgSt();
+    if (_lgRep.recMap && _lgRep.recN === L.n) return _lgRep.recMap;
+    const map = {};
+    Object.keys(L.rec).forEach(key => {
+      const cat = L.rec[key];
+      Object.keys(cat.st).forEach(sid => cat.st[sid].forEach((e, i) => { (map[e.id] = map[e.id] || []).push({ key, scope: cat.s, cat: cat.n, stat: sid, rank: i, v: e.v, l: e.l, y: e.y }); }));
+    });
+    _lgRep.recMap = map; _lgRep.recN = L.n;
+    return map;
+  }
+  function lgRecordsHeld(pid, topOnly) {
+    return (lgRecordMap()[pid] || []).filter(r => !topOnly || r.rank === 0);
+  }
+
+  // Breakdown of a player's reputation points: out (career output), cur (this season's extra weight),
+  // hon (honours), rec (records) and prior (rating bootstrap that fades with minutes played).
+  function sxRepInfo(player) {
+    if (!player) return { pts: 0, out: 0, cur: 0, hon: 0, rec: 0, prior: 0, total: 0 };
+    const k = lgRepKey();
+    if (_lgRep.key !== k) { _lgRep.key = k; _lgRep.map = {}; }
+    const hit = _lgRep.map[player.id]; if (hit) return hit;
+    const W = sxCfg('rep.weights', { goals: 0.6, assists: 0.45, motm: 1.6, cleanSheets: 0.4, saves: 0.02, puskas: 2, per90: 0.05 });
+    const cs = (typeof careerStats !== 'undefined' && careerStats) || {};
+    const ss = (typeof stats !== 'undefined' && stats) || {};
+    const cnt = (src, b) => (((src[b] || {})[player.id]) || {}).count || 0;
+    const mins = cnt(cs, 'minutes');
+    const out = (key => cnt(cs, 'goals') * W.goals + cnt(cs, 'assists') * W.assists + cnt(cs, 'motm') * W.motm + cnt(cs, 'cleanSheets') * W.cleanSheets + cnt(cs, 'saves') * W.saves + cnt(cs, 'puskas') * W.puskas + (mins / 90) * W.per90)();
+    const cur = (cnt(ss, 'goals') * W.goals + cnt(ss, 'assists') * W.assists + cnt(ss, 'motm') * W.motm + cnt(ss, 'cleanSheets') * W.cleanSheets + cnt(ss, 'saves') * W.saves) * sxNum('rep.currentBoost', 0.5);
+    let hon = 0;
+    const achv = (typeof sxAchv === 'function') ? (sxAchv()[player.id] || 0) : 0;
+    hon = achv * sxNum('rep.honourPts', 40);
+    const RP = sxCfg('rep.recordPts', [10, 4, 2, 1, 0.5]);
+    let rec = 0;
+    (lgRecordMap()[player.id] || []).forEach(r => { rec += RP[Math.min(r.rank, RP.length - 1)] || 0; });
+    rec = Math.min(rec, sxNum('rep.recordCap', 40));
+    const P = sxCfg('rep.prior', { max: 22, ovrLo: 62, ovrHi: 92, fadeMatches: 40 });
+    const ovrN = mClamp(((player.ovr || 60) - P.ovrLo) / Math.max(1, P.ovrHi - P.ovrLo), 0, 1);
+    const prior = P.max * ovrN / (1 + (mins / 90) / Math.max(1, P.fadeMatches));
+    const pts = out + cur + hon + rec;
+    const info = { pts, out, cur, hon, rec, prior, total: pts + prior };
+    _lgRep.map[player.id] = info;
+    return info;
+  }
+  function sxRepTotal(p) { return sxRepInfo(p).total; }
+  function sxVerified(p) { return sxRepInfo(p).total >= sxNum('verify.minRep', 8); }
+  // how often a player is picked to talk / be talked about
+  function sxRepWeight(p) { return Math.pow(1 + sxRepTotal(p) / Math.max(1, sxNum('rep.weightRef', 15)), sxNum('rep.weightPow', 1.3)); }
+  function sxRepSort(list) {
+    return list.map(p => ({ p, s: sxRepTotal(p) })).sort((a, b) => b.s - a.s || (b.p.ovr || 0) - (a.p.ovr || 0)).map(x => x.p);
+  }
+
+  // ==========================================================================
+  // Market value / transfer fee: ability x recent performance x honours
+  // ==========================================================================
+  function lgPosGroup(p) {
+    const G = sxCfg('value.groups', {});
+    const pos = ((p && p.pos) || [])[0] || '';
+    const ks = Object.keys(G);
+    for (let i = 0; i < ks.length; i++) if (G[ks[i]].indexOf(pos) !== -1) return ks[i];
+    return 'MF';
+  }
+  function lgFormRowPts(r) {
+    const W = sxCfg('value.form.w', { g: 1, a: 0.75, m: 2, cs: 0.6, sv: 0.03, rate: 0.5 });
+    let v = (r.g || 0) * W.g + (r.a || 0) * W.a + (r.m || 0) * W.m + (r.cs || 0) * W.cs + (r.sv || 0) * W.sv;
+    if (r.r && r.ap) v += (r.r - 6.5) * Math.min(r.ap, 30) * W.rate;
+    return v;
+  }
+  function lgSeasonProgress() {
+    try {
+      if (!season) return 1;
+      let tot = 0, played = 0;
+      Object.values(season.leagues || {}).forEach(lg => { tot = Math.max(tot, (lg.rounds || []).length); played = Math.max(played, lg.currentRound || 0); });
+      return tot ? mClamp(played / tot, 0, 1) : 1;
+    } catch (e) { return 1; }
+  }
+  // seasonal output points, recency weighted (current season counts pro-rata, the unplayed part filled from last season)
+  function lgFormPts(player) {
+    const ss = (typeof stats !== 'undefined' && stats) || {};
+    const cur = lgRows(ss)[player.id];
+    const hist = lgSeasonRows(player.id).slice().reverse().map(lgFormRowPts);
+    const ws = sxCfg('value.form.weights', [1, 0.65, 0.4]);
+    const series = [];
+    const p = lgSeasonProgress();
+    if (cur && (cur.ap || cur.g || cur.a || cur.m || cur.cs)) {
+      let c = lgFormRowPts(cur);
+      if (hist.length && p < 1) c += (1 - p) * hist[0];
+      series.push(c);
+    }
+    hist.forEach(h => series.push(h));
+    let num = 0, den = 0;
+    series.slice(0, ws.length).forEach((x, i) => { num += x * ws[i]; den += ws[i]; });
+    return den ? num / den : null;
+  }
+  function sxMarketValue(player, team) {
+    const V = sxCfg('value', {});
+    if (!player || !V.abilityBase) return null;
+    const info = sxRepInfo(player);
+    const ability = V.abilityBase * Math.exp((V.abilitySlope || 0.135) * ((player.ovr || 60) - (V.abilityRef || 60)));
+    const g = lgPosGroup(player);
+    const F = V.form || {};
+    const fp = lgFormPts(player);
+    const cs = (typeof careerStats !== 'undefined' && careerStats) || {};
+    const matches = ((((cs.minutes || {})[player.id]) || {}).count || 0) / 90;
+    let form = 1;
+    if (fp != null) {
+      const f = fp / ((F.posScale || {})[g] || 30);
+      form = (F.min || 0.7) + ((F.max || 2.6) - (F.min || 0.7)) * (1 - Math.exp(-f / (F.k || 1)));
+      const w = mClamp(matches / (F.evidenceMatches || 15), 0, 1);
+      form = 1 + (form - 1) * w;
+    }
+    const prem = 1 + Math.min(V.honourMax || 0.9, (info.hon + info.rec) * (V.honourPerPoint || 0.004));
+    const posMult = ((V.posValue || {})[g]) || 1;
+    let m = ability * form * prem * posMult;
+    m = mClamp(m, V.min || 0.5, V.max || 400);
+    return { m, ability, form, prem, posMult, group: g, formPts: fp, rep: info };
+  }
+  function lgRound(m) {
+    const steps = sxCfg('value.round', [{ upTo: 10, step: 0.5 }, { upTo: 50, step: 1 }, { upTo: 150, step: 5 }, { step: 10 }]);
+    let step = 1;
+    for (let i = 0; i < steps.length; i++) { if (steps[i].upTo == null || m <= steps[i].upTo) { step = steps[i].step; break; } }
+    return Math.max(step, Math.round(m / step) * step);
+  }
+  function sxMoneyText(m) {
+    const cur = sxCfg('value.currency', '€'), unit = sxCfg('value.unit', 'm');
+    const r = lgRound(m);
+    return cur + (r % 1 ? r.toFixed(1) : String(r)) + unit;
+  }
+  function sxValueText(player, team) {
+    const v = sxMarketValue(player, team); return v ? sxMoneyText(v.m) : '';
+  }
+  // The fee a buying club is asked for: market value, nudged by who is selling and how far the talks have got.
+  function sxTransferFee(player, fromT, toT, stage) {
+    const v = sxMarketValue(player, fromT); if (!v) return '';
+    const V = sxCfg('value.fee', {});
+    let m = v.m;
+    m *= 1 + (V.sellerFame == null ? 0.2 : V.sellerFame) * (fromT ? mFame(fromT) : 0.3);
+    m *= 1 - (V.buyerFame == null ? 0.05 : V.buyerFame) * (toT ? (1 - mFame(toT)) : 0);
+    const st = (V.stage || [1.12, 1.05, 1, 1])[Math.min(stage || 0, 3)];
+    m *= st;
+    return sxMoneyText(mClamp(m, sxNum('value.min', 0.5), sxNum('value.max', 400)));
+  }
+  function sxMostValuable(n) {
+    const out = [];
+    (allTeams || []).forEach(t => (t.players || []).forEach(p => {
+      if (sxRepTotal(p) < sxNum('value.listMinRep', 1)) return;
+      out.push({ p, t, s: sxRepTotal(p) });
+    }));
+    out.sort((a, b) => b.s - a.s);
+    return out.slice(0, sxNum('value.listPrefilter', 120)).map(x => ({ player: x.p, team: x.t, v: sxMarketValue(x.p, x.t) })).filter(x => x.v).sort((a, b) => b.v.m - a.v.m).slice(0, n || 15);
+  }
+
+
+  // ==========================================================================
+  // Legacy-aware wording: what an account knows when it writes a post
+  // ==========================================================================
+  function lgRowVars(r) {
+    return { label: r.l, g: r.g || 0, a: r.a || 0, m: r.m || 0, cs: r.cs || 0, sv: r.sv || 0, team: r.t || '' };
+  }
+  function lgFmt(name, c) { return mx(sxCfg('legacy.fmt.' + name, ''), c); }
+
+  // Variables that any player post / reply can use. Empty values make a template drop out (mOk), so a
+  // brand-new save simply never produces a "last season" line.
+  function lgVars(player, team) {
+    const c = {};
+    if (!player) return c;
+    const pid = player.id, L = lgSt();
+    const cs = (typeof careerStats !== 'undefined' && careerStats) || {};
+    const cnt = b => (((cs[b] || {})[pid]) || {}).count || 0;
+    c.careerGoals = cnt('goals') || ''; c.careerAssists = cnt('assists') || ''; c.careerMotm = cnt('motm') || ''; c.careerCleanSheets = cnt('cleanSheets') || '';
+    const ss = lgSeasonRows(pid);
+    c.seasonsPlayed = ss.length || '';
+    const last = ss[ss.length - 1];
+    if (last) {
+      const lv = lgRowVars(last);
+      c.lastSeasonLabel = last.l;
+      c.lastSeasonGoals = last.g || ''; c.lastSeasonAssists = last.a || '';
+      c.lastSeason = lgFmt(last.g || last.a ? 'season' : 'seasonKeeper', lv);
+    }
+    const bestG = ss.slice().sort((x, y) => (y.g || 0) - (x.g || 0))[0];
+    if (bestG && bestG.g) { c.bestSeasonGoals = bestG.g; c.bestSeasonLabel = bestG.l; }
+    const bestA = ss.slice().sort((x, y) => (y.a || 0) - (x.a || 0))[0];
+    if (bestA && bestA.a) { c.bestSeasonAssists = bestA.a; c.bestSeasonAssistsLabel = bestA.l; }
+    if (ss.length >= 2) c.seasonTrail = ss.slice(-4).map(r => lgFmt('trail', lgRowVars(r))).join(' · ');
+    // honours
+    const aw = lgHonours(pid, 'aw'), tr = lgHonours(pid, 'tr');
+    c.awardCount = aw.reduce((s, x) => s + x.n, 0) || '';
+    c.trophyCount = tr.reduce((s, x) => s + x.n, 0) || '';
+    if (aw.length) {
+      c.honours = aw.slice(0, 3).map(h => lgFmt(h.n > 1 ? 'honourN' : 'honour1', { n: h.n, award: h.name })).join(', ');
+      c.topHonour = aw[0].name; c.topHonourN = aw[0].n;
+    }
+    if (tr.length) c.topTrophy = tr[0].name + (tr[0].n > 1 ? ' (x' + tr[0].n + ')' : '');
+    // records
+    const held = lgRecordsHeld(pid, true);
+    c.recordsHeld = held.length || '';
+    if (held[0]) { const st = (sxCfg('legacy.stats', []) || []).find(s => s.id === held[0].stat) || {}; c.recordLine = lgFmt('recordLine', { v: lgFmtV(held[0].v, st), stat: (st.unit || held[0].stat), scope: lgScopeText(held[0].scope, held[0].cat), label: held[0].l }); }
+    // last tournament
+    const tours = lgHistory(pid).filter(x => x.c.indexOf('tournament|') === 0).sort((x, y) => (x.y || 0) - (y.y || 0));
+    const lt = tours[tours.length - 1];
+    if (lt) { const tn = lt.c.split('|')[1]; c.lastTour = lgFmt('tour', Object.assign(lgRowVars(lt), { cat: tn })); c.lastTourName = tn; c.lastTourGoals = lt.g || ''; }
+    return c;
+  }
+  function lgScopeText(scope, cat) { return mx(sxCfg('legacy.scopeText.' + scope, ''), { cat }); }
+  // club side: how many times it has lifted this trophy before
+  function lgClubVars(team, trophy) {
+    const c = {};
+    if (!team) return c;
+    const list = (typeof trophies !== 'undefined' && trophies) ? trophies : [];
+    const mine = list.filter(t => !t.player && !t.manager && t.team === team.name && (!trophy || t.name === trophy));
+    if (mine.length) { c.titleN = mine.length; c.titleOrd = mOrd(mine.length); }
+    const prev = mine.length > 1 ? mine[mine.length - 2] : null;
+    if (prev && prev.year) c.prevTitleYear = prev.year;
+    const all = list.filter(t => !t.player && !t.manager && t.team === team.name);
+    if (all.length) c.clubTrophies = all.length;
+    return c;
+  }
+
+  // Like sxLine, but a template is only eligible when EVERY variable it uses has a value, and nothing is
+  // posted when none qualifies - so a history line never appears for a player who has no history.
+  function lgLine(names, c) {
+    for (let i = 0; i < names.length; i++) {
+      const list = MB['sx_' + names[i]]; if (!list) continue;
+      const ok = list.filter(t => { const re = /\{([A-Za-z0-9_]+)(?:\|[a-z]+)?\}/g; let m; while ((m = re.exec(t))) { if (c[m[1]] == null || c[m[1]] === '') return false; } return true; });
+      if (ok.length) return mx(mFresh(ok, 'sxlg:' + names[i] + ':' + ok.length), c);
+    }
+    return '';
+  }
+  // A fan (or a stats account) adds a reply that shows they know the player's earlier seasons and honours.
+  function lgThreadHistory(post, ref, trig, c) {
+    if (!post || !ref || !mChance(sxNum('legacy.replyChance', 0.3))) return;
+    const asStat = mChance(0.25);
+    const text = lgLine(asStat ? ['md_legacy_reply', 'fx_legacy_reply'] : ['fx_legacy_reply'], c);
+    if (!text) return;
+    const acct = asStat ? 'statbook' : mPlayerFan(ref.player, ref.team, 'lh' + mInt(0, 400));
+    const r = { u: mUserRef(acct), x: mClean(typeof acct === 'string' ? text : mVoice(text, acct.m)), l: sxReplyLikes(typeof acct === 'string' ? { f: 200000 } : acct, post), to: post.u && post.u.h };
+    post.r = (post.r || []).concat([r]); post.rp = Math.max(post.rp || 0, post.r.length);
+  }
+
+  // ==========================================================================
+  // Record stories (final tallies, and live while a season / tournament is running)
+  // ==========================================================================
+  function lgTeamByName(n) { return (allTeams || []).find(t => t.name === n) || null; }
+  function mgRecord(batch, ev) {
+    if (!sxOn()) return;
+    const team = lgTeamByName(ev.team);
+    const st = (sxCfg('legacy.stats', []) || []).find(s => s.id === ev.stat) || {};
+    const prevRef = ev.prev && ev.prev.id != null ? sxPlayerRef(ev.prev.id) : null;
+    const kind = ev.type === 'equalled' ? 'equal' : 'broken';
+    const c = {
+      me: ev.name, meS: mSur(ev.name), team: team ? mTeamName(team) : ev.team, teamS: team ? (team.short || mTeamName(team)) : ev.team,
+      statLabel: ev.statLabel || '', unit: ev.unit || '', v: lgFmtV(ev.v, st), cat: ev.cat, label: ev.label,
+      scopeText: lgScopeText(ev.scope, ev.cat), icon: ev.icon || '',
+      prevV: ev.prev ? lgFmtV(ev.prev.v, st) : '', prev: ev.prev ? ev.prev.n : '', prevS: ev.prev ? mSur(ev.prev.n) : '', prevLabel: ev.prev ? ev.prev.l : '',
+      prevTeam: ev.prev ? ev.prev.t : '', diff: ev.prev ? lgFmtV(Math.max(0, ev.v - ev.prev.v), st) : '',
+      recordTag: '#RecordBreaker', catTag: mTag(ev.cat)
+    };
+    const base = { ts: team ? [team.id] : [], tg: [c.recordTag, c.catTag, mTag(c.teamS)], c: ev.cat, ph: ev.live ? 'aw' : 'ev', im: 3, rc: 1, free: true };
+    const own = !!(ev.prev && ev.prev.id === ev.id);   // beating his own mark
+    const tail = kind === 'equal' ? 'equal' : (ev.live ? (own ? 'live_own' : 'live') : (own ? 'own' : 'broken'));
+    const outlets = sxCfg('legacy.outlets', ['bn', 'statbook']);
+    outlets.forEach((o, i) => { const t = sxLineAny(['md_record_' + (i === 0 ? '' : 'stat_') + tail, 'md_record_' + tail], c, ''); if (t) sxPost(batch, o, i === 0 ? 'news' : 'stat', t, Object.assign({}, base, { dt: i * 6, v: 2.2 - i * 0.4 })); });
+    const ref = sxPlayerRef(ev.id, team);
+    if (ref) {
+      const cx = Object.assign({}, c, { my: c.team, myS: c.teamS });
+      sxPlayerPost(batch, ref, 'record', 'pp_record' + (tail === 'broken' ? '' : '_' + tail), cx, base, { dt: mInt(3, 60), v: 2.2, im: 3, quote: 0.6, clubQuote: 0.6, heat: sxNum('heat.record', 0.35) });
+      const club = sxLineAny(['cp_record' + (tail === 'broken' ? '' : '_' + tail), 'cp_record'], cx, '');
+      if (club) sxPost(batch, mClubAcct(ref.team), 'tw', club, Object.assign({}, base, { dt: mInt(4, 70), v: 1.6 }));
+      for (let i = 0; i < sxNum('legacy.recordFans', 2); i++) { const fan = mPlayerFan(ref.player, ref.team, 'rc' + mInt(0, 300)); sxPost(batch, fan, 'tw', mVoice(sxLineAny(['fx_record' + (own ? '_own' : ''), 'fx_record'], cx, ''), fan.m), Object.assign({}, base, { dt: mInt(5, 160), v: 1.8 })); }
+    }
+    // the previous holder gives his reaction
+    if (!ev.live && prevRef && !own && mChance(sxNum('legacy.prevHolderReply', 0.7))) {
+      const pc = Object.assign({}, c, { my: mTeamName(prevRef.team), myS: prevRef.team.short || mTeamName(prevRef.team) });
+      sxPlayerPost(batch, prevRef, 'recordprev', 'pp_record_prev', pc, base, { dt: mInt(20, 200), v: 1.6, im: 1, thread: mChance(0.5) });
+    }
+  }
+
+  // Live: someone's running total (this season / this tournament) has just passed the all-time mark.
+  function lgLiveSources() {
+    const out = [];
+    if (typeof stats !== 'undefined' && stats) out.push({ scope: 'season', name: sxCfg('legacy.allName', 'All competitions'), src: stats, label: sxCycleKey() });
+    if (typeof tournament !== 'undefined' && tournament && !tournament.champion && typeof tournamentStats !== 'undefined') {
+      const tn = tournament.competitionName || (tournament.type === 'worldcup' ? 'World Cup' : 'Champions League');
+      out.push({ scope: 'tournament', name: tn, src: tournamentStats, label: 'run' + (tournament._runId || '') });
+    }
+    return out;
+  }
+  function lgLiveRecords(batch) {
+    const L = lgSt();
+    let left = lgNum('liveMax', 2);
+    const minC = k => sxNum('legacy.minCount.' + k, 5);
+    lgLiveSources().forEach(S => {
+      if (left <= 0) return;
+      const cat = L.rec[S.scope + '|' + S.name]; if (!cat) return;
+      const list = Object.values(lgRows(S.src));
+      (sxCfg('legacy.stats', []) || []).forEach(st => {
+        if (left <= 0) return;
+        const top = (cat.st[st.id] || [])[0]; if (!top || st.rate) return;   // average rating only counts once the season is over
+        let best = null;
+        list.forEach(r => { const v = lgStatOf(r, st); if (v != null && (!best || v > best.v)) best = { r, v }; });
+        if (!best || best.v < top.v) return;
+        const type = best.v > top.v ? 'broken' : 'equalled';
+        if (type === 'equalled' && best.r.id === top.id && top.l === S.label) return;
+        const fk = S.scope + '|' + S.name + '|' + st.id + '|' + best.r.id + '|' + S.label + '|' + type;
+        if (L.rb[fk]) return;
+        if (type === 'equalled' && L.rb[fk.replace('equalled', 'broken')]) return;
+        L.rb[fk] = 1;
+        const keys = Object.keys(L.rb); if (keys.length > 120) keys.slice(0, keys.length - 120).forEach(k => { delete L.rb[k]; });
+        left--;
+        mgRecord(batch, { type, live: true, scope: S.scope, cat: S.name, catKey: S.scope + '|' + S.name, stat: st.id, statLabel: st.label, unit: st.unit, icon: st.icon || '', dec: st.dec || 0,
+          v: best.v, id: best.r.id, name: best.r.n, team: best.r.t, label: S.label === sxCycleKey() ? S.label : S.name, year: null, prev: top });
+      });
+    });
+  }
+
+  // ==========================================================================
+  // Career milestones + throwbacks (the accounts remember earlier seasons)
+  // ==========================================================================
+  function lgMilestones(batch) {
+    const L = lgSt();
+    const M = sxCfg('legacy.milestones', {});
+    const win = sxCfg('legacy.msWindow', {});
+    const labels = sxCfg('legacy.msLabels', {});
+    const cs = (typeof careerStats !== 'undefined' && careerStats) || {};
+    let left = lgNum('milestoneMax', 2);
+    Object.keys(M).forEach(b => {
+      if (left <= 0) return;
+      const levels = M[b];
+      Object.values(cs[b] || {}).forEach(e => {
+        if (left <= 0 || !e || e.count < levels[0]) return;
+        let idx = -1; levels.forEach((lv, i) => { if (e.count >= lv) idx = i; });
+        const key = e.id + ':' + b;
+        if (L.ms[key] == null) {
+          // first time we see this player in an existing save: stay quiet unless he has only just crossed the line
+          const justCrossed = e.count - levels[idx] <= (win[b] == null ? 2 : win[b]);
+          L.ms[key] = justCrossed ? idx - 1 : idx;
+        }
+        if (idx <= L.ms[key]) return;
+        L.ms[key] = idx;
+        const team = lgTeamByName(e.team); const ref = sxPlayerRef(e.id, team);
+        if (!ref) return;
+        left--;
+        const c = Object.assign(lgVars(ref.player, ref.team), { n: levels[idx], statName: labels[b] || b, me: ref.player.name, meS: mSur(ref.player.name), team: mTeamName(ref.team), teamS: ref.team.short || mTeamName(ref.team), my: mTeamName(ref.team), myS: ref.team.short || mTeamName(ref.team), recordTag: '#Milestone' });
+        const base = { ts: [ref.team.id], tg: ['#Milestone', mTag(c.teamS)], ph: 'wk', im: 2, free: true };
+        const t = sxLineAny(['md_milestone'], c, ''); if (t) sxPost(batch, 'statbook', 'stat', t, Object.assign({}, base, { dt: 1, v: 1.5 }));
+        sxPlayerPost(batch, ref, 'milestone', 'pp_milestone', c, base, { dt: mInt(3, 90), v: 1.7, im: 2, quote: 0.4, clubQuote: 0.5, heat: 0.15 });
+        const club = sxLineAny(['cp_milestone'], c, ''); if (club) sxPost(batch, mClubAcct(ref.team), 'tw', club, Object.assign({}, base, { dt: mInt(5, 60), v: 1.4 }));
+      });
+    });
+  }
+  // an occasional look back at earlier seasons from a fan, the player himself or a stats outlet
+  function lgThrowback(batch) {
+    if (!mChance(lgNum('throwback', 0.25))) return;
+    const L = lgSt();
+    const ids = Object.keys(L.pl).filter(id => (L.pl[id].h || []).filter(x => x.c.indexOf('season|') === 0).length >= 2);
+    if (!ids.length) return;
+    const items = ids.map(id => { const r = sxPlayerRef(id); return r ? { w: sxRepWeight(r.player), v: r } : null; }).filter(Boolean);
+    if (!items.length) return;
+    const ref = mWeighted(items); if (!ref) return;
+    const c = Object.assign(lgVars(ref.player, ref.team), { me: ref.player.name, meS: mSur(ref.player.name), team: mTeamName(ref.team), teamS: ref.team.short || mTeamName(ref.team), my: mTeamName(ref.team), myS: ref.team.short || mTeamName(ref.team) });
+    if (!c.seasonTrail) return;
+    c.fanTag = sxFanbase(ref.player, ref.team).tag;
+    const base = { ts: [ref.team.id], tg: [mTag(c.teamS)], ph: 'wk', im: 0 };
+    const who = mWeighted([{ w: 3, v: 'fan' }, { w: 2, v: 'player' }, { w: 2, v: 'stat' }]);
+    if (who === 'player') sxPlayerPost(batch, ref, 'legacy', 'pp_legacy', c, base, { dt: mInt(0, 100), v: 1.1 });
+    else if (who === 'fan') { const fan = mPlayerFan(ref.player, ref.team, 'tb' + mInt(0, 300)); sxPost(batch, fan, 'tw', mVoice(sxLine('fx_legacy', c, ''), fan.m), Object.assign({}, base, { dt: mInt(0, 120), v: 1.3 })); }
+    else { const t = sxLine('md_legacy', c, ''); if (t) sxPost(batch, 'statbook', 'stat', t, Object.assign({}, base, { dt: mInt(0, 60), v: 1.2 })); }
+  }
+  function mgLegacyTick(batch) {
+    if (!sxOn()) return;
+    try { lgLiveRecords(batch); } catch (e) { console.warn('Legacy records', e); }
+    try { lgMilestones(batch); } catch (e) { console.warn('Legacy milestones', e); }
+    try { lgThrowback(batch); } catch (e) { console.warn('Legacy throwback', e); }
+  }
+
+  // season / tournament recaps: the best performers look back on the campaign with the full history in mind
+  function mgLegacyEvent(batch, ev) {
+    if (!sxOn() || ev.sub !== 'recap') return;
+    const isSeason = ev.scope === 'season';
+    (ev.ids || []).forEach((x, i) => {
+      const team = lgTeamByName(x.team); const ref = sxPlayerRef(x.id, team); if (!ref) return;
+      const row = lgHistory(x.id).find(h => h.c === ev.scope + '|' + ev.cat && h.l === ev.label);
+      if (!row) return;
+      const c = Object.assign(lgVars(ref.player, ref.team), lgRowVars(row), { me: ref.player.name, meS: mSur(ref.player.name), cat: ev.cat, label: ev.label,
+        my: mTeamName(ref.team), myS: ref.team.short || mTeamName(ref.team), line: lgFmt(row.g || row.a ? 'seasonBare' : 'seasonKeeperBare', lgRowVars(row)) });
+      const base = { ts: [ref.team.id], tg: [mTag(c.myS), isSeason ? '#SeasonReview' : mTag(ev.cat)], c: ev.cat, ph: 'ev', im: 1, free: true };
+      sxPlayerPost(batch, ref, 'recap', isSeason ? 'pp_recap_season' : 'pp_recap_tour', c, base, { dt: mInt(10, 160), v: 1.5, im: 1, thread: i === 0 });
+      if (i === 0) { const t = sxLine(isSeason ? 'md_recap_season' : 'md_recap_tour', c, ''); if (t) sxPost(batch, 'statbook', 'stat', t, Object.assign({}, base, { dt: mInt(5, 60), v: 1.4 })); }
+    });
+  }
+
+
+  // ==========================================================================
+  // Data for the Media tabs (Records, Hall of Fame) and the profile card
+  // ==========================================================================
+  function sxRecordBoard() {
+    const L = lgSt();
+    const stats = sxCfg('legacy.stats', []) || [];
+    const order = ['season', 'league', 'tournament'];
+    const cats = Object.keys(L.rec).map(k => ({ key: k, scope: L.rec[k].s, name: L.rec[k].n, st: L.rec[k].st }));
+    cats.sort((a, b) => order.indexOf(a.scope) - order.indexOf(b.scope) || a.name.localeCompare(b.name));
+    return { cats, stats, log: L.log.slice().reverse() };
+  }
+  // all-time leaders straight from the permanent stores
+  function sxAllTime(bucket, n) {
+    const cs = (typeof careerStats !== 'undefined' && careerStats) || {};
+    return Object.values(cs[bucket] || {}).filter(e => e && e.count > 0).sort((a, b) => b.count - a.count).slice(0, n || 10);
+  }
+  function sxHonourBoard(n) {
+    const map = lgHonourMap();
+    const out = Object.keys(map).map(id => {
+      const aw = lgHonours(id, 'aw'), tr = lgHonours(id, 'tr');
+      const w = (sxCfg('player.followers', {}) || {});
+      const score = aw.reduce((s, x) => s + x.n * (x.w || w.awardDefault || 0.05), 0) + tr.reduce((s, x) => s + x.n * (x.w || w.trophyDefault || 0.02), 0);
+      return { id, aw, tr, score, awN: aw.reduce((s, x) => s + x.n, 0), trN: tr.reduce((s, x) => s + x.n, 0) };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, n || 10);
+    return out.map(x => { const ref = sxPlayerRef(x.id); return ref ? Object.assign(x, { player: ref.player, team: ref.team }) : null; }).filter(Boolean);
+  }
+  // everything the profile card needs for one player
+  function sxLegacyOf(player, team) {
+    const pid = player.id;
+    const hist = lgHistory(pid);
+    return {
+      seasons: lgSeasonRows(pid),
+      comps: hist.filter(x => x.c.indexOf('season|') !== 0).sort((a, b) => (a.y || 0) - (b.y || 0)),
+      awards: lgHonours(pid, 'aw'), trophies: lgHonours(pid, 'tr'),
+      records: lgRecordsHeld(pid, false).filter(r => r.rank < 3),
+      value: sxMarketValue(player, team), rep: sxRepInfo(player)
+    };
+  }
 
 
   // ==========================================================================
@@ -24411,7 +25078,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const rs = [], to = post.u && post.u.h;
     const add = (acct, text) => { if (text) rs.push({ u: mUserRef(acct), x: mClean(mVoice(text, acct.m)), l: sxReplyLikes(acct, post), to }); };
     if (team && o.mates) {
-      const pool = sxTopPlayers(team, 8, p => (p.ovr || 0) >= sxNum('verify.playerMinOvr', 0) && p.id !== o.exclude);
+      const pool = sxTopPlayers(team, 8, p => sxVerified(p) && p.id !== o.exclude);
       mShuffle(pool).slice(0, o.mates).forEach(p => { if (mChance(0.7)) add(mPlayerAcct(p, team), vxMateReply(p, o.authorName || '', team, sent, ctx)); });
     }
     for (let i = 0; i < (o.fans || 0); i++) {
@@ -24816,7 +25483,7 @@ const PLAYSTYLE_BEHAVIOR = {
   const MEDIA_KIND_FILTERS = [
     ['all', 'All'], ['scores', 'Scores'], ['previews', 'Previews'], ['news', 'News'],
     ['social', 'Fans & takes'], ['transfers', 'Transfers'], ['events', 'Awards & trophies'],
-    ['verified', 'Players & clubs'], ['journalists', 'Journalists'], ['managers', 'Managers'], ['teamnews', 'Team news & injuries'], ['hype', 'Awards hype']
+    ['verified', 'Players & clubs'], ['journalists', 'Journalists'], ['managers', 'Managers'], ['teamnews', 'Team news & injuries'], ['hype', 'Awards hype'], ['records', 'Records & milestones']
   ];
 
   function mUserView(u) {
@@ -24902,6 +25569,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const k = mediaFilterKind;
     if (k === 'scores') list = list.filter(p => p.k === 'res' || p.k === 'poll');
     else if (k === 'previews') list = list.filter(p => p.ph === 'pre');
+    else if (k === 'records') list = list.filter(p => p.rc || /#Milestone/.test((p.tg || []).join(' ')));
     else if (k === 'news') list = list.filter(p => ['news', 'art', 'tv', 'stat'].indexOf(p.k) !== -1);
     else if (k === 'social') list = list.filter(p => ['tw', 'meme', 'vid', 'take'].indexOf(p.k) !== -1);
     else if (k === 'transfers') list = list.filter(p => p.k === 'rumor');
@@ -24983,6 +25651,8 @@ const PLAYSTYLE_BEHAVIOR = {
     else if (mediaTabId === 'awards' && sxOn()) html = mAwardsHtml();
     else if (mediaTabId === 'debates' && sxOn()) html = mDebatesHtml();
     else if (mediaTabId === 'accounts' && sxOn()) html = mAccountsHtml();
+    else if (mediaTabId === 'records' && sxOn()) html = mRecordsHtml();
+    else if (mediaTabId === 'fame' && sxOn()) html = mFameHtml();
     else {
       const list = mFilteredPosts();
       html = list.length
@@ -25007,7 +25677,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const n = mediaAllPosts().filter(p => p.u && p.u.h === handle).length;
     return '<div class="card mc-card mx-acct"><div class="mx-acct-top"><div class="mp-av lg" style="background:' + u.color + '">' + u.avatar + '</div><div><div class="mx-acct-name"><b>' + mEsc(info.name) + '</b> <span class="mp-ver">✔</span>' + mRoleTag(u.kind) + '</div><div class="mp-handle">' + mEsc(handle) + '</div></div><a class="mc-link" onclick="App.mediaAcct(\'\')">✕ Close</a></div>' +
       '<div class="mx-stats"><div><b>' + mFmt(info.followers) + '</b><small>Followers</small></div><div><b>' + mFmt(fb.size) + '</b><small>' + mEsc((fb.tierIcon || '') + ' ' + (fb.tier || 'Fanbase')) + '</small></div><div><b>' + n + '</b><small>Posts</small></div></div>' +
-      '<div class="mx-fan"><span>' + mEsc(fb.group || '') + '</span> <span class="mp-tag" onclick="App.mediaTag(\'' + mEsc(fb.tag || '') + '\')">' + mEsc(fb.tag || '') + '</span> ' + (info.kind === 'player' ? 'Fan mood ' + mHeatMeter(fb.heat || 0) : '') + '</div>' + (info.voice && info.voice.label ? '<div class="mx-fan"><b>' + mEsc(info.voice.label) + '</b> · ' + mEsc(info.voice.blurb || '') + '</div>' : '') + '</div>';
+      '<div class="mx-fan"><span>' + mEsc(fb.group || '') + '</span> <span class="mp-tag" onclick="App.mediaTag(\'' + mEsc(fb.tag || '') + '\')">' + mEsc(fb.tag || '') + '</span> ' + (info.kind === 'player' ? 'Fan mood ' + mHeatMeter(fb.heat || 0) : '') + '</div>' + (info.voice && info.voice.label ? '<div class="mx-fan"><b>' + mEsc(info.voice.label) + '</b> · ' + mEsc(info.voice.blurb || '') + '</div>' : '') + (info.kind === 'player' ? mLegacyBlock(info.player, info.team) : '') + '</div>';
   }
   function mAwardsHtml() {
     const w = sxAwardsWatch();
@@ -25039,6 +25709,53 @@ const PLAYSTYLE_BEHAVIOR = {
         (post ? mPostHtml(post, true) : '<p class="mc-empty">The opening post has scrolled out of the feed.</p>') + '</div>';
     }).join('');
   }
+
+  // ---- legacy: seasons, honours, records, market value ----------------------------------------------------------------
+  function mStatDef(id) { return (sxCfg('legacy.stats', []) || []).find(s => s.id === id) || { label: id, unit: id }; }
+  function mLegacyBlock(player, team) {
+    const g = sxLegacyOf(player, team);
+    let h = '<div class="mx-legacy">';
+    if (g.value) h += '<div class="mx-stats"><div><b>' + mEsc(sxMoneyText(g.value.m)) + '</b><small>Market value</small></div><div><b>×' + g.value.form.toFixed(2) + '</b><small>Form factor</small></div><div><b>' + Math.round(g.rep.total) + '</b><small>Reputation</small></div></div>';
+    const chips = g.awards.map(a => '<span class="mx-chip">🏆 ' + (a.n > 1 ? a.n + '× ' : '') + mEsc(a.name) + '</span>').concat(g.trophies.slice(0, 4).map(a => '<span class="mx-chip">' + (a.n > 1 ? a.n + '× ' : '') + mEsc(a.name) + '</span>'));
+    if (chips.length) h += '<div class="mx-chips">' + chips.join('') + '</div>';
+    if (g.records.length) h += '<div class="mx-chips">' + g.records.map(r => '<span class="mx-chip hot">🏅 ' + (r.rank ? '#' + (r.rank + 1) + ' ' : '') + mEsc(r.cat) + ' · ' + mEsc(mStatDef(r.stat).label) + ' ' + mEsc(lgFmtV(r.v, mStatDef(r.stat))) + ' (' + mEsc(r.l) + ')</span>').join('') + '</div>';
+    const rows = g.seasons.slice(-8).reverse().concat(g.comps.slice(-6).reverse());
+    if (rows.length) {
+      h += '<table class="mx-hist"><tr><th>Season / event</th><th>Team</th><th>G</th><th>A</th><th>MOTM</th><th>CS</th></tr>' + rows.map(r => '<tr><td>' + mEsc(r.c.split('|')[1] === sxCfg('legacy.allName', 'All competitions') ? r.l : r.c.split('|')[1] + ' ' + r.l) + '</td><td>' + mEsc(r.t || '') + '</td><td>' + (r.g || 0) + '</td><td>' + (r.a || 0) + '</td><td>' + (r.m || 0) + '</td><td>' + (r.cs || 0) + '</td></tr>').join('') + '</table>';
+    } else h += '<p class="mc-empty">Season history fills in as seasons and tournaments are completed.</p>';
+    return h + '</div>';
+  }
+  function mRecEntryRow(e, i, st) {
+    const team = (allTeams || []).find(t => t.name === e.t);
+    return '<div class="mx-row"><span class="mx-pos">' + (i + 1) + '</span>' + (team ? teamMark(team, 18) : '') + '<div class="mx-who"><b>' + mEsc(e.n) + '</b><small>' + mEsc(e.t || '') + ' · ' + mEsc(e.l) + '</small></div><b>' + mEsc(lgFmtV(e.v, st)) + '</b></div>';
+  }
+  function mRecordsHtml() {
+    const R = sxRecordBoard();
+    if (!R.cats.length) return '<div class="empty-state"><div class="icon">🏅</div><p>No records yet — they are set when a season, league or tournament finishes. Live records are announced as soon as a running total passes the all-time mark.</p></div>';
+    let h = '';
+    if (R.log.length) h += '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">🚨 Record-breaking log</div>' + R.log.slice(0, 8).map(e => { const c = R.cats.find(x => x.key === e.catKey); const st = mStatDef(e.stat); return '<div class="mx-row"><div class="mx-who"><b>' + mEsc(e.n) + '</b> ' + (e.type === 'equalled' ? 'equalled' : 'broke') + ' the ' + mEsc(c ? c.name : '') + ' record<small>' + mEsc(st.label) + ': ' + mEsc(lgFmtV(e.v, st)) + (e.pn ? ' (was ' + mEsc(lgFmtV(e.pv, st)) + ', ' + mEsc(e.pn) + ')' : '') + ' · ' + mEsc(e.l) + '</small></div></div>'; }).join('') + '</div>';
+    ['season', 'league', 'tournament'].forEach(sc => {
+      const cs = R.cats.filter(c => c.scope === sc); if (!cs.length) return;
+      h += '<div class="mx-banner">' + mEsc(sxCfg('legacy.scopeNames.' + sc, sc)) + '</div><div class="mx-grid">';
+      cs.forEach(c => {
+        h += '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">🏅 ' + mEsc(c.name) + '</div>';
+        R.stats.forEach(st => { const arr = c.st[st.id]; if (!arr || !arr.length) return; h += '<div class="mx-rec-h">' + mEsc(st.icon || '') + ' ' + mEsc(st.label) + '</div>' + arr.map((e, i) => mRecEntryRow(e, i, st)).join(''); });
+        h += '</div>';
+      });
+      h += '</div>';
+    });
+    return h;
+  }
+  function mFameHtml() {
+    const allRow = (e, i, unit) => { const t = (allTeams || []).find(x => x.name === e.team); return '<div class="mx-row"><span class="mx-pos">' + (i + 1) + '</span>' + (t ? teamMark(t, 18) : '') + '<div class="mx-who"><b>' + mEsc(e.name) + '</b><small>' + mEsc(e.team || '') + '</small></div><b>' + e.count + '</b></div>'; };
+    const board = (title, bucket) => '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">' + title + '</div>' + (sxAllTime(bucket, 10).map((e, i) => allRow(e, i)).join('') || '<p class="mc-empty">Nothing yet.</p>') + '</div>';
+    const hon = sxHonourBoard(10);
+    const mv = sxMostValuable(12);
+    return '<div class="mx-banner">All-time leaders across every season and tournament played in this save.</div><div class="mx-grid">' +
+      board('⚽ Career goals', 'goals') + board('🅰️ Career assists', 'assists') + board('⭐ Career MOTM awards', 'motm') + board('🧤 Career clean sheets', 'cleanSheets') +
+      '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">🏆 Most decorated</div>' + (hon.map((x, i) => '<div class="mx-row click" onclick="App.mediaAcct(\'' + mEsc(mPlayerAcct(x.player, x.team).h) + '\')"><span class="mx-pos">' + (i + 1) + '</span>' + teamMark(x.team, 18) + '<div class="mx-who"><b>' + mEsc(x.player.name) + '</b><small>' + x.awN + ' awards · ' + x.trN + ' team trophies</small></div></div>').join('') || '<p class="mc-empty">No honours yet.</p>') + '</div>' +
+      '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">💶 Most valuable players <small>(ability × recent performance × honours)</small></div>' + (mv.map((x, i) => '<div class="mx-row click" onclick="App.mediaAcct(\'' + mEsc(mPlayerAcct(x.player, x.team).h) + '\')"><span class="mx-pos">' + (i + 1) + '</span>' + teamMark(x.team, 18) + '<div class="mx-who"><b>' + mEsc(x.player.name) + '</b><small>' + mEsc(mTeamName(x.team)) + ' · form ×' + x.v.form.toFixed(2) + '</small></div><b>' + mEsc(sxMoneyText(x.v.m)) + '</b></div>').join('') || '<p class="mc-empty">Play some matches first.</p>') + '</div></div>';
+  }
   function mAccountsHtml() {
     const top = sxTopAccounts(20, 10);
     const row = (u, name, handle, f, extra, mark) => '<div class="mx-row click" onclick="App.mediaAcct(\'' + mEsc(handle) + '\')">' + mark + '<div class="mx-who"><b>' + mEsc(name) + '</b> <span class="mp-ver">✔</span><small>' + mEsc(handle) + (extra ? ' · ' + extra : '') + '</small></div><b>' + mFmt(f) + '</b></div>';
@@ -25060,7 +25777,7 @@ const PLAYSTYLE_BEHAVIOR = {
   }
   function mediaTab(id) { mediaTabId = id; mediaShown = 40; renderMediaView(); }
   function mediaFilter(kind, v) { if (kind === 'team') mediaFilterTeam = v; else mediaFilterKind = v; mediaShown = 40; renderMediaView(); }
-  function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (['trending', 'awards', 'debates', 'accounts'].indexOf(mediaTabId) !== -1) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
+  function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (['trending', 'awards', 'debates', 'accounts', 'records', 'fame'].indexOf(mediaTabId) !== -1) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
   function mediaAcct(handle) { mediaFilterAcct = handle || ''; mediaShown = 40; if (handle) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
   function mediaMore() { mediaShown += 40; renderMediaView(); }
   function mediaToggleThread(id) { if (mediaOpenThreads.has(id)) mediaOpenThreads.delete(id); else mediaOpenThreads.add(id); renderMediaView(); }
