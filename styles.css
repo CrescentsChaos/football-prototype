@@ -2874,3 +2874,11 @@ select.ss-native {
 .mx-split { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; font-size: 0.88rem; }
 .mx-foot { margin-top: 6px; }
 .mx-debate { margin-bottom: 14px; }
+
+/* legacy / records */
+.mx-legacy { margin-top: 10px; }
+.mx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.mx-hist { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 8px; }
+.mx-hist th, .mx-hist td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--border, rgba(255,255,255,0.08)); }
+.mx-hist th { color: var(--text-3); font-weight: 600; }
+.mx-rec-h { margin: 10px 0 4px; font-weight: 600; font-size: 0.85rem; color: var(--text-2); }

@@ -4254,7 +4254,7 @@
     "keep": 100
    },
    "verify": {
-    "playerMinOvr": 70,
+    "minRep": 8,
     "clubs": true
    },
    "persona": {
@@ -4315,14 +4315,11 @@
      "{sur}Official"
     ],
     "followers": {
-     "base": 400000,
-     "ovrRef": 75,
-     "ovrSlope": 0.14,
+     "base": 150000,
+     "repRef": 20,
+     "repSlope": 1.3,
      "fameWeight": 2.2,
      "jitter": 0.35,
-     "careerGoal": 0.003,
-     "careerAssist": 0.002,
-     "careerMotm": 0.008,
      "heatWeight": 0.25,
      "min": 8000,
      "max": 120000000,
@@ -4431,7 +4428,8 @@
     "award": 0.6,
     "decay": 0.985,
     "cap": 1,
-    "maxEntries": 400
+    "maxEntries": 400,
+    "record": 0.35
    },
    "thread": {
     "mates": [
@@ -5199,6 +5197,296 @@
       "v": 1.3
      }
     ]
+   },
+   "rep": {
+    "_comment": "Reputation points = what a player has DONE (career output, this season's form, honours, records). The overall rating is only a small bootstrap prior that fades as minutes are played (prior.fadeMatches), so it cannot decide who is famous. Used for followers, who gets a verified account, who is picked to post/talk, and rumour subjects.",
+    "weights": {
+     "goals": 0.6,
+     "assists": 0.45,
+     "motm": 1.6,
+     "cleanSheets": 0.4,
+     "saves": 0.02,
+     "puskas": 2,
+     "per90": 0.05
+    },
+    "currentBoost": 0.5,
+    "honourPts": 40,
+    "recordPts": [
+     10,
+     4,
+     2,
+     1,
+     0.5
+    ],
+    "recordCap": 40,
+    "prior": {
+     "max": 22,
+     "ovrLo": 62,
+     "ovrHi": 92,
+     "fadeMatches": 40
+    },
+    "weightRef": 15,
+    "weightPow": 1.3
+   },
+   "legacy": {
+    "_comment": "Legacy ledger + records. stats[] = what is tracked per competition family for single-season / single-tournament records (min = smallest value that counts, rate = average-type stat that needs minCount appearances). fmt/scopeText/msLabels are the wording snippets used inside posts.",
+    "allName": "All competitions",
+    "linesSeason": 60,
+    "linesComp": 10,
+    "histSeason": 20,
+    "histComp": 14,
+    "recordsKeep": 5,
+    "logKeep": 40,
+    "liveMax": 2,
+    "milestoneMax": 2,
+    "throwback": 0.25,
+    "replyChance": 0.3,
+    "recordFans": 2,
+    "prevHolderReply": 0.7,
+    "recapPlayers": 3,
+    "recapTournament": 2,
+    "outlets": [
+     "bn",
+     "statbook"
+    ],
+    "minCount": {
+     "season": 15,
+     "league": 15,
+     "tournament": 4
+    },
+    "rowPts": {
+     "g": 3,
+     "a": 2,
+     "m": 3,
+     "cs": 1.5,
+     "sv": 0.1,
+     "rate": 0.3
+    },
+    "stats": [
+     {
+      "id": "goals",
+      "bucket": "goals",
+      "label": "Goals",
+      "unit": "goals",
+      "icon": "⚽",
+      "min": 3
+     },
+     {
+      "id": "assists",
+      "bucket": "assists",
+      "label": "Assists",
+      "unit": "assists",
+      "icon": "🅰️",
+      "min": 3
+     },
+     {
+      "id": "contrib",
+      "derive": "goals+assists",
+      "label": "Goal contributions",
+      "unit": "goal contributions",
+      "icon": "🎯",
+      "min": 5
+     },
+     {
+      "id": "motm",
+      "bucket": "motm",
+      "label": "Man of the Match awards",
+      "unit": "MOTM awards",
+      "icon": "⭐",
+      "min": 2
+     },
+     {
+      "id": "cleanSheets",
+      "bucket": "cleanSheets",
+      "label": "Clean sheets",
+      "unit": "clean sheets",
+      "icon": "🧤",
+      "min": 3
+     },
+     {
+      "id": "saves",
+      "bucket": "saves",
+      "label": "Saves",
+      "unit": "saves",
+      "icon": "🧱",
+      "min": 15
+     },
+     {
+      "id": "rating",
+      "bucket": "ratings",
+      "label": "Average match rating",
+      "unit": "average rating",
+      "icon": "📈",
+      "min": 6.5,
+      "dec": 2,
+      "rate": true
+     }
+    ],
+    "scopeNames": {
+     "season": "Single season · all competitions",
+     "league": "Single league season",
+     "tournament": "Single tournament / cup run"
+    },
+    "scopeText": {
+     "season": "in a single season",
+     "league": "in a single {cat} season",
+     "tournament": "in a single {cat}"
+    },
+    "milestones": {
+     "goals": [
+      50,
+      100,
+      150,
+      200,
+      250,
+      300,
+      400,
+      500
+     ],
+     "assists": [
+      50,
+      100,
+      150,
+      200,
+      250
+     ],
+     "motm": [
+      25,
+      50,
+      75,
+      100
+     ],
+     "cleanSheets": [
+      25,
+      50,
+      100
+     ]
+    },
+    "msWindow": {
+     "goals": 2,
+     "assists": 2,
+     "motm": 1,
+     "cleanSheets": 2
+    },
+    "msLabels": {
+     "goals": "goals",
+     "assists": "assists",
+     "motm": "Man of the Match awards",
+     "cleanSheets": "clean sheets"
+    },
+    "fmt": {
+     "season": "{label}: {g} goals, {a} assists",
+     "seasonKeeper": "{label}: {cs} clean sheets, {sv} saves",
+     "trail": "{label} {g}G/{a}A",
+     "honour1": "{award}",
+     "honourN": "{n}x {award}",
+     "recordLine": "{v} {stat} {scope}",
+     "tour": "{g} goals and {a} assists at the {cat} ({label})",
+     "seasonBare": "{g} goals and {a} assists",
+     "seasonKeeperBare": "{cs} clean sheets and {sv} saves"
+    }
+   },
+   "value": {
+    "_comment": "Market value / transfer fee: ability (from the overall) x recent PERFORMANCE x honours/records premium x position. Performance = seasonal output points (form.w), recency weighted (form.weights = this season, last, the one before), scaled by position (form.posScale) and saturating between form.min and form.max. fee.* nudges the asking price in rumours.",
+    "currency": "€",
+    "unit": "m",
+    "abilityBase": 2,
+    "abilitySlope": 0.135,
+    "abilityRef": 60,
+    "min": 0.5,
+    "max": 400,
+    "groups": {
+     "GK": [
+      "GK"
+     ],
+     "DF": [
+      "CB",
+      "LB",
+      "RB",
+      "LWB",
+      "RWB",
+      "SW"
+     ],
+     "MF": [
+      "CM",
+      "CDM",
+      "CAM",
+      "LM",
+      "RM",
+      "AM",
+      "AMF"
+     ],
+     "FW": [
+      "ST",
+      "CF",
+      "LW",
+      "RW",
+      "SS",
+      "RF"
+     ]
+    },
+    "posValue": {
+     "GK": 0.7,
+     "DF": 0.9,
+     "MF": 1,
+     "FW": 1.15
+    },
+    "form": {
+     "w": {
+      "g": 1,
+      "a": 0.75,
+      "m": 2,
+      "cs": 0.6,
+      "sv": 0.03,
+      "rate": 0.5
+     },
+     "weights": [
+      1,
+      0.65,
+      0.4
+     ],
+     "posScale": {
+      "GK": 22,
+      "DF": 14,
+      "MF": 24,
+      "FW": 32
+     },
+     "min": 0.7,
+     "max": 2.6,
+     "k": 1,
+     "evidenceMatches": 15
+    },
+    "honourPerPoint": 0.004,
+    "honourMax": 0.9,
+    "round": [
+     {
+      "upTo": 10,
+      "step": 0.5
+     },
+     {
+      "upTo": 50,
+      "step": 1
+     },
+     {
+      "upTo": 150,
+      "step": 5
+     },
+     {
+      "step": 10
+     }
+    ],
+    "fee": {
+     "sellerFame": 0.2,
+     "buyerFame": 0.05,
+     "stage": [
+      1.12,
+      1.05,
+      1,
+      1
+     ]
+    },
+    "listMinRep": 1,
+    "listPrefilter": 120
    }
   },
   "banks": {
@@ -5207,7 +5495,9 @@
     "{pmin2} minute, right place, right time. {?Dream job.|Love this game.|Never gets old.} {myS} {?till I die|all day|forever}",
     "{?Scored|Found the net} and the {?lads|boys|team} did the rest. {?Big night for {myS}.|On we go.}",
     "{?Sweet|Clean|Pure} connection. {?Thanks for the pass.|Thanks for the support.} {fanTag}",
-    "Goal for {myS} 🔥 {?Now we go again.|Eyes on the next one.}"
+    "Goal for {myS} 🔥 {?Now we go again.|Eyes on the next one.}",
+    "{careerGoals} career goals now. {?Grateful.|Just keep going.} {?⚽|🔥}",
+    "Back among the goals. {lastSeason} — aiming higher this time."
    ],
    "pp_goal_cocky": [
     "Another one in the book. {?Easy game.|You know the drill.|Same time next week.} 😎",
@@ -5230,7 +5520,8 @@
     "HAT-TRICK 🎩⚽⚽⚽ {?Pinch me.|Unreal night.|Cannot stop smiling.} Ball is going home with me.",
     "Three goals against {opp}. {?Dreams do come true.|What a feeling.} Thank you {fanGroup} ❤️",
     "{?Hat-trick|Treble} done. {?The match ball is mine|Somebody tell the kit man I'm keeping this ball} 😂🎩",
-    "Special night. {?Three|3} goals, {myScore}, and {myS} fans singing. {fanTag}"
+    "Special night. {?Three|3} goals, {myScore}, and {myS} fans singing. {fanTag}",
+    "Another hat-trick — and {careerGoals} career goals now 🎩"
    ],
    "pp_hattrick_cocky": [
     "Hat-trick. {?Did anyone doubt it?|Was there ever a question?|Write that down.} 🎩 {fanTag}"
@@ -5242,7 +5533,8 @@
    "pp_motm": [
     "Man of the Match, but really it's the whole team's win. {?Thanks to my teammates.|Big three points.} 🙏",
     "{?Happy with the performance|Good day} and the three points. {?On to the next.|Keep pushing.}",
-    "MOTM {?🏅|⭐}. Appreciate all the messages! {fanTag}"
+    "MOTM {?🏅|⭐}. Appreciate all the messages! {fanTag}",
+    "That's {careerMotm} Man of the Match awards in my career. {?Thanks lads.|Keep going.}"
    ],
    "pp_keeper": [
     "{psaves} saves today. {?That's what I'm here for.|Happy to help the team.|Defence deserves the credit too.} 🧤",
@@ -5288,7 +5580,9 @@
    ],
    "pp_trophy": [
     "CHAMPIONS 🏆 {?Dream come true.|Unreal.|So proud of this group.} Thank you to everyone at {myS}!",
-    "{trophy} {?winners|champions} 🏆 {?Can't put it into words.|Worth every drop of sweat.}"
+    "{trophy} {?winners|champions} 🏆 {?Can't put it into words.|Worth every drop of sweat.}",
+    "Another one for the cabinet: {honours}. {?Never stops feeling special.|Hungry for more.} 🏆",
+    "{topTrophy} — {?never gets old.|worth every minute.} 🏆"
    ],
    "pp_rumor": [
     "{?Focused on {myS}.|Not worried about talk.} {?Nothing to say.|Back to training.} 🤐",
@@ -5315,7 +5609,9 @@
    "pp_award_win": [
     "{award} {?🏆|✨}. {?I'm lost for words.|Thank you to my team-mates, my family and every one of you.} {fanTag}",
     "Honoured to win the {award}. {?This belongs to {myS} too.|Couldn't have done it without my teammates.} 🙏",
-    "{award}! {?Dreams do come true.|Hard work pays off.} Thank you {fanGroup} ❤️"
+    "{award}! {?Dreams do come true.|Hard work pays off.} Thank you {fanGroup} ❤️",
+    "{awardCount} individual awards now. {?Never gets old.|Humbled.} {fanTag}",
+    "{honours}. {?I'll keep pushing.|Thank you all.} {fanTag}"
    ],
    "pp_award_win_cocky": [
     "{award}. {?Never in doubt.|Deserved.|You all knew.} 😎🏆 {fanTag}"
@@ -5326,7 +5622,8 @@
    "pp_award_lose": [
     "Congratulations to {winner} on the {award}. {?Well deserved.|A great year.} I'll keep working 💪",
     "Not this time. {?Proud of my season.|Thank you for the support.} Congrats {winnerS}.",
-    "Wasn't meant to be. {?On to next year.|We go again.} {fanTag} ❤️"
+    "Wasn't meant to be. {?On to next year.|We go again.} {fanTag} ❤️",
+    "{honours} already — still want more. Congrats {winner}. 💪"
    ],
    "pp_award_lose_intense": [
     "Disappointed, I won't pretend otherwise. I'll come back harder. Congrats to {winnerS}."
@@ -5337,7 +5634,8 @@
    "pp_shortlist": [
     "{?Honoured|Humbled|Proud} to be on the {award} shortlist {?🏆|✨}. {?Thank you to my teammates.|Thank you fans.}",
     "Nominated for the {award}. {?Whatever happens, proud of this season.|It's been quite a year.} {meTag}",
-    "{?Just the start of the {award} conversation, I hope.|Thanks for the votes.} {?Back to work.|Focused on the next game.}"
+    "{?Just the start of the {award} conversation, I hope.|Thanks for the votes.} {?Back to work.|Focused on the next game.}",
+    "Shortlisted again — {seasonsPlayed} seasons of work behind this. {fanTag}"
    ],
    "pp_shortlist_cocky": [
     "{award} shortlist? {?Obviously.|Of course.|Not a surprise.} {?See you at the ceremony.|Clear space on the shelf.} 😎"
@@ -5623,7 +5921,9 @@
    ],
    "cp_trophy": [
     "{trophy} CHAMPIONS 🏆 {?What a season.|Thank you to every fan.|History made.}",
-    "WE ARE THE CHAMPIONS 🏆 {team} win the {trophy}! {?Parade details to follow.|Congratulations to everyone.}"
+    "WE ARE THE CHAMPIONS 🏆 {team} win the {trophy}! {?Parade details to follow.|Congratulations to everyone.}",
+    "{trophy} — the {titleOrd} in the club's history. {?Never gets old.|Up the {teamS}!}",
+    "{trophy} — last won in Y{prevTitleYear}. {?We're back.|Worth the wait.}"
    ],
    "cp_trophy_rival": [
     "Congratulations to {rival} on the {trophy}. {?Well played.|See you next season.}",
@@ -5841,6 +6141,184 @@
    "db_verdict": [
     "{winner} wins the {award}, and the {winner}-{loser} debate? {?Settled, for now.|It goes on.} Plenty of text messages on this one!",
     "{winnerS} vs {loserS}: the {award} gave the answer, but you know fans don't accept it. Round 2 next season."
+   ],
+   "md_record_broken": [
+    "🚨 RECORD BROKEN: {me} ({teamS}) finishes on {v} {unit} {scopeText}, beating {prev}'s {prevV} ({prevLabel}). {recordTag}",
+    "HISTORY: {meS} now owns the record for {unit} {scopeText} — {v}, past the old mark of {prevV} set by {prev}. {recordTag}",
+    "{me} rewrites the record books: {v} {unit} {scopeText}. The previous best, {prevV}, belonged to {prev} ({prevLabel}). {recordTag}"
+   ],
+   "md_record_stat_broken": [
+    "📊 Record book updated — {unit} {scopeText}: {v} by {me} ({label}). Previous: {prevV} by {prev} ({prevLabel}). Margin +{diff}.",
+    "New all-time mark: {me}, {v} {unit} {scopeText}. {prev} held it with {prevV} ({prevLabel})."
+   ],
+   "md_record_equal": [
+    "{me} ({teamS}) equals the record: {v} {unit} {scopeText}, level with {prev} ({prevLabel}). {recordTag}",
+    "Level on {v}: {meS} matches {prev}'s {unit} record {scopeText}. {recordTag}"
+   ],
+   "md_record_stat_equal": [
+    "📊 Joint record: {v} {unit} {scopeText} — {me} ({label}) joins {prev} ({prevLabel})."
+   ],
+   "md_record_live": [
+    "🚨 ON COURSE FOR HISTORY: {me} ({teamS}) already has {v} {unit} {scopeText} — past {prev}'s record of {prevV} ({prevLabel}) with the campaign still running. {recordTag}",
+    "{meS} has just broken the record for {unit} {scopeText}: {v} and counting. The old mark was {prevV} ({prev}, {prevLabel}). {recordTag}"
+   ],
+   "md_record_stat_live": [
+    "📊 Live record watch: {me} on {v} {unit} {scopeText}. Previous best {prevV} ({prev}). Still adding to it."
+   ],
+   "pp_record": [
+    "Record. {v} {unit} {scopeText}. {?Humbled.|Can't believe it.|Dedicated to everyone who believed in me.} Thank you {myS} 🙏 {recordTag}",
+    "{prev} had {prevV} for so long. {?Proud to take it.|Honoured to take it.} {?Team effort.|Thank you to my teammates.} {recordTag}",
+    "{v} {unit} {scopeText} — {?that's history.|a mark I'll never forget.} {?Not finished yet.|Back to work.} 🙌"
+   ],
+   "pp_record_live": [
+    "Heard I've passed the record — {v} already. {?Not done yet.|Back to work.|Team first.} 🙏",
+    "{v} {unit} so far {scopeText}. {?Surreal.|Wild.} {?Keep going.|One game at a time.}"
+   ],
+   "pp_record_equal": [
+    "Level with {prev} on {v} {unit}. {?One more to make it mine.|Happy to be in that company.} 🙏",
+    "Matching a record held by {prev}? {?Pinch me.|Unreal.} {recordTag}"
+   ],
+   "pp_record_prev": [
+    "{?Records are made to be broken.|Well done.|Congratulations} {meS}. {v} {unit} {scopeText} is something special. {?Take a bow.|Respect.}",
+    "It was a good run while it lasted 😄 Congrats {meS}, {?fully deserved.|you earned it.}"
+   ],
+   "cp_record": [
+    "{me} breaks the record: {v} {unit} {scopeText}. {?History made.|A moment for the {teamS} history books.}",
+    "RECORD BREAKER. {v} {unit} {scopeText} for {meS}. {?Take a bow.|Immense.}"
+   ],
+   "cp_record_live": [
+    "{meS} is now past the record for {unit} {scopeText} — {v} and still going. 👏"
+   ],
+   "cp_record_equal": [
+    "{meS} equals the record: {v} {unit} {scopeText}. {?One more?|Incredible.}"
+   ],
+   "fx_record": [
+    "{meS} has {v} {unit} {scopeText} and it's a RECORD. {?Greatest ever?|Absolute machine.|Frame this season.}",
+    "{prev} held it for ages. {meS} just took it. {?Respect.|Mad.} {recordTag}",
+    "Remember where you were when {meS} passed {prevV}. {?History.|Wow.}"
+   ],
+   "pr_mate_record": [
+    "{?Legend|Unreal|History}. {v} {unit}!! {?🐐|🔥|👏}",
+    "{?Proud of you|Unbelievable}, {?mate|brother}. {?You deserve it.|What a record.}"
+   ],
+   "pr_club_record": [
+    "Record-breaker, {playerS}. {?We are all so proud.|History.} 👏"
+   ],
+   "fx_react_record": [
+    "RECORD!!! {?{playerS} is different.|Legendary.|Unbelievable scenes.} 🐐",
+    "{v} {unit}… {?mad.|take a bow.}"
+   ],
+   "pr_back_record": [
+    "{?Thank you|Appreciate it}, {themH}. {?Team effort.|We go again.} 🙏"
+   ],
+   "md_milestone": [
+    "📊 {n} career {statName} for {me} — {?a landmark|a real milestone|another landmark} for the {teamS} {?star|man|regular}.",
+    "{me} reaches {n} career {statName}. {?Honours so far: {honours}.|}",
+    "{n} career {statName}: {meS} joins an exclusive club. {recordTag}"
+   ],
+   "pp_milestone": [
+    "{n} career {statName}. {?Still hungry.|Grateful.|Thank you to everyone who helped me get here.} 🙏",
+    "{n} {statName} in my career. {?Honoured|Proud} to be doing it at {myS}.",
+    "{n}! {?Never imagined it.|Onwards.} {seasonsPlayed} seasons of work behind it.",
+    "{n} career {statName}. {honours} on the shelf — and the hunger is the same."
+   ],
+   "cp_milestone": [
+    "{me} reaches {n} career {statName}. {?Congratulations|Well done|Take a bow}, {meS}! 👏"
+   ],
+   "pr_mate_milestone": [
+    "{n} {statName}!! {?Legend.|Unreal.} 🐐"
+   ],
+   "pr_club_milestone": [
+    "Landmark moment, {playerS}. {?Proud of you.|Well deserved.} 👏"
+   ],
+   "fx_react_milestone": [
+    "{n} {statName} and counting. {?Legend.|Take a bow.} 🐐"
+   ],
+   "pp_legacy": [
+    "Looking back: {seasonTrail}. {?Grateful for every one.|Still the same hunger.|More to come.}",
+    "{seasonsPlayed} seasons, {careerGoals} goals and counting. {?Thank you for sticking with me.|The next one is the best one.}"
+   ],
+   "fx_legacy": [
+    "{me}: {seasonTrail}. {?Consistency is a skill.|Tell me he's not elite.|Some players just do it every year.} {fanTag}",
+    "{seasonsPlayed} seasons and {meS} is still doing this. {?Legend.|Absurd.} {fanTag}"
+   ],
+   "md_legacy": [
+    "📈 {me} ({teamS}), season by season: {seasonTrail}.",
+    "📈 {me}: {seasonTrail}. {careerGoals} career goals."
+   ],
+   "fx_legacy_reply": [
+    "{playerS}? {lastSeason} last time out. {?Just a different level.|Mad consistency.}",
+    "{playerS} is now on {careerGoals} career goals. {?Absurd.|Pace is wild.}",
+    "{honours}. And he's still getting better. {playerS} 🐐",
+    "Holds the record for {recordLine}. {?Don't @ me.|Greatest.}",
+    "{lastTour}. Don't forget what he does on the big stage.",
+    "{seasonTrail}. {?Case closed.|Take notes.}"
+   ],
+   "md_legacy_reply": [
+    "Context: {playerS} — {lastSeason}; {careerGoals} career goals.",
+    "For the record: {honours} for {playerS}."
+   ],
+   "pp_recap_season": [
+    "{label} done. {line}. {?Thank you for every minute.|On to the next.|Proud of this group.}",
+    "{line}. {honours} on the shelf now, but the hunger hasn't changed.",
+    "{label}: {line}. {seasonTrail} — building something."
+   ],
+   "pp_recap_tour": [
+    "{cat} ({label}): {line}. {?Proud of the lads.|We go again.}",
+    "{line}. {?Pride.|What a ride.} Not forgetting the earlier ones: {lastTour}."
+   ],
+   "md_recap_season": [
+    "📋 {label} in numbers: {me} — {line}.",
+    "📋 {label} review: {me} ({teamS}) leads the way with {line}. Seasons so far: {seasonTrail}."
+   ],
+   "md_recap_tour": [
+    "📋 {cat} {label}: {me} — {line}."
+   ],
+   "md_award_history": [
+    "{winner} collects a {nth} {award}. {honours}",
+    "{nth} {award} for {winner}. The legacy keeps growing."
+   ],
+   "fx_award_history": [
+    "{nth} {award}. {winner} is a different breed. {?Dynasty.|Legacy secured.} {fanTag}"
+   ],
+   "md_record_own": [
+    "🚨 RECORD BROKEN — BY HIS OWN HAND: {me} ({teamS}) tops his own mark with {v} {unit} {scopeText}, up from {prevV} ({prevLabel}). {recordTag}"
+   ],
+   "md_record_stat_own": [
+    "📊 {me} raises his own record: {v} {unit} {scopeText} (was {prevV} in {prevLabel})."
+   ],
+   "md_record_live_own": [
+    "🚨 {me} ({teamS}) is already past his own record: {v} {unit} {scopeText}, up from {prevV} ({prevLabel}). {recordTag}"
+   ],
+   "md_record_stat_live_own": [
+    "📊 Live: {me} on {v} {unit} {scopeText} — beating his own best of {prevV}."
+   ],
+   "pp_record_own": [
+    "{v} {unit} {scopeText} — more than my own best of {prevV}. {?Raising the bar.|Never settle.} 🙏"
+   ],
+   "pp_record_live_own": [
+    "Past my own record already: {v}. {?Not done yet.|Keep going.} 🙏"
+   ],
+   "cp_record_own": [
+    "{meS} beats his own record: {v} {unit} {scopeText}. {?The standard keeps rising.|Incredible.}"
+   ],
+   "cp_record_live_own": [
+    "{meS} is past his own record — {v} {unit} and still going. 👏"
+   ],
+   "fx_record_own": [
+    "{meS} broke his OWN record. {v} {unit}. {?Only competing with himself.|Different class.}"
+   ],
+   "md_quote_record": [
+    "{playerS} {?reacts to|speaks after} the record: {v} {unit} {scopeText}."
+   ],
+   "cp_quote_record": [
+    "{?Record-breaker.|History.} {playerS} 🔥"
+   ],
+   "md_quote_milestone": [
+    "{playerS} reaches {n} career {statName}."
+   ],
+   "cp_quote_milestone": [
+    "{?Landmark.|Legend.} {playerS} 👏"
    ]
   }
  }

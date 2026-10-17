@@ -1,3 +1,105 @@
+LEGACY, RECORDS, REPUTATION & MARKET VALUE (social layer)
+
+Changed files (drop into your football-game folder, overwriting existing ones):
+  NEW  engine/mediaLegacy.js   NEW  test/legacy-harness.js   NEW  test/legacy-cases.js
+  engine/mediaSocial.js  engine/mediaVoices.js  engine/mediaWorld.js  engine/mediaCore.js
+  simulation/seasonEngine.js  simulation/worldEngine.js  simulation/tournamentEngine.js
+  ui/mediaUI.js  index.html  styles.css  media.json  manifest.json  dist/app.js (rebuilt)  CHANGES.txt
+
+WHAT'S NEW
+ - Accounts remember earlier seasons: every finished season / awards round / league / cup / World Cup /
+   Champions League run is snapshotted (top performers' lines) into the media save (apexMedia -> sx.lg).
+   Honours are read retroactively from the trophy case. Posts and replies can now cite last season, season
+   trails ("Y1 30G/9A - Y2 34G/9A"), career totals, honours, records held and the last tournament.
+   Profile cards show market value, form factor, reputation, honours, records and a season-by-season table.
+ - Records & leaderboards: top 5 ever per competition family and scope (single season / single league season /
+   single tournament) for goals, assists, G+A, MOTM, clean sheets, saves, average rating. New Media tabs:
+   "Records" (record books + break log) and "Hall of Fame" (all-time career leaders, most decorated, most valuable).
+ - Record-breaking is featured: live while a season/tournament runs (past the all-time mark) and when it is
+   archived (final tally, previous holder reacts). News outlets, stats account, the player, the club and fans all post;
+   feed filter "Records & milestones". Career milestones (50/100/... goals, assists, MOTM, clean sheets), throwbacks,
+   season/tournament recaps and "Nth award" stories also use the history.
+ - Rating no longer decides reputation: followers, verified accounts, who posts/replies, rumour subjects now come from
+   reputation points (output, this season's form, honours, records). The overall rating survives only as a small prior
+   that fades with minutes played (cfg.rep.prior) - set prior.max to 0 to remove it entirely.
+ - Performance feeds the transfer fee: market value = ability x recent performance (recency-weighted over 3 seasons,
+   position-scaled) x honours/records premium. Rumour fees use it (seller fame / talk stage nudge the price).
+ - Config: media.json -> SOCIAL.cfg.{rep, legacy, value} and new banks (md_record_*, pp_record_*, pp_milestone, ...).
+   verify.playerMinOvr was replaced by verify.minRep. Old saves load fine; the ledger fills from the next archived
+   season/tournament. "Clear media" keeps the ledger; "Reset EVERYTHING" wipes it.
+ - Tests: node test/legacy-harness.js (no jsdom needed). The older jsdom harnesses were not runnable here.
+
+--------------------------------------------------------------------------
+
+APEX MEDIA CENTRE - SOCIAL LAYER (verified players & clubs, fanbases, awards hype, debates)
+
+Changed files (drop into your football-game folder, overwriting existing ones):
+  NEW  engine/mediaSocial.js        NEW  test/social-harness.js
+  media.json (new "SOCIAL" block)   data/mediaData.js   engine/mediaCore.js
+  engine/mediaWorld.js   engine/mediaStories.js   ui/mediaUI.js   ui/matchUI.js
+  simulation/seasonEngine.js   simulation/tournamentEngine.js
+  index.html   styles.css   manifest.json   dist/app.js (rebuilt)   CHANGES.txt
+
+WHAT'S NEW
+ - Verified accounts: every club has an official account; every player rated at or above
+   SOCIAL.cfg.verify.playerMinOvr has a verified account (handle, followers from rating,
+   club fame, career stats, trophies/awards and current form). Click a name in the feed for
+   a profile card (followers, fanbase name/tier, fan mood).
+ - They post and talk: clubs post results/previews/trophies, players react to goals, hat-tricks,
+   winners, MOTM, saves, red cards, injuries, derbies, trophies, rumours and awards. Posts get
+   threads - teammates, the club, an opposition player, fans of the player, rival-fan trolls,
+   and the author replying back. Media outlets and clubs quote-post big moments.
+ - Fanbases: each player has a named fanbase (e.g. "Salah Army") sized from followers, with a
+   tier and a mood ("heat") that rises with goals/MOTM/trophies and falls with reds and losses.
+ - Awards hype BEFORE the announcement: a rolling race update every N matches, a shortlist once
+   the season is in its closing rounds, and a full "eve" build-up (breaking news, TV special with
+   pundit picks, odds, polls, articles, tabloid gossip, nominees' own posts, club and fan
+   campaigns) right before awards are handed out - for the season awards and for tournament
+   awards (Golden Boot/Ball/Glove). After the reveal the winner, club, losing nominees and fans
+   react and the media marks its own predictions (called it / upset / shock).
+ - Debates: fanbase-vs-fanbase wars (award races, striker showdowns, "greatest of the era",
+   title talk, derbies) with a poll weighted by form AND fanbase size, a fan-war thread, player
+   cameos by persona, escalations, and a verdict when the award decides it.
+ - New Media tabs: Awards Watch (live leaders + odds), Debates, Accounts. New feed filters:
+   Players & clubs, Awards hype.
+
+NO HARD-CODING: all wording, thresholds, weights, handle/fan-name patterns, the award list and
+the outlet "recipes" for each hype phase live in media.json -> SOCIAL (cfg + banks). Add awards,
+tune posting rates, rename fanbases or add lines without touching code.
+Save-safe: media never uses the seeded RNG; state lives in the existing "apexMedia" key
+(older saves load fine); post caps are configurable (SOCIAL.cfg.caps).
+Tests: node test/social-harness.js. (end-season, league-tournament and roles harnesses already
+failed on the previous zip - Golden Boot / 8-club matchday count / penalty-icon expectations.)
+
+--------------------------------------------------------------------------
+
+UPDATE — media.json diversified (this zip replaces the earlier media.json etc.)
+ - media.json grew from ~1,100 to ~2,500 template lines (inline {?a|b|c} choices
+   multiply this many times over). Adds story-agnostic "GEN" banks that mix into
+   every storyline (45% generic / 55% storyline-specific), so special stories keep
+   their flavour but nothing repeats as fast.
+ - Moved the remaining hard-coded strings out of the JS into media.json banks:
+   breaking prefixes, club-desk posts, VAR notes, poll prompts, tabloid and
+   broadsheet article bodies, stat lines, TV intros, trophy/award/season/crisis
+   bodies, referee surnames.
+ - 9 new minor outlets (media.json -> MEDIA_OUTLETS entries with "extra": true,
+   voices in MB_X): The Pub Podcast, Retro Football Club, Academy Watch, Ultras
+   Voice, Agent Whispers, Footy Facts Daily, The Treatment Room, Sunday League
+   Legend, Chant Corner. Add your own by adding an outlet + an MB_X entry.
+ - Per-club local papers (e.g. "Leeds Evening Post"): name picked per club from
+   MB_LOCAL.names; own win / lose / draw / preview banks.
+ - Analysis lines now respect the data (xG / possession wording no longer claims
+   "the numbers back it" when they don't); templates referencing an empty value
+   are skipped automatically; late-equaliser and shootout fans now use the right
+   win/lose voices; accented club names keep their letters in handles/hashtags.
+ - Measured on a 24-matchday sim: most-repeated opening fell from 38 to ~11,
+   repeated 6-word sequences fell from 34% to ~25% (the rest is structured
+   score lines like "FT | A 2-1 B").
+Files in this zip: media.json, data/mediaData.js, engine/mediaCore.js,
+engine/mediaStories.js, engine/mediaWorld.js, dist/app.js, CHANGES.txt.
+
+--------------------------------------------------------------------------
+
 Changed files (drop into your football-game folder, overwriting existing ones):
 
 APEX MEDIA CENTRE - news channels, TV studio, pundits and social media.
@@ -39,10 +141,43 @@ SAFE FOR YOUR SAVES
  - All outlets/pundits are FICTIONAL. Rename them in data/mediaData.js.
  - Add derbies in MEDIA_DERBIES (data/mediaData.js).
 
-New files (registered in manifest.json): data/mediaData.js,
-data/mediaBanksMatch.js, data/mediaBanksWorld.js, engine/mediaCore.js,
-engine/mediaStories.js, engine/mediaWorld.js, ui/mediaUI.js.
+All media CONTENT now lives in media.json (project root, next to teams.json):
+outlets, pundits, fan-name pools, derbies, hashtags and every template bank.
+It loads at startup like the other JSON files, so you can edit it without a
+rebuild when served over http(s). If it can't be loaded (file://), the Media
+tab shows a notice and the media layer stays off; the rest of the game is fine.
+Template syntax is described in the "_comment" field at the top of media.json.
+
+New files (registered in manifest.json): media.json, data/mediaData.js (tiny
+loader), engine/mediaCore.js, engine/mediaStories.js, engine/mediaWorld.js,
+ui/mediaUI.js. (data/mediaBanksMatch.js and data/mediaBanksWorld.js from the
+previous zip are gone: DELETE them from your folder.)
 Edited: engine/matchEngine.js (endMatch + startMatch hooks),
 simulation/seasonEngine.js (trophy/award/season hooks, save/load/export),
-ui/matchUI.js (view switch, exports, dropdown guard), index.html, styles.css,
+ui/matchUI.js (loads media.json, view switch, exports, dropdown guard), index.html, styles.css,
 manifest.json, dist/app.js (rebuilt).
+
+=== MEDIA CENTRE — VOICES, JOURNALISTS & NEWSROOM ===
+New files
+  media-voices.json        all new wording (player/manager voices, journalists, news banks, fan composer). Edit freely.
+  engine/mediaVoices.js    voice profiles, manager accounts, journalists, injury/bench/suspension/team-news stories (chunks cvx01-cvx04)
+
+What changed
+  * Players: every player now has a stable voice (15 archetypes - Icon, Showman, Ice Man, Captain, Grafter, Fire, Joker, Wonderkid,
+    Veteran, Finisher, Wall, Family Man, Student, Quiet One, Pro) derived from personality tags, playstyle, position, age and OVR,
+    plus ~130 star signatures (catchphrases, emoji kit, hobby, custom lines). Off-pitch posts use a per-player hobby (golf, chess, gaming...).
+  * Managers: verified manager accounts with 8 voices (Professor, Firebrand, Pragmatist, Mind-Gamer, Calm One, Old Guard, Young Gun,
+    Diplomat) from manager DNA/ovr (+ known managers). They post after matches, before kick-off, on injuries, benching, returns,
+    red cards, transfer rumours and sack pressure; reply to their players; mind-games after derbies. Profile cards show their voice.
+  * Journalists: Fabrizio Romano, David Ornstein, Gianluca Di Marzio, Matteo Moretto, Florian Plettenberg, Santi Aouna, Ben Jacobs.
+    Routed by league beat; each has their own transfer ladder and house style. (The old fictional "ferrante" still does window posts.)
+  * Real-world newsroom: injury stories (taken off -> diagnosis/timeline -> manager update -> return to training), suspensions,
+    team news before matches, "dropped / left out / rested / recalled" stories from the actual starting XI (with a reason and
+    cooldown), early substitutions, injury-crisis and manager-pressure stories. Filters: Journalists, Managers, Team news & injuries.
+  * Fans: each fan account has a stable archetype (ultra, doomer, glory hunter, tactics nerd, fantasy manager, old-timer, comedian,
+    ref-conspiracist, neutral, kid, scout, wholesome). Comments are composed from concrete facts (scorer, minute, xG, injury, manager).
+  * Anti-repeat: a rolling near-duplicate check across the whole feed. Voices posts use their own per-flush budget so they can never
+    starve the original systems.
+Modified: engine/mediaCore.js, mediaSocial.js, mediaStories.js, mediaWorld.js, ui/mediaUI.js, ui/matchUI.js, styles.css, manifest.json,
+          dist/app.js (rebuilt). Also fixed a stray "{?..|..}" in the monthly calendar posts.
+If media-voices.json is missing the game falls back to the previous Media Centre behaviour.
