@@ -837,14 +837,29 @@
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  // Cache canonical skill keys to avoid repeated regex & map overhead on identical strings
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
+    if (typeof s !== 'string') s = String(s || '');
+    let cached = _canonSkillCache.get(s);
+    if (cached !== undefined) return cached;
     const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    const res = SKILL_NAME_ALIASES[k] || k;
+    _canonSkillCache.set(s, res);
+    return res;
   }
+  // Fast skill lookup using a cached Set on p.expandedAttrs
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    if (!p.expandedAttrs._canonSkills) {
+      const set = new Set();
+      const skills = p.expandedAttrs.skills || [];
+      for (let i = 0; i < skills.length; i++) {
+        set.add(canonSkillKey(skills[i]));
+      }
+      p.expandedAttrs._canonSkills = set;
+    }
+    return p.expandedAttrs._canonSkills.has(canonSkillKey(skillName));
   }
 /*@CHUNK:c0031:END*/
 
