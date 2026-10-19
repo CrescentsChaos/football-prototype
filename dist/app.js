@@ -5305,11 +5305,22 @@ const PLAYSTYLE_BEHAVIOR = {
       populateTeamSelects();
       populateFormations();
       bindNav();
-      renderTeamsList();
-      restoreTournamentUI();
-      restoreSeasonUI();
-      const savedView = (function () { try { return localStorage.getItem('apexActiveView'); } catch (e) { return null; } })();
-      if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
+      // Each page (index/match/tournament/season/…) only holds its own
+      // section(s), so only build the UI for what is actually on this page.
+      // The page's own view is rendered through switchView() below (teams
+      // list, season dashboard, leaderboard, players, media, hospital …).
+      const pageView = (document.body && document.body.dataset && document.body.dataset.view) || 'home';
+      if (document.getElementById('view-tournament')) restoreTournamentUI();
+      if (pageView !== 'home' && document.getElementById('view-' + pageView)) switchView(pageView);
+      // Arrived from another page via a "start new" action (Home mode cards).
+      try {
+        const qs = new URLSearchParams(location.search);
+        if (qs.get('go')) {
+          if (pageView === 'match') goToMatch();
+          else if (pageView === 'tournament') goToTournament(qs.get('type') || undefined);
+          if (window.history && history.replaceState) history.replaceState(null, '', location.pathname);
+        }
+      } catch (e) {}
       setupAutoSave();
       try {
         if (sessionStorage.getItem('apexJustReset') === '1') {
@@ -5333,9 +5344,17 @@ const PLAYSTYLE_BEHAVIOR = {
 
   function bindNav() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
+      tab.addEventListener('click', (e) => {
         const view = tab.dataset.view;
-        if (view) switchView(view);
+        if (!view) return;
+        if (tab.tagName === 'A') {
+          // Real page link. If that view is already on this page (e.g. the
+          // Match tab while playing a tournament/season fixture) stay in-page
+          // so a live match isn't lost; otherwise let the browser navigate.
+          if (document.getElementById('view-' + view)) { e.preventDefault(); switchView(view); }
+          return;
+        }
+        switchView(view);
       });
     });
     document.addEventListener('keydown', (e) => {
@@ -5345,7 +5364,27 @@ const PLAYSTYLE_BEHAVIOR = {
     });
   }
 
+  // Multi-page navigation: every view now lives on its own page, all sharing
+  // the same dist/app.js. State is in localStorage (written on pagehide), so
+  // moving between pages simply reloads it. A view present on the current
+  // page is switched in-page exactly as before (Season/Tournament -> live
+  // match -> back); a view that lives on another page navigates there.
+  const VIEW_PAGES = {
+    home: 'index.html', match: 'match.html', squadbuilder: 'match.html',
+    tournament: 'tournament.html', season: 'season.html',
+    leaderboard: 'leaderboard.html', awards: 'awards.html', history: 'history.html',
+    teams: 'teams.html', players: 'players.html', media: 'media.html',
+    hospital: 'hospital.html', extras: 'extras.html'
+  };
+  function navigateToView(view, query) {
+    const page = VIEW_PAGES[view];
+    if (!page) return false;
+    location.href = page + (query ? '?' + query : '');
+    return true;
+  }
+
   function switchView(view) {
+    if (!document.getElementById('view-' + view) && navigateToView(view)) return;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => { t.classList.remove('active'); t.removeAttribute('aria-current'); });
     const viewEl = document.getElementById('view-' + view);
@@ -5412,6 +5451,8 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function goToMatch() {
+    // Not on the match page: go there; match.html runs goToMatch() on arrival (?go=1).
+    if (!document.getElementById('view-match')) { navigateToView('match', 'go=1'); return; }
     switchView('match');
     const setup = document.getElementById('match-setup');
     const live = document.getElementById('match-live');
@@ -5437,6 +5478,11 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function goToTournament(type) {
+    // Not on the tournament page: go there; tournament.html runs goToTournament() on arrival.
+    if (!document.getElementById('view-tournament')) {
+      navigateToView('tournament', 'go=1' + (type ? '&type=' + encodeURIComponent(type) : ''));
+      return;
+    }
     switchView('tournament');
     const setup = document.getElementById('tournament-setup');
     const live = document.getElementById('tournament-live');
@@ -20368,6 +20414,7 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function goToSquadBuilder() {
+    if (!document.getElementById('view-match')) { navigateToView('match', 'go=1'); return; }
     switchView('match');
     const setup = document.getElementById('match-setup');
     const live = document.getElementById('match-live');
