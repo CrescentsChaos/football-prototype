@@ -5305,22 +5305,11 @@ const PLAYSTYLE_BEHAVIOR = {
       populateTeamSelects();
       populateFormations();
       bindNav();
-      // Each page (index/match/tournament/season/…) only holds its own
-      // section(s), so only build the UI for what is actually on this page.
-      // The page's own view is rendered through switchView() below (teams
-      // list, season dashboard, leaderboard, players, media, hospital …).
-      const pageView = (document.body && document.body.dataset && document.body.dataset.view) || 'home';
-      if (document.getElementById('view-tournament')) restoreTournamentUI();
-      if (pageView !== 'home' && document.getElementById('view-' + pageView)) switchView(pageView);
-      // Arrived from another page via a "start new" action (Home mode cards).
-      try {
-        const qs = new URLSearchParams(location.search);
-        if (qs.get('go')) {
-          if (pageView === 'match') goToMatch();
-          else if (pageView === 'tournament') goToTournament(qs.get('type') || undefined);
-          if (window.history && history.replaceState) history.replaceState(null, '', location.pathname);
-        }
-      } catch (e) {}
+      renderTeamsList();
+      restoreTournamentUI();
+      restoreSeasonUI();
+      const savedView = (function () { try { return localStorage.getItem('apexActiveView'); } catch (e) { return null; } })();
+      if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
       setupAutoSave();
       try {
         if (sessionStorage.getItem('apexJustReset') === '1') {
@@ -5344,17 +5333,9 @@ const PLAYSTYLE_BEHAVIOR = {
 
   function bindNav() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
-      tab.addEventListener('click', (e) => {
+      tab.addEventListener('click', () => {
         const view = tab.dataset.view;
-        if (!view) return;
-        if (tab.tagName === 'A') {
-          // Real page link. If that view is already on this page (e.g. the
-          // Match tab while playing a tournament/season fixture) stay in-page
-          // so a live match isn't lost; otherwise let the browser navigate.
-          if (document.getElementById('view-' + view)) { e.preventDefault(); switchView(view); }
-          return;
-        }
-        switchView(view);
+        if (view) switchView(view);
       });
     });
     document.addEventListener('keydown', (e) => {
@@ -5364,27 +5345,7 @@ const PLAYSTYLE_BEHAVIOR = {
     });
   }
 
-  // Multi-page navigation: every view now lives on its own page, all sharing
-  // the same dist/app.js. State is in localStorage (written on pagehide), so
-  // moving between pages simply reloads it. A view present on the current
-  // page is switched in-page exactly as before (Season/Tournament -> live
-  // match -> back); a view that lives on another page navigates there.
-  const VIEW_PAGES = {
-    home: 'index.html', match: 'match.html', squadbuilder: 'match.html',
-    tournament: 'tournament.html', season: 'season.html',
-    leaderboard: 'leaderboard.html', awards: 'awards.html', history: 'history.html',
-    teams: 'teams.html', players: 'players.html', media: 'media.html',
-    hospital: 'hospital.html', extras: 'extras.html'
-  };
-  function navigateToView(view, query) {
-    const page = VIEW_PAGES[view];
-    if (!page) return false;
-    location.href = page + (query ? '?' + query : '');
-    return true;
-  }
-
   function switchView(view) {
-    if (!document.getElementById('view-' + view) && navigateToView(view)) return;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => { t.classList.remove('active'); t.removeAttribute('aria-current'); });
     const viewEl = document.getElementById('view-' + view);
@@ -5451,8 +5412,6 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function goToMatch() {
-    // Not on the match page: go there; match.html runs goToMatch() on arrival (?go=1).
-    if (!document.getElementById('view-match')) { navigateToView('match', 'go=1'); return; }
     switchView('match');
     const setup = document.getElementById('match-setup');
     const live = document.getElementById('match-live');
@@ -5478,11 +5437,6 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function goToTournament(type) {
-    // Not on the tournament page: go there; tournament.html runs goToTournament() on arrival.
-    if (!document.getElementById('view-tournament')) {
-      navigateToView('tournament', 'go=1' + (type ? '&type=' + encodeURIComponent(type) : ''));
-      return;
-    }
     switchView('tournament');
     const setup = document.getElementById('tournament-setup');
     const live = document.getElementById('tournament-live');
@@ -20414,7 +20368,6 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function goToSquadBuilder() {
-    if (!document.getElementById('view-match')) { navigateToView('match', 'go=1'); return; }
     switchView('match');
     const setup = document.getElementById('match-setup');
     const live = document.getElementById('match-live');
@@ -24559,7 +24512,8 @@ const PLAYSTYLE_BEHAVIOR = {
     const V = sxCfg('value', {});
     if (!player || !V.abilityBase) return null;
     const info = sxRepInfo(player);
-    const ability = V.abilityBase * Math.exp((V.abilitySlope || 0.135) * ((player.ovr || 60) - (V.abilityRef || 60)));
+    let ability = V.abilityBase * Math.exp((V.abilitySlope || 0.135) * ((player.ovr || 60) - (V.abilityRef || 60)));
+    try { if (typeof tmAbilityValue === 'function') { const ta = tmAbilityValue(player); if (ta > 0) ability = ta; } } catch (e) {}   // rank-based scale shared with the transfer market
     const g = lgPosGroup(player);
     const F = V.form || {};
     const fp = lgFormPts(player);
@@ -25919,7 +25873,7 @@ const PLAYSTYLE_BEHAVIOR = {
     // money (everything in EUR millions)
     budgetBase: 0.07,       // share of squad value that becomes a yearly transfer budget ...
     budgetPres: 0.10,       // ... plus this much more for the most prestigious clubs
-    budgetRefill: 0.75,     // each summer: budget = 60% of what's left + this share of the base
+    budgetRefill: 0.75,     // each summer: budget = 45% of what is left + (this + 0.1 + last season results bonus) of the yearly base
     wageCapMult: 1.12,      // wage cap = starting wage bill x this (+ a flat 3m)
     releaseCostShare: 0.5,  // cost of tearing up a contract = wage x years left x this
     signOnShare: 0.5,       // signing-on bonus / agent fees = wage x this
@@ -25934,11 +25888,25 @@ const PLAYSTYLE_BEHAVIOR = {
     // player mood thresholds
     moodKeen: 0.64, moodOpen: 0.5, moodReluctant: 0.4,
     // AI activity per window step: share of clubs that act
-    aiIntensity: { open: 0.55, normal: 0.35, deadline: 0.85, offseason: 0.75 },
+    aiIntensity: { open: 0.4, normal: 0.2, deadline: 0.55, offseason: 0.5 },
     aiWinterScale: 0.55,    // winter windows are quieter than summer ones
     // offers sent to the person
     inboxMax: 8,
     logMax: 400,
+    // v2 — real-life club behaviour, staged talks, news
+    talksMin: 12,           // deals at / above this fee (EUR m) go through staged talks (rumour -> talks -> agreed -> done)
+    talkMax: 24,            // most AI negotiations running at once
+    newsMax: 180,           // headlines kept
+    newsMin: 4,             // completed deals under this fee (EUR m) are not headline news unless the player is a star
+    patience: 3,            // low offers a club tolerates before it breaks off talks for the window
+    winterPremium: 1.08,    // clubs charge more in January
+    rivalPremium: 1.28,     // asking-price premium when the buyer is a direct rival
+    contestedPremium: 1.08, // premium while another club is already in talks for the player
+    singleDealShare: 0.62,  // a club will not put more than this share of its budget (x archetype cap) into one player
+    loanOutMax: 2,          // AI clubs loan out at most this many surplus youngsters per window step
+    presDrift: 0.12,        // yearly drift of club stature toward last season's results
+    revenue: { champion: 0.25, top4: 0.15, mid: 0, bottom: -0.1, cl: 0.2, clWin: 0.12 },  // budget bonus by last season's results
+    wageExp: 0.75, wageMul: 0.5,   // wage = wageMul * value^wageExp  (EUR m a year)
     // position-group minimums/ideals (primary position buckets)
     roleMin:   { GK: 2, CB: 3, FB: 3, DM: 1, CM: 2, AM: 1, W: 2, ST: 2 },
     roleIdeal: { GK: 3, CB: 4, FB: 4, DM: 2, CM: 3, AM: 2, W: 3, ST: 3 },
@@ -25955,11 +25923,199 @@ const PLAYSTYLE_BEHAVIOR = {
     'Theo', 'Sami', 'Niko', 'Arda', 'Dani', 'Joel', 'Ruben', 'Elias'];
   const TM_ACADEMY_LAST = ['Moreno', 'Keller', 'Santos', 'Rossi', 'Dubois', 'Novak', 'Ferreira', 'Weber', 'Martin', 'Lopes', 'Costa',
     'Bianchi', 'Lambert', 'Ortega', 'Brandt', 'Marques', 'Petit', 'Romano', 'Vidal', 'Aguilar'];
+  const TM_ARCH = {
+    galactico: {
+      name: 'Galácticos', ico: '👑', blurb: 'Buys the best players in the world in their prime — price is secondary.',
+      age: [22, 29, 26], ageMax: 33, wQual: 1.4, wNeed: 0.5, wPot: 0.45, wBarg: 0.0, wFree: 0.15,
+      pay: 1.1, cap: 0.6, act: 0.8, ask: 1.12, keep: 1.0, reach: 12, loanOut: 0.25
+    },
+    spender: {
+      name: 'Big spenders', ico: '💰', blurb: 'Deep pockets, high wages — will pay over the odds for established quality.',
+      age: [21, 30, 26], ageMax: 34, wQual: 1.1, wNeed: 0.8, wPot: 0.5, wBarg: 0.1, wFree: 0.2,
+      pay: 1.06, cap: 0.5, act: 1.0, ask: 1.05, keep: 0.8, reach: 10, loanOut: 0.4
+    },
+    contender: {
+      name: 'Title contenders', ico: '🏆', blurb: 'Want ready-made starters in their prime to win now, but watch the books.',
+      age: [21, 30, 26], ageMax: 34, wQual: 0.9, wNeed: 1.0, wPot: 0.35, wBarg: 0.3, wFree: 0.3,
+      pay: 1.0, cap: 0.42, act: 0.85, ask: 1.0, keep: 0.7, reach: 7, loanOut: 0.35
+    },
+    developer: {
+      name: 'Talent developers', ico: '🌱', blurb: 'Buy young, develop, sell high. Allergic to anyone past 28.',
+      age: [17, 24, 21], ageMax: 29, wQual: 0.4, wNeed: 0.6, wPot: 1.4, wBarg: 0.8, wFree: 0.2,
+      pay: 0.96, cap: 0.35, act: 1.0, ask: 1.08, keep: 0.2, reach: 6, loanOut: 0.6
+    },
+    bargain: {
+      name: 'Bargain hunters', ico: '🧠', blurb: 'Free agents, expiring deals and experienced players at a discount.',
+      age: [26, 33, 29], ageMax: 36, wQual: 0.5, wNeed: 0.9, wPot: 0.0, wBarg: 1.2, wFree: 1.3,
+      pay: 0.95, cap: 0.3, act: 0.9, ask: 0.98, keep: 0.5, reach: 6, loanOut: 0.3
+    },
+    homegrown: {
+      name: 'Identity clubs', ico: '🏡', blurb: 'Lean on the academy and local talent. Hard to buy from, slow to buy.',
+      age: [18, 27, 22], ageMax: 31, wQual: 0.4, wNeed: 0.7, wPot: 0.9, wBarg: 0.5, wFree: 0.3,
+      pay: 1.0, cap: 0.3, act: 0.55, ask: 1.2, keep: 1.2, reach: 5, loanOut: 0.3
+    },
+    survivor: {
+      name: 'Survival mode', ico: '🛟', blurb: 'Tight budgets: loans, free agents and veterans to plug holes.',
+      age: [24, 33, 28], ageMax: 35, wQual: 0.3, wNeed: 1.2, wPot: 0.2, wBarg: 1.0, wFree: 1.2,
+      pay: 0.93, cap: 0.3, act: 0.8, ask: 0.95, keep: 0.3, reach: 3, loanOut: 0.2
+    }
+  };
+
+  // key = club id minus its trailing season digits.   [stature, budget EUR m, archetype, rivals, tagline, overrides]
+  const TM_PROFILES = {
+    // ---- Premier League
+    mci: [0.97, 220, 'spender', 'mun', 'State-backed superpower'],
+    liv: [0.95, 150, 'contender', 'mun,everton', 'Data-led, buys prime talent and sells at the peak', { age: [20, 28, 25], keep: 0.5 }],
+    ars: [0.92, 170, 'contender', 'tot', 'Young core, Champions League regulars'],
+    chelsea: [0.88, 230, 'spender', 'tot', 'Multi-club model — hoards young talent', { wPot: 1.0, age: [18, 27, 23] }],
+    mun: [0.93, 160, 'spender', 'liv,mci', 'Global brand, big wages'],
+    tot: [0.80, 105, 'contender', 'ars,chelsea', 'Hard bargainers who never overpay', { ask: 1.15, wPot: 0.7 }],
+    new: [0.74, 140, 'spender', 'sunderland', 'Newly rich ambition', { wQual: 1.1 }],
+    avl: [0.68, 90, 'contender', '', 'Europe-chasing project'],
+    brentford: [0.52, 60, 'developer', '', 'Moneyball: buy undervalued, sell dear'],
+    bha: [0.58, 75, 'developer', '', 'Scouting machine that sells at the top of the market'],
+    bournemouth: [0.50, 55, 'developer', '', 'Ambitious youth market player'],
+    cry: [0.52, 50, 'bargain', '', 'Shrewd mid-table recruiters'],
+    everton: [0.56, 50, 'bargain', 'liv', 'Value-driven, experienced squad'],
+    ful: [0.54, 55, 'bargain', '', 'Veteran-friendly west Londoners'],
+    nottinghamforest: [0.55, 75, 'contender', '', 'Spend freely, rebuild constantly', { act: 1.1 }],
+    leedsunited: [0.50, 50, 'survivor', '', 'Big club on a modest budget'],
+    sunderland: [0.46, 45, 'developer', 'new', 'Young, hungry recruitment'],
+    coventrycity: [0.32, 25, 'survivor', '', 'Promoted — needs bodies'],
+    hullcity: [0.28, 20, 'survivor', '', 'Promoted — tight purse'],
+    ipswichtown: [0.34, 28, 'survivor', '', 'Newly promoted'],
+    // ---- La Liga
+    rma: [1.00, 210, 'galactico', 'bar,atm', 'Real Madrid: the world’s best, in their prime'],
+    bar: [0.96, 80, 'contender', 'rma', 'Huge name, tight finances — loves free deals', { wFree: 1.0, pay: 0.95, loanOut: 0.5 }],
+    atm: [0.84, 100, 'contender', 'rma', 'Solid, physical, built on Simeone’s system', { age: [22, 31, 27], keep: 0.9 }],
+    athletic: [0.64, 55, 'homegrown', 'realsociedad', 'Basque-only policy: never signs from abroad', { domOnly: true }],
+    realsociedad: [0.62, 55, 'homegrown', 'athletic', 'Cantera-first, plays the long game'],
+    sevilla: [0.66, 60, 'bargain', 'bet', 'Masters of the cut-price deal'],
+    bet: [0.62, 55, 'bargain', 'sevilla', 'Technical, shrewd'],
+    vil: [0.60, 55, 'developer', '', 'Buys prospects, sells them to giants'],
+    valencia: [0.58, 40, 'bargain', '', 'Rebuilding on a budget'],
+    celta: [0.50, 35, 'developer', 'deportivo', 'Galician academy pipeline'],
+    deportivo: [0.40, 22, 'survivor', 'celta', 'Back among the big boys'],
+    osasuna: [0.40, 25, 'homegrown', '', 'Proud local identity'],
+    getafe: [0.42, 22, 'bargain', '', 'Pragmatic and physical'],
+    rayo: [0.42, 22, 'survivor', '', 'Madrid’s other club'],
+    alaves: [0.38, 20, 'survivor', '', 'Battling to stay up'],
+    espanyol: [0.45, 25, 'survivor', 'bar', 'Catalan underdog'],
+    elche: [0.35, 20, 'survivor', '', 'Small budget, big ambition'],
+    levante: [0.35, 20, 'survivor', '', 'Looking for bargains'],
+    malaga: [0.40, 22, 'survivor', '', 'Rebuilding'],
+    racing: [0.33, 18, 'survivor', '', 'Newly arrived'],
+    // ---- Serie A
+    int: [0.86, 85, 'bargain', 'acmilan,juventus', 'Free agents and experienced stars — and they win', { wQual: 0.9, age: [26, 33, 29] }],
+    juventus: [0.84, 100, 'contender', 'int,nap,torino', 'Needs quality but runs a strict wage structure', { wBarg: 0.7, wFree: 0.8 }],
+    acmilan: [0.84, 90, 'contender', 'int', 'Moneyball-minded giant', { age: [20, 28, 25] }],
+    nap: [0.72, 90, 'contender', 'juventus', 'Smart buyers, president drives a hard bargain', { ask: 1.1 }],
+    rom: [0.74, 80, 'bargain', 'lazio', 'Experienced stars on free or loan'],
+    lazio: [0.64, 50, 'bargain', 'rom', 'Frugal, wise recruiters'],
+    atalanta: [0.66, 70, 'developer', '', 'Famous for finding talent and selling it dear', { ask: 1.15 }],
+    fiorentina: [0.58, 50, 'developer', '', 'Ambitious, youth-friendly'],
+    bologna: [0.56, 45, 'developer', '', 'Smart young recruiters'],
+    torino: [0.45, 28, 'survivor', 'juventus', 'Mid-table, tight'],
+    genoa: [0.42, 30, 'developer', '', 'Loans and prospects'],
+    udinese: [0.42, 30, 'developer', '', 'Scouting network across Europe'],
+    com: [0.52, 120, 'spender', '', 'Wealthy owners, big-name signings', { age: [18, 33, 27], act: 1.2 }],
+    parma: [0.42, 40, 'developer', '', 'Multi-club talent pipeline'],
+    cagliari: [0.38, 20, 'survivor', '', 'Survival focus'],
+    frosinone: [0.28, 15, 'survivor', '', 'Promoted'],
+    venezia: [0.30, 15, 'survivor', '', 'Promoted'],
+    uslecce: [0.36, 18, 'developer', '', 'Cheap young talent'],
+    sassuolo: [0.38, 22, 'developer', '', 'Youth outlet'],
+    acmonza: [0.32, 18, 'survivor', '', 'Staying up'],
+    // ---- Bundesliga
+    bay: [0.96, 140, 'contender', 'bvb', 'Mia san mia — poach the best of the Bundesliga', { wQual: 1.1, reach: 9 }],
+    bvb: [0.84, 90, 'developer', 'bay', 'The talent machine: buy teenagers, sell stars', { ask: 1.05, age: [17, 25, 21] }],
+    leverkusen: [0.76, 100, 'developer', '', 'Smart, ambitious, sells for profit'],
+    rbl: [0.72, 90, 'developer', '', 'Red Bull pipeline: no one over 27', { ageMax: 27 }],
+    vfb: [0.68, 55, 'developer', '', 'Developers with a big stage'],
+    frankfurt: [0.62, 70, 'developer', '', 'Record-breaking sellers', { ask: 1.12 }],
+    wolfsburg: [0.54, 50, 'bargain', '', 'Experienced squad on solid money'],
+    gladbach: [0.55, 40, 'developer', 'koln', 'Academy and development'],
+    freiburg: [0.56, 40, 'developer', '', 'Famous for continuity and academy talent'],
+    hoffenheim: [0.52, 40, 'developer', '', 'Youth recruitment'],
+    mainz: [0.48, 28, 'developer', '', 'Develop and flip'],
+    augsburg: [0.42, 25, 'survivor', '', 'Battle for safety'],
+    unionberlin: [0.48, 28, 'homegrown', '', 'Strong identity, loyal squad'],
+    bremen: [0.50, 25, 'survivor', 'hsv', 'Northern giants rebuilding'],
+    koln: [0.50, 30, 'survivor', 'gladbach', 'Passionate, not rich'],
+    hsv: [0.50, 28, 'survivor', 'stpauli,bremen', 'Back among the elite'],
+    stpauli: [0.42, 20, 'survivor', 'hsv', 'Cult club, small budget'],
+    heidenheim: [0.35, 15, 'survivor', '', 'Smallest budget in the league'],
+    // ---- Ligue 1
+    psg: [0.92, 220, 'spender', 'om', 'Qatari-funded — young stars on huge money', { age: [19, 29, 24], wQual: 1.2 }],
+    asm: [0.62, 80, 'developer', 'ogcn', 'Famous for turning prospects into millions'],
+    om: [0.70, 70, 'contender', 'psg,ol', 'Passionate, ambitious, impulsive'],
+    ol: [0.70, 65, 'developer', 'om', 'Academy powerhouse'],
+    losc: [0.60, 55, 'developer', 'rclens', 'Sell-high specialists'],
+    ogcn: [0.52, 45, 'developer', 'asm', 'Ambitious Riviera project'],
+    rclens: [0.52, 40, 'developer', 'losc', 'Smart recruitment'],
+    srf: [0.55, 50, 'developer', '', 'Academy-led, sells talent dear'],
+    rcs: [0.50, 45, 'developer', '', 'Multi-club model: young talent in, profit out'],
+    pfc: [0.42, 40, 'contender', '', 'Wealthy backers, early-stage project', { act: 1.1 }],
+    sb29: [0.40, 22, 'survivor', '', 'Overachieving small club'],
+    tfc: [0.38, 22, 'survivor', '', 'Mid-table realists'],
+    fcl: [0.35, 18, 'developer', '', 'Youth outlet'],
+    hac: [0.33, 15, 'developer', '', 'Famous academy'],
+    aja: [0.34, 15, 'survivor', '', 'Newly competitive'],
+    sco: [0.30, 14, 'survivor', '', 'Survival mode'],
+    estac: [0.32, 14, 'developer', '', 'Group-owned feeder'],
+    lmc: [0.25, 10, 'survivor', '', 'Promoted — barely any budget']
+  };
+
+  const TM_LEAGUE_INFO = {
+    epl:        { name: 'Premier League', pres: 1.00, tv: 1.25, bud: 1.0, stature: 0.5 },
+    laliga:     { name: 'La Liga',        pres: 0.95, tv: 1.0,  bud: 0.8, stature: 0.48 },
+    bundesliga: { name: 'Bundesliga',     pres: 0.88, tv: 0.95, bud: 0.7, stature: 0.44 },
+    seriea:     { name: 'Serie A',        pres: 0.85, tv: 0.9,  bud: 0.65, stature: 0.42 },
+    ligue1:     { name: 'Ligue 1',        pres: 0.75, tv: 0.75, bud: 0.55, stature: 0.38 }
+  };
+
+  // Market value by rank in the league-wide player pool: [share of players rated BELOW him, EUR m]. Interpolated in log space.
+  const TM_VALUE_CURVE = [
+    [0.00, 0.4], [0.10, 1.2], [0.25, 2.5], [0.50, 6], [0.75, 14], [0.90, 28],
+    [0.95, 45], [0.97, 65], [0.99, 110], [0.999, 160], [1.00, 185]
+  ];
+
+  // Headlines. {p} player, {f} selling club, {t} buying club, {fee} fee text, {t2} second suitor.
+  const TM_NEWS = {
+    rumour: ['{t} are monitoring {p} ahead of a possible approach.', '{t} have identified {p} as a priority target.', 'Scouts from {t} were watching {p}.'],
+    talks: ['{t} have opened talks with {f} over {p}.', 'Advanced talks: {t} and {f} discussing a fee for {p}.', '{t} step up their interest — {p} on the verge of a bid.'],
+    agreed: ['HERE WE GO — {p} to {t} agreed with {f}, fee {fee}.', '{t} reach agreement with {f} for {p}. Medical to follow.', 'Done deal in principle: {p} set for {t}.'],
+    done: ['OFFICIAL: {p} joins {t} from {f} for {fee}.', '{p} completes his move to {t}.', '{t} announce the signing of {p} ({fee}).'],
+    free: ['{p} signs for {t} on a free transfer.', 'OFFICIAL: {t} sign free agent {p}.'],
+    loan: ['{p} joins {t} on loan from {f}.', '{t} bring in {p} on a season-long loan.'],
+    pre: ['{p} agrees a pre-contract with {t} — leaves {f} for free in the summer.'],
+    hijack: ['{t2} hijack the deal: {p} chooses them over {t}.', '{t} lose out — {p} joins {t2} instead.'],
+    collapse: ['{t}’s move for {p} collapses.', 'Talks over {p} break down — {t} walk away.', '{f} reject {t}’s final offer for {p}.'],
+    refused: ['{p} turns down {t}.', '{p} rejects a move to {t}.'],
+    bidwar: ['Bidding war: {t} and {t2} both want {p}.', '{t2} enter the race for {p}, challenging {t}.'],
+    deadline: ['DEADLINE DAY: {t} land {p} from {f} ({fee}).', 'Deadline-day rush: {p} signs for {t}.'],
+    retire: ['{p} announces his retirement.'],
+    release: ['{f} release {p}.']
+  };
+
+  // How a selling club talks, by archetype and situation.
+  const TM_VOICE = {
+    lowball: ['{f} laughed it off — nowhere near their valuation.', '{f} won’t even dignify that with a reply.'],
+    counter: ['{f} turned that down but would do business for {ask}.', '{f} came back with a counter: {ask}.'],
+    final: ['{f} say {ask} is their final price.', 'Take it or leave it: {f} want {ask}.'],
+    key: ['{p} is a key man for {f} — they only talk at {ask}.', '{f} don’t want to sell {p}; it would take {ask}.'],
+    hardball: ['{f} are tough negotiators — {ask} and not a penny less.'],
+    homegrown: ['{f} don’t sell their own: it would take {ask} to even listen.'],
+    rival: ['{f} refuse to deal with a direct rival.'],
+    broke: ['{f} need the money — {ask} gets it done.'],
+    cool: ['{f} broke off talks after repeated low offers — try again next window.']
+  };
   // ========== TRANSFER MARKET — ledger, caches, helpers ==========
   const TM_KEY = 'apexTransfers';
   let tm = null;      // the persisted ledger (see tmFresh)
   let tmFA = [];      // runtime free-agent player objects (rebuilt from the ledger on load)
-  let tmCache = { idx: null, clubs: null, clubsSeason: null, leagueOf: null, val: null, valStamp: '', pres: null, loans: null };
+  let tmCache = { idx: null, clubs: null, clubsSeason: null, leagueOf: null, val: null, valStamp: '', pres: null, loans: null,
+    prof: null, ctx: null, book: null, bookSeason: null, abil: null, int: null, pot: null };
 
   const TM_ROLE_OF = { GK: 'GK', CB: 'CB', SW: 'CB', RB: 'FB', LB: 'FB', RWB: 'FB', LWB: 'FB', CDM: 'DM', CM: 'CM',
     CAM: 'AM', LM: 'AM', RM: 'AM', LW: 'W', RW: 'W', ST: 'ST', CF: 'ST' };
@@ -25969,14 +26125,15 @@ const PLAYSTYLE_BEHAVIOR = {
   const TM_ROLES = ['GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'W', 'ST'];
 
   function tmFresh() {
-    return { v: 1, init: false, loc: {}, prof: {}, base: {}, bal: {}, cap: {}, pres: {}, short: {}, listed: {}, moved: {},
-      log: [], inbox: [], pre: [], loans: [], gen: [], me: null, seq: 1, lastKey: '', lastOpen: '', acad: 0 };
+    return { v: 1, rv: 2, init: false, loc: {}, prof: {}, base: {}, bal: {}, cap: {}, pres: {}, short: {}, listed: {}, moved: {},
+      log: [], inbox: [], pre: [], loans: [], gen: [], me: null, seq: 1, lastKey: '', lastOpen: '', acad: 0,
+      talks: [], news: [], neg: {}, cool: {}, res: {}, clNext: [], seen: 0 };
   }
   function tmEnsure() { if (!tm) tm = tmFresh(); return tm; }
   function tmSave() { try { if (tm) safeSetItem(TM_KEY, JSON.stringify(tm)); } catch (e) {} }
 
   function tmDirty() {
-    tmCache.idx = null; tmCache.val = null; tmCache.pres = null; tmCache.loans = null;
+    tmCache.idx = null; tmCache.val = null; tmCache.pres = null; tmCache.loans = null; tmCache.ctx = null; tmCache.int = null;
     // the Players tab / player profile keep their own player->team indexes; rebuild them after any move
     try { _allPlayersFlatCache = null; _playerTeamIndexCache = null; } catch (e) {}
   }
@@ -26014,7 +26171,16 @@ const PLAYSTYLE_BEHAVIOR = {
       if (raw) { const o = JSON.parse(raw); if (o && o.v === 1) tm = Object.assign(tmFresh(), o); }
     } catch (e) { tm = null; }
     tmDirty();
-    if (tm) tmReplay();
+    if (tm) { tmMigrate(); tmReplay(); }
+  }
+  // saves made before the real-life market (rv 1) carried absurd budgets/wages from the old value scale: re-derive them
+  // (the roster ledger, contracts' length, listings and the deal log are kept untouched).
+  function tmMigrate() {
+    if (!tm || tm.rv >= 2) return;
+    tm.pres = {}; tm.base = {}; tm.bal = {}; tm.cap = {};
+    Object.keys(tm.prof || {}).forEach(id => { if (tm.prof[id]) delete tm.prof[id].w; });
+    tm.inbox = []; tm.rv = 2;
+    tm.init = false;   // re-run tmReady() once the clubs exist
   }
 
   function tmGenPlayer(rec) {
@@ -26147,29 +26313,105 @@ const PLAYSTYLE_BEHAVIOR = {
   }
   function tmLoanOf(pid) { return tmLoanMap()[pid] || null; }
 
+  // ----- club identity (real life) -----
+  function tmStem(t) { return String((t && t.id) || '').replace(/_?20\d\d$/, ''); }
+  function tmLg(t) { const l = tmLeagueOf(t); return l ? l.key : ''; }
+  function tmLeagueInfo(t) { return TM_LEAGUE_INFO[tmLg(t)] || { name: '', pres: 0.85, tv: 0.9, bud: 0.6, stature: 0.4 }; }
+  function tmLeaguePres(t) { return tmLeagueInfo(t).pres; }
+  function tmProfile(t) {
+    if (!t) return { known: false, stature: 0.3, budget: 10, arch: 'survivor', rivals: [], tag: '', ov: {}, domOnly: false, A: TM_ARCH.survivor };
+    if (!tmCache.prof) tmCache.prof = {};
+    let pr = tmCache.prof[t.id]; if (pr) return pr;
+    const row = TM_PROFILES[tmStem(t)], L = tmLeagueInfo(t);
+    if (row) {
+      pr = { known: true, stature: row[0], budget: row[1], arch: TM_ARCH[row[2]] ? row[2] : 'contender',
+        rivals: String(row[3] || '').split(',').filter(Boolean), tag: row[4] || '', ov: row[5] || {} };
+    } else {   // a club nobody wrote a profile for: derive one from its league and strength
+      const st = tmClamp(L.stature + (tmTopAvg(t) - 74) / 60, 0.2, 0.75);
+      pr = { known: false, stature: st, budget: Math.round(12 + st * st * 150 * L.bud), arch: st >= 0.6 ? 'contender' : st >= 0.45 ? 'developer' : 'survivor',
+        rivals: [], tag: 'Mid-table club', ov: {} };
+    }
+    pr.domOnly = !!pr.ov.domOnly;
+    pr.A = Object.assign({}, TM_ARCH[pr.arch], pr.ov);
+    tmCache.prof[t.id] = pr; return pr;
+  }
+  function tmArch(t) { return tmProfile(t).A; }
+
+  // ----- the league-wide ability scale: value by RANK in the player pool, so it works whatever the rating inflation -----
+  function tmOvrBook() {
+    if (tmCache.book && tmCache.bookSeason === season) return tmCache.book;
+    const arr = [], clubs = tmClubs();
+    (clubs.length ? clubs : ((typeof teamsData !== 'undefined' && teamsData.club) || [])).forEach(t => (t.players || []).forEach(p => arr.push(p.ovr || 0)));
+    tmFA.forEach(p => arr.push(p.ovr || 0));
+    arr.sort((a, b) => a - b);
+    tmCache.book = arr; tmCache.bookSeason = season; tmCache.abil = {};
+    return arr;
+  }
+  function tmRankFrac(ovr) {      // share of the pool rated below him (equals count half), 0..1
+    const book = tmOvrBook(); if (!book.length) return 0.5;
+    let lo = 0, hi = book.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (book[m] < ovr) lo = m + 1; else hi = m; }
+    let up = lo; hi = book.length;
+    while (up < hi) { const m = (up + hi) >> 1; if (book[m] <= ovr) up = m + 1; else hi = m; }
+    return (lo + up) / 2 / book.length;
+  }
+  function tmAbilityValue(p) {
+    tmOvrBook();
+    const o = (p && p.ovr) || 0;
+    if (tmCache.abil && tmCache.abil[o] != null) return tmCache.abil[o];
+    const f = tmRankFrac(o), C = TM_VALUE_CURVE;
+    let v = C[C.length - 1][1];
+    for (let i = 1; i < C.length; i++) {
+      if (f <= C[i][0]) {
+        const a = C[i - 1], b = C[i], u = (f - a[0]) / Math.max(1e-9, b[0] - a[0]);
+        v = Math.exp(Math.log(a[1]) + (Math.log(b[1]) - Math.log(a[1])) * u); break;
+      }
+    }
+    if (tmCache.abil) tmCache.abil[o] = v;
+    return v;
+  }
+  function tmWorldRank(p) { return 1 - tmRankFrac((p && p.ovr) || 0); }   // 0 = the best player in the game
+
+  // ----- potential (ratings are static in this game, so this is the expected ceiling the market prices in) -----
+  function tmGrowth(p) {
+    if (!tmCache.pot) tmCache.pot = {};
+    const k = p.id + ':' + tmAge(p);
+    if (tmCache.pot[k] != null) return tmCache.pot[k];
+    const age = tmAge(p), ovr = p.ovr || 60;
+    const base = age <= 18 ? 9 : age === 19 ? 8 : age === 20 ? 7 : age === 21 ? 5.5 : age === 22 ? 4 : age === 23 ? 3 : age === 24 ? 2 : age === 25 ? 1.2 : age === 26 ? 0.6 : 0;
+    let g = base * tmClamp(1 - (tmRankFrac(ovr) - 0.5) * 0.9, 0.3, 1.1) * (0.8 + tmR(p.id + ':pot') * 0.45);
+    try { if (p.expandedAttrs && (p.expandedAttrs.personality || []).includes('Prodigy') && age < 22) g *= 1.3; } catch (e) {}
+    g = Math.round(g * 10) / 10;
+    tmCache.pot[k] = g; return g;
+  }
+  function tmPotential(p) { return Math.round((p.ovr || 0) + tmGrowth(p)); }
+
   // ----- value / wage -----
   function tmAgeMult(age) {
     for (let i = 0; i < TM_AGE_MULT.length; i++) if (age <= TM_AGE_MULT[i][0]) return TM_AGE_MULT[i][1];
     return 0.2;
   }
   function tmPosFallback(p) { const l = tmLine(p); return l === 'GK' ? 0.7 : l === 'DEF' ? 0.9 : l === 'MID' ? 1 : 1.15; }
-  function tmStableValue(p) {   // ability x age only (no form) — what wages and budgets are derived from
-    return 2 * Math.exp(0.135 * ((p.ovr || 60) - 60)) * tmPosFallback(p) * tmAgeMult(tmAge(p));
+  function tmSoftCap(m) { return m > 120 ? 120 + 80 * (1 - Math.exp(-(m - 120) / 80)) : m; }
+  function tmStableValue(p) {   // ability x position x age only (no form) — what wages and budgets are derived from
+    return tmSoftCap(tmAbilityValue(p) * tmPosFallback(p) * tmAgeMult(tmAge(p)));
   }
-  function tmValue(p) {         // market value: ability x recent performance x honours (media layer) x age
+  function tmValue(p) {         // market value: ability (rank scale) x recent form x honours (media layer) x age
     const stamp = (season ? season.year + ':' + season.week : '0') + ':' + (tm ? tm.seq : 0);
     if (!tmCache.val || tmCache.valStamp !== stamp) { tmCache.val = {}; tmCache.valStamp = stamp; }
     const hit = tmCache.val[p.id]; if (hit != null) return hit;
     let m = null;
-    try { const v = (typeof sxMarketValue === 'function') ? sxMarketValue(p, null) : null; if (v && isFinite(v.m)) m = v.m; } catch (e) {}
-    if (m == null) m = 2 * Math.exp(0.135 * ((p.ovr || 60) - 60)) * tmPosFallback(p);
-    m = m * tmAgeMult(tmAge(p));
-    if (m > 60) m = 60 + 100 * (1 - Math.exp(-(m - 60) / 100));   // soft ceiling: even a 100-OVR superstar tops out near EUR 150m
-    m = tmClamp(m, 0.3, 170);
+    try {
+      const v = (typeof sxMarketValue === 'function') ? sxMarketValue(p, null) : null;
+      if (v && isFinite(v.m)) m = tmAbilityValue(p) * tmClamp(v.form || 1, 0.8, 1.6) * tmClamp(v.prem || 1, 1, 1.5) * (v.posMult || tmPosFallback(p));
+    } catch (e) {}
+    if (m == null) m = tmAbilityValue(p) * tmPosFallback(p);
+    m = tmSoftCap(m * tmAgeMult(tmAge(p)));
+    m = tmClamp(m, 0.3, 200);
     try { const ib = injuryBook && injuryBook[p.id]; if (ib && ib.matchesLeft >= 8) m *= 0.85; } catch (e) {}
     tmCache.val[p.id] = m; return m;
   }
-  function tmWageFromValue(v) { return Math.max(0.3, 0.45 * Math.pow(v, 0.8)); }
+  function tmWageFromValue(v) { return Math.max(0.3, TM_CFG.wageMul * Math.pow(v, TM_CFG.wageExp)); }
   function tmRoundWage(w) { return w < 3 ? Math.round(w * 20) / 20 : Math.round(w * 10) / 10; }
   function tmWage(p) {
     const o = tmEnsure().prof[p.id];
@@ -26182,31 +26424,34 @@ const PLAYSTYLE_BEHAVIOR = {
   // ----- prestige & money -----
   function tmPresStored(t) {
     const m = tmEnsure().pres;
-    if (m[t.id] == null) m[t.id] = Math.round(tmClamp((tmTopAvg(t) - 72) / 16, 0, 1) * 1000) / 1000;
+    if (m[t.id] == null) {
+      const live = tmClamp((tmTopAvg(t) - 72) / 40, 0, 1);
+      m[t.id] = Math.round((0.88 * tmProfile(t).stature + 0.12 * live) * 1000) / 1000;
+    }
     return m[t.id];
   }
-  function tmPrestige(t) {      // a club's standing: mostly its history, partly how strong it is right now
+  function tmPrestige(t) {      // a club's standing: its real-life stature (drifting with results), a little of how strong it is right now
     if (!t) return 0.3;
     if (!tmCache.pres) tmCache.pres = {};
     const hit = tmCache.pres[t.id]; if (hit != null) return hit;
-    const live = tmClamp((tmTopAvg(t) - 72) / 16, 0, 1);
-    const v = 0.65 * tmPresStored(t) + 0.35 * live;
+    const live = tmClamp((tmTopAvg(t) - 72) / 40, 0, 1);
+    const v = 0.88 * tmPresStored(t) + 0.12 * live;
     tmCache.pres[t.id] = v; return v;
   }
-  function tmBase(t) {
+  function tmInCL(t) {          // plays (or has qualified for) the Champions League this / next season
+    if (!t || !season) return false;
+    if (season.archived) return ((tm && tm.clNext) || []).indexOf(t.id) >= 0;
+    return !!(season.ucl && (season.ucl.teams || []).some(x => x.id === t.id));
+  }
+  function tmBase(t) {          // yearly transfer budget (EUR m): the club's real-world spending power
     const b = tmEnsure().base;
-    if (b[t.id] == null) {
-      const vals = (t.players || []).map(p => tmStableValue(p)).sort((a, c) => c - a).slice(0, 18);
-      const V = vals.reduce((s, x) => s + x, 0);
-      const pr = tmPresStored(t);
-      b[t.id] = Math.round(V * (TM_CFG.budgetBase + TM_CFG.budgetPres * Math.pow(pr, 1.2)) * 10) / 10;
-    }
+    if (b[t.id] == null) b[t.id] = Math.round(tmProfile(t).budget * 10) / 10;
     return b[t.id];
   }
   function tmBudget(t) { return tmBase(t) + (tmEnsure().bal[t.id] || 0); }
   function tmCapOf(t) {
     const c = tmEnsure().cap;
-    if (c[t.id] == null) c[t.id] = Math.round(tmWageBill(t) * TM_CFG.wageCapMult + 3);
+    if (c[t.id] == null) c[t.id] = Math.round(tmWageBill(t) * TM_CFG.wageCapMult + 3 + tmProfile(t).budget * 0.08);
     return c[t.id];
   }
   function tmWageRoom(t) { return tmCapOf(t) - tmWageBill(t); }
@@ -26224,19 +26469,23 @@ const PLAYSTYLE_BEHAVIOR = {
     const yl = tmYearsLeft(p);
     return tmRoundFee(Math.max(0.1, tmValue(p) * TM_CFG.loanFeeShare * (yl <= 1 ? 0.6 : 1)));
   }
-  function tmAskFor(p, seller) {
+  function tmAskFor(p, seller, buyer) {
     let m = tmValue(p);
     const yl = tmYearsLeft(p);
     m *= TM_CFG.contractFactor[Math.min(5, yl)] || 1;
     if (seller) {
-      const pr = tmPrestige(seller);
-      const rank = tmRank(p, seller);
-      if (rank <= 2 && pr >= 0.5) m *= TM_CFG.keyPlayerPremium;
+      const pf = tmProfile(seller), A = pf.A, pr = tmPrestige(seller), rank = tmRank(p, seller);
+      if (rank <= 2 && pr >= 0.5) m *= 1 + (TM_CFG.keyPlayerPremium - 1) * (0.6 + 0.5 * A.keep);
       else if (rank <= 11) m *= TM_CFG.starterPremium;
       else if (rank > 18) m *= TM_CFG.surplusDiscount;
+      m *= A.ask;                                                  // hardball sellers / sell-high clubs / bargain sellers
+      if (A.keep >= 1 && rank <= 11 && tmAge(p) <= 26) m *= 1.12;   // identity clubs price their own youngsters dear
       m *= 1 + 0.12 * pr;
       if (tmBudget(seller) < 0.15 * tmBase(seller)) m *= 0.93;
       if (tmEnsure().listed[p.id]) m *= 0.97;
+      if (tmWinterWindow()) m *= TM_CFG.winterPremium;
+      if (buyer && pf.rivals.indexOf(tmStem(buyer)) >= 0) m *= TM_CFG.rivalPremium;
+      if (typeof tmTalkFor === 'function' && tmTalkFor(p.id)) m *= TM_CFG.contestedPremium;
     }
     return tmRoundFee(Math.max(0.1, m));
   }
@@ -26320,7 +26569,44 @@ const PLAYSTYLE_BEHAVIOR = {
     return d;
   }
 
-  // o: { p, from (team|null), to (team|null), fee, years, wage, kind: 'buy'|'loan'|'free'|'pre', extraCost, byUser }
+  // ----- headlines -----
+  function tmNews(k, p, from, to, fee, extra) {
+    tmEnsure();
+    const w = tmWindowInfo(), n = tm.seq++;
+    const e = Object.assign({ n, y: season ? season.year : 1, w: season ? (season.week || 0) : 0, win: w.id || '', k,
+      pid: p ? p.id : '', nm: p ? p.name : '', ovr: p ? (p.ovr || 0) : 0, f: from ? from.id : '', t: to ? to.id : '',
+      fee: Math.round((fee || 0) * 100) / 100, v: Math.floor(tmR('nw' + n) * 97) }, extra || {});
+    tm.news.push(e);
+    if (tm.news.length > TM_CFG.newsMax) tm.news.splice(0, tm.news.length - TM_CFG.newsMax);
+    return e;
+  }
+  function tmNewsText(e) {
+    const bank = TM_NEWS[e.k] || [''];
+    const tpl = bank[(e.v || 0) % bank.length];
+    const vars = { p: e.nm, f: tmClubNameById(e.f), t: tmClubNameById(e.t), t2: tmClubNameById(e.t2), fee: tmFmt(e.fee) };
+    return tpl.replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m);
+  }
+  function tmNewsworthy(p, fee, byUser, kind) { return !!byUser || fee >= TM_CFG.newsMin || (p.ovr || 0) >= 95 || kind === 'pre'; }
+  function tmAfterMove(o) {
+    const p = o.p, kind = o.kind || 'buy', to = o.to || null, from = o.from || null;
+    const tk = tmTalkFor(p.id);
+    if (tk) {
+      tm.talks = tm.talks.filter(x => x.pid !== p.id);
+      if (!o.fromTalk && to && tk.to !== to.id) tmNews('hijack', p, from, getTeam(tk.to), o.fee || 0, { t2: to.id, u: o.byUser ? 1 : 0 });
+    }
+    if (o.fromTalk || !tmNewsworthy(p, o.fee || 0, o.byUser, kind)) return;
+    const dl = tmWindowInfo().deadline && !o.byUser;
+    const k = kind === 'buy' ? (dl ? 'deadline' : 'done') : kind === 'free' ? 'free' : kind === 'loan' ? 'loan' : kind === 'pre' ? 'pre' : 'done';
+    tmNews(k, p, from, to, o.fee || 0, { u: o.byUser ? 1 : 0 });
+  }
+  function tmVoice(kind, vars, salt) {
+    const arr = TM_VOICE[kind] || []; if (!arr.length) return '';
+    const t = arr[Math.floor(tmR('v:' + kind + ':' + (salt || '')) * arr.length) % arr.length];
+    return t.replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m);
+  }
+  function tmNegKey(p, buyer) { return 'n:' + p.id + ':' + (buyer ? buyer.id : '') + ':' + (tmWindowInfo().id || ''); }
+
+  // o: { p, from (team|null), to (team|null), fee, years, wage, kind: 'buy'|'loan'|'free'|'pre', extraCost, byUser, fromTalk }
   function tmExecute(o) {
     tmEnsure();
     const p = o.p, kind = o.kind || 'buy', fee = o.fee || 0, cy = tmCurYear();
@@ -26338,6 +26624,7 @@ const PLAYSTYLE_BEHAVIOR = {
     tm.inbox = tm.inbox.filter(x => x.pid !== p.id);
     tm.moved[p.id] = tmWindowInfo().id || 'x';
     const d = tmLog(kind, p, from, to, fee, { yrs: o.years || 0, u: o.byUser ? 1 : 0 });
+    try { tmAfterMove(o); } catch (e) { console.error('transfer news:', e); }
     tmDirty();
     return d;
   }
@@ -26349,6 +26636,7 @@ const PLAYSTYLE_BEHAVIOR = {
     delete tm.listed[p.id];
     tm.inbox = tm.inbox.filter(x => x.pid !== p.id);
     tmLog(kind || 'release', p, from, null, cost || 0);
+    try { tm.talks = tm.talks.filter(x => x.pid !== p.id); } catch (e) {}
     tmDirty();
   }
   function tmRetire(p, from) {
@@ -26427,30 +26715,50 @@ const PLAYSTYLE_BEHAVIOR = {
     if (score >= TM_CFG.moodReluctant) return { key: 'reluctant', text: 'Reluctant', ico: '🟠' };
     return { key: 'no', text: 'Refuses to join', ico: '🔴' };
   }
-  // terms: { wage, years }
+  // terms: { wage, years, role: 'key'|'rotation'|'prospect' }
   function tmMood(p, buyer, seller, terms) {
     terms = terms || {};
     const reasons = [];
-    let s = 0.52;
+    let s = 0.5;
+    const age = tmAge(p), role = tmRole(p), ovr = p.ovr || 0;
     const pb = tmPrestige(buyer), ps = seller ? tmPrestige(seller) : 0.35;
     const dp = pb - ps;
-    s += dp * 0.55;
+    s += dp * (age <= 24 ? 0.65 : age <= 29 ? 0.55 : 0.4);          // ambition fades with age
     if (dp > 0.12) reasons.push({ t: '+', x: 'A bigger club' });
     else if (dp < -0.12) reasons.push({ t: '−', x: 'A step down in ambition' });
-    if (buyer && seller !== buyer) {
-      const thr = tmStarterThreshold(buyer, tmRole(p));
-      const diff = (p.ovr || 0) - thr;
+    const moving = !!buyer && seller !== buyer;
+    if (moving) {
+      const clB = tmInCL(buyer), clS = seller ? tmInCL(seller) : false;
+      if (clB && !clS) { s += 0.07; reasons.push({ t: '+', x: 'Champions League football' }); }
+      else if (!clB && clS) { s -= 0.06; reasons.push({ t: '−', x: 'No Champions League' }); }
+      const lb = tmLeaguePres(buyer), ls = seller ? tmLeaguePres(seller) : 0.8;
+      if (lb - ls > 0.07) { s += 0.05; reasons.push({ t: '+', x: 'A more prestigious league' }); }
+      else if (ls - lb > 0.07) { s -= 0.05; reasons.push({ t: '−', x: 'A weaker league' }); }
+      const thr = tmStarterThreshold(buyer, role);
+      const diff = ovr - thr;
+      const promise = terms.role;
       if (diff >= 2) { s += 0.12; reasons.push({ t: '+', x: 'Would be a starter' }); }
       else if (diff >= -2) { s += 0.02; reasons.push({ t: '~', x: 'Would fight for a place' }); }
-      else { s -= 0.16; reasons.push({ t: '−', x: 'Would sit on the bench' }); }
+      else {
+        const pen = (age <= 24 ? 0.22 : 0.15) * (promise === 'rotation' || promise === 'prospect' ? 0.55 : 1);
+        s -= pen; reasons.push({ t: '−', x: promise === 'rotation' || promise === 'prospect' ? 'Expects to start on the bench' : 'Would sit on the bench' });
+      }
+      if (promise === 'key') {
+        if (diff >= -1) { s += 0.07; reasons.push({ t: '+', x: 'Promised a key role' }); }
+        else { s -= 0.04; reasons.push({ t: '−', x: 'Doesn’t believe the “key player” promise' }); }
+      } else if (promise === 'prospect' && age <= 23) { s += 0.04; reasons.push({ t: '+', x: 'Happy to develop' }); }
+      if (age <= 22 && tmProfile(buyer).arch === 'developer') { s += 0.04; reasons.push({ t: '+', x: 'Known for developing young players' }); }
+      if (age >= 31 && tmProfile(buyer).arch === 'bargain') { s += 0.03; reasons.push({ t: '+', x: 'Values experience' }); }
     }
     if (terms.wage) {
       const ratio = terms.wage / Math.max(0.05, tmWageDemand(p));
-      s += (ratio - 1) * 0.7;
+      s += (ratio - 1) * (age >= 29 ? 0.85 : 0.7);
       if (ratio >= 1.08) reasons.push({ t: '+', x: 'Generous wages' });
       else if (ratio < 0.95) reasons.push({ t: '−', x: 'Wages below his demands' });
     }
     if (terms.years >= 3) s += 0.02;
+    if (age >= 30 && terms.years >= 3) s += 0.02;
+    if (moving && seller && tmYearsLeft(p) <= 1) { s += 0.05; reasons.push({ t: '+', x: 'Contract running down — open to a move' }); }
     const wm = (typeof transferWillingnessMult === 'function') ? transferWillingnessMult(p) : 1;
     if (wm !== 1) {
       s += (wm - 1) * 0.2;
@@ -26462,28 +26770,45 @@ const PLAYSTYLE_BEHAVIOR = {
     return Object.assign({ score: s, reasons }, tmMoodLabel(s));
   }
 
-  // what the selling club says to a bid. kind: 'buy' | 'loan'
+  // what the selling club says to a bid (pure — the patience counter is advanced in tmNegotiate). kind: 'buy' | 'loan'
   function tmSellerReply(p, seller, buyer, fee, kind) {
-    const ask = kind === 'loan' ? tmLoanFee(p) : tmAskFor(p, seller);
+    const pf = tmProfile(seller), A = pf.A, nm = tmClubName(seller);
+    const rank = tmRank(p, seller), role = tmRole(p);
+    const rounds = buyer ? (tm.neg[tmNegKey(p, buyer)] || 0) : 0;
+    const rival = !!(buyer && pf.rivals.indexOf(tmStem(buyer)) >= 0);
+    const vars = { f: nm, p: p.name };
+    const ask = kind === 'loan' ? tmLoanFee(p) : tmAskFor(p, seller, buyer);
+    vars.ask = tmFmt(ask);
     if (kind === 'loan') {
-      if (tmRank(p, seller) <= 12) return { status: 'reject', ask, msg: tmClubName(seller) + ' need him in their squad — not available on loan.' };
+      if (rival) return { status: 'reject', ask, msg: tmVoice('rival', vars, p.id) };
+      if (rank <= (A.keep >= 1 ? 14 : 12)) return { status: 'reject', ask, msg: nm + ' need him in their squad — not available on loan.' };
       if (fee >= ask * 0.9) return { status: 'accept', ask };
-      return { status: 'counter', ask, counter: ask, msg: tmClubName(seller) + ' want a loan fee of ' + tmFmt(ask) + '.' };
+      return { status: 'counter', ask, counter: ask, msg: tmVoice('counter', vars, p.id + rounds) };
     }
-    let need = ask;
-    const counts = tmRoleCounts(seller), role = tmRole(p);
-    if (seller.players.length - 1 < TM_CFG.squadMin + 1) return { status: 'reject', ask, msg: tmClubName(seller) + ' can’t weaken a squad this thin.' };
-    if (counts[role] - 1 < TM_CFG.roleMin[role]) {
-      need = tmRoundFee(ask * 1.25);
-      if (fee < need * 0.97) return { status: 'counter', ask: need, counter: need, msg: tmClubName(seller) + ' have no cover at ' + TM_ROLE_NAME[role].toLowerCase() + ' — it would take ' + tmFmt(need) + '.' };
-    }
+    if (rival && rank <= 11) return { status: 'reject', ask, msg: tmVoice('rival', vars, p.id) };
+    if (seller.players.length - 1 < TM_CFG.squadMin + 1) return { status: 'reject', ask, msg: nm + ' can’t weaken a squad this thin.' };
+    let need = ask, tag = '';
+    const counts = tmRoleCounts(seller);
+    if (counts[role] - 1 < TM_CFG.roleMin[role]) { need = tmRoundFee(need * 1.25); tag = 'cover'; }
+    if (rank <= 2 && buyer && tmPrestige(buyer) < tmPrestige(seller) - 0.05) { need = tmRoundFee(need * 1.3); tag = 'key'; }
+    else if (A.keep >= 1 && rank <= 11 && tmAge(p) <= 26 && !tag) tag = 'homegrown';
+    vars.ask = tmFmt(need);
     const ratio = fee / Math.max(0.05, need);
     if (ratio >= TM_CFG.acceptRatio) return { status: 'accept', ask: need };
+    const finalRound = rounds >= TM_CFG.patience - 1;
     if (ratio >= TM_CFG.counterRatio) {
       const c = Math.max(tmRoundFee(need * 0.98), tmRoundFee(fee * 1.02));
-      return { status: 'counter', ask: need, counter: c, msg: tmClubName(seller) + ' rejected that but would sell for ' + tmFmt(c) + '.' };
+      vars.ask = tmFmt(c);
+      let msg;
+      if (tag === 'cover') msg = nm + ' have no cover at ' + TM_ROLE_NAME[role].toLowerCase() + ' — it would take ' + tmFmt(c) + '.';
+      else if (tag === 'key') msg = tmVoice('key', vars, p.id);
+      else if (tag === 'homegrown') msg = tmVoice('homegrown', vars, p.id);
+      else if (finalRound) msg = tmVoice('final', vars, p.id + rounds);
+      else if (A.ask >= 1.1 && rounds === 0) msg = tmVoice('hardball', vars, p.id);
+      else msg = tmVoice('counter', vars, p.id + rounds);
+      return { status: 'counter', ask: need, counter: c, msg, final: finalRound, tag };
     }
-    return { status: 'reject', ask: need, msg: tmClubName(seller) + ' laughed it off — nowhere near their valuation.' };
+    return { status: 'reject', ask: need, msg: tag === 'key' ? tmVoice('key', vars, p.id) : tmVoice('lowball', vars, p.id + rounds), lowball: true, tag };
   }
 
   // Everything the person sees before and after pressing "Submit offer".
@@ -26498,6 +26823,8 @@ const PLAYSTYLE_BEHAVIOR = {
     if (!me) { out.blocks.push('Pick the club you are managing first.'); return out; }
     if (seller && seller.id === me.id) { out.blocks.push('He already plays for you.'); return out; }
     const kind = req.kind;
+    out.talk = tmTalkFor(p.id);
+    if (seller && tm.cool[tmNegKey(p, me)]) out.blocks.push(tmVoice('cool', { f: tmClubName(seller) }, p.id));
     if (kind === 'free') { if (seller) out.blocks.push('He is not a free agent.'); }
     else {
       if (!seller) out.blocks.push('He is a free agent — use Sign.');
@@ -26528,13 +26855,13 @@ const PLAYSTYLE_BEHAVIOR = {
     if (wage > out.wageRoom + 1e-9) out.blocks.push('Wage cap: his ' + tmFmt(wage) + '/yr doesn’t fit — you have ' + tmFmt(Math.max(0, out.wageRoom)) + ' of room.');
     // seller side
     if (kind === 'buy' || kind === 'loan') {
-      out.ask = kind === 'loan' ? tmLoanFee(p) : tmAskFor(p, seller);
+      out.ask = kind === 'loan' ? tmLoanFee(p) : tmAskFor(p, seller, me);
       out.sellerReply = tmSellerReply(p, seller, me, fee, kind);
     } else {
       out.ask = 0; out.sellerReply = { status: 'accept', ask: 0 };
     }
     // player side
-    out.mood = tmMood(p, me, seller, { wage, years });
+    out.mood = tmMood(p, me, seller, { wage, years, role: req.role });
     out.playerOk = out.mood.score >= TM_CFG.moodOpen;
     if (age >= 35 && kind !== 'free') out.warns.push('He is ' + age + ' — expect a short career left.');
     out.ok = out.blocks.length === 0;
@@ -26548,12 +26875,21 @@ const PLAYSTYLE_BEHAVIOR = {
     if (!ev.ok) return { status: 'blocked', msg: ev.blocks[0], ev };
     const p = ev.p, seller = ev.seller, me = ev.buyer, kind = req.kind;
     if (kind === 'buy' || kind === 'loan') {
-      const r = ev.sellerReply;
+      const r = ev.sellerReply, nk = tmNegKey(p, me);
+      if (r.status !== 'accept') {
+        tm.neg[nk] = (tm.neg[nk] || 0) + 1;
+        if (r.status === 'reject' && tm.neg[nk] >= TM_CFG.patience) {
+          tm.cool[nk] = 1; tmSave();
+          return { status: 'rejected', msg: tmVoice('cool', { f: tmClubName(seller) }, p.id), cool: true, ev };
+        }
+        tmSave();
+      }
       if (r.status === 'reject') return { status: 'rejected', msg: r.msg, ev };
-      if (r.status === 'counter') return { status: 'counter', msg: r.msg, counter: r.counter, ev };
+      if (r.status === 'counter') return { status: 'counter', msg: r.msg, counter: r.counter, final: r.final, ev };
     }
     if (!ev.playerOk) {
-      return { status: 'refused', msg: p.name + ' ' + (ev.mood.key === 'no' ? 'has no interest in joining you.' : 'isn’t convinced — improve his wages or contract.'), ev };
+      try { tmNews('refused', p, seller, me, 0, { u: 1 }); } catch (e) {}
+      return { status: 'refused', msg: p.name + ' ' + (ev.mood.key === 'no' ? 'has no interest in joining you.' : 'isn’t convinced — improve his wages, contract or role.'), ev };
     }
     if (kind === 'pre') {
       tm.bal[me.id] = (tm.bal[me.id] || 0) - ev.extra;
@@ -26622,7 +26958,8 @@ const PLAYSTYLE_BEHAVIOR = {
   function tmInboxLive() {
     tmEnsure();
     const w = tmWindowInfo();
-    return (tm.inbox || []).filter(o => w.open && o.win === w.id);
+    const wk = season ? (season.week || 0) : 0;
+    return (tm.inbox || []).filter(o => w.open && o.win === w.id && (!o.after || o.after <= wk || w.deadline));
   }
   function tmAcceptOffer(id) {
     const o = (tm.inbox || []).find(x => x.id === id);
@@ -26686,6 +27023,28 @@ const PLAYSTYLE_BEHAVIOR = {
     tmSave();
   }
 
+  // final positions, Champions League, club stature drift and next season's European field
+  function tmSeasonResults() {
+    const res = {};
+    SEASON_LEAGUE_DEFS.forEach(def => {
+      const comp = season.leagues[def.key]; if (!comp) return;
+      const rows = sortedTable(comp.table), n = rows.length;
+      rows.forEach((r, i) => { res[r.team.id] = { pos: i + 1, n, lg: def.key, y: season.year }; });
+    });
+    const champ = season.ucl && season.ucl.champion, champId = champ && (champ.id || champ);
+    ((season.ucl && season.ucl.teams) || []).forEach(t => { if (res[t.id]) { res[t.id].cl = true; if (t.id === champId) res[t.id].clWin = true; } });
+    tm.res = res;
+    try { tm.clNext = computeUCLQualifiersFromStandings().map(t => t.id); } catch (e) { tm.clNext = []; }
+    tmClubs().forEach(t => {
+      const r = res[t.id]; if (!r) return;
+      const posScore = r.n > 1 ? 1 - (r.pos - 1) / (r.n - 1) : 0.5;
+      let d = (posScore - 0.5) * 0.06 + (r.cl ? 0.02 : -0.008) + (r.clWin ? 0.03 : 0) + (r.pos === 1 ? 0.015 : 0);
+      d *= TM_CFG.presDrift / 0.12;
+      tm.pres[t.id] = Math.round(tmClamp(tmPresStored(t) + d, 0.05, 1) * 1000) / 1000;
+    });
+    tmDirty();
+  }
+
   function tmWindowSummary(id) {
     const deals = (tm.log || []).filter(d => d.win === id && (d.k === 'buy' || d.k === 'loan' || d.k === 'free' || d.k === 'pre'));
     const spent = deals.reduce((s, d) => s + (d.fee || 0), 0);
@@ -26693,6 +27052,7 @@ const PLAYSTYLE_BEHAVIOR = {
   }
   function tmCloseWindow(id) {
     tm.inbox = (tm.inbox || []).filter(o => o.win !== id);
+    tm.talks = []; tm.neg = {}; tm.cool = {};
     const s = tmWindowSummary(id);
     try { toast('🔒 ' + tmWindowLabel(id) + ' window closed — ' + s.n + ' deals, ' + tmFmt(s.spent) + ' spent'); } catch (e) {}
   }
@@ -26707,6 +27067,8 @@ const PLAYSTYLE_BEHAVIOR = {
     const clubs = tmClubs();
     const me = tmMeTeam();
     const rng = tmRng('seasonEnd:' + y + ':' + tm.seq);
+    tm.talks = []; tm.neg = {}; tm.cool = {};
+    try { tmSeasonResults(); } catch (e) { console.error('transfers results:', e); }
     // 1) loans go home
     (tm.loans || []).slice().forEach(l => {
       if (l.end > y) return;
@@ -26754,9 +27116,11 @@ const PLAYSTYLE_BEHAVIOR = {
     });
     // 5) money: unspent budgets roll over, revenue comes in
     clubs.forEach(t => {
-      const base = tmBase(t);
-      const cur = tmBudget(t);
-      const next = tmClamp(Math.max(0, cur) * 0.6 + base * TM_CFG.budgetRefill, 0, base * 2.2);
+      const base = tmBase(t), cur = tmBudget(t), r = (tm.res || {})[t.id] || {}, R = TM_CFG.revenue;
+      let bonus = 0;
+      if (r.pos === 1) bonus += R.champion; else if (r.pos && r.pos <= 4) bonus += R.top4; else if (r.pos && r.n && r.pos > r.n - 3) bonus += R.bottom;
+      if (r.cl) bonus += R.cl; if (r.clWin) bonus += R.clWin;
+      const next = tmClamp(Math.max(0, cur) * 0.45 + base * (TM_CFG.budgetRefill + 0.1 + bonus), 0, base * 2.2);
       tm.bal[t.id] = next - base;
       tm.cap[t.id] = Math.max(tmCapOf(t), Math.round(tmWageBill(t) * 1.04 + 2));
     });
@@ -26815,120 +27179,172 @@ const PLAYSTYLE_BEHAVIOR = {
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const x = a[i]; a[i] = a[j]; a[j] = x; }
     return a;
   }
-  // the role a club most wants to strengthen (lowest starter vs its own level), or one it is short of
-  function tmAINeed(t, rng) {
-    const counts = tmRoleCounts(t), avg = tmTopAvg(t);
-    let best = null;
+  // positions a club most wants to strengthen, most urgent first (philosophy-weighted)
+  function tmAINeedList(t, rng) {
+    const c = tmClubCtx(t), A = c.A, list = [];
     TM_ROLES.forEach(r => {
-      const thr = tmStarterThreshold(t, r);
-      let score = (avg - (thr || 55)) + rng() * 3;
-      if (counts[r] < TM_CFG.roleMin[r]) score += 20;
-      else if (counts[r] < TM_CFG.roleIdeal[r] - 1) score += 1;
-      if (!best || score > best.score) best = { role: r, thr, score, short: counts[r] < TM_CFG.roleMin[r] };
+      const thr = c.thr[r];
+      let score = (c.avg - (thr || 55)) * Math.max(0.6, A.wNeed) + rng() * 3;
+      const short = c.counts[r] < TM_CFG.roleMin[r];
+      if (short) score += 20; else if (c.counts[r] < TM_CFG.roleIdeal[r] - 1) score += 1;
+      if (A.wQual >= 1.3) score += 2;
+      list.push({ role: r, thr, score, short });
     });
-    return best;
+    return list.sort((a, b) => b.score - a.score);
   }
-  // can `seller` let `p` go to `buyer` at all (depth, squad size, key-player protection)?
+  function tmAINeed(t, rng) { return tmAINeedList(t, rng)[0]; }
+
+  // can `seller` let `p` go to `buyer` at all (depth, squad size, key-player protection, rivalry, identity)?
   function tmSellerCanSell(seller, p, buyer) {
     if (seller.players.length - 1 < TM_CFG.squadMin + 2) return false;
     if (tmRoleCounts(seller)[tmRole(p)] - 1 < TM_CFG.roleMin[tmRole(p)]) return false;
-    const rank = tmRank(p, seller);
+    const pf = tmProfile(seller), A = pf.A, rank = tmRank(p, seller);
     const gap = tmPrestige(buyer) - tmPrestige(seller);
-    if (rank <= 2 && gap < 0) return false;
-    if (rank <= 11 && gap < -0.2 && tmAge(p) < 30) return false;
+    if (pf.rivals.indexOf(tmStem(buyer)) >= 0 && rank <= 11) return false;
+    if (rank <= 2 && gap < 0 && A.keep >= 0.3) return false;
+    if (rank <= 11 && gap < -0.2 && tmAge(p) < 30 && A.keep >= 0.3) return false;
+    if (A.keep >= 1 && rank <= 11 && tmAge(p) <= 25 && gap < 0.15) return false;
     return true;
   }
-  function tmAIBuy(t, pool, rng, info) {
+  function tmWindowBuys(t, win) {
+    let n = 0;
+    (tm.log || []).forEach(d => { if (d.t === t.id && d.win === win && (d.k === 'buy' || d.k === 'loan' || d.k === 'free' || d.k === 'pre')) n++; });
+    return n;
+  }
+
+  function tmAIBuy(t, pool, rng, info, mode) {
     if (t.players.length >= TM_CFG.squadMax - 2) return 0;
-    const need = tmAINeed(t, rng);
-    const minOvr = Math.max(need.thr + 2, 60);
-    const ceil = tmTopAvg(t) + 4 + 8 * tmPrestige(t);
-    const budget = tmBudget(t), room = tmWageRoom(t);
+    if (tmWindowBuys(t, info.id) >= (tmProfile(t).stature > 0.7 ? 5 : 4)) return 0;
+    const c = tmClubCtx(t), A = c.A;
+    const needs = tmAINeedList(t, rng);
+    const roles = [needs[0]]; if (needs[1] && rng() < 0.4) roles.push(needs[1]);
     const cands = [];
-    const list = pool[need.role] || [];
-    for (let i = 0; i < list.length && cands.length < 14; i++) {
-      const { p, t: s } = list[i];
-      if (p.ovr > ceil) continue;
-      if (p.ovr < minOvr) break;
-      if (s === t || s.players.indexOf(p) < 0 || tm.moved[p.id] === info.id) continue;
-      if (tmAge(p) > 34 || tmLoanOf(p.id)) continue;
-      if (!tmSellerCanSell(s, p, t)) continue;
-      const gap = tmPrestige(t) - tmPrestige(s);
-      if (gap < -0.2 && tmAge(p) < 30 && tmRank(p, s) <= 11) continue;   // won't drop down a tier
-      const ask = tmAskFor(p, s);
-      const fee = tmRoundFee(ask * (0.97 + rng() * 0.08));
-      if (fee > budget || tmWageDemand(p) > room) continue;
-      cands.push({ p, s, fee, score: (p.ovr - minOvr) - (fee / Math.max(1, budget)) * 8 + rng() * 2 });
-    }
+    roles.forEach(rn => {
+      const list = pool[rn.role] || []; let seen = 0;
+      for (let i = 0; i < list.length && seen < 70; i++) {
+        const { p, t: s } = list[i], ov = p.ovr || 0;
+        if (ov > c.avg + A.reach + 2) continue;
+        if (ov < Math.max(rn.thr + 1, 58)) break;
+        if (s === t || s.players.indexOf(p) < 0 || tm.moved[p.id] === info.id || tmLoanOf(p.id)) continue;
+        seen++;
+        if (!tmSellerCanSell(s, p, t)) continue;
+        const it = tmInterest(t, p, s);
+        if (it.block || it.score < 42) continue;
+        cands.push({ p, s, it, score: it.score + (rn.short ? 12 : 0) + rng() * 10 });
+      }
+    });
     if (!cands.length) return 0;
     cands.sort((a, b) => b.score - a.score);
-    const c = cands[Math.min(cands.length - 1, Math.floor(rng() * Math.min(3, cands.length)))];
-    const age = tmAge(c.p);
-    tmExecute({ p: c.p, from: c.s, to: t, fee: c.fee, years: age >= 31 ? 2 : age <= 23 ? 5 : 4, wage: tmWageDemand(c.p), kind: 'buy' });
-    tmEnsureSquad(c.s);
+    const pick = cands[Math.min(cands.length - 1, Math.floor(rng() * Math.min(3, cands.length)))];
+    const ask = tmAskFor(pick.p, pick.s, t);
+    const fee = tmRoundFee(ask * Math.max(0.97, A.pay) * (0.99 + rng() * 0.05));
+    const wage = tmWageDemand(pick.p);
+    if (fee > c.budget || wage > c.room) return 0;
+    const age = tmAge(pick.p), yrs = age >= 31 ? 2 : age <= 23 ? 5 : 4;
+    if (mode !== 'deadline' && info.open && fee >= TM_CFG.talksMin) return tmOpenTalk(t, pick.p, pick.s, fee, wage, yrs, info, rng);
+    tmExecute({ p: pick.p, from: pick.s, to: t, fee, years: yrs, wage, kind: 'buy' });
+    tmEnsureSquad(pick.s);
     return 1;
   }
+
   function tmAISignFree(t, rng) {
     if (!tmFA.length || t.players.length >= TM_CFG.squadMax - 3) return 0;
-    const need = tmAINeed(t, rng);
-    const room = tmWageRoom(t);
-    const fa = tmFA.filter(p => tmRole(p) === need.role && (p.ovr || 0) >= need.thr + 1 && tmAge(p) < 35 && tmWageDemand(p) <= room)
-      .sort((a, b) => (b.ovr || 0) - (a.ovr || 0))[0];
-    if (!fa) return 0;
-    tmExecute({ p: fa, from: null, to: t, fee: 0, years: tmAge(fa) >= 31 ? 1 : 3, wage: tmWageDemand(fa), kind: 'free' });
+    const c = tmClubCtx(t), A = c.A, needs = tmAINeedList(t, rng).slice(0, 3);
+    let best = null;
+    tmFA.forEach(p => {
+      const rn = needs.find(n => n.role === tmRole(p)); if (!rn) return;
+      if ((p.ovr || 0) < rn.thr + 1 || tmAge(p) > A.ageMax) return;
+      const it = tmInterest(t, p, null);
+      if (it.block || it.score < 45) return;
+      const sc = it.score + rng() * 6 + (rn.short ? 10 : 0);
+      if (!best || sc > best.sc) best = { p, sc };
+    });
+    if (!best) return 0;
+    const p = best.p, age = tmAge(p);
+    tmExecute({ p, from: null, to: t, fee: 0, years: age >= 31 ? 1 : 3, wage: tmWageDemand(p), kind: 'free' });
     return 1;
   }
+
   function tmAIPreContract(t, pool, rng, info) {
-    const need = tmAINeed(t, rng);
-    const list = pool[need.role] || [];
+    const c = tmClubCtx(t), A = c.A, rn = tmAINeedList(t, rng)[0];
+    const list = pool[rn.role] || []; let tried = 0;
     for (let i = 0; i < list.length; i++) {
-      const { p, t: s } = list[i];
-      if (p.ovr < need.thr + 3) break;
+      const { p, t: s } = list[i], ov = p.ovr || 0;
+      if (ov > c.avg + A.reach + 2) continue;
+      if (ov < rn.thr + 2) break;
       if (s === t || tmYearsLeft(p) !== 1 || tm.pre.some(x => x.pid === p.id)) continue;
-      if (tmPrestige(t) < tmPrestige(s) - 0.1 || tmWageDemand(p) > tmWageRoom(t) || tmAge(p) > 33) continue;
+      if (++tried > 40) break;
+      if (tmPrestige(t) < tmPrestige(s) - 0.1 || tmAge(p) > 33) continue;
+      const it = tmInterest(t, p, s);
+      if (it.block || it.score < 50) continue;
       if (rng() > 0.5) continue;
-      tm.pre.push({ pid: p.id, to: t.id, from: s.id, yrs: tmAge(p) >= 30 ? 2 : 4, wage: tmWageDemand(p), u: 0 });
-      tmLog('pre', p, s, t, 0, { yrs: 3, u: 0 });
+      const yrs = tmAge(p) >= 30 ? 2 : 4, wage = tmWageDemand(p);
+      tm.pre.push({ pid: p.id, to: t.id, from: s.id, yrs, wage, u: 0 });
+      tmLog('pre', p, s, t, 0, { yrs, u: 0 });
+      tmNews('pre', p, s, t, 0);
       return 1;
     }
     return 0;
   }
 
-  // bids for the person's players land in his inbox instead of executing
+  // a club with surplus youngsters lends one to a club that can use him (development loans)
+  function tmAILoanOut(t, rng, info) {
+    const me = tmMeTeam();
+    if (t.players.length < 22) return 0;
+    const cands = t.players.slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(15)
+      .filter(p => tmAge(p) <= 23 && (p.ovr || 0) >= 62 && !tmLoanOf(p.id) && tm.moved[p.id] !== info.id);
+    if (!cands.length) return 0;
+    const p = cands[Math.floor(rng() * cands.length)];
+    const fee = tmLoanFee(p);
+    let best = null;
+    tmShuffle(tmClubs().filter(b => b !== t && !(me && b.id === me.id) && b.players.length < TM_CFG.squadMax - 2), rng).slice(0, 14).forEach(b => {
+      if (tmPrestige(b) > tmPrestige(t) + 0.12 || tmBudget(b) < fee || tmWageDemand(p) > tmWageRoom(b)) return;
+      if (tmProfile(t).rivals.indexOf(tmStem(b)) >= 0) return;
+      const it = tmInterest(b, p, t);
+      if (it.block || it.score < 40) return;
+      if (!best || it.score > best.it.score) best = { b, it };
+    });
+    if (!best) return 0;
+    tmExecute({ p, from: t, to: best.b, fee, kind: 'loan' });
+    return 1;
+  }
+
+  // bids for the person's players land in his inbox instead of executing. Bidders are the clubs the interest model says want him.
   function tmAIOffers(info, mode, rng, force) {
     const me = tmMeTeam(); if (!me) return 0;
     tm.inbox = (tm.inbox || []).filter(o => o.win === info.id);
     let made = 0;
-    const base = mode === 'deadline' ? 0.05 : mode === 'offseason' ? 0.03 : 0.015;
+    const week = season ? (season.week || 0) : 0;
+    const base = mode === 'deadline' ? 0.06 : mode === 'offseason' ? 0.04 : 0.02;
     const loanedIn = new Set((tm.loans || []).filter(l => l.to === me.id).map(l => l.pid));
-    const others = tmShuffle(tmClubs().filter(t => t.id !== me.id), rng);
     (me.players || []).slice().forEach(p => {
       if (loanedIn.has(p.id) || (force && force.pid !== p.id)) return;
       if (tm.inbox.length >= TM_CFG.inboxMax) return;
+      const suitors = tmInterestedClubs(p, me, 6);
+      if (!suitors.length) return;
       const listed = !!tm.listed[p.id];
-      let chance = base * (listed ? 8 : 1) * (tmRank(p, me) <= 5 ? 1.4 : 1);
+      let chance = base * (listed ? 6 : 1) * (0.4 + suitors[0].score / 60) * (tmRank(p, me) <= 5 ? 1.3 : 1);
       if (force) chance = 1;
       if (rng() >= chance) return;
-      const role = tmRole(p), ask = tmAskFor(p, me);
+      const ask = tmAskFor(p, me);
       const wantLoan = force ? force.kind === 'loan' : (tmRank(p, me) > 14 && tmAge(p) <= 23 && rng() < 0.3);
       let count = 0;
-      for (const b of others) {
+      for (const it of suitors) {
         if (count >= (force ? 3 : 1)) break;
-        if (b.players.length >= TM_CFG.squadMax - 1) continue;
+        const b = it.t;
         if (tm.inbox.some(o => o.pid === p.id && o.from === b.id)) continue;
         if (!listed && !force && tmPrestige(b) < tmPrestige(me) - 0.25) continue;
-        const thr = tmStarterThreshold(b, role);
         if (wantLoan) {
-          if ((p.ovr || 0) < thr - 6) continue;
           const lf = tmLoanFee(p);
           if (tmBudget(b) < lf || tmWageDemand(p) > tmWageRoom(b)) continue;
-          tm.inbox.push({ id: tm.seq++, pid: p.id, from: b.id, fee: lf, max: lf, kind: 'loan', yrs: 0, win: info.id });
+          tm.inbox.push({ id: tm.seq++, pid: p.id, from: b.id, fee: lf, max: lf, kind: 'loan', yrs: 0, win: info.id, score: it.score });
         } else {
-          if ((p.ovr || 0) < thr + 1 && tmRoleCounts(b)[role] >= TM_CFG.roleMin[role]) continue;
-          if ((p.ovr || 0) > tmTopAvg(b) + 4 + 8 * tmPrestige(b)) continue;
-          const fee = tmRoundFee(ask * ((listed || force) ? 0.92 + rng() * 0.2 : 0.9 + rng() * 0.22));
+          const A = tmArch(b);
+          const fee = tmRoundFee(ask * ((listed || force) ? 0.92 + rng() * 0.2 : 0.9 + rng() * 0.22) * (0.97 + (A.pay - 1) * 0.8));
           if (tmBudget(b) < fee || tmWageDemand(p) > tmWageRoom(b)) continue;
-          tm.inbox.push({ id: tm.seq++, pid: p.id, from: b.id, fee, max: tmRoundFee(fee * (1.08 + rng() * 0.14)), kind: 'buy', yrs: tmAge(p) >= 31 ? 2 : 4, win: info.id });
+          const o = { id: tm.seq++, pid: p.id, from: b.id, fee, max: tmRoundFee(fee * (1.08 + rng() * 0.14)), kind: 'buy', yrs: tmAge(p) >= 31 ? 2 : 4, win: info.id, score: it.score };
+          if (!force && fee >= TM_CFG.talksMin && mode !== 'deadline') { o.after = week + 1; tmNews('talks', p, me, b, fee); }   // a headline first, the bid follows
+          tm.inbox.push(o);
         }
         count++; made++;
       }
@@ -26952,14 +27368,17 @@ const PLAYSTYLE_BEHAVIOR = {
     const inten = (TM_CFG.aiIntensity[mode] || 0.35) * (winter ? TM_CFG.aiWinterScale : 1);
     const pool = tmAIPool(me && me.id);
     const order = tmShuffle(tmClubs().filter(t => !(me && t.id === me.id)), rng);
-    let deals = 0;
+    let deals = 0, loans = 0;
+    if (info.open) deals += tmTalksStep(mode, rng);
     order.forEach(t => {
-      if (rng() < 0.22) deals += tmAISignFree(t, rng);
+      const A = tmArch(t);
+      if (rng() < 0.16 + A.wFree * 0.1) deals += tmAISignFree(t, rng);
       if (!info.open) return;
-      if (rng() < inten * (0.55 + tmPrestige(t) * 0.6)) deals += tmAIBuy(t, pool, rng, info);
+      if (rng() < inten * (0.4 + A.act * 0.5 + tmPrestige(t) * 0.3)) deals += tmAIBuy(t, pool, rng, info, mode);
+      if (mode === 'deadline' && rng() < inten * 0.45) deals += tmAIBuy(t, pool, rng, info, mode);     // deadline-day rush
       if (winter && rng() < 0.12) deals += tmAIPreContract(t, pool, rng, info);
-      // oversized squads shed their surplus
-      while (t.players.length > TM_CFG.squadMax + 1) {
+      if (loans < TM_CFG.loanOutMax && rng() < 0.2 * A.loanOut) { const n = tmAILoanOut(t, rng, info); loans += n; deals += n; }
+      while (t.players.length > TM_CFG.squadMax + 1) {   // oversized squads shed their surplus
         const worst = t.players.slice().sort((a, b) => (a.ovr || 0) - (b.ovr || 0))[0];
         tmReleaseToFA(worst, t, 'release', 0); deals++;
       }
@@ -26967,6 +27386,182 @@ const PLAYSTYLE_BEHAVIOR = {
     if (info.open) tmAIOffers(info, mode, rng, null);
     tmDirty();
     return deals;
+  }
+  function tmClubCtx(t) {
+    if (!tmCache.ctx) tmCache.ctx = {};
+    let c = tmCache.ctx[t.id]; if (c) return c;
+    const pf = tmProfile(t), thr = {};
+    TM_ROLES.forEach(r => { thr[r] = tmStarterThreshold(t, r); });
+    c = { t, pf, A: pf.A, counts: tmRoleCounts(t), thr, avg: tmTopAvg(t), budget: tmBudget(t), room: tmWageRoom(t), lg: tmLg(t), n: (t.players || []).length };
+    tmCache.ctx[t.id] = c; return c;
+  }
+  function tmFitLabel(score) {
+    if (score >= 75) return { key: 'dream', text: 'Dream target', ico: '🔥' };
+    if (score >= 60) return { key: 'strong', text: 'Strong interest', ico: '⭐' };
+    if (score >= 45) return { key: 'interested', text: 'Interested', ico: '👀' };
+    if (score >= 30) return { key: 'lukewarm', text: 'Lukewarm', ico: '😐' };
+    return { key: 'none', text: 'Not interested', ico: '✖' };
+  }
+
+  // opt: { user: true } = the person's club (scouting): ignores AI-only policies (own-league only, rivals, age bans)
+  function tmInterest(t, p, s, opt) {
+    opt = opt || {};
+    if (!tmCache.int) tmCache.int = {};
+    const ck = t.id + '|' + p.id + '|' + (s ? s.id : '-') + '|' + (opt.user ? 1 : 0);
+    const hit = tmCache.int[ck]; if (hit) return hit;
+    const c = tmClubCtx(t), A = c.A, role = tmRole(p), age = tmAge(p), ovr = p.ovr || 0, free = !s, yl = tmYearsLeft(p);
+    const R = [];
+    const fin = (score, block, extra) => {
+      const r = Object.assign({ score: Math.round(score), reasons: R, block: block || null, fit: tmFitLabel(score), t }, extra || {});
+      tmCache.int[ck] = r; return r;
+    };
+    if (s && s.id === t.id) return fin(0, 'own');
+    if (!opt.user) {
+      if (age > A.ageMax) { R.push({ t: '−', x: 'Too old for their policy (' + age + ')' }); return fin(0, 'age'); }
+      if (c.pf.domOnly && s && tmLg(s) !== c.lg) { R.push({ t: '−', x: 'Policy: only signs players from their own league' }); return fin(0, 'policy'); }
+      if (ovr > c.avg + A.reach + 2) { R.push({ t: '−', x: 'Out of their reach' }); return fin(0, 'reach'); }
+    }
+    let sum = 0;
+    // 1) need
+    const thr = c.thr[role] || 0, gap = thr ? ovr - thr : 10;
+    let need = thr ? tmClamp(gap / 7, -1, 1.2) : 1.2;
+    if (c.counts[role] < TM_CFG.roleMin[role]) { need = Math.max(need, 1.0); R.push({ t: '+', x: 'Short of numbers at ' + TM_ROLE_NAME[role].toLowerCase() }); }
+    else if (gap >= 4) R.push({ t: '+', x: 'Clear upgrade at ' + TM_ROLE_NAME[role].toLowerCase() + ' (+' + gap + ')' });
+    else if (gap < -2) R.push({ t: '−', x: 'Wouldn’t start for them' });
+    sum += need * A.wNeed;
+    // 2) quality vs their level
+    const q = tmClamp((ovr - c.avg) / 8, -1, 1.2);
+    sum += q * A.wQual;
+    if (q > 0.45 && A.wQual >= 1) R.push({ t: '+', x: 'Elite quality — exactly their kind of signing' });
+    // 3) age window of their philosophy
+    const lo = A.age[0], hi = A.age[1], sw = A.age[2];
+    let af;
+    if (age >= lo && age <= hi) af = 1 - Math.abs(age - sw) / Math.max(4, hi - lo) * 0.6;
+    else if (age < lo) af = 0.4 - (lo - age) * 0.2;
+    else af = 0.4 - (age - hi) * 0.25;
+    af = tmClamp(af, -1.2, 1);
+    sum += af * 0.9;
+    if (af >= 0.75) R.push({ t: '+', x: 'Ideal age for their model (' + age + ')' });
+    else if (af < 0) R.push({ t: '−', x: 'Wrong age for their model (' + age + ')' });
+    // 4) potential
+    const g = tmGrowth(p);
+    sum += (g / 6) * A.wPot;
+    if (g >= 4 && A.wPot >= 0.8) R.push({ t: '+', x: 'High ceiling — they develop and sell on' });
+    // 5) price: bargains and free agents
+    let ask = 0;
+    if (free) {
+      sum += 0.3 + A.wFree;
+      R.push({ t: '+', x: 'Free agent — no fee' + (A.wFree >= 1 ? ', just what they love' : '') });
+    } else {
+      ask = tmAskFor(p, s, t);
+      const ratio = tmValue(p) / Math.max(0.5, ask);
+      sum += tmClamp((ratio - 0.95) * 2.2, -0.6, 1) * A.wBarg;
+      if (ratio >= 1.12 && A.wBarg >= 0.7) R.push({ t: '+', x: 'Priced below his value' });
+      if (yl <= 1) { sum += 0.45 * A.wFree; if (A.wFree >= 0.5) R.push({ t: '+', x: 'Contract expiring — cut-price' }); }
+    }
+    // 6) money
+    let block = null;
+    if (!free) {
+      const fee = ask * A.pay;
+      if (fee > c.budget + 1e-9) { block = 'budget'; R.push({ t: '−', x: 'Can’t afford the fee (' + tmFmt(fee) + ' vs budget ' + tmFmt(c.budget) + ')' }); }
+      else if (fee > c.budget * A.cap * 1.4) { sum -= 0.8; R.push({ t: '−', x: 'Would stretch their budget to the limit' }); }
+      else if (fee > c.budget * A.cap * 0.85) sum -= 0.25;
+    }
+    const wd = tmWageDemand(p);
+    if (wd > c.room + 1e-9) { block = block || 'wage'; R.push({ t: '−', x: 'No room under the wage cap (' + tmFmt(wd) + '/yr)' }); }
+    // 7) context
+    if (s) {
+      if (tmLg(s) === c.lg) { sum += 0.12; R.push({ t: '+', x: 'Knows the league' }); }
+      if (c.pf.rivals.indexOf(tmStem(s)) >= 0) { sum -= opt.user ? 0 : 0.5; R.push({ t: '−', x: 'Direct rival — would cost a premium' }); }
+      if (tmPrestige(s) - tmPrestige(t) > 0.3 && tmRank(p, s) <= 8) { sum -= 0.5; R.push({ t: '−', x: 'Hard to prise away from a much bigger club' }); }
+    }
+    if (A.wQual >= 1.3 && tmWorldRank(p) <= 0.02) { sum += 0.5; R.push({ t: '+', x: 'A global superstar' }); }
+    const score = 100 / (1 + Math.exp(-(sum - 1.1) * 1.15));
+    return fin(block ? Math.min(score, 100) : score, block, { fee: free ? 0 : ask * A.pay });
+  }
+
+  // the clubs that would want him (never the seller, never the person unless includeMe)
+  function tmInterestedClubs(p, seller, n, opt) {
+    opt = opt || {};
+    const me = tmMeTeam(), out = [];
+    tmClubs().forEach(t => {
+      if (seller && t.id === seller.id) return;
+      if (me && t.id === me.id && !opt.includeMe) return;
+      if ((t.players || []).length >= TM_CFG.squadMax) return;
+      const r = tmInterest(t, p, seller || null);
+      if (r.score < (opt.min || 30)) return;
+      if (r.block && !(opt.includeBlocked && (r.block === 'budget' || r.block === 'wage'))) return;
+      out.push(r);
+    });
+    out.sort((a, b) => b.score - a.score);
+    return out.slice(0, n || 5);
+  }
+
+  // a club's wish-list, as a scout would write it
+  function tmClubWants(t, n) {
+    const c = tmClubCtx(t), A = c.A, out = [];
+    TM_ROLES.forEach(r => {
+      const thr = c.thr[r]; let urgency = 0, why = '';
+      if (c.counts[r] < TM_CFG.roleMin[r]) { urgency = 3; why = 'Short of numbers'; }
+      else if (thr && thr < c.avg - 4) { urgency = 2; why = 'Weakest link in the XI'; }
+      else if (c.counts[r] < TM_CFG.roleIdeal[r] - 1) { urgency = 1; why = 'Needs depth'; }
+      if (A.wQual >= 1.3 && thr && thr < c.avg + 2 && urgency < 1) { urgency = 1; why = 'Always chasing an upgrade'; }
+      if (!urgency) return;
+      out.push({ role: r, name: TM_ROLE_NAME[r], urgency, why, minOvr: thr ? thr + 2 : Math.round(c.avg - 4),
+        ageMax: Math.min(A.ageMax, A.age[1] + 2), ageIdeal: A.age[2], maxFee: Math.round(c.budget * A.cap * 1.4) });
+    });
+    out.sort((a, b) => b.urgency - a.urgency || a.minOvr - b.minOvr);
+    return out.slice(0, n || 3);
+  }
+
+  // ---------------- staged talks ----------------
+  function tmTalkFor(pid) { return ((tm && tm.talks) || []).find(x => x.pid === pid) || null; }
+  function tmTalksOfClub(id) { return ((tm && tm.talks) || []).filter(x => x.to === id || x.from === id); }
+
+  // a club opens talks. If another club already is, the better-placed bidder (fee + stature) wins the race.
+  function tmOpenTalk(buyer, p, seller, fee, wage, yrs, info, rng) {
+    tmEnsure();
+    const ex = tmTalkFor(p.id);
+    if (ex) {
+      const exBuyer = getTeam(ex.to);
+      const mine = fee / Math.max(0.1, ex.fee) + 0.3 * tmPrestige(buyer) + rng() * 0.08;
+      const theirs = 1 + 0.3 * tmPrestige(exBuyer) + rng() * 0.08;
+      if (mine <= theirs) return 0;
+      tmNews('bidwar', p, seller, exBuyer, ex.fee, { t2: buyer.id });
+      tm.talks = tm.talks.filter(x => x.pid !== p.id);
+    }
+    if (tm.talks.length >= TM_CFG.talkMax) return 0;
+    tm.talks.push({ id: tm.seq++, pid: p.id, from: seller.id, to: buyer.id, fee, wage, yrs, step: 0, win: info.id, w: season ? (season.week || 0) : 0 });
+    tmNews('talks', p, seller, buyer, fee);
+    return 1;
+  }
+  function tmTalkResolve(tk, mode, rng) {
+    const f = tmFind(tk.pid), buyer = getTeam(tk.to), seller = getTeam(tk.from);
+    tm.talks = tm.talks.filter(x => x !== tk);
+    if (!f || !buyer || !seller || f.t !== seller || tmLoanOf(tk.pid)) return 0;     // he moved on meanwhile
+    const p = f.p;
+    const me = tmMeTeam();
+    if (me && (buyer.id === me.id || seller.id === me.id)) return 0;
+    if (buyer.players.length >= TM_CFG.squadMax - 1 || tmBudget(buyer) + 1e-9 < tk.fee || tk.wage > tmWageRoom(buyer) + 0.01 || !tmSellerCanSell(seller, p, buyer)) {
+      tmNews('collapse', p, seller, buyer, tk.fee); return 0;
+    }
+    const mood = tmMood(p, buyer, seller, { wage: tk.wage, years: tk.yrs });
+    if (mood.score < TM_CFG.moodOpen - 0.08) { tmNews('refused', p, seller, buyer, tk.fee); return 0; }
+    const pc = 0.12 + (tmProfile(seller).A.ask >= 1.1 ? 0.06 : 0) - (mode === 'deadline' ? 0.08 : 0);
+    if (rng() < pc) { tmNews('collapse', p, seller, buyer, tk.fee); return 0; }
+    if (tk.fee >= 40 || (p.ovr || 0) >= 100) tmNews('agreed', p, seller, buyer, tk.fee);
+    tmExecute({ p, from: seller, to: buyer, fee: tk.fee, years: tk.yrs, wage: tk.wage, kind: 'buy' });
+    tmEnsureSquad(seller);
+    return 1;
+  }
+  function tmTalksStep(mode, rng) {
+    let n = 0;
+    ((tm && tm.talks) || []).slice().forEach(tk => {
+      if (tm.talks.indexOf(tk) < 0) return;
+      tk.step++;
+      if (tk.step >= 1) n += tmTalkResolve(tk, mode, rng);
+    });
+    return n;
   }
   // per-role read of a club: how many, how good the weakest starter is, and whether it is a problem
   function tmNeeds(t) {
@@ -26983,6 +27578,7 @@ const PLAYSTYLE_BEHAVIOR = {
       return { role: r, name: TM_ROLE_NAME[r], count: counts[r], thr, sev, why };
     }).sort((a, b) => b.sev - a.sev || a.thr - b.thr);
   }
+  // scouting picks: ranked by how well the player fits YOUR club's own philosophy (the same interest model the AI uses)
   function tmScoutPicks(t, n, roleFilter) {
     if (!t) return [];
     const needs = tmNeeds(t).filter(x => roleFilter ? x.role === roleFilter : x.sev > 0).slice(0, 3);
@@ -26995,12 +27591,13 @@ const PLAYSTYLE_BEHAVIOR = {
       tmFA.forEach(p => { if (tmRole(p) === nd.role) all.push({ p, s: null }); });
       all.forEach(({ p, s }) => {
         if ((p.ovr || 0) < Math.max(nd.thr + 2, 62) || tmAge(p) > 33) return;
-        const fee = s ? tmAskFor(p, s) : 0;
+        const fee = s ? tmAskFor(p, s, t) : 0;
         if (s && !open) return;
         if (fee + tmWageDemand(p) * TM_CFG.signOnShare > budget || tmWageDemand(p) > room) return;
         const mood = tmMood(p, t, s, { wage: tmWageDemand(p), years: 3 });
         if (mood.score < TM_CFG.moodOpen) return;
-        out.push({ p, s, fee, need: nd, mood, score: (p.ovr - nd.thr) * 2 - fee / Math.max(1, budget) * 10 + (s ? 0 : 4) });
+        const it = tmInterest(t, p, s, { user: true });
+        out.push({ p, s, fee, need: nd, mood, fit: it, score: (p.ovr - nd.thr) * 1.5 + it.score * 0.25 - fee / Math.max(1, budget) * 10 + (s ? 0 : 4) });
       });
     });
     out.sort((a, b) => b.score - a.score);
@@ -27009,11 +27606,11 @@ const PLAYSTYLE_BEHAVIOR = {
     return res;
   }
   const tmUI = {
-    sub: 'overview', q: '', league: 'all', club: 'all', line: 'all', role: 'all', minOvr: 0, maxAge: 0, contract: 'any',
-    maxPrice: 0, sort: 'ovr', dir: -1, shown: 30, flags: {}, faQ: '', faLine: 'all', faMin: 0, faShown: 30,
-    dealsFilter: 'all', dealsShown: 30
+    sub: 'hub', q: '', league: 'all', club: 'all', line: 'all', role: 'all', minOvr: 0, maxAge: 0, contract: 'any',
+    maxPrice: 0, sort: 'ovr', dir: -1, shown: 30, flags: {}, view: 'list', faQ: '', faLine: 'all', faMin: 0, faShown: 30,
+    dealsFilter: 'all', dealsShown: 30, newsFilter: 'all', newsShown: 40, clubsLg: 'all', clubsArch: 'all', clubsQ: ''
   };
-  let tmOffer = null;   // the open dialog: { mode:'offer'|'renew', pid, kind, fee, years, wageMult }
+  let tmOffer = null;   // the open dialog: { mode:'offer'|'renew'|'player'|'club', pid|cid, kind, fee, years, wageMult, role, result }
 
   function tmRefreshAll() { try { renderSeasonDashboard(); } catch (e) {} }
   function tmSub(s) { tmUI.sub = s; tmUI.shown = 30; tmRefreshAll(); }
@@ -27024,113 +27621,388 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   // ---------- small pieces ----------
-  function tmPosBadge(p) { return '<span class="tm-pos tm-pos-' + tmLine(p) + '">' + tmEsc((p.pos || [])[0] || '') + '</span>'; }
-  function tmMeBox() {
-    const me = tmMeTeam();
-    return me;
+  function tmTier(p) {
+    const f = tmRankFrac(p.ovr || 0);
+    return f >= 0.99 ? 'icon' : f >= 0.95 ? 'elite' : f >= 0.8 ? 'gold' : f >= 0.4 ? 'silver' : 'bronze';
   }
+  function tmShield(p, big) {
+    return '<div class="tm-shield tier-' + tmTier(p) + (big ? ' big' : '') + '"><b>' + (p.ovr || 0) + '</b><i>' + tmEsc((p.pos || [])[0] || '') + '</i></div>';
+  }
+  function tmPosBadge(p) { return '<span class="tm-pos tm-pos-' + tmLine(p) + '">' + tmEsc((p.pos || [])[0] || '') + '</span>'; }
+  function tmStars(x) { const n = Math.round(tmClamp(x, 0, 1) * 5 * 2) / 2; let s = ''; for (let i = 1; i <= 5; i++) s += i <= n ? '★' : (i - 0.5 === n ? '⯨' : '☆'); return '<span class="tm-stars" title="Club stature">' + s + '</span>'; }
+  function tmArchChip(t) { const A = tmArch(t); return '<span class="tm-arch" title="' + tmEsc(A.blurb) + '">' + A.ico + ' ' + tmEsc(A.name) + '</span>'; }
+  function tmClubLink(t, size) { return t ? '<span class="tm-clublink" onclick="App.tmOpenClub(\'' + t.id + '\')">' + teamMark(t, size || 16) + ' ' + tmEsc(tmClubName(t)) + '</span>' : 'Unattached'; }
+  function tmPlayerLink(p) { return '<b class="tm-link" onclick="App.tmOpenPlayer(\'' + p.id + '\')">' + tmEsc(p.name) + '</b>'; }
+  function tmMeter(v, cls) { return '<span class="tm-meter ' + (cls || '') + '"><i style="width:' + Math.round(tmClamp(v, 0, 1) * 100) + '%"></i></span>'; }
   function tmClubSelectHTML() {
-    const careerLocked = !!careerTeamId;
-    const cur = tmMeId() || '';
+    const careerLocked = !!careerTeamId, cur = tmMeId() || '';
     const opts = SEASON_LEAGUE_DEFS.map(d => '<optgroup label="' + tmEsc(d.name) + '">' + ((season.leagues[d.key] || {}).teams || [])
       .map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + tmEsc(tmClubName(t)) + '</option>').join('') + '</optgroup>').join('');
     return '<select class="tm-sel" ' + (careerLocked ? 'disabled title="Your Career Mode club"' : '') + ' onchange="App.tmSetClub(this.value)"><option value="">— choose your club —</option>' + opts + '</select>';
   }
+  function tmUnread() { try { return tmMeTeam() ? tmInboxLive().length : 0; } catch (e) { return 0; } }
+  function tmTabBadge() { const n = tmUnread(); return n ? ' <span class="tm-badge">' + n + '</span>' : (tmWindowOpen() ? ' <span class="tm-dot"></span>' : ''); }
+
+  // ---------- window hero ----------
   function tmWindowCardHTML() {
     const w = tmWindowInfo();
     if (!season) return '';
+    const b = tmWindowBounds();
+    const phases = [['Summer', w.id && w.id[0] === 'S'], ['Season', !w.open], ['Winter', w.id && w.id[0] === 'W']];
+    const tl = '<div class="tm-phases">' + phases.map(ph => '<span class="' + (ph[1] ? 'on' : '') + '">' + ph[0] + '</span>').join('<em></em>') + '</div>';
     if (w.open) {
-      const b = tmWindowBounds();
       const span = w.offseason ? b.augEnd : (w.name === 'Winter' ? b.janEnd - b.janStart : b.augEnd);
-      const pct = w.offseason ? 0 : Math.round((1 - w.daysLeft / Math.max(1, span)) * 100);
-      return '<div class="tm-win open' + (w.deadline ? ' deadline' : '') + '"><div class="tm-win-top"><span class="tm-chip on">● WINDOW OPEN</span><b>' + tmEsc(w.label) + '</b>' +
-        '<span class="tm-win-left">' + (w.deadline ? '⏰ DEADLINE DAY' : tmEsc(w.text)) + '</span></div>' +
-        '<div class="tm-bar"><i style="width:' + pct + '%"></i></div></div>';
+      const pct = w.offseason ? 4 : Math.round((1 - w.daysLeft / Math.max(1, span)) * 100);
+      return '<div class="tm-win open' + (w.deadline ? ' deadline' : '') + '"><div class="tm-win-top"><span class="tm-chip on">● WINDOW OPEN</span><b class="tm-win-title">' + tmEsc(w.label) + '</b>' +
+        '<span class="tm-win-left">' + (w.deadline ? '⏰ DEADLINE DAY' : tmEsc(w.text)) + '</span></div><div class="tm-bar"><i style="width:' + pct + '%"></i></div>' + tl + '</div>';
     }
-    return '<div class="tm-win"><div class="tm-win-top"><span class="tm-chip off">● WINDOW CLOSED</span><span class="tm-win-left">' + tmEsc(w.reason) + '</span></div></div>';
+    return '<div class="tm-win"><div class="tm-win-top"><span class="tm-chip off">● WINDOW CLOSED</span><span class="tm-win-left">' + tmEsc(w.reason) + '</span></div>' + tl + '</div>';
   }
   function tmBannerHTML() {
     if (!season) return '';
-    const w = tmWindowInfo();
-    const n = tmUnread();
+    const w = tmWindowInfo(), n = tmUnread();
     if (!w.open && !n) return '';
     const txt = w.open ? ('💸 <b>' + tmEsc(w.label) + '</b> transfer window is open · ' + (w.deadline ? '<b>deadline day</b>' : tmEsc(w.text))) : '💸 Transfers';
     return '<div class="tm-banner' + (w.deadline ? ' deadline' : '') + '"><span>' + txt + (n ? ' · <b>' + n + ' offer' + (n > 1 ? 's' : '') + ' waiting</b>' : '') + '</span>' +
       '<button class="btn btn-secondary btn-sm" onclick="App.showSeasonComp(\'transfers\')">Open Transfers</button></div>';
   }
-  function tmUnread() { try { return tmMeTeam() ? tmInboxLive().length : 0; } catch (e) { return 0; } }
-  function tmTabBadge() { const n = tmUnread(); return n ? ' <span class="tm-badge">' + n + '</span>' : (tmWindowOpen() ? ' <span class="tm-dot"></span>' : ''); }
-
   function tmSubTabsHTML() {
-    const nIn = tmUnread(), nSh = Object.keys((tm && tm.short) || {}).length;
-    const tabs = [['overview', '🏠 Overview'], ['market', '🔎 Market'], ['squad', '👥 My Squad'],
-      ['offers', '📬 Offers' + (nIn ? ' <span class="tm-badge">' + nIn + '</span>' : '')], ['free', '🆓 Free Agents'],
-      ['deals', '📰 Deals'], ['short', '⭐ Shortlist' + (nSh ? ' (' + nSh + ')' : '')]];
+    const nIn = tmUnread(), nSh = Object.keys((tm && tm.short) || {}).length, nT = ((tm && tm.talks) || []).length;
+    const tabs = [['hub', '🏠 Hub'], ['market', '🔎 Market'], ['squad', '👥 Squad'],
+      ['offers', '📬 Inbox' + (nIn ? ' <span class="tm-badge">' + nIn + '</span>' : '')],
+      ['news', '📰 News' + (nT ? ' <span class="tm-badge b">' + nT + '</span>' : '')], ['clubs', '🏟 Clubs'],
+      ['free', '🆓 Free agents'], ['deals', '📜 Deals'], ['short', '⭐ Shortlist' + (nSh ? ' (' + nSh + ')' : '')]];
     return '<div class="leaderboard-tabs tm-subtabs">' + tabs.map(t => '<button class="lb-tab ' + (tmUI.sub === t[0] ? 'active' : '') + '" onclick="App.tmSub(\'' + t[0] + '\')">' + t[1] + '</button>').join('') + '</div>';
   }
 
-  // ---------- one player row (Market / Free agents / Shortlist / scouting) ----------
+  // ---------- one player row / card ----------
+  function tmInterestChips(p, t, n) {
+    let list = [];
+    try { list = tmInterestedClubs(p, t, n || 2); } catch (e) {}
+    if (!list.length) return '';
+    return '<span class="tm-int" title="Clubs that would want him">' + list.map(x => '<span class="tm-intchip" onclick="event.stopPropagation();App.tmOpenClub(\'' + x.t.id + '\')">' + teamMark(x.t, 14) + '<em>' + x.score + '</em></span>').join('') + '</span>';
+  }
   function tmRowHTML(p, t, opts) {
     opts = opts || {};
     const me = tmMeTeam();
-    const age = tmAge(p), yl = tmYearsLeft(p), val = tmValue(p);
-    const loan = tmLoanOf(p.id);
-    const fa = !t;
-    const ask = fa ? 0 : tmAskFor(p, t);
-    const lg = t ? tmLeagueOf(t) : null;
+    const age = tmAge(p), yl = tmYearsLeft(p), val = tmValue(p), loan = tmLoanOf(p.id), fa = !t;
+    const ask = fa ? 0 : tmAskFor(p, t, me);
+    const lg = t ? tmLeagueOf(t) : null, talk = tmTalkFor(p.id);
     let moodIco = '';
     if (me && (!t || t.id !== me.id)) { try { moodIco = '<span class="tm-mood" title="Would he join you?">' + tmMood(p, me, t, { wage: tmWageDemand(p), years: 3 }).ico + '</span>'; } catch (e) {} }
     const tags = [];
     if (fa) tags.push('<span class="tm-tag fa">FREE AGENT</span>');
     else if (yl <= 1) tags.push('<span class="tm-tag exp">Contract ends ' + (TM_BASE_YEAR + tmContractEnd(p)) + '</span>');
     else tags.push('<span class="tm-tag">' + yl + 'y left</span>');
+    if (talk) tags.push('<span class="tm-tag talk">🔥 IN TALKS · ' + tmEsc(tmClubNameById(talk.to)) + '</span>');
     if (loan) tags.push('<span class="tm-tag loan">ON LOAN</span>');
     if (t && tm.listed[p.id]) tags.push('<span class="tm-tag listed">LISTED</span>');
     if (isPlayerInjured(p.id)) tags.push('<span class="tm-tag inj">🏥</span>');
-    if (age <= 21 && (p.ovr || 0) >= 78) tags.push('<span class="tm-tag wk">Wonderkid</span>');
+    const g = tmGrowth(p);
+    if (age <= 21 && g >= 4) tags.push('<span class="tm-tag wk">Wonderkid · pot ' + tmPotential(p) + '</span>');
     const star = tm.short[p.id] ? '★' : '☆';
     const canBuy = me && (!t || t.id !== me.id) && !loan;
     let btn = '';
-    if (canBuy) {
-      if (fa) btn = '<button class="btn btn-primary btn-sm" onclick="App.tmOpenOffer(\'' + p.id + '\',\'free\')">Sign</button>';
-      else btn = '<button class="btn btn-primary btn-sm" onclick="App.tmOpenOffer(\'' + p.id + '\',\'buy\')">Offer</button>';
-    } else if (t && me && t.id === me.id) btn = '<span class="tm-tag">Your player</span>';
-    const name = fa ? '<b>' + tmEsc(p.name) + '</b>' : '<b class="tm-link" onclick="App.showPlayerProfile(\'' + p.id + '\')">' + tmEsc(p.name) + '</b>';
-    return '<div class="tm-row">' +
-      '<div class="tm-ovr tm-ovr-' + tmLine(p) + '">' + (p.ovr || 0) + '</div>' +
-      '<div class="tm-main"><div class="tm-name">' + tmPosBadge(p) + ' ' + name + ' ' + moodIco + '</div>' +
-      '<div class="tm-sub">' + (t ? teamMark(t, 16) + ' ' + tmEsc(tmClubName(t)) + (lg ? ' · ' + tmEsc(lg.name) : '') : 'Unattached') + ' · ' + age + 'y</div>' +
-      '<div class="tm-tags">' + tags.join('') + '</div></div>' +
+    if (canBuy) btn = '<button class="btn btn-primary btn-sm" onclick="App.tmOpenOffer(\'' + p.id + '\',\'' + (fa ? 'free' : 'buy') + '\')">' + (fa ? 'Sign' : 'Offer') + '</button>';
+    else if (t && me && t.id === me.id) btn = '<span class="tm-tag">Your player</span>';
+    const cls = 'tm-row tier-' + tmTier(p);
+    if (tmUI.view === 'cards' && !opts.list) {
+      return '<div class="tm-card-p ' + cls + '" onclick="App.tmOpenPlayer(\'' + p.id + '\')"><div class="tm-cp-top">' + tmShield(p) + '<div class="tm-cp-av">' + (function () { try { return playerAvatarMark(p); } catch (e) { return ''; } })() + '</div></div>' +
+        '<div class="tm-cp-name">' + tmEsc(p.name) + ' ' + moodIco + '</div><div class="tm-sub">' + (t ? teamMark(t, 16) + ' ' + tmEsc(tmClubName(t)) : 'Unattached') + ' · ' + age + 'y</div>' +
+        '<div class="tm-tags">' + tags.join('') + '</div><div class="tm-cp-money"><span><small>' + (fa ? 'Wage ask' : 'Asking') + '</small><b>' + (fa ? tmFmt(tmWageDemand(p)) + '/yr' : tmFmt(ask)) + '</b></span><span><small>Value</small><b class="dim">' + tmFmt(val) + '</b></span></div>' +
+        '<div class="tm-cp-foot">' + (opts.noInt ? '' : tmInterestChips(p, t, 3)) + '<span class="tm-acts" onclick="event.stopPropagation()"><button class="tm-star" onclick="App.tmStar(\'' + p.id + '\')">' + star + '</button>' + btn + '</span></div></div>';
+    }
+    return '<div class="' + cls + '">' + tmShield(p) +
+      '<div class="tm-main"><div class="tm-name">' + tmPlayerLink(p) + ' ' + moodIco + '</div>' +
+      '<div class="tm-sub">' + (t ? tmClubLink(t, 16) + (lg ? ' · ' + tmEsc(lg.name) : '') : 'Unattached') + ' · ' + age + 'y</div>' +
+      '<div class="tm-tags">' + tags.join('') + (opts.noInt ? '' : tmInterestChips(p, t, 2)) + '</div></div>' +
       '<div class="tm-money"><small>' + (fa ? 'Wage ask' : 'Asking') + '</small><b>' + (fa ? tmFmt(tmWageDemand(p)) + '/yr' : tmFmt(ask)) + '</b><small>Value ' + tmFmt(val) + '</small></div>' +
       '<div class="tm-acts"><button class="tm-star" onclick="App.tmStar(\'' + p.id + '\')" title="Shortlist">' + star + '</button>' + btn + '</div></div>';
   }
 
-  // ---------- Overview ----------
-  function tmOverviewHTML() {
-    const me = tmMeTeam();
-    let h = '';
-    if (!me) {
-      return '<div class="card tm-card"><div class="card-title">Pick your club</div><p class="tm-note">Choose the club whose transfers you run. (In Career Mode this is your career club.)</p>' + tmClubSelectHTML() + '</div>' +
-        tmLatestDealsHTML(8);
-    }
-    const budget = tmBudget(me), bill = tmWageBill(me), cap = tmCapOf(me);
+  // ---------- Hub ----------
+  function tmKpiHTML(me) {
+    const budget = tmBudget(me), base = tmBase(me), bill = tmWageBill(me), cap = tmCapOf(me);
     const exp = me.players.filter(p => tmYearsLeft(p) <= 1 && !tmLoanOf(p.id)).length;
-    h += '<div class="tm-grid">' +
-      '<div class="tm-stat"><small>Transfer budget</small><b>' + tmFmt(budget) + '</b></div>' +
-      '<div class="tm-stat"><small>Wage bill / cap</small><b>' + tmFmt(bill) + ' <em>/ ' + tmFmt(cap) + '</em></b></div>' +
-      '<div class="tm-stat"><small>Squad</small><b>' + me.players.length + ' <em>/ ' + TM_CFG.squadMax + '</em></b></div>' +
-      '<div class="tm-stat ' + (exp ? 'warn' : '') + '"><small>Contracts expiring</small><b>' + exp + '</b></div></div>';
-    const needs = tmNeeds(me).filter(n => n.sev > 0).slice(0, 4);
-    h += '<div class="card tm-card"><div class="card-title">🧭 Where you need help</div>' + (needs.length ? needs.map(n =>
-      '<div class="tm-need sev' + n.sev + '"><div><b>' + tmEsc(n.name) + '</b><small>' + tmEsc(n.why) + '</small></div><button class="btn btn-secondary btn-sm" onclick="App.tmFindRole(\'' + n.role + '\')">Find targets</button></div>').join('')
+    const win = tmWindowInfo().id;
+    let spent = 0, got = 0;
+    (tm.log || []).forEach(d => { if (d.win !== win || d.k !== 'buy') return; if (d.t === me.id) spent += d.fee; if (d.f === me.id) got += d.fee; });
+    const r = (tm.res || {})[me.id];
+    return '<div class="tm-grid">' +
+      '<div class="tm-stat"><small>Transfer budget</small><b>' + tmFmt(budget) + '</b>' + tmMeter(budget / Math.max(1, base * 1.6), 'gold') + '<em>yearly base ' + tmFmt(base) + '</em></div>' +
+      '<div class="tm-stat"><small>Wage bill / cap</small><b>' + tmFmt(bill) + ' <em>/ ' + tmFmt(cap) + '</em></b>' + tmMeter(bill / Math.max(1, cap), bill / cap > 0.95 ? 'red' : 'green') + '<em>room ' + tmFmt(Math.max(0, cap - bill)) + '</em></div>' +
+      '<div class="tm-stat"><small>This window</small><b>' + tmFmt(spent - got) + '</b><em>' + tmFmt(spent) + ' in · ' + tmFmt(got) + ' out</em></div>' +
+      '<div class="tm-stat"><small>Squad</small><b>' + me.players.length + ' <em>/ ' + TM_CFG.squadMax + '</em></b><em>' + exp + ' contract' + (exp === 1 ? '' : 's') + ' expiring</em></div>' +
+      (r ? '<div class="tm-stat"><small>Last season</small><b>' + r.pos + tmOrd(r.pos) + ' <em>of ' + r.n + '</em></b><em>' + (r.clWin ? '🏆 Champions League winners' : r.cl ? 'Champions League' : 'No Europe') + '</em></div>' : '') + '</div>';
+  }
+  function tmOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return s[(v - 20) % 10] || s[v] || s[0]; }
+  function tmNewsLineHTML(e) {
+    const ico = { rumour: '🟠', talks: '🟠', agreed: '🟢', done: '🔵', free: '🆓', loan: '🔄', pre: '✍️', hijack: '😮', collapse: '❌', refused: '🙅', bidwar: '⚔️', deadline: '⏰', retire: '🏁', release: '✋' }[e.k] || '•';
+    const lab = { talks: 'TALKS', agreed: 'HERE WE GO', done: 'OFFICIAL', free: 'FREE', loan: 'LOAN', pre: 'PRE-CONTRACT', hijack: 'HIJACKED', collapse: 'OFF', refused: 'REFUSED', bidwar: 'BIDDING WAR', deadline: 'DEADLINE DAY' }[e.k] || '';
+    const t = getTeam(e.t), f = getTeam(e.f), p = e.pid ? tmFind(e.pid) : null;
+    return '<div class="tm-news k-' + e.k + (e.u ? ' mine' : '') + '"><span class="tm-news-ico">' + ico + '</span><div class="tm-news-body">' +
+      (lab ? '<span class="tm-news-tag">' + lab + '</span>' : '') + '<span>' + tmEsc(tmNewsText(e)) + '</span><small>' + (f ? teamMark(f, 12) + ' ' : '') + (f && t ? '→ ' : '') + (t ? teamMark(t, 12) + ' ' : '') +
+      (e.ovr ? e.ovr + ' OVR · ' : '') + tmEsc(tmWindowLabel(e.win) || ('Year ' + e.y)) + (e.fee ? ' · ' + tmFmt(e.fee) : '') + '</small></div>' +
+      (p ? '<button class="tm-mini" onclick="App.tmOpenPlayer(\'' + e.pid + '\')">View</button>' : '') + '</div>';
+  }
+  function tmTalksHTML() {
+    const talks = (tm.talks || []);
+    if (!talks.length) return '';
+    return '<div class="card tm-card"><div class="card-title">🔥 Live talks <small>(complete next matchday — you can still hijack)</small></div>' + talks.map(tk => {
+      const f = tmFind(tk.pid); if (!f) return '';
+      const to = getTeam(tk.to), fr = getTeam(tk.from);
+      return '<div class="tm-talk">' + tmShield(f.p) + '<div class="tm-main"><div class="tm-name">' + tmPlayerLink(f.p) + '</div><div class="tm-sub">' + tmClubLink(fr, 14) + ' → ' + tmClubLink(to, 14) + '</div></div><div class="tm-money"><small>Bid</small><b>' + tmFmt(tk.fee) + '</b></div></div>';
+    }).join('') + '</div>';
+  }
+  function tmHubHTML() {
+    const me = tmMeTeam();
+    if (!me) return '<div class="card tm-card"><div class="card-title">Pick your club</div><p class="tm-note">Choose the club whose transfers you run. (In Career Mode this is your career club.)</p>' + tmClubSelectHTML() + '</div>' + tmTalksHTML() + tmLatestNewsHTML(8);
+    let h = tmKpiHTML(me);
+    h += '<div class="tm-prof"><div class="tm-prof-top">' + teamMark(me, 34) + '<div><b>' + tmEsc(tmClubName(me)) + '</b> ' + tmStars(tmPrestige(me)) + '<br>' + tmArchChip(me) + '</div></div><p class="tm-note">' + tmEsc(tmArch(me).blurb) + ' ' + tmEsc(tmProfile(me).tag) + '</p></div>';
+    const wants = tmClubWants(me, 4);
+    h += '<div class="card tm-card"><div class="card-title">🧭 Where you need help</div>' + (wants.length ? wants.map(n =>
+      '<div class="tm-need sev' + n.urgency + '"><div><b>' + tmEsc(n.name) + '</b><small>' + tmEsc(n.why) + ' · look for ' + n.minOvr + '+ OVR, age ≤ ' + n.ageMax + '</small></div><button class="btn btn-secondary btn-sm" onclick="App.tmFindRole(\'' + n.role + '\')">Find targets</button></div>').join('')
       : '<p class="tm-note">No obvious weak spots — your squad is balanced.</p>') + '</div>';
-    const picks = tmScoutPicks(me, 6);
-    h += '<div class="card tm-card"><div class="card-title">🔭 Scout recommends <small>(affordable, fits your wage cap, willing to join)</small></div>' +
-      (picks.length ? picks.map(x => tmRowHTML(x.p, x.s)).join('') : '<p class="tm-note">' + (tmWindowOpen() ? 'No suitable targets right now.' : 'Targets appear while a window is open (free agents any time).') + '</p>') + '</div>';
-    h += tmLatestDealsHTML(8);
+    const picks = tmScoutPicks(me, 5);
+    h += '<div class="card tm-card"><div class="card-title">🔭 Scout recommends <small>(fits your club, affordable, willing to join)</small></div>' +
+      (picks.length ? picks.map(x => tmRowHTML(x.p, x.s, { list: true, noInt: true }) + (x.fit && x.fit.reasons.length ? '<div class="tm-why">' + x.fit.reasons.slice(0, 3).map(r => tmEsc(r.t + ' ' + r.x)).join(' · ') + '</div>' : '')).join('')
+        : '<p class="tm-note">' + (tmWindowOpen() ? 'No suitable targets right now.' : 'Targets appear while a window is open (free agents any time).') + '</p>') + '</div>';
+    // who is sniffing around the squad
+    const hot = me.players.slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, 12).map(p => ({ p, cl: tmInterestedClubs(p, me, 3, { min: 50 }) })).filter(x => x.cl.length).slice(0, 4);
+    h += '<div class="card tm-card"><div class="card-title">👀 Interest in your squad</div>' + (hot.length ? hot.map(x => '<div class="tm-hot">' + tmShield(x.p) + '<div class="tm-main"><div class="tm-name">' + tmPlayerLink(x.p) + '</div><div class="tm-sub">' +
+      x.cl.map(c => '<span class="tm-intchip wide" onclick="App.tmOpenClub(\'' + c.t.id + '\')">' + teamMark(c.t, 14) + ' ' + tmEsc(tmClubName(c.t)) + ' <em>' + c.score + '</em></span>').join('') + '</div></div></div>').join('')
+      : '<p class="tm-note">Nobody is circling your players right now.</p>') + '</div>';
+    h += tmTalksHTML() + tmLatestNewsHTML(6);
     return h;
   }
-  function tmDealLine(d, mine) {
+  function tmLatestNewsHTML(n) {
+    const rows = (tm.news || []).slice(-n).reverse();
+    return '<div class="card tm-card"><div class="card-title">📰 Latest headlines <button class="tm-mini" onclick="App.tmSub(\'news\')">All news</button></div>' + (rows.length ? rows.map(tmNewsLineHTML).join('') : '<p class="tm-note">The market is quiet — for now.</p>') + '</div>';
+  }
+
+  // ---------- Market ----------
+  function tmMarketEntries(includeMine) {
+    const me = tmMeTeam(), out = [];
+    tmClubs().forEach(t => { if (!includeMine && me && t.id === me.id) return; (t.players || []).forEach(p => out.push({ p, t })); });
+    return out;
+  }
+  function tmFiltered(entries) {
+    const u = tmUI, me = tmMeTeam(), q = u.q.trim().toLowerCase();
+    const budget = me ? tmBudget(me) : 0;
+    const list = entries.filter(({ p, t }) => {
+      if (q && p.name.toLowerCase().indexOf(q) < 0 && tmClubName(t).toLowerCase().indexOf(q) < 0) return false;
+      if (u.league !== 'all' && (!t || tmLg(t) !== u.league)) return false;
+      if (u.club !== 'all' && (!t || t.id !== u.club)) return false;
+      if (u.line !== 'all' && tmLine(p) !== u.line) return false;
+      if (u.role !== 'all' && tmRole(p) !== u.role) return false;
+      if (u.minOvr && (p.ovr || 0) < u.minOvr) return false;
+      if (u.maxAge && tmAge(p) > u.maxAge) return false;
+      if (u.contract === 'expiring' && tmYearsLeft(p) > 1) return false;
+      if (u.contract === 'long' && tmYearsLeft(p) < 3) return false;
+      if (u.maxPrice && tmAskFor(p, t, me) > u.maxPrice) return false;
+      if (u.flags.afford && tmAskFor(p, t, me) > budget) return false;
+      if (u.flags.u23 && tmAge(p) > 23) return false;
+      if (u.flags.listed && !tm.listed[p.id]) return false;
+      if (u.flags.talks && !tmTalkFor(p.id)) return false;
+      if (u.flags.loanable && (!t || tmRank(p, t) <= 12)) return false;
+      if (u.flags.short && !tm.short[p.id]) return false;
+      return true;
+    });
+    const dir = u.dir;
+    const val = { ovr: x => x.p.ovr || 0, value: x => tmValue(x.p), ask: x => tmAskFor(x.p, x.t, me), age: x => tmAge(x.p), contract: x => tmYearsLeft(x.p), pot: x => tmPotential(x.p), name: x => x.p.name }[u.sort] || (x => x.p.ovr);
+    list.sort((a, b) => { const A = val(a), B = val(b); return (A < B ? -1 : A > B ? 1 : 0) * dir || ((b.p.ovr || 0) - (a.p.ovr || 0)); });
+    return list;
+  }
+  function tmMarketControlsHTML() {
+    const u = tmUI;
+    const sel = (label, opts, cur, fn) => '<label class="tm-f"><span>' + label + '</span><select class="tm-sel" onchange="App.tmFilter(\'' + fn + '\',this.value)">' +
+      opts.map(o => '<option value="' + o[0] + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>';
+    const leagues = [['all', 'All leagues']].concat(SEASON_LEAGUE_DEFS.map(d => [d.key, d.name]));
+    const clubs = [['all', 'All clubs']].concat(tmClubs().filter(t => u.league === 'all' || tmLg(t) === u.league).sort((a, b) => tmClubName(a).localeCompare(tmClubName(b))).map(t => [t.id, tmClubName(t)]));
+    const roles = [['all', 'Any position'], ['GK', 'Goalkeeper'], ['CB', 'Centre-back'], ['FB', 'Full-back'], ['DM', 'Defensive mid'], ['CM', 'Central mid'], ['AM', 'Attacking mid'], ['W', 'Winger'], ['ST', 'Striker']];
+    const chip = (k, t) => '<button class="tm-chip-btn ' + (u.flags[k] ? 'on' : '') + '" onclick="App.tmToggle(\'' + k + '\')">' + t + '</button>';
+    return '<div class="card tm-card tm-filters">' +
+      '<div class="tm-searchrow"><input class="tm-search" type="search" placeholder="Search player or club…" value="' + tmEsc(u.q) + '" oninput="App.tmSearch(this.value)">' +
+      '<div class="tm-viewtog"><button class="' + (u.view === 'list' ? 'on' : '') + '" onclick="App.tmView(\'list\')" title="List">☰</button><button class="' + (u.view === 'cards' ? 'on' : '') + '" onclick="App.tmView(\'cards\')" title="Cards">▦</button></div></div>' +
+      '<div class="tm-linechips">' + [['all', 'All'], ['GK', 'GK'], ['DEF', 'DEF'], ['MID', 'MID'], ['FWD', 'FWD']].map(l => '<button class="tm-chip-btn ' + (u.line === l[0] ? 'on' : '') + '" onclick="App.tmFilter(\'line\',\'' + l[0] + '\')">' + l[1] + '</button>').join('') + '</div>' +
+      '<div class="tm-fgrid">' + sel('League', leagues, u.league, 'league') + sel('Club', clubs, u.club, 'club') + sel('Position', roles, u.role, 'role') +
+      sel('Min OVR', [[0, 'Any'], [75, '75+'], [80, '80+'], [90, '90+'], [100, '100+'], [105, '105+']], u.minOvr, 'minOvr') +
+      sel('Max age', [[0, 'Any'], [21, '21'], [23, '23'], [26, '26'], [29, '29'], [32, '32']], u.maxAge, 'maxAge') +
+      sel('Contract', [['any', 'Any'], ['expiring', 'Expiring'], ['long', '3+ years']], u.contract, 'contract') +
+      sel('Max price', [[0, 'Any'], [5, '€5m'], [15, '€15m'], [30, '€30m'], [60, '€60m'], [100, '€100m']], u.maxPrice, 'maxPrice') +
+      sel('Sort by', [['ovr', 'Overall'], ['pot', 'Potential'], ['value', 'Value'], ['ask', 'Asking price'], ['age', 'Age'], ['contract', 'Contract'], ['name', 'Name']], u.sort, 'sort') + '</div>' +
+      '<div class="tm-chiprow">' + chip('afford', '💰 Affordable') + chip('u23', '🌱 Under 23') + chip('loanable', '🔄 Loanable') + chip('listed', '🏷 Listed') + chip('talks', '🔥 In talks') + chip('short', '★ Shortlist') +
+      '<button class="tm-chip-btn" onclick="App.tmDir()">' + (u.dir < 0 ? '⬇ High first' : '⬆ Low first') + '</button><button class="tm-chip-btn" onclick="App.tmResetFilters()">✖ Reset</button></div></div>';
+  }
+  function tmMarketListHTML() {
+    const list = tmFiltered(tmMarketEntries(false)), shown = list.slice(0, tmUI.shown);
+    return '<div class="tm-count">' + list.length + ' player' + (list.length === 1 ? '' : 's') + '</div>' +
+      '<div class="' + (tmUI.view === 'cards' ? 'tm-cards' : 'tm-list') + '">' +
+      (shown.length ? shown.map(x => tmRowHTML(x.p, x.t)).join('') : '<div class="empty-state"><div class="icon">🔎</div>No players match these filters.</div>') + '</div>' +
+      (list.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="App.tmMore()">Show more (' + (list.length - shown.length) + ')</button></div>' : '');
+  }
+  function tmMarketHTML() {
+    const w = tmWindowInfo();
+    return (w.open ? '' : '<div class="tm-warn">' + tmEsc(w.reason) + ' You can still browse, shortlist and sign free agents.</div>') + tmMarketControlsHTML() + '<div id="tm-list">' + tmMarketListHTML() + '</div>';
+  }
+  function tmRenderList() { const el = document.getElementById('tm-list'); if (el) el.innerHTML = tmMarketListHTML(); }
+  function tmSearch(v) { tmUI.q = v || ''; tmUI.shown = 30; tmRenderList(); }
+  function tmView(v) { tmUI.view = v; tmRefreshAll(); }
+  function tmFilter(k, v) {
+    if (k === 'minOvr' || k === 'maxAge' || k === 'maxPrice') v = parseInt(v, 10) || 0;
+    tmUI[k] = v; tmUI.shown = 30;
+    if (k === 'league') tmUI.club = 'all';
+    if (k === 'line') tmUI.role = 'all';
+    if (k === 'role' && v !== 'all') tmUI.line = 'all';
+    if (k === 'league' || k === 'line') tmRefreshAll(); else tmRenderList();
+  }
+  function tmToggle(k) { tmUI.flags[k] = !tmUI.flags[k]; tmUI.shown = 30; tmRefreshAll(); }
+  function tmDir() { tmUI.dir = -tmUI.dir; tmRefreshAll(); }
+  function tmMore() { tmUI.shown += 30; tmRenderList(); }
+  function tmResetFilters() { Object.assign(tmUI, { q: '', league: 'all', club: 'all', line: 'all', role: 'all', minOvr: 0, maxAge: 0, contract: 'any', maxPrice: 0, sort: 'ovr', dir: -1, shown: 30, flags: {} }); tmRefreshAll(); }
+  function tmFindRole(role) { tmResetFilters(); tmUI.role = role; tmUI.flags.afford = true; tmUI.sub = 'market'; tmRefreshAll(); }
+  function tmStar(pid) { tmToggleShort(pid); if (tmUI.sub === 'market') tmRenderList(); else tmRefreshAll(); }
+
+  // ---------- My Squad ----------
+  function tmSquadHTML() {
+    const me = tmMeTeam();
+    if (!me) return '<div class="card tm-card"><div class="card-title">Pick your club</div>' + tmClubSelectHTML() + '</div>';
+    const open = tmWindowOpen();
+    const loanedIn = new Set((tm.loans || []).filter(l => l.to === me.id).map(l => l.pid));
+    const groups = [['GK', 'Goalkeepers'], ['DEF', 'Defenders'], ['MID', 'Midfielders'], ['FWD', 'Forwards']];
+    let h = tmKpiHTML(me);
+    groups.forEach(g => {
+      const ps = me.players.filter(p => tmLine(p) === g[0]).sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+      h += '<div class="card tm-card"><div class="card-title">' + g[1] + ' (' + ps.length + ')</div>' + ps.map(p => {
+        const yl = tmYearsLeft(p), loan = loanedIn.has(p.id), rank = tmRank(p, me);
+        const tags = [];
+        if (loan) tags.push('<span class="tm-tag loan">LOAN-IN</span>');
+        else if (yl <= 1) tags.push('<span class="tm-tag exp">Expires ' + (TM_BASE_YEAR + tmContractEnd(p)) + '</span>');
+        else tags.push('<span class="tm-tag">until ' + (TM_BASE_YEAR + tmContractEnd(p)) + '</span>');
+        tags.push('<span class="tm-tag">' + (rank <= 3 ? '⭐ Key player' : rank <= 14 ? 'First team' : rank <= 20 ? 'Rotation' : 'Reserve') + '</span>');
+        if (tm.listed[p.id]) tags.push('<span class="tm-tag listed">LISTED</span>');
+        if (isPlayerInjured(p.id)) tags.push('<span class="tm-tag inj">🏥</span>');
+        if (tm.pre.some(x => x.pid === p.id)) tags.push('<span class="tm-tag">Pre-contract</span>');
+        const acts = loan ? '' :
+          '<button class="btn btn-secondary btn-sm" onclick="App.tmOpenRenew(\'' + p.id + '\')">Renew</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="App.tmList(\'' + p.id + '\')">' + (tm.listed[p.id] ? 'Unlist' : 'List') + '</button>' +
+          (open ? '<button class="btn btn-secondary btn-sm" onclick="App.tmShop(\'' + p.id + '\',\'buy\')">Find buyers</button><button class="btn btn-secondary btn-sm" onclick="App.tmShop(\'' + p.id + '\',\'loan\')">Loan out</button>' : '') +
+          '<button class="btn btn-danger btn-sm" onclick="App.tmRelease(\'' + p.id + '\')">Release</button>';
+        return '<div class="tm-row sq tier-' + tmTier(p) + '">' + tmShield(p) + '<div class="tm-main"><div class="tm-name">' + tmPosBadge(p) + ' ' + tmPlayerLink(p) + '</div>' +
+          '<div class="tm-sub">' + tmAge(p) + 'y · wage ' + tmFmt(tmWage(p)) + '/yr · value ' + tmFmt(tmValue(p)) + '</div><div class="tm-tags">' + tags.join('') + tmInterestChips(p, me, 2) + '</div>' +
+          '<div class="tm-contract" title="Contract"><i style="width:' + Math.min(100, yl * 20) + '%"></i></div></div><div class="tm-acts wrap">' + acts + '</div></div>';
+      }).join('') + '</div>';
+    });
+    const out = (tm.loans || []).filter(l => l.from === me.id).map(l => tmFind(l.pid)).filter(Boolean);
+    if (out.length) h += '<div class="card tm-card"><div class="card-title">🔄 Out on loan</div>' + out.map(f => '<div class="tm-deal"><span class="tm-deal-ico">🔄</span><div>' + tmPlayerLink(f.p) + ' at ' + tmClubLink(f.t, 14) + '<small>Returns at season end</small></div></div>').join('') + '</div>';
+    return h;
+  }
+  function tmList(pid) { const on = !tm.listed[pid]; tmSetListed(pid, on); toast(on ? 'Listed for transfer — clubs will show interest' : 'Removed from the transfer list'); tmRefreshAll(); }
+  function tmShop(pid, kind) {
+    const n = tmShopPlayer(pid, kind);
+    if (n < 0) toast('The window is closed');
+    else if (n === 0) toast('No club is interested at the moment');
+    else { toast(n + ' offer' + (n > 1 ? 's' : '') + ' received — see Inbox'); tmUI.sub = 'offers'; }
+    tmRefreshAll();
+  }
+  function tmRelease(pid) {
+    const f = tmFind(pid); if (!f) return;
+    const cost = tmReleaseCost(f.p);
+    if (!confirm('Release ' + f.p.name + '? ' + (cost ? 'Settling his contract costs ' + tmFmt(cost) + '.' : 'He is out of contract soon, so it is free.'))) return;
+    const r = tmReleasePlayer(pid); toast(r.msg); tmRefreshAll();
+  }
+
+  // ---------- Inbox ----------
+  function tmOffersHTML() {
+    const me = tmMeTeam();
+    if (!me) return '<div class="card tm-card"><div class="card-title">Pick your club</div>' + tmClubSelectHTML() + '</div>';
+    const inbox = tmInboxLive();
+    let h = '<div class="card tm-card"><div class="card-title">📬 Offers for your players</div>';
+    if (!inbox.length) h += '<p class="tm-note">' + (tmWindowOpen() ? 'No offers right now. List a player or use “Find buyers” in Squad — clubs bid for players that fit their philosophy.' : 'Offers only arrive while a window is open.') + '</p>';
+    inbox.forEach(o => {
+      const f = tmFind(o.pid), b = getTeam(o.from); if (!f || !b) return;
+      const ask = o.kind === 'loan' ? o.fee : tmAskFor(f.p, me, b), pct = Math.round(o.fee / Math.max(0.1, ask) * 100);
+      h += '<div class="tm-row tier-' + tmTier(f.p) + '">' + tmShield(f.p) + '<div class="tm-main"><div class="tm-name">' + tmPlayerLink(f.p) + '</div>' +
+        '<div class="tm-sub">' + tmClubLink(b, 16) + ' want him ' + (o.kind === 'loan' ? 'on loan' : 'permanently') + '</div>' +
+        '<div class="tm-tags">' + tmArchChip(b) + (o.score ? '<span class="tm-tag">Interest ' + o.score + '</span>' : '') + '</div>' +
+        (o.kind === 'buy' ? '<div class="tm-offerbar" title="Offer vs your valuation"><i style="width:' + Math.min(100, pct) + '%" class="' + (pct >= 100 ? 'ok' : pct >= 90 ? 'mid' : 'low') + '"></i><span>' + pct + '% of your valuation (' + tmFmt(ask) + ')</span></div>' : '') + '</div>' +
+        '<div class="tm-money"><small>Offer</small><b>' + tmFmt(o.fee) + '</b></div>' +
+        '<div class="tm-acts wrap"><button class="btn btn-primary btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'accept\')">Accept</button>' +
+        (o.kind === 'buy' ? '<button class="btn btn-secondary btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'c10\')">Ask +10%</button><button class="btn btn-secondary btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'c20\')">Ask +20%</button>' : '') +
+        '<button class="btn btn-danger btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'reject\')">Reject</button></div></div>';
+    });
+    h += '</div>';
+    const pre = (tm.pre || []).filter(x => x.u);
+    h += '<div class="card tm-card"><div class="card-title">✍️ Pre-contracts you agreed</div>' + (pre.length ? pre.map(x => { const f = tmFind(x.pid); return f ? '<div class="tm-deal"><span class="tm-deal-ico">✍️</span><div>' + tmPlayerLink(f.p) + ' joins from ' + tmEsc(tmClubNameById(x.from)) + ' on a free<small>Arrives when this season ends · ' + tmFmt(x.wage) + '/yr · ' + x.yrs + ' years</small></div></div>' : ''; }).join('') : '<p class="tm-note">None. In the Winter window you can agree free deals with players in their final contract year.</p>') + '</div>';
+    const loans = (tm.loans || []).filter(l => l.to === me.id || l.from === me.id);
+    h += '<div class="card tm-card"><div class="card-title">🔄 Loans</div>' + (loans.length ? loans.map(l => { const f = tmFind(l.pid); return f ? '<div class="tm-deal"><span class="tm-deal-ico">🔄</span><div>' + tmPlayerLink(f.p) + ' ' + (l.to === me.id ? 'from ' + tmEsc(tmClubNameById(l.from)) : 'at ' + tmEsc(tmClubNameById(l.to))) + '<small>Returns at season end</small></div></div>' : ''; }).join('') : '<p class="tm-note">No loans.</p>') + '</div>';
+    return h;
+  }
+  function tmOfferAct(id, act) {
+    let r;
+    if (act === 'accept') r = tmAcceptOffer(id);
+    else if (act === 'reject') { tmRejectOffer(id); r = { msg: 'Offer rejected.' }; }
+    else r = tmCounterOffer(id, act === 'c10' ? 0.10 : 0.20);
+    toast(r.msg); tmRefreshAll();
+  }
+
+  // ---------- News ----------
+  function tmNewsHTML() {
+    const me = tmMeTeam(), f = tmUI.newsFilter;
+    let rows = (tm.news || []).slice().reverse();
+    if (f === 'mine') rows = rows.filter(e => e.u || (me && (e.f === me.id || e.t === me.id)));
+    else if (f === 'big') rows = rows.filter(e => e.fee >= 40 || e.ovr >= 100);
+    else if (f === 'talks') rows = rows.filter(e => e.k === 'talks' || e.k === 'agreed' || e.k === 'bidwar' || e.k === 'hijack' || e.k === 'collapse' || e.k === 'refused');
+    else if (f === 'done') rows = rows.filter(e => e.k === 'done' || e.k === 'deadline' || e.k === 'free' || e.k === 'loan' || e.k === 'pre');
+    const tabs = '<div class="leaderboard-tabs tm-subtabs">' + [['all', 'All'], ['talks', '🔥 Talks & drama'], ['done', '✅ Completed'], ['big', '💎 Big stories'], ['mine', 'My club']].map(x => '<button class="lb-tab ' + (f === x[0] ? 'active' : '') + '" onclick="App.tmNewsFilter(\'' + x[0] + '\')">' + x[1] + '</button>').join('') + '</div>';
+    return tabs + tmTalksHTML() + '<div class="card tm-card"><div class="card-title">Transfer news</div>' + (rows.length ? rows.slice(0, tmUI.newsShown).map(tmNewsLineHTML).join('') : '<p class="tm-note">Nothing yet.</p>') +
+      (rows.length > tmUI.newsShown ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="App.tmNewsMore()">Show more</button></div>' : '') + '</div>';
+  }
+  function tmNewsFilter(f) { tmUI.newsFilter = f; tmUI.newsShown = 40; tmRefreshAll(); }
+  function tmNewsMore() { tmUI.newsShown += 40; tmRefreshAll(); }
+
+  // ---------- Clubs directory ----------
+  function tmClubsHTML() {
+    const u = tmUI, q = u.clubsQ.trim().toLowerCase();
+    const archKeys = ['all'].concat(Object.keys(TM_ARCH));
+    const tabs = '<div class="tm-linechips">' + archKeys.map(k => '<button class="tm-chip-btn ' + (u.clubsArch === k ? 'on' : '') + '" onclick="App.tmClubsFilter(\'arch\',\'' + k + '\')">' + (k === 'all' ? 'All styles' : TM_ARCH[k].ico + ' ' + TM_ARCH[k].name) + '</button>').join('') + '</div>';
+    const lgs = '<div class="tm-linechips">' + [['all', 'All leagues']].concat(SEASON_LEAGUE_DEFS.map(d => [d.key, d.name])).map(l => '<button class="tm-chip-btn ' + (u.clubsLg === l[0] ? 'on' : '') + '" onclick="App.tmClubsFilter(\'lg\',\'' + l[0] + '\')">' + l[1] + '</button>').join('') + '</div>';
+    let clubs = tmClubs().filter(t => (u.clubsLg === 'all' || tmLg(t) === u.clubsLg) && (u.clubsArch === 'all' || tmProfile(t).arch === u.clubsArch) && (!q || tmClubName(t).toLowerCase().indexOf(q) >= 0));
+    clubs.sort((a, b) => tmPrestige(b) - tmPrestige(a));
+    const cards = clubs.map(t => {
+      const w = tmClubWants(t, 2);
+      return '<div class="tm-clubcard" onclick="App.tmOpenClub(\'' + t.id + '\')"><div class="tm-cc-top">' + teamMark(t, 30) + '<div><b>' + tmEsc(tmClubName(t)) + '</b><br>' + tmStars(tmPrestige(t)) + '</div></div>' +
+        '<div>' + tmArchChip(t) + '</div><div class="tm-cc-kv"><span>Budget <b>' + tmFmt(tmBudget(t)) + '</b></span><span>Wage room <b>' + tmFmt(Math.max(0, tmWageRoom(t))) + '</b></span></div>' +
+        '<div class="tm-sub">' + (w.length ? 'Wants: ' + w.map(x => tmEsc(x.name)).join(', ') : 'Squad is settled') + '</div></div>';
+    }).join('');
+    return '<div class="card tm-card tm-filters"><input class="tm-search" type="search" placeholder="Search clubs…" value="' + tmEsc(u.clubsQ) + '" oninput="App.tmClubsFilter(\'q\',this.value)">' + lgs + tabs + '</div><div class="tm-count">' + clubs.length + ' clubs</div><div class="tm-clubgrid" id="tm-clubgrid">' + cards + '</div>';
+  }
+  function tmClubsFilter(k, v) {
+    if (k === 'q') { tmUI.clubsQ = v || ''; const el = document.getElementById('tm-clubgrid'); if (el) { const tmp = document.createElement('div'); tmp.innerHTML = tmClubsHTML(); const n = tmp.querySelector('#tm-clubgrid'); if (n) el.innerHTML = n.innerHTML; return; } }
+    else if (k === 'lg') tmUI.clubsLg = v; else tmUI.clubsArch = v;
+    tmRefreshAll();
+  }
+
+  // ---------- Free agents ----------
+  function tmFreeHTML() {
+    const q = tmUI.faQ.trim().toLowerCase();
+    const list = tmFA.filter(p => (!q || p.name.toLowerCase().indexOf(q) >= 0) && (tmUI.faLine === 'all' || tmLine(p) === tmUI.faLine) && (p.ovr || 0) >= tmUI.faMin).sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    const shown = list.slice(0, tmUI.faShown);
+    return '<div class="card tm-card tm-filters"><input class="tm-search" type="search" placeholder="Search free agents…" value="' + tmEsc(tmUI.faQ) + '" oninput="App.tmFaFilter(\'faQ\',this.value)">' +
+      '<div class="tm-linechips">' + [['all', 'All'], ['GK', 'GK'], ['DEF', 'DEF'], ['MID', 'MID'], ['FWD', 'FWD']].map(l => '<button class="tm-chip-btn ' + (tmUI.faLine === l[0] ? 'on' : '') + '" onclick="App.tmFaFilter(\'faLine\',\'' + l[0] + '\',1)">' + l[1] + '</button>').join('') +
+      '<select class="tm-sel" onchange="App.tmFaFilter(\'faMin\',this.value,1)">' + [[0, 'Any OVR'], [65, '65+'], [70, '70+'], [75, '75+'], [80, '80+']].map(o => '<option value="' + o[0] + '"' + (o[0] === tmUI.faMin ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div></div>' +
+      '<div id="tm-fa-list"><div class="tm-count">' + list.length + ' free agent' + (list.length === 1 ? '' : 's') + ' — signable any time</div><div class="tm-list">' +
+      (shown.length ? shown.map(p => tmRowHTML(p, null, { list: true })).join('') : '<div class="empty-state"><div class="icon">🆓</div>No free agents match.</div>') + '</div>' +
+      (list.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="App.tmFaMore()">Show more</button></div>' : '') + '</div>';
+  }
+  function tmFaFilter(k, v, full) {
+    tmUI[k] = (k === 'faMin') ? (parseInt(v, 10) || 0) : v; tmUI.faShown = 30;
+    if (full) tmRefreshAll(); else { const el = document.getElementById('tm-fa-list'); if (el) { const tmp = document.createElement('div'); tmp.innerHTML = tmFreeHTML(); const n = tmp.querySelector('#tm-fa-list'); if (n) el.innerHTML = n.innerHTML; } }
+  }
+  function tmFaMore() { tmUI.faShown += 30; tmRefreshAll(); }
+
+  // ---------- Deals ----------
+  function tmDealLine(d) {
     const ico = { buy: '🔁', free: '🆓', loan: '🔄', pre: '✍️', release: '✋', expire: '⌛', retire: '🏁', renew: '📝', academy: '🎓', loanend: '↩️' }[d.k] || '•';
     const from = tmClubNameById(d.f), to = tmClubNameById(d.t);
     let txt;
@@ -27147,206 +28019,22 @@ const PLAYSTYLE_BEHAVIOR = {
     return '<div class="tm-deal' + (d.u ? ' mine' : '') + '"><span class="tm-deal-ico">' + ico + '</span><div>' + txt +
       '<small>' + tmEsc(d.pos) + ' · ' + d.ovr + ' OVR · ' + d.age + 'y · ' + tmEsc(tmWindowLabel(d.win) || ('Year ' + d.y)) + '</small></div></div>';
   }
-  function tmLatestDealsHTML(n) {
-    const rows = (tm.log || []).filter(d => d.k !== 'renew' && d.k !== 'academy').slice(-n).reverse();
-    return '<div class="card tm-card"><div class="card-title">📰 Latest headlines</div>' + (rows.length ? rows.map(d => tmDealLine(d)).join('') : '<p class="tm-note">No deals yet — the market is quiet.</p>') + '</div>';
-  }
-
-  // ---------- Market ----------
-  function tmMarketEntries(includeMine) {
-    const me = tmMeTeam(), out = [];
-    tmClubs().forEach(t => { if (!includeMine && me && t.id === me.id) return; (t.players || []).forEach(p => out.push({ p, t })); });
-    return out;
-  }
-  function tmFiltered(entries) {
-    const u = tmUI, me = tmMeTeam(), q = u.q.trim().toLowerCase();
-    const budget = me ? tmBudget(me) : 0;
-    let list = entries.filter(({ p, t }) => {
-      if (q && p.name.toLowerCase().indexOf(q) < 0 && tmClubName(t).toLowerCase().indexOf(q) < 0) return false;
-      if (u.league !== 'all' && (!t || (tmLeagueOf(t) || {}).key !== u.league)) return false;
-      if (u.club !== 'all' && (!t || t.id !== u.club)) return false;
-      if (u.line !== 'all' && tmLine(p) !== u.line) return false;
-      if (u.role !== 'all' && tmRole(p) !== u.role) return false;
-      if (u.minOvr && (p.ovr || 0) < u.minOvr) return false;
-      if (u.maxAge && tmAge(p) > u.maxAge) return false;
-      if (u.contract === 'expiring' && tmYearsLeft(p) > 1) return false;
-      if (u.contract === 'long' && tmYearsLeft(p) < 3) return false;
-      if (u.maxPrice && tmAskFor(p, t) > u.maxPrice) return false;
-      if (u.flags.afford && tmAskFor(p, t) > budget) return false;
-      if (u.flags.u23 && tmAge(p) > 23) return false;
-      if (u.flags.listed && !tm.listed[p.id]) return false;
-      if (u.flags.loanable && (!t || tmRank(p, t) <= 12)) return false;
-      if (u.flags.short && !tm.short[p.id]) return false;
-      return true;
-    });
-    const key = u.sort, dir = u.dir;
-    const val = { ovr: x => x.p.ovr || 0, value: x => tmValue(x.p), ask: x => tmAskFor(x.p, x.t), age: x => tmAge(x.p), contract: x => tmYearsLeft(x.p), name: x => x.p.name }[key] || (x => x.p.ovr);
-    list.sort((a, b) => { const A = val(a), B = val(b); return (A < B ? -1 : A > B ? 1 : 0) * dir || (b.p.ovr - a.p.ovr); });
-    return list;
-  }
-  function tmMarketControlsHTML() {
-    const u = tmUI, me = tmMeTeam();
-    const sel = (id, label, opts, cur, fn) => '<label class="tm-f"><span>' + label + '</span><select class="tm-sel" onchange="App.tmFilter(\'' + fn + '\',this.value)">' +
-      opts.map(o => '<option value="' + o[0] + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>';
-    const leagues = [['all', 'All leagues']].concat(SEASON_LEAGUE_DEFS.map(d => [d.key, d.name]));
-    const clubs = [['all', 'All clubs']].concat(tmClubs().filter(t => u.league === 'all' || (tmLeagueOf(t) || {}).key === u.league)
-      .sort((a, b) => tmClubName(a).localeCompare(tmClubName(b))).map(t => [t.id, tmClubName(t)]));
-    const roles = [['all', 'Any position'], ['GK', 'Goalkeeper'], ['CB', 'Centre-back'], ['FB', 'Full-back'], ['DM', 'Defensive mid'], ['CM', 'Central mid'], ['AM', 'Attacking mid'], ['W', 'Winger'], ['ST', 'Striker']];
-    const chip = (k, t) => '<button class="tm-chip-btn ' + (u.flags[k] ? 'on' : '') + '" onclick="App.tmToggle(\'' + k + '\')">' + t + '</button>';
-    return '<div class="card tm-card tm-filters">' +
-      '<input class="tm-search" type="search" placeholder="Search player or club…" value="' + tmEsc(u.q) + '" oninput="App.tmSearch(this.value)">' +
-      '<div class="tm-linechips">' + [['all', 'All'], ['GK', 'GK'], ['DEF', 'DEF'], ['MID', 'MID'], ['FWD', 'FWD']].map(l => '<button class="tm-chip-btn ' + (u.line === l[0] ? 'on' : '') + '" onclick="App.tmFilter(\'line\',\'' + l[0] + '\')">' + l[1] + '</button>').join('') + '</div>' +
-      '<div class="tm-fgrid">' + sel('l', 'League', leagues, u.league, 'league') + sel('c', 'Club', clubs, u.club, 'club') + sel('r', 'Position', roles, u.role, 'role') +
-      sel('o', 'Min OVR', [[0, 'Any'], [70, '70+'], [75, '75+'], [80, '80+'], [85, '85+'], [90, '90+']], u.minOvr, 'minOvr') +
-      sel('a', 'Max age', [[0, 'Any'], [21, '21'], [23, '23'], [26, '26'], [29, '29'], [32, '32']], u.maxAge, 'maxAge') +
-      sel('k', 'Contract', [['any', 'Any'], ['expiring', 'Expiring'], ['long', '3+ years']], u.contract, 'contract') +
-      sel('p', 'Max price', [[0, 'Any'], [5, '€5m'], [15, '€15m'], [30, '€30m'], [60, '€60m'], [100, '€100m']], u.maxPrice, 'maxPrice') +
-      sel('s', 'Sort by', [['ovr', 'Overall'], ['value', 'Value'], ['ask', 'Asking price'], ['age', 'Age'], ['contract', 'Contract'], ['name', 'Name']], u.sort, 'sort') + '</div>' +
-      '<div class="tm-chiprow">' + chip('afford', '💰 Affordable') + chip('u23', '🌱 Under 23') + chip('loanable', '🔄 Loanable') + chip('listed', '🏷 Listed') + chip('short', '★ Shortlist') +
-      '<button class="tm-chip-btn" onclick="App.tmDir()">' + (u.dir < 0 ? '⬇ High first' : '⬆ Low first') + '</button><button class="tm-chip-btn" onclick="App.tmResetFilters()">✖ Reset</button></div></div>';
-  }
-  function tmMarketListHTML() {
-    const list = tmFiltered(tmMarketEntries(false));
-    const shown = list.slice(0, tmUI.shown);
-    return '<div class="tm-count">' + list.length + ' player' + (list.length === 1 ? '' : 's') + '</div>' +
-      (shown.length ? shown.map(x => tmRowHTML(x.p, x.t)).join('') : '<div class="empty-state"><div class="icon">🔎</div>No players match these filters.</div>') +
-      (list.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="App.tmMore()">Show more (' + (list.length - shown.length) + ')</button></div>' : '');
-  }
-  function tmMarketHTML() {
-    const w = tmWindowInfo();
-    return (w.open ? '' : '<div class="tm-warn">' + tmEsc(w.reason) + ' You can still browse, shortlist and sign free agents.</div>') + tmMarketControlsHTML() + '<div id="tm-list">' + tmMarketListHTML() + '</div>';
-  }
-  function tmRenderList() { const el = document.getElementById('tm-list'); if (el) el.innerHTML = tmMarketListHTML(); }
-  function tmSearch(v) { tmUI.q = v || ''; tmUI.shown = 30; tmRenderList(); }
-  function tmFilter(k, v) {
-    if (k === 'minOvr' || k === 'maxAge' || k === 'maxPrice') v = parseInt(v, 10) || 0;
-    tmUI[k] = v; tmUI.shown = 30;
-    if (k === 'league') tmUI.club = 'all';
-    if (k === 'line') tmUI.role = 'all';
-    if (k === 'role' && v !== 'all') tmUI.line = 'all';
-    if (k === 'league' || k === 'line') tmRefreshAll(); else tmRenderList();
-  }
-  function tmToggle(k) { tmUI.flags[k] = !tmUI.flags[k]; tmUI.shown = 30; tmRefreshAll(); }
-  function tmDir() { tmUI.dir = -tmUI.dir; tmRefreshAll(); }
-  function tmMore() { tmUI.shown += 30; tmRenderList(); }
-  function tmResetFilters() { Object.assign(tmUI, { q: '', league: 'all', club: 'all', line: 'all', role: 'all', minOvr: 0, maxAge: 0, contract: 'any', maxPrice: 0, sort: 'ovr', dir: -1, shown: 30, flags: {} }); tmRefreshAll(); }
-  function tmFindRole(role) { tmResetFilters(); tmUI.role = role; tmUI.flags.afford = true; tmUI.sub = 'market'; tmRefreshAll(); }
-  function tmStar(pid) {
-    tmToggleShort(pid);
-    if (tmUI.sub === 'market') tmRenderList(); else tmRefreshAll();
-  }
-
-  // ---------- My Squad ----------
-  function tmSquadHTML() {
-    const me = tmMeTeam();
-    if (!me) return '<div class="card tm-card"><div class="card-title">Pick your club</div>' + tmClubSelectHTML() + '</div>';
-    const open = tmWindowOpen();
-    const loanedIn = new Set((tm.loans || []).filter(l => l.to === me.id).map(l => l.pid));
-    const groups = [['GK', 'Goalkeepers'], ['DEF', 'Defenders'], ['MID', 'Midfielders'], ['FWD', 'Forwards']];
-    let h = '<div class="tm-grid"><div class="tm-stat"><small>Budget</small><b>' + tmFmt(tmBudget(me)) + '</b></div><div class="tm-stat"><small>Wage room</small><b>' + tmFmt(tmWageRoom(me)) + '</b></div>' +
-      '<div class="tm-stat"><small>Squad</small><b>' + me.players.length + '</b></div></div>';
-    groups.forEach(g => {
-      const ps = me.players.filter(p => tmLine(p) === g[0]).sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
-      h += '<div class="card tm-card"><div class="card-title">' + g[1] + ' (' + ps.length + ')</div>' + ps.map(p => {
-        const yl = tmYearsLeft(p), loan = loanedIn.has(p.id);
-        const tags = [];
-        if (loan) tags.push('<span class="tm-tag loan">LOAN-IN</span>');
-        else if (yl <= 1) tags.push('<span class="tm-tag exp">Expires ' + (TM_BASE_YEAR + tmContractEnd(p)) + '</span>');
-        else tags.push('<span class="tm-tag">until ' + (TM_BASE_YEAR + tmContractEnd(p)) + '</span>');
-        if (tm.listed[p.id]) tags.push('<span class="tm-tag listed">LISTED</span>');
-        if (isPlayerInjured(p.id)) tags.push('<span class="tm-tag inj">🏥</span>');
-        if (tm.pre.some(x => x.pid === p.id)) tags.push('<span class="tm-tag">Pre-contract</span>');
-        const acts = loan ? '' :
-          '<button class="btn btn-secondary btn-sm" onclick="App.tmOpenRenew(\'' + p.id + '\')">Renew</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="App.tmList(\'' + p.id + '\')">' + (tm.listed[p.id] ? 'Unlist' : 'List') + '</button>' +
-          (open ? '<button class="btn btn-secondary btn-sm" onclick="App.tmShop(\'' + p.id + '\',\'buy\')">Find buyers</button><button class="btn btn-secondary btn-sm" onclick="App.tmShop(\'' + p.id + '\',\'loan\')">Loan out</button>' : '') +
-          '<button class="btn btn-danger btn-sm" onclick="App.tmRelease(\'' + p.id + '\')">Release</button>';
-        return '<div class="tm-row sq"><div class="tm-ovr tm-ovr-' + tmLine(p) + '">' + (p.ovr || 0) + '</div><div class="tm-main"><div class="tm-name">' + tmPosBadge(p) + ' <b class="tm-link" onclick="App.showPlayerProfile(\'' + p.id + '\')">' + tmEsc(p.name) + '</b></div>' +
-          '<div class="tm-sub">' + tmAge(p) + 'y · wage ' + tmFmt(tmWage(p)) + '/yr · value ' + tmFmt(tmValue(p)) + '</div><div class="tm-tags">' + tags.join('') + '</div></div><div class="tm-acts wrap">' + acts + '</div></div>';
-      }).join('') + '</div>';
-    });
-    const out = (tm.loans || []).filter(l => l.from === me.id).map(l => tmFind(l.pid)).filter(Boolean);
-    if (out.length) h += '<div class="card tm-card"><div class="card-title">🔄 Out on loan</div>' + out.map(f => '<div class="tm-deal"><span class="tm-deal-ico">🔄</span><div><b>' + tmEsc(f.p.name) + '</b> at ' + tmEsc(tmClubName(f.t)) + '<small>Returns at season end</small></div></div>').join('') + '</div>';
-    return h;
-  }
-  function tmList(pid) { const on = !tm.listed[pid]; tmSetListed(pid, on); toast(on ? 'Listed for transfer — clubs will show interest' : 'Removed from the transfer list'); tmRefreshAll(); }
-  function tmShop(pid, kind) {
-    const n = tmShopPlayer(pid, kind);
-    if (n < 0) toast('The window is closed');
-    else if (n === 0) toast('No club is interested at the moment');
-    else { toast(n + ' offer' + (n > 1 ? 's' : '') + ' received — see Offers'); tmUI.sub = 'offers'; }
-    tmRefreshAll();
-  }
-  function tmRelease(pid) {
-    const f = tmFind(pid); if (!f) return;
-    const cost = tmReleaseCost(f.p);
-    if (!confirm('Release ' + f.p.name + '? ' + (cost ? 'Settling his contract costs ' + tmFmt(cost) + '.' : 'He is out of contract soon, so it is free.'))) return;
-    const r = tmReleasePlayer(pid); toast(r.msg); tmRefreshAll();
-  }
-
-  // ---------- Offers ----------
-  function tmOffersHTML() {
-    const me = tmMeTeam();
-    if (!me) return '<div class="card tm-card"><div class="card-title">Pick your club</div>' + tmClubSelectHTML() + '</div>';
-    const inbox = tmInboxLive();
-    let h = '<div class="card tm-card"><div class="card-title">📬 Offers for your players</div>';
-    if (!inbox.length) h += '<p class="tm-note">' + (tmWindowOpen() ? 'No offers right now. List a player or use “Find buyers” in My Squad.' : 'Offers only arrive while a window is open.') + '</p>';
-    inbox.forEach(o => {
-      const f = tmFind(o.pid), b = getTeam(o.from); if (!f || !b) return;
-      h += '<div class="tm-row"><div class="tm-ovr tm-ovr-' + tmLine(f.p) + '">' + (f.p.ovr || 0) + '</div><div class="tm-main"><div class="tm-name">' + tmPosBadge(f.p) + ' <b>' + tmEsc(f.p.name) + '</b></div>' +
-        '<div class="tm-sub">' + teamMark(b, 16) + ' ' + tmEsc(tmClubName(b)) + ' want him ' + (o.kind === 'loan' ? 'on loan' : 'permanently') + '</div>' +
-        '<div class="tm-tags"><span class="tm-tag">Your valuation ' + tmFmt(tmAskFor(f.p, me)) + '</span></div></div>' +
-        '<div class="tm-money"><small>Offer</small><b>' + tmFmt(o.fee) + '</b></div>' +
-        '<div class="tm-acts wrap"><button class="btn btn-primary btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'accept\')">Accept</button>' +
-        (o.kind === 'buy' ? '<button class="btn btn-secondary btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'c10\')">Ask +10%</button><button class="btn btn-secondary btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'c20\')">Ask +20%</button>' : '') +
-        '<button class="btn btn-danger btn-sm" onclick="App.tmOfferAct(' + o.id + ',\'reject\')">Reject</button></div></div>';
-    });
-    h += '</div>';
-    const pre = (tm.pre || []).filter(x => x.u);
-    h += '<div class="card tm-card"><div class="card-title">✍️ Pre-contracts you agreed</div>' + (pre.length ? pre.map(x => { const f = tmFind(x.pid); return f ? '<div class="tm-deal"><span class="tm-deal-ico">✍️</span><div><b>' + tmEsc(f.p.name) + '</b> joins from ' + tmEsc(tmClubNameById(x.from)) + ' on a free<small>Arrives when this season ends · ' + tmFmt(x.wage) + '/yr · ' + x.yrs + ' years</small></div></div>' : ''; }).join('') : '<p class="tm-note">None. In the Winter window you can agree free deals with players in their final contract year.</p>') + '</div>';
-    const loans = (tm.loans || []).filter(l => l.to === me.id || l.from === me.id);
-    h += '<div class="card tm-card"><div class="card-title">🔄 Loans</div>' + (loans.length ? loans.map(l => { const f = tmFind(l.pid); return f ? '<div class="tm-deal"><span class="tm-deal-ico">🔄</span><div><b>' + tmEsc(f.p.name) + '</b> ' + (l.to === me.id ? 'from ' + tmEsc(tmClubNameById(l.from)) : 'at ' + tmEsc(tmClubNameById(l.to))) + '<small>Returns at season end</small></div></div>' : ''; }).join('') : '<p class="tm-note">No loans.</p>') + '</div>';
-    return h;
-  }
-  function tmOfferAct(id, act) {
-    let r;
-    if (act === 'accept') r = tmAcceptOffer(id);
-    else if (act === 'reject') { tmRejectOffer(id); r = { msg: 'Offer rejected.' }; }
-    else r = tmCounterOffer(id, act === 'c10' ? 0.10 : 0.20);
-    toast(r.msg); tmRefreshAll();
-  }
-
-  // ---------- Free agents ----------
-  function tmFreeHTML() {
-    const q = tmUI.faQ.trim().toLowerCase();
-    let list = tmFA.filter(p => (!q || p.name.toLowerCase().indexOf(q) >= 0) && (tmUI.faLine === 'all' || tmLine(p) === tmUI.faLine) && (p.ovr || 0) >= tmUI.faMin)
-      .sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
-    const shown = list.slice(0, tmUI.faShown);
-    return '<div class="card tm-card tm-filters"><input class="tm-search" type="search" placeholder="Search free agents…" value="' + tmEsc(tmUI.faQ) + '" oninput="App.tmFaFilter(\'faQ\',this.value)">' +
-      '<div class="tm-linechips">' + [['all', 'All'], ['GK', 'GK'], ['DEF', 'DEF'], ['MID', 'MID'], ['FWD', 'FWD']].map(l => '<button class="tm-chip-btn ' + (tmUI.faLine === l[0] ? 'on' : '') + '" onclick="App.tmFaFilter(\'faLine\',\'' + l[0] + '\',1)">' + l[1] + '</button>').join('') +
-      '<select class="tm-sel" onchange="App.tmFaFilter(\'faMin\',this.value,1)">' + [[0, 'Any OVR'], [65, '65+'], [70, '70+'], [75, '75+'], [80, '80+']].map(o => '<option value="' + o[0] + '"' + (o[0] === tmUI.faMin ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div></div>' +
-      '<div id="tm-fa-list"><div class="tm-count">' + list.length + ' free agent' + (list.length === 1 ? '' : 's') + ' — signable any time</div>' + (shown.length ? shown.map(p => tmRowHTML(p, null)).join('') : '<div class="empty-state"><div class="icon">🆓</div>No free agents match.</div>') +
-      (list.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="App.tmFaMore()">Show more</button></div>' : '') + '</div>';
-  }
-  function tmFaFilter(k, v, full) { tmUI[k] = (k === 'faMin') ? (parseInt(v, 10) || 0) : v; tmUI.faShown = 30; if (full) tmRefreshAll(); else { const el = document.getElementById('tm-fa-list'); if (el) { const tmp = document.createElement('div'); tmp.innerHTML = tmFreeHTML(); const n = tmp.querySelector('#tm-fa-list'); if (n) el.innerHTML = n.innerHTML; } } }
-  function tmFaMore() { tmUI.faShown += 30; tmRefreshAll(); }
-
-  // ---------- Deals ----------
   function tmDealsHTML() {
-    const me = tmMeTeam();
-    const f = tmUI.dealsFilter;
+    const me = tmMeTeam(), f = tmUI.dealsFilter;
     let rows = (tm.log || []).filter(d => d.k !== 'academy' && d.k !== 'loanend');
     if (f === 'mine') rows = rows.filter(d => d.u || (me && (d.f === me.id || d.t === me.id)));
-    else if (f === 'big') rows = rows.filter(d => d.fee >= 20);
+    else if (f === 'big') rows = rows.filter(d => d.fee >= 40);
     else if (f === 'moves') rows = rows.filter(d => d.k === 'buy' || d.k === 'loan' || d.k === 'free' || d.k === 'pre');
     rows = rows.slice().reverse();
     const buys = (tm.log || []).filter(d => d.k === 'buy').sort((a, b) => b.fee - a.fee).slice(0, 5);
-    const spend = {}; (tm.log || []).forEach(d => { if (d.k === 'buy' && d.t) spend[d.t] = (spend[d.t] || 0) + d.fee; });
-    const top = Object.keys(spend).sort((a, b) => spend[b] - spend[a]).slice(0, 5);
-    let h = '<div class="leaderboard-tabs tm-subtabs">' + [['all', 'All'], ['moves', 'Transfers'], ['big', '€20m+'], ['mine', 'My club']].map(x => '<button class="lb-tab ' + (f === x[0] ? 'active' : '') + '" onclick="App.tmDealsFilter(\'' + x[0] + '\')">' + x[1] + '</button>').join('') + '</div>';
+    const spend = {}, earn = {};
+    (tm.log || []).forEach(d => { if (d.k === 'buy') { if (d.t) spend[d.t] = (spend[d.t] || 0) + d.fee; if (d.f) earn[d.f] = (earn[d.f] || 0) + d.fee; } });
+    const top = Object.keys(spend).sort((a, b) => spend[b] - spend[a]).slice(0, 5), sellers = Object.keys(earn).sort((a, b) => earn[b] - earn[a]).slice(0, 5);
+    let h = '<div class="leaderboard-tabs tm-subtabs">' + [['all', 'All'], ['moves', 'Transfers'], ['big', '€40m+'], ['mine', 'My club']].map(x => '<button class="lb-tab ' + (f === x[0] ? 'active' : '') + '" onclick="App.tmDealsFilter(\'' + x[0] + '\')">' + x[1] + '</button>').join('') + '</div>';
     if (buys.length) h += '<div class="tm-two"><div class="card tm-card"><div class="card-title">💎 Record fees</div>' + buys.map(d => '<div class="tm-deal"><span class="tm-deal-ico">💎</span><div><b>' + tmEsc(d.nm) + '</b> · ' + tmFmt(d.fee) + '<small>' + tmEsc(tmClubNameById(d.f)) + ' → ' + tmEsc(tmClubNameById(d.t)) + '</small></div></div>').join('') + '</div>' +
-      '<div class="card tm-card"><div class="card-title">💸 Biggest spenders</div>' + top.map(id => '<div class="tm-deal"><span class="tm-deal-ico">💸</span><div><b>' + tmEsc(tmClubNameById(id)) + '</b><small>' + tmFmt(spend[id]) + ' on fees</small></div></div>').join('') + '</div></div>';
-    h += '<div class="card tm-card"><div class="card-title">Deal log</div>' + (rows.length ? rows.slice(0, tmUI.dealsShown).map(d => tmDealLine(d)).join('') : '<p class="tm-note">Nothing here yet.</p>') +
+      '<div class="card tm-card"><div class="card-title">💸 Biggest spenders</div>' + top.map(id => '<div class="tm-deal"><span class="tm-deal-ico">💸</span><div><b>' + tmEsc(tmClubNameById(id)) + '</b><small>' + tmFmt(spend[id]) + ' on fees</small></div></div>').join('') + '</div>' +
+      '<div class="card tm-card"><div class="card-title">🏦 Biggest sellers</div>' + sellers.map(id => '<div class="tm-deal"><span class="tm-deal-ico">🏦</span><div><b>' + tmEsc(tmClubNameById(id)) + '</b><small>' + tmFmt(earn[id]) + ' received</small></div></div>').join('') + '</div></div>';
+    h += '<div class="card tm-card"><div class="card-title">Deal log</div>' + (rows.length ? rows.slice(0, tmUI.dealsShown).map(tmDealLine).join('') : '<p class="tm-note">Nothing here yet.</p>') +
       (rows.length > tmUI.dealsShown ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="App.tmDealsMore()">Show more</button></div>' : '') + '</div>';
     return h;
   }
@@ -27355,9 +28043,8 @@ const PLAYSTYLE_BEHAVIOR = {
 
   // ---------- Shortlist ----------
   function tmShortHTML() {
-    const ids = Object.keys(tm.short || {});
-    const rows = ids.map(id => tmFind(id)).filter(Boolean);
-    return '<div class="card tm-card"><div class="card-title">⭐ Your shortlist</div>' + (rows.length ? rows.map(f => tmRowHTML(f.p, f.t)).join('') : '<p class="tm-note">Tap ☆ on any player to track him here.</p>') + '</div>';
+    const rows = Object.keys(tm.short || {}).map(id => tmFind(id)).filter(Boolean);
+    return '<div class="card tm-card"><div class="card-title">⭐ Your shortlist</div><div class="tm-list">' + (rows.length ? rows.map(f => tmRowHTML(f.p, f.t, { list: true })).join('') : '<p class="tm-note">Tap ☆ on any player to track him here.</p>') + '</div></div>';
   }
 
   // ---------- the whole tab ----------
@@ -27369,17 +28056,19 @@ const PLAYSTYLE_BEHAVIOR = {
       case 'market': body = tmMarketHTML(); break;
       case 'squad': body = tmSquadHTML(); break;
       case 'offers': body = tmOffersHTML(); break;
+      case 'news': body = tmNewsHTML(); break;
+      case 'clubs': body = tmClubsHTML(); break;
       case 'free': body = tmFreeHTML(); break;
       case 'deals': body = tmDealsHTML(); break;
       case 'short': body = tmShortHTML(); break;
-      default: body = tmOverviewHTML();
+      default: body = tmHubHTML();
     }
     const me = tmMeTeam();
-    const head = '<div class="tm-head">' + tmWindowCardHTML() + '<div class="tm-meline">' + (me ? teamMark(me, 22) + ' <b>' + tmEsc(tmClubName(me)) + '</b>' : '') + ' ' + (careerTeamId ? '<small>Career club</small>' : tmClubSelectHTML()) + '</div></div>';
+    const head = '<div class="tm-head">' + tmWindowCardHTML() + '<div class="tm-meline">' + (me ? teamMark(me, 24) + ' <b>' + tmEsc(tmClubName(me)) + '</b> ' : '') + (careerTeamId ? '<small>Career club</small>' : tmClubSelectHTML()) + '</div></div>';
     return head + tmSubTabsHTML() + '<div class="tm-body">' + body + '</div>';
   }
 
-  // ---------- offer / renewal dialog ----------
+  // ---------- dialogs ----------
   function tmModalEl() {
     let el = document.getElementById('tm-modal');
     if (!el) {
@@ -27391,60 +28080,114 @@ const PLAYSTYLE_BEHAVIOR = {
     return el;
   }
   function tmCloseModal() { const el = document.getElementById('tm-modal'); if (el) el.classList.remove('active'); tmOffer = null; }
+  function tmShowModal(html) { const el = tmModalEl(), box = document.getElementById('tm-modal-content'); box.innerHTML = html; el.classList.add('active'); }
   function tmDefaultFee(p, kind) {
-    const f = tmFind(p.id);
+    const f = tmFind(p.id), me = tmMeTeam();
     if (kind === 'loan') return tmLoanFee(p);
-    if (kind === 'buy') return tmAskFor(p, f && f.t);
+    if (kind === 'buy') return tmAskFor(p, f && f.t, me);
     return 0;
   }
+
+  // player dossier
+  function tmOpenPlayer(pid) {
+    const f = tmFind(pid); if (!f) return;
+    tmOffer = { mode: 'player', pid };
+    const p = f.p, t = f.t, me = tmMeTeam();
+    const age = tmAge(p), yl = tmYearsLeft(p);
+    const bar = (lab, v) => '<div class="tm-attr"><span>' + lab + '</span>' + tmMeter((v || 0) / 100, 'gold') + '<b>' + (v || 0) + '</b></div>';
+    let mood = '';
+    if (me && (!t || t.id !== me.id)) { const m = tmMood(p, me, t, { wage: tmWageDemand(p), years: 3 }); mood = '<div class="tm-sect">Would he join you?</div>' + tmMoodHTML(m); }
+    const list = tmInterestedClubs(p, t, 6, { includeBlocked: true, min: 35 });
+    const interest = '<div class="tm-sect">Clubs that want him</div>' + (list.length ? list.map(x => '<div class="tm-introw" onclick="App.tmOpenClub(\'' + x.t.id + '\')">' + teamMark(x.t, 20) + '<div class="tm-intmain"><b>' + tmEsc(tmClubName(x.t)) + '</b> ' + tmArchChip(x.t) + '<small>' +
+      x.reasons.filter(r => r.t === '+').slice(0, 2).map(r => tmEsc(r.x)).join(' · ') + (x.block ? ' · <em class="bad">can’t afford</em>' : '') + '</small></div><div class="tm-intscore">' + tmMeter(x.score / 100, x.score >= 60 ? 'green' : 'gold') + '<b>' + x.score + '</b></div></div>').join('') : '<p class="tm-note">No club is really after him right now.</p>');
+    const talk = tmTalkFor(p.id);
+    const canBuy = me && (!t || t.id !== me.id) && !tmLoanOf(pid);
+    tmShowModal('<div class="tm-mhead">' + tmShield(p, true) + '<div><b class="tm-big">' + tmEsc(p.name) + '</b><small>' + tmEsc((p.pos || []).join('/')) + ' · ' + age + 'y · ' + (t ? tmClubLink(t, 16) : 'Free agent') + '</small><small>Contract ' + tmEsc(tmContractLabel(p)) + ' · wage ' + tmFmt(tmWage(p)) + '/yr</small></div><button class="tm-x" onclick="App.tmCloseModal()">✕</button></div>' +
+      (talk ? '<div class="tm-sellerbox mid">🔥 ' + tmEsc(tmClubNameById(talk.to)) + ' are in talks with ' + tmEsc(tmClubNameById(talk.from)) + ' (' + tmFmt(talk.fee) + '). Move now to hijack the deal.</div>' : '') +
+      '<div class="tm-lines"><div><span>Market value</span><b>' + tmFmt(tmValue(p)) + '</b></div>' + (t ? '<div><span>Asking price</span><b>' + tmFmt(tmAskFor(p, t, me)) + '</b></div>' : '<div><span>Wage demand</span><b>' + tmFmt(tmWageDemand(p)) + '/yr</b></div>') +
+      '<div><span>Potential</span><b>' + tmPotential(p) + (tmGrowth(p) >= 3 ? ' ▲' : '') + '</b></div></div>' +
+      '<div class="tm-attrs">' + bar('ATT', p.att) + bar('DEF', p.def) + bar('PHY', p.phy) + bar('PAC', p.pac) + bar('TEC', p.tec) + '</div>' + mood + interest +
+      '<div class="modal-actions"><button class="btn btn-secondary btn-sm" onclick="App.tmStar(\'' + pid + '\');App.tmOpenPlayer(\'' + pid + '\')">' + (tm.short[pid] ? '★ Shortlisted' : '☆ Shortlist') + '</button>' +
+      (t ? '<button class="btn btn-secondary btn-sm" onclick="App.tmCloseModal();App.showPlayerProfile(\'' + pid + '\')">Profile</button>' : '') +
+      (canBuy ? '<button class="btn btn-primary btn-sm" onclick="App.tmOpenOffer(\'' + pid + '\',\'' + (t ? 'buy' : 'free') + '\')">' + (t ? 'Make offer' : 'Sign') + '</button>' : '') + '</div>');
+  }
+
+  // club dossier
+  function tmOpenClub(cid) {
+    const t = getTeam(cid); if (!t) return;
+    tmOffer = { mode: 'club', cid };
+    const pf = tmProfile(t), A = pf.A, r = (tm.res || {})[t.id];
+    const wants = tmClubWants(t, 4);
+    const key = t.players.slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, 5);
+    const biz = (tm.log || []).filter(d => (d.t === t.id || d.f === t.id) && (d.k === 'buy' || d.k === 'free' || d.k === 'loan' || d.k === 'pre')).slice(-5).reverse();
+    const rivals = pf.rivals.map(s => tmClubs().find(x => tmStem(x) === s)).filter(Boolean);
+    tmShowModal('<div class="tm-mhead">' + teamMark(t, 44) + '<div><b class="tm-big">' + tmEsc(tmClubName(t)) + '</b><small>' + tmEsc(tmLeagueInfo(t).name) + ' · ' + tmStars(tmPrestige(t)) + '</small><small>' + tmEsc(pf.tag) + '</small></div><button class="tm-x" onclick="App.tmCloseModal()">✕</button></div>' +
+      '<div class="tm-prof"><div>' + tmArchChip(t) + '</div><p class="tm-note">' + tmEsc(A.blurb) + '</p></div>' +
+      '<div class="tm-lines"><div><span>Transfer budget</span><b>' + tmFmt(tmBudget(t)) + '</b></div><div><span>Wage bill / cap</span><b>' + tmFmt(tmWageBill(t)) + ' / ' + tmFmt(tmCapOf(t)) + '</b></div><div><span>Ideal age</span><b>' + A.age[0] + '–' + A.age[1] + ' (max ' + A.ageMax + ')</b></div>' +
+      '<div><span>Champions League</span><b>' + (tmInCL(t) ? 'Yes' : 'No') + '</b></div>' + (r ? '<div><span>Last season</span><b>' + r.pos + tmOrd(r.pos) + (r.clWin ? ' · 🏆 CL winners' : '') + '</b></div>' : '') +
+      (pf.domOnly ? '<div><span>Policy</span><b>Own league only</b></div>' : '') + (rivals.length ? '<div><span>Rivals</span><b>' + rivals.map(x => tmEsc(tmClubName(x))).join(', ') + '</b></div>' : '') + '</div>' +
+      '<div class="tm-sect">Looking for</div>' + (wants.length ? wants.map(n => '<div class="tm-need sev' + n.urgency + '"><div><b>' + tmEsc(n.name) + '</b><small>' + tmEsc(n.why) + ' · ' + n.minOvr + '+ OVR · age ≤ ' + n.ageMax + ' · up to ' + tmFmt(n.maxFee) + '</small></div></div>').join('') : '<p class="tm-note">Nothing pressing.</p>') +
+      '<div class="tm-sect">Key players</div>' + key.map(p => '<div class="tm-deal">' + tmShield(p) + '<div>' + tmPlayerLink(p) + '<small>' + tmAge(p) + 'y · ' + tmContractLabel(p) + ' · value ' + tmFmt(tmValue(p)) + '</small></div></div>').join('') +
+      (biz.length ? '<div class="tm-sect">Recent business</div>' + biz.map(tmDealLine).join('') : '') +
+      '<div class="modal-actions"><button class="btn btn-secondary btn-sm" onclick="App.tmClubBrowse(\'' + cid + '\')">Browse squad</button></div>');
+  }
+  function tmClubBrowse(cid) { tmCloseModal(); tmResetFilters(); tmUI.club = cid; tmUI.league = tmLg(getTeam(cid)); tmUI.sub = 'market'; tmRefreshAll(); }
+
+  // offer / renewal dialog
   function tmOpenOffer(pid, kind) {
     const f = tmFind(pid); if (!f) return;
-    if (!tmMeTeam()) { toast('Pick your club first'); tmUI.sub = 'overview'; tmRefreshAll(); return; }
-    tmOffer = { mode: 'offer', pid, kind: kind || (f.t ? 'buy' : 'free'), years: 4, wageMult: 1, fee: 0, result: null };
+    if (!tmMeTeam()) { toast('Pick your club first'); tmUI.sub = 'hub'; tmCloseModal(); tmRefreshAll(); return; }
+    tmOffer = { mode: 'offer', pid, kind: kind || (f.t ? 'buy' : 'free'), years: 4, wageMult: 1, fee: 0, role: 'rotation', result: null };
     tmOffer.fee = tmDefaultFee(f.p, tmOffer.kind);
     tmDrawModal();
   }
-  function tmOpenRenew(pid) {
-    tmOffer = { mode: 'renew', pid, years: 3, wageMult: 1, result: null };
-    tmDrawModal();
-  }
+  function tmOpenRenew(pid) { tmOffer = { mode: 'renew', pid, years: 3, wageMult: 1, result: null }; tmDrawModal(); }
   function tmKindsFor(f) {
     if (!f.t) return [['free', 'Sign free agent']];
     const k = [['buy', 'Buy'], ['loan', 'Loan']];
     if (tmWinterWindow() && tmYearsLeft(f.p) === 1) k.push(['pre', 'Pre-contract']);
     return k;
   }
+  function tmChips(label, field, opts, cur) {
+    return '<div class="tm-f"><span>' + label + '</span><div class="tm-linechips">' + opts.map(o => '<button class="tm-chip-btn ' + (String(o[0]) === String(cur) ? 'on' : '') + '" onclick="App.tmOfferChange(\'' + field + '\',\'' + o[0] + '\')">' + o[1] + '</button>').join('') + '</div></div>';
+  }
   function tmDrawModal() {
-    const el = tmModalEl(), box = document.getElementById('tm-modal-content');
     const o = tmOffer; if (!o) return;
     const f = tmFind(o.pid); if (!f) { tmCloseModal(); return; }
-    const p = f.p;
-    const head = '<div class="tm-mhead"><div class="tm-ovr tm-ovr-' + tmLine(p) + '">' + (p.ovr || 0) + '</div><div><b>' + tmEsc(p.name) + '</b><small>' + tmEsc((p.pos || []).join('/')) + ' · ' + tmAge(p) + 'y · ' + (f.t ? tmEsc(tmClubName(f.t)) : 'Free agent') + ' · contract ' + tmEsc(tmContractLabel(p)) + '</small></div><button class="tm-x" onclick="App.tmCloseModal()">✕</button></div>';
-    const yrs = '<label class="tm-f"><span>Contract</span><select class="tm-sel" onchange="App.tmOfferChange(\'years\',this.value)">' + [1, 2, 3, 4, 5].map(y => '<option value="' + y + '"' + (o.years === y ? ' selected' : '') + '>' + y + ' year' + (y > 1 ? 's' : '') + '</option>').join('') + '</select></label>';
-    const wages = '<label class="tm-f"><span>Wages</span><select class="tm-sel" onchange="App.tmOfferChange(\'wageMult\',this.value)">' + [[0.9, '90% of demand'], [1, 'His demand'], [1.1, '+10%'], [1.25, '+25%'], [1.5, '+50%']].map(w => '<option value="' + w[0] + '"' + (o.wageMult === w[0] ? ' selected' : '') + '>' + w[1] + '</option>').join('') + '</select></label>';
+    const p = f.p, t = f.t;
+    const head = '<div class="tm-mhead">' + tmShield(p, true) + '<div><b class="tm-big">' + tmEsc(p.name) + '</b><small>' + tmEsc((p.pos || []).join('/')) + ' · ' + tmAge(p) + 'y · ' + (t ? tmClubLink(t, 16) : 'Free agent') + ' · ' + tmEsc(tmContractLabel(p)) + '</small></div><button class="tm-x" onclick="App.tmCloseModal()">✕</button></div>';
+    const yrs = tmChips('Contract length', 'years', [1, 2, 3, 4, 5].map(y => [y, y + (y > 1 ? ' yrs' : ' yr')]), o.years);
+    const wages = tmChips('Wages', 'wageMult', [[0.9, '90%'], [1, 'His ask'], [1.1, '+10%'], [1.25, '+25%'], [1.5, '+50%']], o.wageMult);
     let inner;
     if (o.mode === 'renew') {
-      inner = '<div class="tm-mtitle">Offer a new contract</div><div class="tm-fgrid">' + yrs + wages + '</div><div id="tm-prev"></div><div id="tm-result"></div><div class="modal-actions"><button class="btn btn-secondary btn-sm" onclick="App.tmCloseModal()">Cancel</button><button class="btn btn-primary btn-sm" onclick="App.tmOfferSubmit()">Offer contract</button></div>';
+      inner = '<div class="tm-mtitle">Offer a new contract</div>' + yrs + wages + '<div id="tm-prev"></div><div id="tm-result"></div><div class="modal-actions"><button class="btn btn-secondary btn-sm" onclick="App.tmCloseModal()">Cancel</button><button class="btn btn-primary btn-sm" onclick="App.tmOfferSubmit()">Offer contract</button></div>';
     } else {
       const kinds = tmKindsFor(f);
-      const kindChips = kinds.length > 1 ? '<div class="tm-linechips">' + kinds.map(k => '<button class="tm-chip-btn ' + (o.kind === k[0] ? 'on' : '') + '" onclick="App.tmOfferChange(\'kind\',\'' + k[0] + '\')">' + k[1] + '</button>').join('') + '</div>' : '';
-      const feeBox = (o.kind === 'buy' || o.kind === 'loan') ? '<label class="tm-f"><span>' + (o.kind === 'loan' ? 'Loan fee (€m)' : 'Transfer fee (€m)') + '</span><input class="tm-num" type="number" min="0" step="0.5" value="' + o.fee + '" oninput="App.tmOfferChange(\'fee\',this.value)"></label>' : '';
-      inner = kindChips + '<div class="tm-fgrid">' + feeBox + (o.kind === 'loan' ? '' : yrs + wages) + '</div><div id="tm-prev"></div><div id="tm-result"></div><div class="modal-actions"><button class="btn btn-secondary btn-sm" onclick="App.tmCloseModal()">Cancel</button><button class="btn btn-primary btn-sm" onclick="App.tmOfferSubmit()">Submit offer</button></div>';
+      const kindChips = kinds.length > 1 ? '<div class="tm-linechips tm-kinds">' + kinds.map(k => '<button class="tm-chip-btn ' + (o.kind === k[0] ? 'on' : '') + '" onclick="App.tmOfferChange(\'kind\',\'' + k[0] + '\')">' + k[1] + '</button>').join('') + '</div>' : '';
+      let feeBox = '';
+      if (o.kind === 'buy' || o.kind === 'loan') {
+        const ask = o.kind === 'loan' ? tmLoanFee(p) : tmAskFor(p, t, tmMeTeam());
+        feeBox = '<div class="tm-f"><span>' + (o.kind === 'loan' ? 'Loan fee' : 'Transfer fee') + ' (€m)</span><div class="tm-feerow"><input class="tm-range" type="range" min="' + Math.max(0.1, Math.round(ask * 0.5 * 10) / 10) + '" max="' + Math.round(ask * 1.7 * 10) / 10 + '" step="0.1" value="' + o.fee + '" oninput="App.tmOfferChange(\'feeR\',this.value)">' +
+          '<input class="tm-num" id="tm-fee-num" type="number" min="0" step="0.5" value="' + o.fee + '" oninput="App.tmOfferChange(\'fee\',this.value)"></div><div class="tm-ticks"><span>50%</span><span>value ' + tmFmt(tmValue(p)) + '</span><span>ask ' + tmFmt(ask) + '</span><span>170%</span></div></div>';
+      }
+      const role = (o.kind === 'loan') ? '' : tmChips('Promised role', 'role', [['key', '⭐ Key player'], ['rotation', 'Rotation'], ['prospect', '🌱 Prospect']], o.role);
+      inner = kindChips + feeBox + (o.kind === 'loan' ? '' : yrs + wages) + role + '<div id="tm-prev"></div><div id="tm-result"></div><div class="modal-actions"><button class="btn btn-secondary btn-sm" onclick="App.tmCloseModal()">Cancel</button><button class="btn btn-primary btn-sm" onclick="App.tmOfferSubmit()">Submit offer</button></div>';
     }
-    box.innerHTML = head + inner;
-    el.classList.add('active');
+    tmShowModal(head + inner);
     tmOfferRefresh();
   }
   function tmOfferChange(field, val) {
     const o = tmOffer; if (!o) return;
     if (field === 'kind') { o.kind = val; const f = tmFind(o.pid); o.fee = tmDefaultFee(f.p, val); o.result = null; tmDrawModal(); return; }
-    if (field === 'fee') o.fee = Math.max(0, parseFloat(val) || 0);
-    else if (field === 'years') o.years = parseInt(val, 10) || 3;
-    else if (field === 'wageMult') o.wageMult = parseFloat(val) || 1;
+    if (field === 'fee' || field === 'feeR') { o.fee = Math.max(0, parseFloat(val) || 0); if (field === 'feeR') { const n = document.getElementById('tm-fee-num'); if (n) n.value = o.fee; } }
+    else if (field === 'years') { o.years = parseInt(val, 10) || 3; tmDrawModal(); return; }
+    else if (field === 'wageMult') { o.wageMult = parseFloat(val) || 1; tmDrawModal(); return; }
+    else if (field === 'role') { o.role = val; tmDrawModal(); return; }
     tmOfferRefresh();
   }
   function tmMoodHTML(m) {
-    return '<div class="tm-mood-box ' + m.key + '"><b>' + m.ico + ' ' + m.text + '</b>' + (m.reasons.length ? '<small>' + m.reasons.map(r => tmEsc(r.t + ' ' + r.x)).join(' · ') + '</small>' : '') + '</div>';
+    const items = m.reasons.map(r => '<span class="tm-rs ' + (r.t === '+' ? 'up' : r.t === '−' ? 'down' : '') + '">' + tmEsc(r.t + ' ' + r.x) + '</span>').join('');
+    return '<div class="tm-mood-box ' + m.key + '"><div class="tm-mood-top"><b>' + m.ico + ' ' + m.text + '</b>' + tmMeter(m.score, m.score >= TM_CFG.moodOpen ? 'green' : 'red') + '</div>' + (items ? '<div class="tm-rsrow">' + items + '</div>' : '') + '</div>';
   }
   function tmOfferRefresh() {
     const o = tmOffer, el = document.getElementById('tm-prev'); if (!o || !el) return;
@@ -27453,20 +28196,27 @@ const PLAYSTYLE_BEHAVIOR = {
       el.innerHTML = '<div class="tm-lines"><div><span>New wage</span><b>' + tmFmt(q.wage) + '/yr</b></div><div><span>Change</span><b>' + (q.delta >= 0 ? '+' : '') + tmFmt(q.delta) + '</b></div></div>' + tmMoodHTML(q.mood.score >= TM_CFG.moodOpen - 0.02 ? Object.assign({}, q.mood, { ico: q.mood.score >= TM_CFG.moodKeen ? '🟢' : '🟡', text: 'Willing to extend', key: 'open' }) : q.mood);
       return;
     }
-    const ev = tmEvaluate({ pid: o.pid, kind: o.kind, fee: o.fee, years: o.years, wageMult: o.wageMult });
+    const ev = tmEvaluate({ pid: o.pid, kind: o.kind, fee: o.fee, years: o.years, wageMult: o.wageMult, role: o.role });
     if (!ev.p) { el.innerHTML = '<div class="tm-warn">' + tmEsc(ev.blocks[0] || '') + '</div>'; return; }
-    let h = '<div class="tm-lines">';
+    let h = '';
+    if (o.kind === 'buy' || o.kind === 'loan') {
+      const r = ev.sellerReply, cls = r.status === 'accept' ? 'ok' : r.status === 'counter' ? 'mid' : 'bad';
+      const sellerName = ev.seller ? tmEsc(tmClubName(ev.seller)) : '';
+      h += '<div class="tm-bubble ' + cls + '"><div class="tm-bub-who">' + (ev.seller ? teamMark(ev.seller, 18) : '') + ' ' + sellerName + ' <small>' + (ev.seller ? tmEsc(tmArch(ev.seller).name) : '') + '</small></div>' +
+        (r.status === 'accept' ? '✅ We would accept this fee.' : '💬 ' + tmEsc(r.msg || '')) + '</div>';
+    }
+    h += '<div class="tm-bubble agent"><div class="tm-bub-who">🧑‍💼 Agent</div>' + tmMoodHTML(ev.mood) + '</div>';
+    if (ev.talk && (!ev.seller || ev.talk.to !== (tmMeTeam() || {}).id)) h += '<div class="tm-warn warm">🔥 ' + tmEsc(tmClubNameById(ev.talk.to)) + ' are already in talks (' + tmFmt(ev.talk.fee) + '). A completed deal hijacks it — but the price is up.</div>';
+    h += '<div class="tm-lines">';
     if (o.kind === 'buy' || o.kind === 'loan') h += '<div><span>Asking ' + (o.kind === 'loan' ? '(loan fee)' : 'price') + '</span><b>' + tmFmt(ev.ask) + '</b></div>';
     h += '<div><span>Market value</span><b>' + tmFmt(ev.value) + '</b></div>';
     if (o.kind !== 'loan') h += '<div><span>His wages</span><b>' + tmFmt(ev.wage) + '/yr</b></div><div><span>Signing-on / agent fees</span><b>' + tmFmt(ev.extra) + '</b></div>';
     else h += '<div><span>Wages (you pay)</span><b>' + tmFmt(ev.wage) + '/yr</b></div>';
-    h += '<div><span>Total now</span><b>' + tmFmt(ev.total) + '</b></div><div><span>Budget after</span><b>' + tmFmt(ev.budget - ev.total) + '</b></div><div><span>Wage room</span><b>' + tmFmt(ev.wageRoom) + '</b></div></div>';
-    if (o.kind === 'buy' || o.kind === 'loan') {
-      const r = ev.sellerReply;
-      const cls = r.status === 'accept' ? 'ok' : r.status === 'counter' ? 'mid' : 'bad';
-      h += '<div class="tm-sellerbox ' + cls + '">' + (r.status === 'accept' ? '✅ ' + tmEsc(tmClubName(ev.seller)) + ' would accept this fee' : '💬 ' + tmEsc(r.msg || '')) + '</div>';
-    }
-    h += tmMoodHTML(ev.mood);
+    h += '<div><span>Total now</span><b>' + tmFmt(ev.total) + '</b></div><div><span>Budget after</span><b class="' + (ev.budget - ev.total < 0 ? 'bad' : '') + '">' + tmFmt(ev.budget - ev.total) + '</b></div><div><span>Wage room</span><b>' + tmFmt(ev.wageRoom) + '</b></div></div>';
+    try {
+      const rivals = tmInterestedClubs(ev.p, ev.seller, 3, { min: 55 });
+      if (rivals.length) h += '<div class="tm-rivals">⚔️ Competition: ' + rivals.map(x => teamMark(x.t, 14) + ' ' + tmEsc(tmClubName(x.t)) + ' <em>' + x.score + '</em>').join(' · ') + '</div>';
+    } catch (e) {}
     ev.blocks.forEach(b => { h += '<div class="tm-warn">⛔ ' + tmEsc(b) + '</div>'; });
     ev.warns.forEach(b => { h += '<div class="tm-note">⚠ ' + tmEsc(b) + '</div>'; });
     el.innerHTML = h;
@@ -27480,11 +28230,13 @@ const PLAYSTYLE_BEHAVIOR = {
       if (r.status === 'done') { tmCloseModal(); tmRefreshAll(); } else if (res) res.innerHTML = '<div class="tm-warn">' + tmEsc(r.msg) + '</div>';
       return;
     }
-    const r = tmNegotiate({ pid: o.pid, kind: o.kind, fee: o.fee, years: o.years, wageMult: o.wageMult });
+    const r = tmNegotiate({ pid: o.pid, kind: o.kind, fee: o.fee, years: o.years, wageMult: o.wageMult, role: o.role });
     if (r.status === 'done') { toast(r.msg); tmCloseModal(); tmRefreshAll(); return; }
     let h = '<div class="tm-warn">' + tmEsc(r.msg || 'No deal.') + '</div>';
-    if (r.status === 'counter') h += '<button class="btn btn-primary btn-sm" onclick="App.tmAcceptCounter(' + r.counter + ')">Accept counter — ' + tmFmt(r.counter) + '</button>';
+    if (r.status === 'counter') h += '<button class="btn btn-primary btn-sm" onclick="App.tmAcceptCounter(' + r.counter + ')">Accept counter — ' + tmFmt(r.counter) + '</button>' + (r.final ? ' <small class="tm-note">Final offer.</small>' : '');
     if (res) res.innerHTML = h;
+    tmOfferRefresh();
+    if (res) { /* keep the result visible after the preview redraw */ res.innerHTML = h; }
   }
   function tmAcceptCounter(fee) { if (!tmOffer) return; tmOffer.fee = fee; tmOfferSubmit(); }
 
@@ -27526,7 +28278,8 @@ const PLAYSTYLE_BEHAVIOR = {
     renderMediaView, mediaTab, mediaFilter, mediaTag, mediaMore, mediaToggleThread, mediaToggleArticle, mediaClear, mediaAcct,
     tmSub, tmSetClub, tmSearch, tmFilter, tmToggle, tmDir, tmMore, tmResetFilters, tmFindRole, tmStar, tmList, tmShop, tmRelease,
     tmOfferAct, tmFaFilter, tmFaMore, tmDealsFilter, tmDealsMore, tmOpenOffer, tmOpenRenew, tmCloseModal, tmOfferChange,
-    tmOfferSubmit, tmAcceptCounter, tmTick, tmWindowInfo, __tmDebug: () => ({ tm, tmFA })
+    tmOfferSubmit, tmAcceptCounter, tmView, tmNewsFilter, tmNewsMore, tmClubsFilter, tmOpenPlayer, tmOpenClub, tmClubBrowse,
+    tmTick, tmWindowInfo, __tmDebug: () => ({ tm, tmFA })
   };
 })();
 
