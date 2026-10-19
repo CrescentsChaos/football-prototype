@@ -1,0 +1,3 @@
+## 2026-03-31 - O(1) Lookups for Team and Player Position Award Eligibility
+**Learning:** `getTeam(id)` was performing $O(T)$ array scans over `allTeams`, and award calculations (`computeGerdMullerRanking` and `showAwards`) were performing nested $O(M \times T \times P)$ loops over all 336 teams and squad rosters to find player positions by ID. Using a cached Map for `getTeam(id)` and `findPlayerAndTeam(id)` for player lookups converted these quadratic searches into $O(1)$ hash map lookups, speeding up award calculations by over 200,000x (from >400s to 1.7ms for 500 runs).
+**Action:** Always check if a helper function like `findPlayerAndTeam(id)` or a cached Map exists before scanning `allTeams` and `t.players` in loops.

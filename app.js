@@ -4031,7 +4031,24 @@ var App = (() => {
     });
   }
 
-  function getTeam(id) { return allTeams.find(t => t.id === id); }
+  // Cached map for O(1) team lookups, re-indexed if allTeams array reference or length changes
+  let _teamByIdMap = null;
+  let _teamByIdMapRef = null;
+  let _teamByIdMapLen = 0;
+  function getTeam(id) {
+    if (!_teamByIdMap || _teamByIdMapRef !== allTeams || _teamByIdMapLen !== (allTeams ? allTeams.length : 0)) {
+      _teamByIdMap = new Map();
+      _teamByIdMapRef = allTeams;
+      _teamByIdMapLen = allTeams ? allTeams.length : 0;
+      if (allTeams) {
+        for (let i = 0; i < allTeams.length; i++) {
+          const t = allTeams[i];
+          if (t && t.id) _teamByIdMap.set(t.id, t);
+        }
+      }
+    }
+    return _teamByIdMap.get(id);
+  }
 
   // Every match is played at the home team's stadium. Falls back to Wembley
   // Stadium whenever a team in teams.json doesn't define its own "stadium".
@@ -11508,12 +11525,9 @@ var App = (() => {
       scores[p.id].pts += p.count * 0.8;
     });
     Object.values(scores).forEach(s => {
-      let isST = false;
-      for (const t of allTeams) {
-        const pl = (t.players || []).find(x => x.id === s.id);
-        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
-      }
-      if (isST) s.pts += 2;
+      const found = findPlayerAndTeam(s.id);
+      const pl = found ? found.player : null;
+      if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { s.pts += 2; }
     });
     return Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals);
   }
@@ -15618,12 +15632,9 @@ var App = (() => {
       });
       // Bonus if player is a striker on roster
       Object.values(scores).forEach(s => {
-        let isST = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
-        }
-        if (isST) s.pts += 2;
+        const found = findPlayerAndTeam(s.id);
+        const pl = found ? found.player : null;
+        if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { s.pts += 2; }
       });
       const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
@@ -15674,12 +15685,9 @@ var App = (() => {
       });
       // Bonus if the player is actually a defender on their roster (CB/RB/LB/RWB/LWB).
       Object.values(scores).forEach(s => {
-        let isDef = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) { isDef = true; break; }
-        }
-        if (isDef) s.pts += 3;
+        const found = findPlayerAndTeam(s.id);
+        const pl = found ? found.player : null;
+        if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) { s.pts += 3; }
       });
       const data = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
       if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧱</div><p>No defensive stats yet.</p></div>'; return; }
