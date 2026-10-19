@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teams — APEX SIM</title>
+  <meta name="description" content="APEX SIM — a browser-based football simulation platform with a live match engine, formations, injuries, domestic seasons, a 36-team Champions League format and a full World Cup.">
+  <meta name="theme-color" content="#05080f">
+  <meta property="og:title" content="Teams — APEX SIM">
+  <meta property="og:description" content="A football simulation platform with a live match engine, domestic seasons and international tournaments.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23111a2b' stroke='%23f0c14b' stroke-width='6'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-view="teams">
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">⚽</div>
+        <span>APEX SIM</span>
+      </div>
+      <nav class="nav-tabs" aria-label="Main navigation">
+        <a class="nav-tab" data-view="home" href="index.html">Home</a>
+        <a class="nav-tab" data-view="match" href="match.html">Match</a>
+        <a class="nav-tab" data-view="tournament" href="tournament.html">Tournament</a>
+        <a class="nav-tab" data-view="season" href="season.html">Season</a>
+        <a class="nav-tab" data-view="leaderboard" href="leaderboard.html">Leaderboard</a>
+        <a class="nav-tab" data-view="awards" href="awards.html">Awards</a>
+        <a class="nav-tab" data-view="history" href="history.html">History</a>
+        <a class="nav-tab active" data-view="teams" href="teams.html" aria-current="page">Teams</a>
+        <a class="nav-tab" data-view="players" href="players.html">Players</a>
+        <a class="nav-tab" data-view="media" href="media.html">📡 Media</a>
+        <a class="nav-tab" data-view="hospital" href="hospital.html">🏥 Hospital</a>
+        <a class="nav-tab" data-view="extras" href="extras.html">🧰 Extras</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- TEAMS -->
+    <section id="view-teams" class="view active">
+      <div class="card">
+        <div class="card-title">Team Database</div>
+        <p style="color:var(--text-secondary);margin-bottom:12px">Browse squads, managers & ratings. Tap a team for full profile.</p>
+        <div class="teams-toolbar">
+          <input type="search" id="teams-search" placeholder="Search teams..." oninput="App.searchTeams(this.value)" autocomplete="off" aria-label="Search teams">
+          <select id="teams-sort" onchange="App.sortTeams(this.value)" aria-label="Sort teams">
+            <option value="name">Sort: Name</option>
+            <option value="ovr">Sort: Strength</option>
+            <option value="players">Sort: Squad size</option>
+            <option value="flag">Sort: Flag</option>
+          </select>
+          <select id="teams-type" onchange="App.filterTeams(this.value)" aria-label="Filter team type">
+            <option value="all">All teams</option>
+            <option value="national">National</option>
+            <option value="club">Clubs</option>
+          </select>
+          <select id="teams-league" onchange="App.filterTeamsLeague(this.value)" aria-label="Filter league">
+            <option value="all">All leagues</option>
+            <option value="Premier League">Premier League</option>
+            <option value="La Liga">La Liga</option>
+            <option value="Serie A">Serie A</option>
+            <option value="Bundesliga">Bundesliga</option>
+            <option value="Ligue 1">Ligue 1</option>
+            <option value="other">Other / National</option>
+          </select>
+          <select id="teams-rating" onchange="App.filterTeamsRating(this.value)" aria-label="Filter by strength">
+            <option value="all">All strengths</option>
+            <option value="elite">Elite (85+)</option>
+            <option value="great">Great (75-84)</option>
+            <option value="good">Good (65-74)</option>
+            <option value="dev">Development (&lt;65)</option>
+          </select>
+        </div>
+        <div id="teams-list" class="teams-checkbox-grid" style="max-height:none"></div>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">Tap a team to open its full profile (manager, squad, colors).</p>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="modal-overlay" id="match-report-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Match report">
+    <div class="modal" id="match-report-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
+  </div>
+  <div class="modal-overlay" id="player-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player profile">
+    <div class="modal" id="player-modal-content" style="max-width:420px"></div>
+  </div>
+  <div class="modal-overlay" id="team-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team profile">
+    <div class="modal" id="team-modal-content" style="max-width:520px"></div>
+  </div>
+  <div class="modal-overlay" id="lineup-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team lineup">
+    <div class="modal" id="lineup-modal-content" style="max-width:420px"></div>
+  </div>
+  <div class="modal-overlay" id="compare-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player comparison">
+    <div class="modal" id="compare-modal-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
+  </div>
+  <div class="modal-overlay" id="modal" role="dialog" aria-modal="true">
+    <div class="modal" id="modal-content"></div>
+  </div>
+
+  <div class="scroll-fab-group" id="scroll-fab-group">
+    <button type="button" class="scroll-fab" id="scroll-fab-top" title="Scroll to top" aria-label="Scroll to top">▲</button>
+    <button type="button" class="scroll-fab" id="scroll-fab-bottom" title="Scroll to bottom" aria-label="Scroll to bottom">▼</button>
+  </div>
+
+  <script src="dist/app.js"></script>
+<div class="toast" id="toast"></div>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaderboard — APEX SIM</title>
+  <meta name="description" content="APEX SIM — a browser-based football simulation platform with a live match engine, formations, injuries, domestic seasons, a 36-team Champions League format and a full World Cup.">
+  <meta name="theme-color" content="#05080f">
+  <meta property="og:title" content="Leaderboard — APEX SIM">
+  <meta property="og:description" content="A football simulation platform with a live match engine, domestic seasons and international tournaments.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23111a2b' stroke='%23f0c14b' stroke-width='6'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-view="leaderboard">
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">⚽</div>
+        <span>APEX SIM</span>
+      </div>
+      <nav class="nav-tabs" aria-label="Main navigation">
+        <a class="nav-tab" data-view="home" href="index.html">Home</a>
+        <a class="nav-tab" data-view="match" href="match.html">Match</a>
+        <a class="nav-tab" data-view="tournament" href="tournament.html">Tournament</a>
+        <a class="nav-tab" data-view="season" href="season.html">Season</a>
+        <a class="nav-tab active" data-view="leaderboard" href="leaderboard.html" aria-current="page">Leaderboard</a>
+        <a class="nav-tab" data-view="awards" href="awards.html">Awards</a>
+        <a class="nav-tab" data-view="history" href="history.html">History</a>
+        <a class="nav-tab" data-view="teams" href="teams.html">Teams</a>
+        <a class="nav-tab" data-view="players" href="players.html">Players</a>
+        <a class="nav-tab" data-view="media" href="media.html">📡 Media</a>
+        <a class="nav-tab" data-view="hospital" href="hospital.html">🏥 Hospital</a>
+        <a class="nav-tab" data-view="extras" href="extras.html">🧰 Extras</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- LEADERBOARD -->
+    <section id="view-leaderboard" class="view active">
+      <div class="card">
+        <div class="card-title">Global Leaderboards</div>
+        <div class="leaderboard-tabs">
+          <button class="lb-tab active" data-lb="goals" onclick="App.showLeaderboard('goals')"><img src="assets/images/goal.png" alt="" class="emoji-icon-img"> Goals</button>
+          <button class="lb-tab" data-lb="assists" onclick="App.showLeaderboard('assists')"><img src="assets/images/assist.png" alt="" class="emoji-icon-img"> Assists</button>
+          <button class="lb-tab" data-lb="saves" onclick="App.showLeaderboard('saves')">🧤 Saves</button>
+          <button class="lb-tab" data-lb="cleanSheets" onclick="App.showLeaderboard('cleanSheets')">🛡️ Clean Sheets</button>
+          <button class="lb-tab" data-lb="interceptions" onclick="App.showLeaderboard('interceptions')">🧱 Interceptions</button>
+          <button class="lb-tab" data-lb="blocks" onclick="App.showLeaderboard('blocks')">🚫 Blocks</button>
+          <button class="lb-tab" data-lb="chancesCreated" onclick="App.showLeaderboard('chancesCreated')">🎯 Big Chances Created</button>
+          <button class="lb-tab" data-lb="xa" onclick="App.showLeaderboard('xa')">🅰️ xA</button>
+          <button class="lb-tab" data-lb="xg" onclick="App.showLeaderboard('xg')">🎯 xG</button>
+          <button class="lb-tab" data-lb="yellows" onclick="App.showLeaderboard('yellows')"><img src="assets/images/yellow_card.png" alt="" class="emoji-icon-img"> Yellows</button>
+          <button class="lb-tab" data-lb="reds" onclick="App.showLeaderboard('reds')"><img src="assets/images/red_card.png" alt="" class="emoji-icon-img"> Reds</button>
+          <button class="lb-tab" data-lb="motm" onclick="App.showLeaderboard('motm')">⭐ MOTM</button>
+          <button class="lb-tab" data-lb="puskas" onclick="App.showLeaderboard('puskas')">🏆 Puskas</button>
+          <button class="lb-tab" data-lb="ratings" onclick="App.showLeaderboard('ratings')">📊 Avg Rating</button>
+          <button class="btn btn-danger btn-sm" onclick="App.resetLeaderboard()" style="margin-left:auto">Reset Stats</button>
+        </div>
+        <div id="leaderboard-content">
+          <div class="empty-state">
+            <div class="icon">📊</div>
+            <p>Simulate matches to populate the leaderboards.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="modal-overlay" id="match-report-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Match report">
+    <div class="modal" id="match-report-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
+  </div>
+  <div class="modal-overlay" id="player-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player profile">
+    <div class="modal" id="player-modal-content" style="max-width:420px"></div>
+  </div>
+  <div class="modal-overlay" id="team-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team profile">
+    <div class="modal" id="team-modal-content" style="max-width:520px"></div>
+  </div>
+  <div class="modal-overlay" id="lineup-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Team lineup">
+    <div class="modal" id="lineup-modal-content" style="max-width:420px"></div>
+  </div>
+  <div class="modal-overlay" id="compare-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Player comparison">
+    <div class="modal" id="compare-modal-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
+  </div>
+  <div class="modal-overlay" id="modal" role="dialog" aria-modal="true">
+    <div class="modal" id="modal-content"></div>
+  </div>
+
+  <div class="scroll-fab-group" id="scroll-fab-group">
+    <button type="button" class="scroll-fab" id="scroll-fab-top" title="Scroll to top" aria-label="Scroll to top">▲</button>
+    <button type="button" class="scroll-fab" id="scroll-fab-bottom" title="Scroll to bottom" aria-label="Scroll to bottom">▼</button>
+  </div>
+
+  <script src="dist/app.js"></script>
+<div class="toast" id="toast"></div>
+</body>
+</html>

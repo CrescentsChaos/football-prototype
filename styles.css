@@ -156,6 +156,8 @@ body::before {
   100% { transform: scale(1); }
 }
 .nav-tab:active { transform: scale(0.96); }
+/* Nav tabs are real page links now (index/match/tournament/…​.html) */
+a.nav-tab { text-decoration: none; display: inline-block; line-height: normal; }
 
 .save-btn {
   display: flex; align-items: center; gap: 6px; flex-shrink: 0;
