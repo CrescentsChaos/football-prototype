@@ -3,49 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Players — APEX SIM</title>
-  <meta name="description" content="APEX SIM — a browser-based football simulation platform with a live match engine, formations, injuries, domestic seasons, a 36-team Champions League format and a full World Cup.">
-  <meta name="theme-color" content="#05080f">
-  <meta property="og:title" content="Players — APEX SIM">
-  <meta property="og:description" content="A football simulation platform with a live match engine, domestic seasons and international tournaments.">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Players: Apex Sim</title>
+  <meta name="description" content="Apex Sim is a browser-based football simulator with a live match engine, domestic seasons and international tournaments.">
+  <meta name="theme-color" content="#0d1513">
+  <meta property="og:title" content="Players: Apex Sim">
+  <meta property="og:description" content="Apex Sim is a browser-based football simulator with a live match engine, domestic seasons and international tournaments.">
   <meta property="og:type" content="website">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23111a2b' stroke='%23f0c14b' stroke-width='6'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1513'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%234cb782' stroke-width='2'/%3E%3Cpath d='M16 5v22' stroke='%234cb782' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='%234cb782'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body data-view="players">
   <header class="app-header">
     <div class="header-inner">
-      <div class="logo">
-        <div class="logo-icon">⚽</div>
-        <span>APEX SIM</span>
-      </div>
-      <nav class="nav-tabs" aria-label="Main navigation">
-        <a class="nav-tab" data-view="home" href="index.html">Home</a>
+      <a class="brand" href="index.html" aria-label="Apex Sim home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="16" cy="16" r="11"/><path d="M16 5v22"/><circle cx="16" cy="16" r="2.4" fill="currentColor" stroke="none"/></svg>
+        <span class="brand-name">Apex<span>Sim</span></span>
+      </a>
+      <button type="button" class="menu-toggle" aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
         <a class="nav-tab" data-view="match" href="match.html">Match</a>
-        <a class="nav-tab" data-view="tournament" href="tournament.html">Tournament</a>
         <a class="nav-tab" data-view="season" href="season.html">Season</a>
-        <a class="nav-tab" data-view="leaderboard" href="leaderboard.html">Leaderboard</a>
-        <a class="nav-tab" data-view="awards" href="awards.html">Awards</a>
-        <a class="nav-tab" data-view="history" href="history.html">History</a>
+        <a class="nav-tab" data-view="tournament" href="tournament.html">Tournament</a>
         <a class="nav-tab" data-view="teams" href="teams.html">Teams</a>
         <a class="nav-tab active" data-view="players" href="players.html" aria-current="page">Players</a>
-        <a class="nav-tab" data-view="media" href="media.html">📡 Media</a>
-        <a class="nav-tab" data-view="hospital" href="hospital.html">🏥 Hospital</a>
-        <a class="nav-tab" data-view="extras" href="extras.html">🧰 Extras</a>
+        <a class="nav-tab" data-view="leaderboard" href="leaderboard.html">Leaderboard</a>
+        <div class="nav-more">
+          <button type="button" class="nav-tab nav-more-btn" aria-expanded="false" aria-haspopup="true">More</button>
+          <div class="nav-more-panel">
+            <a class="nav-tab" data-view="awards" href="awards.html">Awards</a>
+            <a class="nav-tab" data-view="history" href="history.html">History</a>
+            <a class="nav-tab" data-view="media" href="media.html">Media</a>
+            <a class="nav-tab" data-view="hospital" href="hospital.html">Injury ward</a>
+            <a class="nav-tab" data-view="extras" href="extras.html">Extras</a>
+          </div>
+        </div>
       </nav>
     </div>
   </header>
 
   <main class="main-content">
+    <div class="page-head">
+      <div>
+        <h1>Players</h1>
+        <p>Search every player, filter by position or team, and open a profile for career stats and attributes. Turn on compare to set two or three players side by side.</p>
+      </div>
+    </div>
+
     <!-- PLAYERS -->
     <section id="view-players" class="view active">
       <div class="card">
-        <div class="card-title">Player Database</div>
-        <p style="color:var(--text-secondary);margin-bottom:12px">Browse every player across every team. Tap a player for their full profile, or turn on Compare to line two or three up side by side.</p>
         <div class="teams-toolbar">
           <input type="search" id="players-search" placeholder="Search players..." oninput="App.searchPlayers(this.value)" autocomplete="off" aria-label="Search players">
           <select id="players-sort" onchange="App.sortPlayers(this.value)" aria-label="Sort players">
@@ -97,7 +108,7 @@
             <option value="good">Good (65-74)</option>
             <option value="dev">Development (&lt;65)</option>
           </select>
-          <button type="button" class="btn btn-secondary btn-sm" id="players-compare-toggle" onclick="App.togglePlayersCompareMode()">⚖️ Compare</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="players-compare-toggle" onclick="App.togglePlayersCompareMode()">Compare players</button>
         </div>
         <div id="players-compare-tray" class="compare-tray" style="display:none">
           <span style="color:var(--text-muted);font-size:0.8rem">Tap players below to add them to comparison (up to 3)</span>
@@ -106,15 +117,18 @@
           <button type="button" class="btn btn-primary btn-sm" id="players-compare-go" onclick="App.openPlayersCompare()" disabled>Compare selected</button>
           <button type="button" class="btn btn-secondary btn-sm" onclick="App.clearPlayersCompare()">Clear</button>
         </div>
-        <p id="players-count" style="color:var(--text-muted);font-size:0.78rem;margin:10px 0 8px"></p>
-        <div id="players-list" class="teams-checkbox-grid" style="max-height:none"></div>
+        <p id="players-count" class="pp-muted" style="margin:6px 0 10px"></p>
+        <div id="players-list" class="dir-list"></div>
         <div style="text-align:center;margin-top:16px">
           <button type="button" class="btn btn-secondary btn-sm" id="players-load-more" onclick="App.loadMorePlayers()" style="display:none">Load more players</button>
         </div>
       </div>
     </section>
 
+  
   </main>
+
+  <footer class="site-footer">Progress saves in this browser as you play. <a href="extras.html">Back up or restore a save</a></footer>
 
   <div class="modal-overlay" id="match-report-modal" onclick="if(event.target===this)this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Match report">
     <div class="modal" id="match-report-content" style="max-width:640px;max-height:85vh;overflow-y:auto"></div>
@@ -140,6 +154,7 @@
     <button type="button" class="scroll-fab" id="scroll-fab-bottom" title="Scroll to bottom" aria-label="Scroll to bottom">▼</button>
   </div>
 
+  <script src="shell.js"></script>
   <script src="dist/app.js"></script>
 <div class="toast" id="toast"></div>
 </body>
