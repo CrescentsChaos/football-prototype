@@ -5308,8 +5308,19 @@ const PLAYSTYLE_BEHAVIOR = {
       renderTeamsList();
       restoreTournamentUI();
       restoreSeasonUI();
-      const savedView = (function () { try { return localStorage.getItem('apexActiveView'); } catch (e) { return null; } })();
-      if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
+      // Each page declares which view it is via <body data-view="...">. That
+      // always wins, so a page opens on its own content (and runs that view's
+      // renderer) instead of whatever tab was active when the last page was
+      // left. The stored view is only a fallback for pages with no declaration.
+      const pageView = document.body && document.body.dataset ? document.body.dataset.view : '';
+      if (pageView === 'home') {
+        renderHomeFacts();
+      } else if (pageView) {
+        switchView(pageView);
+      } else {
+        const savedView = (function () { try { return localStorage.getItem('apexActiveView'); } catch (e) { return null; } })();
+        if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
+      }
       setupAutoSave();
       try {
         if (sessionStorage.getItem('apexJustReset') === '1') {
@@ -5334,6 +5345,9 @@ const PLAYSTYLE_BEHAVIOR = {
   function bindNav() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        // Nav tabs are real links to their own pages, so the browser handles
+        // the navigation. Only non-link tabs switch views in place.
+        if (tab.tagName === 'A' && tab.getAttribute('href')) return;
         const view = tab.dataset.view;
         if (view) switchView(view);
       });
@@ -5360,6 +5374,8 @@ const PLAYSTYLE_BEHAVIOR = {
     if (view === 'hospital') renderHospitalList();
     if (view === 'season') goToSeason();
     if (view === 'media') renderMediaView();
+    if (view === 'player') renderPlayerPage(ppQueryId());
+    if (view === 'team') renderTeamPage(ppQueryId());
   }
 
   function randomMatch(category) {
@@ -17518,26 +17534,27 @@ const PLAYSTYLE_BEHAVIOR = {
     const el = document.getElementById('teams-list');
     if (!el) return;
     if (!list.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>No teams match your search.</p></div>';
+      el.innerHTML = '<div class="empty-state"><p><strong>No teams match.</strong></p><p>Clear a filter or try a shorter search.</p></div>';
       return;
     }
-    el.innerHTML = list.map(t => {
-      const ovr = teamAvgOvr(t).toFixed(0);
-      const primary = t.color || '#d4af37';
+    el.innerHTML = '<div class="dir-head" aria-hidden="true"><span></span><span>Team</span><span class="dir-col-form">Formation</span><span class="dir-col-style">Manager and style</span><span class="dir-col-act"></span><span class="dir-col-ovr">Rating</span></div>' + list.map(t => {
+      const ovr = Math.round(teamAvgOvr(t));
+      const primary = t.color || '#7a8a84';
       const formKey = pickTeamFormation(t);
       const formName = (FORMATIONS[formKey] && FORMATIONS[formKey].name) || formKey;
-      return `<div class="team-check" style="cursor:pointer;border-left:3px solid ${primary}" onclick="App.showTeamProfile('${t.id}')">
-        <div style="display:flex;align-items:center;gap:8px;width:100%">
-          <span style="font-size:1.5rem">${teamMark(t, 32)}</span>
-          <div style="flex:1;min-width:0">
-            <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</strong>
-            <div style="font-size:0.75rem;color:var(--text-2)">${(t.players || []).length} players · ${t.short || ''} · ${formName}</div>
-            <div style="font-size:0.7rem;color:var(--gold);display:flex;align-items:center;gap:4px">${t.manager && t.manager.name ? managerAvatarMark(t.manager, 16) : ''}${(t.manager && t.manager.name) || ''} · ${getManagerPlaystyle(t)}</div>
-          </div>
-          <button type="button" class="lineup-btn" title="View lineup" aria-label="View ${t.name} lineup" onclick="event.stopPropagation();App.showTeamLineup('${t.id}')">🧩</button>
-          <span class="player-ovr">${ovr}</span>
-        </div>
-      </div>`;
+      const mgrName = (t.manager && t.manager.name) || '';
+      const isNat = (teamsData.national || []).includes(t);
+      return `<a class="dir-row" href="${teamPageURL(t.id)}" style="--row-accent:${primary}">
+        <span class="dir-mark">${teamMark(t, 34)}</span>
+        <span class="dir-main">
+          <strong class="dir-name">${t.name}</strong>
+          <span class="dir-sub">${isNat ? 'National team' : 'Club'}, ${(t.players || []).length} players</span>
+        </span>
+        <span class="dir-col-form">${formName}</span>
+        <span class="dir-col-style">${mgrName ? `<span class="dir-mgr">${managerAvatarMark(t.manager, 18)}<span>${mgrName}</span></span>` : ''}<span class="dir-style">${getManagerPlaystyle(t)}</span></span>
+        <button type="button" class="btn btn-secondary btn-sm dir-col-act" title="View lineup" aria-label="View ${t.name} lineup" onclick="event.preventDefault();event.stopPropagation();App.showTeamLineup('${t.id}')">Lineup</button>
+        <span class="dir-col-ovr"><span class="player-ovr">${ovr}</span></span>
+      </a>`;
     }).join('');
   }
 
@@ -18035,6 +18052,9 @@ const PLAYSTYLE_BEHAVIOR = {
       </div>`;
   }
   function showPlayerProfile(playerId) {
+    // Outside a live match a player opens on their own page; the popup below
+    // is only used when leaving the page would lose the match in progress.
+    if (!ppUsePopup() && findPlayerAndTeam(playerId)) { location.href = playerPageURL(playerId); return; }
     let player = null, team = null;
     const found = findPlayerAndTeam(playerId);
     if (found) { player = found.player; team = found.team; }
@@ -18214,7 +18234,7 @@ const PLAYSTYLE_BEHAVIOR = {
                 <div class="attr-track"><div class="attr-fill ${statTierClass(v)}" style="width:${Math.min(100, v||50)}%"></div></div>
                 <span class="attr-val ${statTierClass(v)}">${v||'-'}</span></div>`).join('')}
       </div>
-      ${playerTrophyCabinetHTML(player)}      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
+      ${playerTrophyCabinetHTML(player)}      <div class="modal-actions"><a class="btn btn-primary" href="${playerPageURL(player.id)}" target="_blank" rel="noopener">Open full page</a><button class="btn btn-secondary" onclick="document.getElementById('player-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
     // Canvas needs real layout dimensions (clientWidth) to size itself —
     // wait a frame after the modal's just been made visible/laid out.
@@ -18228,6 +18248,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function showTeamProfile(teamId) {
     const team = getTeam(teamId);
     if (!team) { toast('Team not found'); return; }
+    if (!ppUsePopup()) { location.href = teamPageURL(teamId); return; }
     const primary = team.color || '#d4af37';
     const secondary = team.secondary || '#fff';
     const mgr = team.manager || {};
@@ -18274,8 +18295,359 @@ const PLAYSTYLE_BEHAVIOR = {
         }).join('')}
       </div>
       ${renderTeamMatchLogHTML(team.id)}
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
+      <div class="modal-actions"><a class="btn btn-primary" href="${teamPageURL(team.id)}" target="_blank" rel="noopener">Open full page</a><button class="btn btn-secondary" onclick="document.getElementById('team-modal').classList.remove('active')">Close</button></div>`;
     modal.classList.add('active');
+  }
+  // ========== PROFILE PAGES (player.html / team.html) ==========
+  // Full-page replacements for the old player and team popups. Both pages are
+  // addressed by query string (player.html?id=<playerId>, team.html?id=<teamId>)
+  // and render with the same helpers the popups used, laid out for a page.
+  //
+  // Inside a live match the old popup is kept (see ppUsePopup) because leaving
+  // the match page would throw away the match in progress.
+
+  function ppQueryId() {
+    try { return new URLSearchParams(location.search).get('id') || ''; } catch (e) { return ''; }
+  }
+  function playerPageURL(id) { return 'player.html?id=' + encodeURIComponent(id); }
+  function teamPageURL(id) { return 'team.html?id=' + encodeURIComponent(id); }
+
+  // True while a match screen is showing on the current page. Opening a profile
+  // page from there would discard the match, so the popup is used instead.
+  function ppUsePopup() {
+    const v = document.getElementById('view-match');
+    return !!(v && v.classList.contains('active'));
+  }
+
+  function ppEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function ppHexToRgb(h) {
+    h = String(h || '').replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    if (!/^[0-9a-f]{6}$/i.test(h)) return null;
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function ppLuminance(rgb) {
+    const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+  }
+  function ppHex(rgb) { return '#' + rgb.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
+
+  // Hero colours come from the team's own kit. Text colour flips to whichever
+  // of near-black / white reads better on that colour.
+  function ppTheme(team) {
+    const base = ppHexToRgb(team && team.color) || [38, 56, 50];
+    const trim = ppHexToRgb(team && team.secondary) || [235, 240, 238];
+    const lum = ppLuminance(base);
+    const dist = Math.abs(base[0] - trim[0]) + Math.abs(base[1] - trim[1]) + Math.abs(base[2] - trim[2]);
+    return {
+      bg: ppHex(base),
+      trim: dist < 90 ? (lum > 0.4 ? '#0e1412' : '#f2f5f4') : ppHex(trim),
+      ink: lum > 0.4 ? '#0e1412' : '#ffffff',
+      soft: lum > 0.4 ? 'rgba(14,20,18,0.68)' : 'rgba(255,255,255,0.74)'
+    };
+  }
+
+  function ppPosGroup(p) {
+    const pos = ((p.pos || [])[0] || '').toUpperCase();
+    if (pos === 'GK') return 0;
+    if (['CB', 'LB', 'RB', 'LWB', 'RWB', 'SW'].includes(pos)) return 1;
+    if (['CDM', 'CM', 'CAM', 'LM', 'RM', 'DM', 'AM'].includes(pos)) return 2;
+    return 3;
+  }
+  const PP_GROUP_LABELS = ['Goalkeepers', 'Defenders', 'Midfielders', 'Forwards'];
+
+  function ppTeamLeague(team) {
+    if (!team) return '';
+    try {
+      for (const name of DOMESTIC_LEAGUES) {
+        if (getLeagueTeamPool(name).some(t => t.id === team.id)) return name;
+      }
+    } catch (e) {}
+    return (teamsData.national || []).includes(team) ? 'National team' : 'Club';
+  }
+
+  function ppEmpty(title, body, href, linkLabel) {
+    return `<div class="pp-empty"><h1>${ppEsc(title)}</h1><p>${ppEsc(body)}</p><a class="btn btn-primary" href="${href}">${ppEsc(linkLabel)}</a></div>`;
+  }
+
+  function ppStat(label, value, hint) {
+    return `<div class="pp-stat"${hint ? ` title="${ppEsc(hint)}"` : ''}><dd>${value}</dd><dt>${label}</dt></div>`;
+  }
+
+  function ppFormStrip(teamId) {
+    const log = teamMatchLog[teamId] || [];
+    if (!log.length) return '';
+    const cls = { W: 'result-w', D: 'result-d', L: 'result-l' };
+    const chips = log.slice(0, 5).reverse().map(raw => {
+      const e = readTeamLogEntry(raw);
+      return `<span class="result-tag ${cls[e.result] || 'result-d'}" title="${ppEsc(e.opponentShort)} ${e.scoreFor}-${e.scoreAgainst}">${e.result}</span>`;
+    }).join('');
+    return `<div class="pp-form-strip">${chips}</div>`;
+  }
+
+  // ---------- TEAM PAGE ----------
+  function ppTeamHonours(team) {
+    const won = trophies.filter(t => t.team === team.name && !t.player && !t.manager && t.playerId == null);
+    if (!won.length) return '';
+    const grouped = groupPlayerTrophies(won);
+    return `<section class="pp-card">
+      <h2 class="pp-card-title">Honours</h2>
+      <div class="trophy-cabinet-grid">
+        ${grouped.map(t => `<div class="trophy-cabinet-item" title="${ppEsc(t.type || '')}">${trophyMark(t.name, 52)}<div class="tc-name">${ppEsc(t.name)}${t.count > 1 ? ` <span class="tc-count">×${t.count}</span>` : ''}</div></div>`).join('')}
+      </div>
+    </section>`;
+  }
+
+  function ppSquadTable(team) {
+    const players = [...(team.players || [])].sort((a, b) => ppPosGroup(a) - ppPosGroup(b) || (b.ovr || 0) - (a.ovr || 0));
+    if (!players.length) return '<p class="pp-muted">No players registered.</p>';
+    let html = '';
+    let group = -1;
+    players.forEach(p => {
+      const g = ppPosGroup(p);
+      if (g !== group) {
+        if (group !== -1) html += '</tbody>';
+        group = g;
+        html += `<tbody><tr class="pp-group-row"><th colspan="7" scope="colgroup">${PP_GROUP_LABELS[g]}</th></tr>`;
+      }
+      const goals = playerCareerCount('goals', p.id);
+      const assists = playerCareerCount('assists', p.id);
+      const apps = playerCareerCount('ratings', p.id);
+      const injured = (typeof isPlayerInjured === 'function' && isPlayerInjured(p.id));
+      html += `<tr class="pp-row" data-href="${playerPageURL(p.id)}">
+        <td class="pp-c-pos">${ppEsc((p.pos || [])[0] || '')}</td>
+        <td class="pp-c-name"><a class="pp-link" href="${playerPageURL(p.id)}"><span class="tsr-avatar">${playerAvatarMark(p)}</span><span class="pp-name">${playerNameHTML(p)}</span>${injured ? '<span class="pp-flag" title="Injured">Injured</span>' : ''}</a></td>
+        <td class="pp-num">${apps || '–'}</td>
+        <td class="pp-num">${goals || '–'}</td>
+        <td class="pp-num">${assists || '–'}</td>
+        <td class="pp-c-form">${formArrow(p)}</td>
+        <td class="pp-num pp-ovr"><span class="player-ovr">${p.ovr || ''}</span></td>
+      </tr>`;
+    });
+    html += '</tbody>';
+    return `<div class="pp-table-wrap"><table class="pp-table">
+      <thead><tr><th>Pos</th><th>Player</th><th class="pp-num" title="Competitive appearances">Apps</th><th class="pp-num">Goals</th><th class="pp-num">Assists</th><th>Form</th><th class="pp-num">OVR</th></tr></thead>
+      ${html}</table></div>`;
+  }
+
+  function renderTeamPage(teamId) {
+    const root = document.getElementById('team-page');
+    if (!root) return;
+    const team = getTeam(teamId);
+    if (!team) {
+      document.title = 'Team not found — Apex Sim';
+      root.innerHTML = ppEmpty('Team not found', 'That team is not in the database. It may have been removed or the link is out of date.', 'teams.html', 'Browse all teams');
+      return;
+    }
+    document.title = team.name + ' — Apex Sim';
+    const th = ppTheme(team);
+    const players = [...(team.players || [])].sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    const rating = Math.round(teamAvgOvr(team));
+    const mgr = team.manager || {};
+    const mgrStyle = getManagerPlaystyle(team);
+    const mgrAwards = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
+    const formKey = pickTeamFormation(team);
+    const formation = (FORMATIONS[formKey] && FORMATIONS[formKey].name) || formKey;
+    const league = ppTeamLeague(team);
+    const top = players[0];
+    const isNational = (teamsData.national || []).includes(team);
+
+    root.innerHTML = `
+      <nav class="pp-crumbs" aria-label="Breadcrumb"><a href="teams.html">Teams</a><span aria-hidden="true">/</span><span>${ppEsc(team.name)}</span></nav>
+      <header class="pp-hero" style="--hero-bg:${th.bg};--hero-ink:${th.ink};--hero-soft:${th.soft};--hero-trim:${th.trim}">
+        <div class="pp-crest">${teamAvatarMark(team)}</div>
+        <div class="pp-hero-main">
+          <h1>${ppEsc(team.name)}</h1>
+          <p class="pp-hero-meta">${ppEsc(league)}${isNational ? '' : ''}</p>
+          <p class="pp-hero-meta">${ppEsc(getStadium(team))}, usually lines up in ${ppEsc(formation)}</p>
+        </div>
+        <div class="pp-hero-score" aria-label="Team rating ${rating}"><b>${rating}</b><span>Rating</span></div>
+      </header>
+
+      <dl class="pp-facts">
+        ${ppStat('Squad', players.length)}
+        ${top ? ppStat('Best player', `${ppEsc(top.name)} <small>${top.ovr || ''}</small>`) : ''}
+        ${ppStat('Manager', ppEsc(mgr.name || 'None'))}
+        ${ppStat('Style', ppEsc(mgrStyle))}
+        ${ppFormStrip(team.id) ? `<div class="pp-stat"><dd>${ppFormStrip(team.id)}</dd><dt>Last five</dt></div>` : ''}
+      </dl>
+
+      <div class="pp-grid">
+        <div class="pp-main">
+          <section class="pp-card">
+            <div class="pp-card-head"><h2 class="pp-card-title">Squad</h2><span class="pp-muted">${players.length} players</span></div>
+            ${ppSquadTable(team)}
+          </section>
+        </div>
+        <aside class="pp-side">
+          <section class="pp-card">
+            <h2 class="pp-card-title">Manager</h2>
+            <div class="manager-profile-row">
+              ${managerAvatarMark(mgr, 56)}
+              <div class="pp-mgr">
+                <strong>${ppEsc(mgr.name || 'No manager')}</strong>
+                <span>${mgr.ovr ? mgr.ovr + ' rating' : ''}</span>
+                <span class="playstyle-tag">${ppEsc(mgrStyle)}</span>
+                ${mgrAwards ? `<span class="pp-muted">${mgrAwards} manager award${mgrAwards === 1 ? '' : 's'}</span>` : ''}
+              </div>
+            </div>
+          </section>
+          <section class="pp-card">
+            <h2 class="pp-card-title">Starting XI <span class="pp-muted">${ppEsc(formation)}</span></h2>
+            <div class="pitch-wrap">${renderTeamLineupPitchHTML(team)}</div>
+          </section>
+          ${renderTeamMatchLogHTML(team.id) ? `<section class="pp-card pp-log">${renderTeamMatchLogHTML(team.id).replace('card-title', 'pp-card-title')}</section>` : ''}
+          ${ppTeamHonours(team)}
+        </aside>
+      </div>`;
+  }
+
+  // ---------- PLAYER PAGE ----------
+  function ppStatGroup(title, rows) {
+    return `<div class="pp-statgroup"><h3>${title}</h3><dl>${rows.map(([l, v]) => `<div><dt>${l}</dt><dd>${v}</dd></div>`).join('')}</dl></div>`;
+  }
+
+  function renderPlayerPage(playerId) {
+    const root = document.getElementById('player-page');
+    if (!root) return;
+    const found = findPlayerAndTeam(playerId);
+    if (!found) {
+      document.title = 'Player not found — Apex Sim';
+      root.innerHTML = ppEmpty('Player not found', 'That player is not in the database. They may have been released or the link is out of date.', 'players.html', 'Browse all players');
+      return;
+    }
+    const player = found.player, team = found.team;
+    document.title = player.name + ' — Apex Sim';
+    const th = ppTheme(team);
+    const aff = getPlayerAffiliations(player.id);
+    const club = aff.club || team, nation = aff.national;
+    const pos = (player.pos || []);
+
+    const g = playerCareerCount('goals', playerId), a = playerCareerCount('assists', playerId);
+    const saves = playerCareerCount('saves', playerId), motm = playerCareerCount('motm', playerId);
+    const yel = playerCareerCount('yellows', playerId), red = playerCareerCount('reds', playerId);
+    const apps = playerCareerCount('ratings', playerId);
+    const ints = playerCareerCount('interceptions', playerId), blk = playerCareerCount('blocks', playerId);
+    const cc = playerCareerCount('chancesCreated', playerId), bcm = playerCareerCount('bigChancesMissed', playerId);
+    const xg = playerCareerCount('xg', playerId), xa = playerCareerCount('xa', playerId);
+    const ratingEntry = (careerStats.ratings || {})[playerId];
+    const avgRating = ratingEntry && ratingEntry.count ? ratingEntry.avg : null;
+    const mins = ((careerStats.minutes || {})[playerId] || {}).count || 0;
+    const minsPerGA = (mins > 0 && (g + a) > 0) ? Math.round(mins / (g + a)) : null;
+
+    const boosted = !!player.attrBoosted;
+    const attr = player.expandedAttrs || {};
+    const bio = [];
+    if (boosted) {
+      if (typeof attr.age === 'number') bio.push(['Age', attr.age]);
+      if (typeof attr.height_cm === 'number') bio.push(['Height', Math.round(attr.height_cm) + ' cm']);
+      if (attr.preferred_foot) bio.push(['Foot', ppEsc(attr.preferred_foot)]);
+      if (typeof attr['weak foot'] === 'number') bio.push(['Weak foot', attr['weak foot'] + ' of 5']);
+      if (attr.injury_res) bio.push(['Injury resistance', ppEsc(attr.injury_res)]);
+    }
+
+    const playstyles = (attr.playstyle || []);
+    const personality = (attr.personality || []);
+    const tags = playstyles.map(s => {
+      const desc = PLAYSTYLE_DESCRIPTIONS[s] || '';
+      const cls = player.autoPlaystyle ? 'playstyle-tag auto-assigned' : 'playstyle-tag';
+      return `<span class="${cls}" title="${ppEsc(desc)}${player.autoPlaystyle ? ' (assigned by position)' : ''}">${ppEsc(s)}</span>`;
+    }).join('') + personality.map(s => `<span class="playstyle-tag personality-tag" title="${ppEsc(PERSONALITY_DESCRIPTIONS[s] || '')}">${ppEsc(s)}</span>`).join('');
+
+    const injRec = (typeof isPlayerInjured === 'function' && isPlayerInjured(playerId)) ? injuryBook[playerId] : null;
+    const injuryBanner = injRec ? `<div class="pp-alert" role="status"><strong>${ppEsc(injRec.type || 'Injured')}</strong>${injRec.bodyPart ? ' (' + ppEsc(injRec.bodyPart) + ')' : ''}. Out for ${injRec.matchesLeft} more match${injRec.matchesLeft > 1 ? 'es' : ''}.${injRec.cause ? ` <span class="pp-muted">${ppEsc(injRec.cause)}${injRec.opponent ? ' vs ' + ppEsc(injRec.opponent) : ''}</span>` : ''}</div>` : '';
+
+    const attributes = (boosted && player.expandedAttrs)
+      ? expandedAttrRowsHTML(player)
+      : [['ATT', player.att], ['DEF', player.def], ['PHY', player.phy], ['PAC', player.pac], ['TEC', player.tec]].map(([n, v]) => `
+          <div class="attr-bar-row"><span class="attr-name">${n}</span>
+            <div class="attr-track"><div class="attr-fill ${statTierClass(v)}" style="width:${Math.min(100, v || 50)}%"></div></div>
+            <span class="attr-val ${statTierClass(v)}">${v || '-'}</span></div>`).join('');
+
+    const skills = (boosted && (attr.skills || []).length)
+      ? `<div class="pp-skills"><h3>Skills</h3>${attr.skills.map(sk => `<span class="playstyle-tag">${ppEsc(sk)}</span>`).join('')}</div>` : '';
+
+    const posNote = (boosted && player.ovrPosAlt && player.ovrPos)
+      ? `<p class="pp-note">Rated at ${ppEsc(player.ovrPos)}, the best of the positions he is known to play.</p>` : '';
+    const sigNote = (boosted && player.signatureBonus > 0)
+      ? `<p class="pp-note">+${player.signatureBonus} from signature attributes that sit well above the rest of the sheet.</p>` : '';
+
+    const log = renderPlayerMatchLogHTML(playerId);
+    const injLog = renderPlayerInjuryLogHTML(playerId);
+    const cabinet = playerTrophyCabinetHTML(player);
+    const ratingChart = renderPlayerRatingFormChartHTML(playerId);
+    const contribChart = renderPlayerContributionChartHTML(playerId);
+    const stripTitle = (html) => html.replace(/<div class="card-title"[^>]*>/, '<h2 class="pp-card-title">').replace('</div>', '</h2>');
+
+    root.innerHTML = `
+      <nav class="pp-crumbs" aria-label="Breadcrumb"><a href="players.html">Players</a><span aria-hidden="true">/</span>${club ? `<a href="${teamPageURL(club.id)}">${ppEsc(club.name)}</a><span aria-hidden="true">/</span>` : ''}<span>${ppEsc(player.name)}</span></nav>
+      <header class="pp-hero pp-hero-player" style="--hero-bg:${th.bg};--hero-ink:${th.ink};--hero-soft:${th.soft};--hero-trim:${th.trim}">
+        <div class="pp-portrait">${playerAvatarMark(player)}</div>
+        <div class="pp-hero-main">
+          <h1>${playerNameHTML(player)}</h1>
+          <p class="pp-hero-meta pp-affil">
+            ${club ? `<a href="${teamPageURL(club.id)}">${teamMark(club, 20)}<span>${ppEsc(club.name)}</span></a>` : ''}
+            ${nation ? `<a href="${teamPageURL(nation.id)}">${teamMark(nation, 20)}<span>${ppEsc(nation.name)}</span></a>` : ''}
+          </p>
+          <p class="pp-hero-meta">${pos.map(ppEsc).join(', ') || 'No position'}${boosted ? ' · Enhanced profile' : ''}</p>
+        </div>
+        <div class="pp-hero-score" aria-label="Overall ${player.ovr || 0}"><b>${player.ovr || '–'}</b><span>${formArrow(player)} ${ppEsc(formLabel(player))}</span></div>
+      </header>
+
+      ${injuryBanner}
+
+      ${(bio.length || tags) ? `<div class="pp-strip">
+        ${bio.length ? `<dl class="pp-facts pp-facts-inline">${bio.map(([l, v]) => ppStat(l, v)).join('')}</dl>` : ''}
+        ${tags ? `<div class="pp-tags">${tags}</div>` : ''}
+      </div>` : ''}
+
+      <div class="pp-grid">
+        <div class="pp-main">
+          <section class="pp-card">
+            <h2 class="pp-card-title">Career, competitive matches</h2>
+            <div class="pp-statgroups">
+              ${ppStatGroup('Output', [['Apps', apps], ['Goals', g], ['Assists', a], ['Mins per G+A', minsPerGA != null ? minsPerGA : '–'], ['Avg rating', avgRating != null ? avgRating.toFixed(2) : '–'], ['Player of the match', motm]])}
+              ${ppStatGroup('Chance quality', [['xG', xg.toFixed(2)], ['xA', xa.toFixed(2)], ['Chances created', cc], ['Chances missed', bcm]])}
+              ${ppStatGroup('Defending and discipline', [['Interceptions', ints], ['Blocks', blk], ['Saves', saves], ['Yellow cards', yel], ['Red cards', red]])}
+            </div>
+          </section>
+          ${ratingChart ? `<section class="pp-card">${stripTitle(ratingChart)}</section>` : ''}
+          ${contribChart ? `<section class="pp-card">${stripTitle(contribChart)}</section>` : ''}
+          ${log ? `<section class="pp-card pp-log">${stripTitle(log)}</section>` : ''}
+          ${injLog ? `<section class="pp-card pp-log">${stripTitle(injLog)}</section>` : ''}
+          ${cabinet ? `<section class="pp-card">${stripTitle(cabinet).replace('🏆 ', '')}</section>` : ''}
+        </div>
+        <aside class="pp-side">
+          <section class="pp-card">
+            <h2 class="pp-card-title">Attributes</h2>
+            ${renderPlayerAttributeRadarHTML(player).replace(/<div class="card-title"[^>]*>Attribute Radar<\/div>/, '')}
+            ${sigNote}${posNote}
+            <div class="pp-attrs">${attributes}</div>
+            ${skills}
+          </section>
+        </aside>
+      </div>`;
+
+    requestAnimationFrame(() => {
+      try { drawPlayerRatingFormChart(player.id); } catch (e) {}
+      try { drawPlayerContributionChart(player.id); } catch (e) {}
+    });
+  }
+
+  // Home page: live counts from the loaded database.
+  function renderHomeFacts() {
+    const el = document.getElementById('home-facts');
+    if (!el) return;
+    try {
+      const teams = allTeams.length;
+      const players = getAllPlayersFlat().length;
+      const clubs = (teamsData.club || []).length, nations = (teamsData.national || []).length;
+      el.innerHTML = `<span><b>${teams.toLocaleString()}</b>teams (${clubs.toLocaleString()} clubs, ${nations.toLocaleString()} national)</span><span><b>${players.toLocaleString()}</b>players</span>`;
+    } catch (e) { el.textContent = ''; }
   }
 
 
@@ -20720,18 +21092,20 @@ const PLAYSTYLE_BEHAVIOR = {
     const teamLine = (entry.clubTeam && entry.nationalTeam)
       ? `${teamMark(entry.clubTeam, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entry.clubTeam.short || entry.clubTeam.name}</span> · ${teamMark(entry.nationalTeam, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${entry.nationalTeam.short || entry.nationalTeam.name}</span>`
       : `${teamMark(t, 14)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.short || t.name}</span>`;
-    return `<div class="team-check${selected ? ' selected' : ''}" style="cursor:pointer;border-left:3px solid ${primary}" onclick="${clickAction}">
-      <div style="display:flex;align-items:center;gap:8px;width:100%">
-        <span class="tsr-avatar" style="width:36px;height:36px;flex-shrink:0">${playerAvatarMark(p)}</span>
-        <div style="flex:1;min-width:0">
-          <strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${playerNameHTML(p)}</strong>
-          <div style="font-size:0.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px">${teamLine} · ${(p.pos || [])[0] || ''}${bioBit}</div>
-        </div>
+    const inner = `
+        <span class="dir-mark"><span class="tsr-avatar">${playerAvatarMark(p)}</span></span>
+        <span class="dir-main">
+          <strong class="dir-name">${playerNameHTML(p)}</strong>
+          <span class="dir-sub">${teamLine}${bioBit}</span>
+        </span>
+        <span class="dir-col-pos">${(p.pos || [])[0] || ''}</span>
         ${playersCompareMode ? `<span class="compare-check${selected ? ' checked' : ''}">${selected ? '✓' : ''}</span>` : ''}
-        ${formArrow(p)}
-        <span class="player-ovr">${p.ovr || ''}</span>
-      </div>
-    </div>`;
+        <span class="dir-col-form">${formArrow(p)}</span>
+        <span class="dir-col-ovr"><span class="player-ovr">${p.ovr || ''}</span></span>`;
+    if (playersCompareMode) {
+      return `<div class="dir-row dir-row-player${selected ? ' selected' : ''}" role="button" tabindex="0" style="--row-accent:${primary}" onclick="${clickAction}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${clickAction}}">${inner}</div>`;
+    }
+    return `<a class="dir-row dir-row-player" href="${playerPageURL(p.id)}" style="--row-accent:${primary}">${inner}</a>`;
   }
 
 
@@ -20743,7 +21117,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const countEl = document.getElementById('players-count');
     if (countEl) countEl.textContent = list.length ? `${list.length} player${list.length === 1 ? '' : 's'} · showing ${Math.min(playersShown, list.length)}` : '';
     if (!list.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>No players match your search.</p></div>';
+      el.innerHTML = '<div class="empty-state"><p><strong>No players match.</strong></p><p>Clear a filter or try a shorter search.</p></div>';
       const moreBtn = document.getElementById('players-load-more');
       if (moreBtn) moreBtn.style.display = 'none';
       return;
@@ -28248,7 +28622,7 @@ const PLAYSTYLE_BEHAVIOR = {
     simTournamentRound, simAllTournament, resetTournament, filterTeams, filterTeamsLeague, filterTeamsRating,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     playLeagueTournamentFixture, simLeagueTournamentFixture,
-    returnToTournament, showPlayerProfile, showTeamProfile, showTeamLineup, randomMatch, randomizeTeamSide,
+    returnToTournament, showPlayerProfile, showTeamProfile, renderPlayerPage, renderTeamPage, playerPageURL, teamPageURL, showTeamLineup, randomMatch, randomizeTeamSide,
     resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
     sortTournamentTeams, filterTournamentTeamsLeague, filterTournamentTeamsRating,
