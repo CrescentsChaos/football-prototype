@@ -4636,14 +4636,24 @@ const PLAYSTYLE_BEHAVIOR = {
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
+    if (typeof s !== 'string') return '';
+    let cached = _canonSkillCache.get(s);
+    if (cached !== undefined) return cached;
     const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    cached = SKILL_NAME_ALIASES[k] || k;
+    _canonSkillCache.set(s, cached);
+    return cached;
   }
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    let set = p.expandedAttrs._canonSkills;
+    if (!set) {
+      set = new Set((p.expandedAttrs.skills || []).map(canonSkillKey));
+      p.expandedAttrs._canonSkills = set;
+    }
+    return set.has(canonSkillKey(skillName));
   }
   function xattr(p, key, fallback) {
     const v = p && p.expandedAttrs && p.expandedAttrs[key];
