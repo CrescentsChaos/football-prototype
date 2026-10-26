@@ -1,0 +1,775 @@
+{
+ "_comment": "Media Centre — storylines (manager sackings, breakout stars, dressing-room rows, transfer hijacks, underdogs). Template syntax is the same as media.json: {var}, {var|sur}, {?a|b|c}. All stories are generated from real simulation events (match results, tables, lineups, the transfer log).",
+ "CFG": {
+  "budgetPerFlush": 64,
+  "sack": {
+   "protect": 6,
+   "perLeague": 2,
+   "leagueGap": 14,
+   "slumpBp": 45,
+   "decay": 0.94,
+   "caretakerGames": 3
+  },
+  "breakout": {
+   "minApps": 4,
+   "minAvg": 7.5,
+   "minContrib": 3,
+   "teamCooldown": 10,
+   "maxRank": 7,
+   "stage2Contrib": 8,
+   "stage2Apps": 7
+  },
+  "dispute": {
+   "cooldown": 10,
+   "peaceWins": 2,
+   "expire": 10,
+   "starRank": 4,
+   "chance": 0.3
+  },
+  "underdog": {
+   "cooldown": 8,
+   "minRound": 6,
+   "upsetGap": 4,
+   "runUnbeaten": 6
+  },
+  "hijack": {
+   "maxPerFlush": 4
+  }
+ },
+ "NAMES": {
+  "first": [
+   "Marco",
+   "Dietmar",
+   "Tomás",
+   "Álvaro",
+   "Stefan",
+   "Julien",
+   "Rui",
+   "Mattias",
+   "Giorgos",
+   "Emre",
+   "Paolo",
+   "Joachim",
+   "Sérgio",
+   "Nikola",
+   "Andrés",
+   "Henrik",
+   "Luca",
+   "Kasper",
+   "Mihai",
+   "Yannick",
+   "Fernando",
+   "Ruud",
+   "Claudio",
+   "Thiago",
+   "Ivan",
+   "Bastian",
+   "Darren",
+   "Gareth",
+   "Lars",
+   "Matteo"
+  ],
+  "last": [
+   "Falcone",
+   "Brandt",
+   "Navarro",
+   "Reinholt",
+   "Oliveira",
+   "Vasquez",
+   "Lindqvist",
+   "Moretti",
+   "Kowalczyk",
+   "Delacroix",
+   "Santoro",
+   "Hartmann",
+   "Ibáñez",
+   "Petrakis",
+   "Albrecht",
+   "Rossetti",
+   "Duarte",
+   "Novák",
+   "Verhoeven",
+   "Calderón",
+   "Whitlock",
+   "Strand",
+   "Marchetti",
+   "Beaumont",
+   "Okafor-Reyes",
+   "Kessler",
+   "Ferraro",
+   "Almeida",
+   "Holm",
+   "Tavares"
+  ]
+ },
+ "B": {
+  "sack_bn": [
+   "🚨 BREAKING: {team} have sacked {mgr} {trig}. {interim} to take interim charge.",
+   "🚨 {team} part company with {mgr} {trig}. Board confirmed the decision this morning.",
+   "BREAKING | {mgr} is OUT at {team}. Dismissed {trig}. {interimS} steps up.",
+   "🚨 DONE: {mgr} has been relieved of his duties at {team} {trig}.",
+   "BREAKING NEWS 🔴 {team} sack {mgr}. {interimS} placed in temporary charge of the first team."
+  ],
+  "sack_j": [
+   "{team} have decided to part ways with {mgr} {trig}. {interim} will take charge of the team in the next fixture. Board meeting ended a short time ago. 🚨",
+   "Sources: {mgrS}'s exit at {team} was agreed after a tense board meeting. {interimS} is the interim solution while the club moves quickly on a replacement.",
+   "Understand {team} board made the call on {mgrS} {trig}. No resignation, no compensation talks yet — straight dismissal. {interimS} takes over.",
+   "{team} confirm: {mgrS} leaves. Decision taken {trig}. Search for the next head coach starts immediately. {interimS} in charge for now.",
+   "Total shock inside {team} — the decision on {mgrS} was only made in the last hours. Dismissal confirmed {trig}."
+  ],
+  "sack_club": [
+   "{team} can confirm that {mgr} has left his role as head coach with immediate effect. We thank him for his work and wish him well. {interim} takes interim charge.",
+   "Official | {mgr} has been relieved of his duties. {interim} will lead the first team while the club identifies a successor.",
+   "The club has parted company with head coach {mgr}. The board will make no further comment at this time. {interimS} to take training.",
+   "Club statement: after careful consideration the board has decided to make a change in the dugout. {mgr} leaves with our thanks. Interim: {interim}."
+  ],
+  "sack_gaffe": [
+   "{mgrS} AXED! {team} chiefs pull the trigger {trig} — and the dressing room didn't see it coming",
+   "BLOOD ON THE FLOOR: {team} sack {mgrS} {trig}. Players told in the canteen.",
+   "{team} BOSS {mgrS} GETS THE BOOT {trig} — and the timing has shocked everyone",
+   "It's over for {mgrS}! {team} board fire him {trig} in a ruthless morning call",
+   "SACKED: {mgrS} told to clear his desk at {team} {trig}. Who's next in the hot seat?"
+  ],
+  "sack_head": [
+   "{team} dismiss {mgr} {trig}",
+   "Why {team} pulled the trigger on {mgr} now",
+   "{mgrS} out: the {team} decision explained",
+   "The sacking nobody saw coming at {team}",
+   "{team} change the man in the dugout — {mgr} gone {trig}"
+  ],
+  "sack_body1": [
+   "{team} have dismissed {mgr}, {trig}. The decision was taken by the board after discussions that began on the night of the {score} result against {opp}, with {interim} named to take training immediately.",
+   "The board at {team} acted decisively on {mgr}, parting ways {trig}. The club insists the decision was taken with the long-term project in mind, though few inside the building expected it to come so abruptly.",
+   "{mgr} is no longer the head coach of {team}. The club announced the news {trig}, bringing an unexpected end to a tenure that, only weeks ago, looked secure."
+  ],
+  "sack_body2": [
+   "{interim} will take interim charge for the next fixtures while the club searches for a permanent successor. Several names have already been linked, though the board is expected to take its time over the appointment.",
+   "The players were informed before training. Senior figures are understood to have been consulted in the days leading up to the decision, and {interimS} will address the squad before the next match.",
+   "For {mgrS}, it ends a spell that included moments of real quality, but the club felt the direction of travel had changed. {team} sit {pos} in the table, with {pts} points from {rounds} league games."
+  ],
+  "sack_trig_slump": [
+   "after {n} defeats in a row",
+   "with {team} {pos} and winless in {nw}",
+   "following a dismal run of {pts} points from {rounds} games",
+   "after the {score} defeat to {opp} extended the slump to {n}"
+  ],
+  "sack_trig_cupshock": [
+   "hours after the {score} exit against {opp} in the {comp}",
+   "after the shock {score} defeat to {opp} ended their {comp} run",
+   "within 24 hours of the {comp} elimination at the hands of {opp}"
+  ],
+  "sack_trig_derby": [
+   "after the {score} derby humiliation against {opp}",
+   "one day after losing {score} to rivals {opp}",
+   "following the derby hammering at {opp}, a {score} result the fans will not forgive"
+  ],
+  "sack_trig_topfour": [
+   "despite {team} sitting {pos} in the table",
+   "even though {team} are {pos} — a decision that has stunned the league",
+   "with {team} still {pos}, in one of the most surprising sackings of the season"
+  ],
+  "sack_trig_revolt": [
+   "after weeks of dressing-room unrest — and in spite of the {score} result against {opp}",
+   "just hours after beating {opp} {score}, as the dressing-room row finally boiled over",
+   "following a breakdown in relations with senior players despite the {score} win over {opp}"
+  ],
+  "sack_fan_stun": [
+   "wait... {mgrS} sacked?? we are {pos}. what is the board doing",
+   "I need someone to explain this to me. {mgrS} gone {trig}?",
+   "so we sack the manager {trig} and call it a plan. sure.",
+   "no way. no way. {mgrS} out?? this club will never stop shooting itself in the foot",
+   "{interimS}?? we are really handing the team to {interimS} now?",
+   "Absolutely did not see that coming. {mgrS} was the one thing keeping this together"
+  ],
+  "sack_fan_angry": [
+   "BOARD OUT. {mgrS} did NOT deserve this. #{teamS}",
+   "{mgrS} got the sack and the people who signed the {pos} squad are still in a job. Madness.",
+   "Mate we were {pos}. The club is a circus. Sack the board, not the manager.",
+   "Sacking {mgrS} {trig} is the most {team} thing that could ever happen",
+   "A club with no plan. Fire the manager every time something goes wrong, see where it gets you."
+  ],
+  "sack_fan_happy": [
+   "should have gone weeks ago. the {score} vs {opp} was the last straw. thank you {mgrS}, now go",
+   "FINALLY. {mgrS} had no answers. Fresh start, {interimS}, do your thing.",
+   "{mgrS} was a nice man. he was also a terrible tactician. goodbye.",
+   "the players stopped playing for him a month ago. I'm gutted for him but it had to happen",
+   "Right decision, wrong timing. Should've been done after the {n}-game slide. Let's go {interimS} 💪"
+  ],
+  "sack_rival": [
+   "{mgrS} sacked {trig}?? the {team} ship is sinking 😂",
+   "heard {team} are announcing {interimS} as a cost-saving measure",
+   "Could {mgrS} have another kind of free time now? asking for {team} fans",
+   "RIP {mgrS}'s tenure 🪦 {team} board strikes again",
+   "{team} fans pretending to be sad about {mgrS} while checking Transfermarkt for the next name"
+  ],
+  "sack_farewell": [
+   "Thank you {team}. To the players, staff and supporters: it was an honour. I leave with my head high and wish the club nothing but success. {mgrS}",
+   "Proud of what we built together. Football is football, decisions get made. I will always wish this club well. 🙏",
+   "I have received the news with respect. Gratitude to everyone at {team} — I gave everything. See you down the road.",
+   "Sad, but that's the profession. Grateful to the fans who stayed behind me. {team} will always have a place in my heart."
+  ],
+  "sack_player": [
+   "Thank you boss. For everything. This one hurts. 💔",
+   "Not the news anyone wanted today. Thank you {mgrS} for believing in me.",
+   "Football can be cruel. Respect, boss. Now we get back to work and do right by the badge.",
+   "Gutted for {mgrS}. We as players have to take responsibility too."
+  ],
+  "sack_meme": [
+   "{team} board after sacking {mgrS}: 'we have solved football' 🤡",
+   "the manager at {team}: *sacked {trig}* the board: 'it's a new era' the table: {pos}",
+   "{mgrS} out. Interim manager sweating. Players sweating. Board: 😎",
+   "POV: you're {interimS} walking into training on the first day"
+  ],
+  "sack_radio": [
+   "Hold on, think about it: you sack him {trig}. What's the plan, exactly? A new man in the dugout doesn't fix a squad. I give {interimS} six weeks.",
+   "Some clubs sack managers because they've run out of ideas. Some because they have too many. {team} seem to have found a third category: panic.",
+   "You can disagree with {mgrS}, but this is a club where the manager is always the first to fall. Same story every time, different name on the door."
+  ],
+  "sack_vid": [
+   "🎥 {mgr} OUT at {team}: what really happened behind the scenes? Full breakdown",
+   "🎥 {team}'s sacking chaos explained — who gets the job next?",
+   "🎥 REACTION: {team} fans react to {mgrS} being sacked outside the stadium"
+  ],
+  "sack_tv_line": [
+   "Breaking news in the studio: {team} have dismissed {mgr}. We've got the details, plus reaction from the panel.",
+   "A major managerial shock this hour: {mgr} has been sacked by {team} {trig}. The board have moved quickly."
+  ],
+  "sack_pan_analyst": [
+   "You have to look at the process here. {mgrS} had a clear idea, but the fixtures and the squad didn't always match. The problem for {interimS} is the same one.",
+   "I can't fault the structure, but the results at {opp} showed the lack of a plan B. It's hard to defend that."
+  ],
+  "sack_pan_attacker": [
+   "Brutal. And honestly, harsh. {team} were {pos}. Give a manager time, for goodness' sake!",
+   "I'm not saying it was the wrong call, I'm saying it was the loudest one. The players have to take a huge share of the blame here."
+  ],
+  "sack_pan_hardman": [
+   "In my day if you lost like that you answered for it in the dressing room. The board has made a decision. Players need to wake up.",
+   "It's a brutal business, and the dressing room always wins in the end. If the players don't want to run for you, you're gone."
+  ],
+  "sack_stat": [
+   "{team} have changed manager {trig}. Since the start of the season: {pts} points from {rounds} league games, {pos} in the table. Interim: {interimS}. Next-manager market opens now.",
+   "📊 {team} after sacking {mgrS}: {pos} place, {pts} pts from {rounds}. Preseason projection: {exp}. Over/under on the replacement's first-month points: 6.5"
+  ],
+  "sack_linked": [
+   "Names being linked with the {team} job: {names}. Nothing agreed, but the board is already canvassing opinion.",
+   "Early {team} shortlist: {names}. Sources say the board wants a quick appointment to avoid a prolonged interim spell.",
+   "Bookmakers' early odds on the {team} job: {names}. The market has opened within hours."
+  ],
+  "care_win_bn": [
+   "{interim} gets off to a perfect start at {team}: {score} win over {opp}. 'New boss bounce' headlines coming...",
+   "WIN for {team} under interim boss {interimS} — {score} against {opp}. Reaction: 'It was always about the players'."
+  ],
+  "care_loss_bn": [
+   "No bounce for {team}: {interimS}'s first game ends in a {score} defeat to {opp}. The club's search for a new head coach intensifies.",
+   "{team} slump on under {interimS}: {score} defeat at {opp} piles more pressure on the board."
+  ],
+  "care_draw_bn": [
+   "{interimS} takes a point from {opp} in his first game in charge of {team} ({score}). Solid, not spectacular.",
+   "Honours even: {team} {score} {opp} in the first game under {interimS}."
+  ],
+  "care_fan_win": [
+   "maybe it WAS the manager?? {interimS} for the job 😅",
+   "first game under {interimS}: {score}. I did not see that coming. keep him!",
+   "The players are playing for the shirt again. {interimS} must stay"
+  ],
+  "care_fan_loss": [
+   "same old {team}, just with a different guy shouting on the touchline",
+   "{score}. The interim change changed nothing. Board needs to look at itself.",
+   "told you the manager wasn't the problem. {interimS} can't fix that squad."
+  ],
+  "care_manager_quote": [
+   "{interimS}: 'It's a difficult situation but my focus is simply the next game. The lads have been fantastic in training.'",
+   "{interimS} after the {opp} game: 'I'm only here until the board decides. I have to give them something to think about.'"
+  ],
+  "appoint_bn": [
+   "🚨 OFFICIAL: {team} appoint {newMgr} as head coach, replacing sacked {mgr}.",
+   "{team} name {newMgr} as their new manager after {rounds2} games of interim control.",
+   "BREAKING | {newMgr} is the new {team} head coach. {interimS} returns to his previous role."
+  ],
+  "appoint_j": [
+   "Here we go! {newMgr} is the new head coach of {team}. Deal done on a contract until the end of next season. {interimS} goes back to his usual role. ✍️",
+   "{team} announce {newMgr} as the successor to {mgrS}. The board wanted continuity and a quick fix — and believe they have found both."
+  ],
+  "appoint_club": [
+   "Welcome, {newMgr}. 🤝 The club is delighted to announce the appointment of {newMgr} as head coach.",
+   "{team} are pleased to confirm {newMgr} as our new first-team manager. We thank {interim} for his work as interim boss."
+  ],
+  "appoint_gaffe": [
+   "{newMgrS} IS IN! {team} unveil their new boss — and it's not the name anyone was expecting",
+   "NEW BOSS: {team} land {newMgrS} after chaos following the {mgrS} sacking"
+  ],
+  "appoint_quote": [
+   "{newMgrS}: 'I know the size of the challenge. The club is {pos} for a reason, but I have a clear plan and good players.'",
+   "{newMgrS} at his unveiling: 'I won't promise titles. I promise a team that fights every minute.'"
+  ],
+  "appoint_fan": [
+   "who?? {newMgrS}?? fine, let's see what he can do",
+   "sounds like a gamble but the board has had a few already. Welcome {newMgrS}!",
+   "{newMgrS} — never heard of him but I'll back anyone who isn't the last guy",
+   "if {newMgrS} gets us out of this I'll eat my scarf 🧣"
+  ],
+  "star_bn": [
+   "⭐ {player} has now been directly involved in {line} for {team}. Nobody had him on the radar in August.",
+   "Breakout watch: {player} ({team}) — {line}, average rating {avg}. The {role} is the story of the season so far.",
+   "{player} did it again for {team}: {score} vs {opp}. {line} now. Where did this come from?",
+   "🔥 {who} {player} has come from nowhere to become {team}'s most talked-about {role}: {line}."
+  ],
+  "star_stat": [
+   "📊 {player} ({teamS}): {apps} games, {line}, avg rating {avg}. He wasn't among {teamS}'s big names in preseason — that has changed.",
+   "{player}'s season: {g} goals, {a} assists, {avg} avg rating over {apps} matches. Among the best numbers for any {role} in the league right now.",
+   "Quietly the form {role} in the game: {player} — {line} in {apps} appearances, avg {avg}."
+  ],
+  "star_gaffe": [
+   "WHO IS {player|up}? The {teamS} {role} everyone is suddenly talking about",
+   "{player}: from squad player to match-winner. {line}",
+   "{teamS}'s secret weapon {playerS} is making the big names look nervous",
+   "HE'S THE REAL DEAL: {playerS} strikes again for {teamS}"
+  ],
+  "star_head": [
+   "{player}: the unheralded {role} who is lighting up {team}",
+   "How {team}'s {playerS} went from the bench to the headlines",
+   "The rise of {player}: {line} and counting",
+   "Meet {playerS}, {team}'s accidental star"
+  ],
+  "star_body1": [
+   "Nobody inside {team} would have predicted this when the squad was assembled. {player} was a fringe name in preseason; {apps} games later he has {line} and an average rating of {avg}, numbers that put several of the league's famous {role}s to shame.",
+   "There is a case that {player} is the most important surprise of the campaign. {line} from {apps} appearances, with a performance against {opp} ({score}) that sealed his reputation: confident, direct, and completely unafraid of the big stage.",
+   "The numbers are hard to argue with: {line}, {avg} average rating, {apps} appearances. {player} has gone from squad player to indispensable at {team}."
+  ],
+  "star_body2": [
+   "{mgrS} has been quick to protect him from the hype, but admitted the club did not expect this level of output. Scouts from other clubs have reportedly been making calls.",
+   "The question now is whether {team} can keep hold of him. Once a player produces like this, suitors tend to arrive — and so do the questions about contract and price.",
+   "Whether this is a purple patch or a new baseline will be tested in the coming weeks. For now, {team} supporters are simply enjoying the ride."
+  ],
+  "star_take": [
+   "What's working for {player}: he's getting into the same pockets every game, and defenders still don't know how to deal with it. {team} built around that and the results followed.",
+   "Look at where {playerS} is receiving the ball. He isn't a lucky finisher — it's repeatable, and that's why this form isn't going away.",
+   "He doesn't have the profile of a star, which is the point. Opponents haven't scouted him properly. That edge lasts maybe six more games."
+  ],
+  "star_club": [
+   "{player}. {apps} games. {line}. 🔥 #{teamS}",
+   "Unstoppable. {playerS} 🙌 {line}.",
+   "That's our {playerS}! ⭐ Another huge performance against {oppS}."
+  ],
+  "star_mgr": [
+   "{playerS} has worked incredibly hard. He deserves every bit of this. But he is a part of a team — I won't let the headlines change his head.",
+   "People ask me: did you expect this? Honestly? He trains like this every day. Now everybody sees what we see.",
+   "Great player in the making. He needs to keep the same humility, because the league doesn't forgive."
+  ],
+  "star_player": [
+   "Just happy to help the team. Thank you to the boss and the lads for the trust. {line} — now back to work 🙏",
+   "Dreams come true. Thank you to everyone who believed in me when nobody was looking. Next one is on Saturday.",
+   "Keep your head down, keep working. That's the plan. Thank you for all the messages ❤️",
+   "Big thanks to my teammates — I just finish what they create. Onwards! 💪"
+  ],
+  "star_fan": [
+   "{playerS} for the national team call-up. {line}. what more do you want",
+   "I was shouting for {playerS} to start since August. Nobody listened. Now look.",
+   "Bought the {playerS} shirt already 🙌 {teamS} keep him!!",
+   "scout reports on {playerS}: 'elite instincts, great off the ball, fearless'. we got a gem",
+   "can we just appreciate {playerS}? {line}. out of nowhere!",
+   "if {teamS} lose {playerS} in the summer I'm done. build the team around him NOW"
+  ],
+  "star_meme": [
+   "{team} pulling {playerS} out of the bargain bin: 'He's a gem' defenders: 😰",
+   "scouts at {teamS} games: 'who the heck is {playerS}' also scouts, two weeks later: *urgently calling agent*",
+   "Footballers: *sign for £100m* {playerS}, {line}: 'am I a joke to you?'"
+  ],
+  "star_tv": [
+   "{player} from {team} is the talk of the league: {line}. Our panel weighs in on whether this is sustainable.",
+   "Tonight: the breakout star nobody saw coming — {player} of {team} and a season that is rewriting the script."
+  ],
+  "star_pan_analyst": [
+   "It's repeatable. The movement is intelligent and {team} have found the right system for him.",
+   "He has the technical level, and the role suits him perfectly. I'd be surprised if this stops."
+  ],
+  "star_pan_attacker": [
+   "It's pure confidence. {playerS} shoots, dribbles, tries things. I love players who play without fear!",
+   "Great to see a player doing it on the big stage. That's what football needs."
+  ],
+  "star_pan_hardman": [
+   "Let's see him do it in a dogfight in February. Season isn't over. But yes, credit where it's due.",
+   "Brilliant start. But the big clubs will test him in ways he hasn't seen yet."
+  ],
+  "star_suitors_j": [
+   "{player} is being monitored by {suitor1} and {suitor2}, sources say. Scouts have been at several {team} games. No bid yet, but the interest is serious. 👀",
+   "Interest growing in {playerS}: {suitor1} have asked for information, {suitor2} sent scouts to the last two matches. {team} want to keep him.",
+   "Exclusive: {suitor1} are admirers of {team}'s {player}. Early talks over valuation could follow soon."
+  ],
+  "star_talk_j": [
+   "Real talks! {to} have opened discussions with {from} for {player}. First approach is {fee}. The breakout {role} is now a serious target. ✍️",
+   "{to} have made their move for {player}: negotiations underway with {from}. Fee being discussed around {fee}."
+  ],
+  "star_suitors_gaffe": [
+   "{player|up} MANIA: {suitor1} and {suitor2} ready to raid {teamS} for the breakout star",
+   "TOP CLUBS CIRCLE {playerS}: {suitor1} lead the chase as {teamS} fear the worst"
+  ],
+  "star_suitors_fan": [
+   "{suitor1}?? you can't have him! {playerS} stays at {teamS}!",
+   "mate {suitor1} always do this — find a great young player, hover for months, sign them in the summer",
+   "I'd be happy for {playerS} if he leaves, but please at least let {teamS} get a proper fee",
+   "everyone suddenly wants {playerS} now. where were you when he was on the bench? 🙄"
+  ],
+  "room_trig_hooked": [
+   "was substituted after {min} minutes against {opp} ({score}) and walked straight down the tunnel",
+   "was taken off on {min} minutes in the {score} game with {opp}, visibly furious with the decision",
+   "was hooked early at {opp} ({score}) — cameras caught him shaking his head at the touchline"
+  ],
+  "room_trig_benched": [
+   "has been left out for the {streak}th straight game, the latest being the {score} result against {opp}",
+   "has started on the bench again — the {streak}th match without a start — and the club says nothing",
+   "dropped for another game after {team}'s {score} reaction against {opp}, with {streak} games on the sidelines"
+  ],
+  "room_trig_red": [
+   "was sent off after {min} minutes against {opp} and the team collapsed in a {score} defeat, teammates reportedly furious",
+   "saw red after {min} minutes in the {score} loss against {opp}. The dressing room is said to be split on the punishment",
+   "was dismissed on {min} minutes in a {score} defeat — a moment that has divided the squad"
+  ],
+  "room1_bn": [
+   "⚠️ Unrest at {team}: {player} {trig}. Club sources downplay the story.",
+   "Reports of a rift at {team}: {player} {trig}. Camp reaction awaited.",
+   "{team} dressing-room tension — {player} {trig}. Manager {mgrS} to address media."
+  ],
+  "room1_gaffe": [
+   "DRESSING ROOM BUST-UP! {player|up} {trig} — and {mgrS} faces a showdown",
+   "{teamS} IN TURMOIL: {playerS} furious after {opp} — and the squad is taking sides",
+   "{playerS} vs {mgrS}: the row that could rip {teamS} apart"
+  ],
+  "room1_club": [
+   "Matter is internal. We will not be commenting on speculation about our players or staff.",
+   "Everything is fine in our group. Focus is on the next match. #{teamS}"
+  ],
+  "room1_mgr": [
+   "Every player wants to play. {playerS} is a top professional and we speak daily. There's no issue between us.",
+   "That is football: decisions are made for the team. It was not about one player. We move on.",
+   "I don't discuss what happens in the dressing room. What I can say is the team comes first."
+  ],
+  "room1_player": [
+   "Focus. Work. Silence is sometimes the strongest answer. 🔒",
+   "Never in my career have I stopped fighting for my team. That's all I'm saying.",
+   "…"
+  ],
+  "room1_fan": [
+   "{playerS} has every right to be furious. he is our best player and gets treated like that??",
+   "benching/subbing {playerS} was baffling. {mgrS} has lost the dressing room already",
+   "{playerS} needs to be professional. No player is bigger than the club",
+   "we always do this, we have a great squad and let it fall apart over ego"
+  ],
+  "room2_bn": [
+   "🚨 {team}: training-ground row between {player} and {mgrS}, say reports. Captain {other} stepped in to calm things down.",
+   "Escalation at {team}: heated exchange between {player} and the staff after the {score} defeat to {opp}. {other} acted as peacemaker.",
+   "Dressing room divided at {team}. Senior players ({other}, {player}) met {mgrS} for an emergency talk after the {score} defeat at {opp}."
+  ],
+  "room2_gaffe": [
+   "TRAINING GROUND BUST-UP: {player|up} and {mgrS} in shouting match as {teamS} season unravels",
+   "{other|up} STEPS IN as {teamS} stars clash — row goes on for 20 minutes",
+   "CRISIS MEETING at {teamS}: {playerS} and the boss — what was said behind closed doors"
+  ],
+  "room2_head": [
+   "{team} have a dressing-room problem — and defeat at {opp} made it worse",
+   "Inside the {team} dressing room: the divide between {playerS} and {mgrS}",
+   "Why the {playerS} row threatens {team}'s season"
+  ],
+  "room2_body1": [
+   "The {score} defeat to {opp} was meant to be the line in the sand, but instead it widened a split. According to those close to the squad, {player} and {mgr} had a heated exchange the following morning, with {other} forced to intervene before things escalated.",
+   "A club that had hoped to keep this quiet found it impossible after the {score} result. {player} {trig}, and since then relations with {mgrS} have been strained, with several senior players now said to be taking sides."
+  ],
+  "room2_body2": [
+   "Results will decide the outcome. A win would paper over most of the cracks; another defeat and the {team} board will face a tough decision about whether to protect the manager or the player.",
+   "{mgrS} has so far chosen not to speak publicly about the matter, but the body language in training has told its own story. The next few games may decide who wins this particular argument."
+  ],
+  "room2_other": [
+   "Everyone at this club wants the same: to win. Let's keep our problems inside and fix them together. 🤝",
+   "Not the time to point fingers. We are a team, we win and lose together. Respect to everyone.",
+   "Heard a lot of noise lately. We are fine. Let us play football."
+  ],
+  "room2_fan": [
+   "this is how seasons die. {player} and {mgrS} need to sort it out NOW",
+   "{other} is the only adult in this club. Captain.",
+   "so who's going to go: {playerS} or {mgrS}? because both can't stay",
+   "{team} stuck in the worst place possible: bad results, bad atmosphere, bad news"
+  ],
+  "room3_bn": [
+   "🚨 {player} has told {team} he wants to leave after the dressing-room row with {mgrS}. Club hopes to resolve the matter internally — for now.",
+   "Transfer saga brewing: {player} is open to leaving {team}. Relationship with {mgrS} has broken down, sources claim.",
+   "{playerS} has asked about leaving {team}. The club's stance: not for sale. But the {opp} defeat ({score}) has changed the mood."
+  ],
+  "room3_j": [
+   "{player} wants out. The situation at {team} is beyond repair, with {suitorLine} 👀",
+   "Understand {playerS} would prefer a new club after the situation with {mgrS}. {suitorLine}",
+   "{team} are aware of {playerS}'s desire to move. {suitorLine}"
+  ],
+  "room3_gaffe": [
+   "{player|up} WANTS OUT! {teamS} star hands in transfer request after bust-up with {mgrS}",
+   "REBEL {playerS} TELLS {teamS}: I'M LEAVING — {mgrS} told to choose",
+   "{teamS} SUPERSTAR {playerS|up} ISSUES ULTIMATUM: ME OR {mgrS|up}"
+  ],
+  "room3_fan": [
+   "If {playerS} leaves {teamS} is finished. Board needs to fix this.",
+   "{mgrS} has lost the dressing room. Sack him before we lose {playerS} too.",
+   "{playerS} wants out? honestly don't blame him, the whole club is a mess",
+   "pick the best player and let the manager go. it's always been the answer"
+  ],
+  "room_suitor_real": [
+   "{suitorTo} already in talks to sign him.",
+   "{suitorTo} have already opened negotiations."
+  ],
+  "room_suitor_rumor": [
+   "{suitor1} and {suitor2} are expected to monitor the situation closely.",
+   "{suitor1} are tracking the situation and could make a move."
+  ],
+  "room_peace_bn": [
+   "Peace at {team}: {player} and {mgrS} have settled their differences after back-to-back wins. 'It's all in the past', says the club.",
+   "{team} dressing-room row is over: {player} back in the fold after two wins in a row.",
+   "Truce at {team} — {playerS} and {mgrS} shake hands after the {score} win over {opp}."
+  ],
+  "room_peace_club": [
+   "United. 💪 #{teamS}",
+   "One team. One badge. {playerS}, {mgrS} and the lads — back to winning ways. 🔵",
+   "Smiles at training this week. Back to business. #{teamS}"
+  ],
+  "room_peace_fan": [
+   "see? winning fixes everything. {playerS} and {mgrS} back on the same page 🤝",
+   "this is why you don't panic, the lads sorted it out in the dressing room",
+   "I told you it was blown out of proportion. Great win, {teamS}!"
+  ],
+  "hj_bn": [
+   "🚨 HIJACKED! {to2} have swooped in and signed {player} from {from} — {to} were in advanced talks. Fee: {fee}.",
+   "{to2} STEAL a march on {to}: {player} completes move from {from} ({fee}) while {to} were still negotiating.",
+   "BREAKING | {player} → {to2}. The deal was agreed behind the scenes and {to} have been blindsided. Fee {fee}."
+  ],
+  "hj_j": [
+   "{to2} hijacked the {player} deal! {to} were in talks with {from} but {to2} came in with a stronger offer ({fee}) and the player chose them. Done. ✍️",
+   "Total twist: {to2} gazumped {to} for {player}. {from} accepted {fee}. Medical booked. HERE WE GO! 🚨",
+   "{to} thought it was done — it wasn't. {to2} have moved faster, agreed terms with {from} for {playerS} and the deal is completed."
+  ],
+  "hj_gaffe": [
+   "{to2|up} HIJACK {to|up}'S DEAL! {playerS} snatched from under their noses for {fee}",
+   "SNATCHED! {to2} swoop for {playerS} as {to} fume — {fee} deal rips up the script",
+   "{to} left HUMILIATED as {to2} pinch {player} from {from} in a stunning hijack"
+  ],
+  "hj_head": [
+   "{to2} hijack {player} deal: how {to} lost the race",
+   "The anatomy of a hijack: {to2}, {to} and {player}",
+   "{to} outmanoeuvred: {playerS} goes to {to2} for {fee}"
+  ],
+  "hj_body1": [
+   "{to} had been in talks with {from} over {player}, and most observers believed the deal was close. Then {to2} stepped in, offered more, and convinced the player — completing the transfer for {fee} within hours.",
+   "It is the kind of deal that every sporting director dreads: {to2} watched the negotiations between {to} and {from}, waited for the right moment and moved decisively for {player}, with a fee of {fee}."
+  ],
+  "hj_body2": [
+   "For {to}, it is a painful setback and leaves them scrambling for alternatives. For {to2}, a statement of intent — and a reminder that in the transfer market, nothing is done until it is done.",
+   "{from} will not complain about a clean exit, but {to} are said to be furious, and a replacement target is already being lined up."
+  ],
+  "hj_club_hijacker": [
+   "Welcome to {to2}, {player}! 🔥 {fee}.",
+   "OFFICIAL: {player} signs for {to2}. 🤝",
+   "Done deal. {playerS} is ours. #{to2S}"
+  ],
+  "hj_club_victim": [
+   "We note the speculation. Our focus remains on the squad we have.",
+   "No comment on player movements. Business as usual. #{toS}"
+  ],
+  "hj_fan_hijacker": [
+   "HIJACK!!! {to2S} fans we are so back 😂 {playerS} is OURS",
+   "imagine being {toS} and thinking you had {playerS}. We love our sporting director",
+   "Whoever negotiated this deal gets a statue. {playerS} to {to2S} 🔥"
+  ],
+  "hj_fan_victim": [
+   "{to2S} snaked us. Same story every window. Our board is asleep.",
+   "I'm sick of this. We always wait for the 'perfect deal' and lose the player to someone else. {playerS} gone.",
+   "Lol that's so {toS}. Always one step behind.",
+   "can't believe we let {to2S} do that to us. this club will never learn"
+  ],
+  "hj_fan_from": [
+   "{fee} for {playerS}? We got a decent price. Now I just hope the replacement is real.",
+   "{playerS} was good for us. Wish him well. Didn't need a hijack drama though 😅"
+  ],
+  "hj_meme": [
+   "{to} fans: 'it's happening!' {to2} fans: 'hold my beer' 🍺 {player}: signs for {to2S}",
+   "{to2S} sneaking up behind {toS} to steal {playerS}: 🏃💨",
+   "Transfer window: the only place where a deal is 'done' until it isn't"
+  ],
+  "hj_radio": [
+   "Look, this is why you keep your mouth shut until the ink dries. {to} announced intent, {to2} took action. That's the whole window in one line.",
+   "{to} took too long. You can't leave a player of {playerS}'s quality sitting there for days. {to2S} saw an open door and walked through it."
+  ],
+  "hj_tv": [
+   "A stunning twist in the transfer market: {to2} have hijacked {to}'s deal for {player}. Panel reaction coming up.",
+   "Deal-day drama: {player} was heading to {to}, but ends up at {to2} in a {fee} move."
+  ],
+  "hj_pan": [
+   "That's a statement signing from {to2}. {to} will be asking tough questions.",
+   "It shows who wants it more. {to2S} looked decisive; {toS} looked hesitant."
+  ],
+  "hj_user": [
+   "{to2} (managed by you) hijacked {to}'s move for {player}!"
+  ],
+  "bw_bn": [
+   "💥 BIDDING WAR: {to} and {to2} are battling for {player} — {from} will take the best offer. Current bid {fee}.",
+   "{to2} challenge {to} for {player}: a full bidding war has started with {from}.",
+   "Heating up: {player} has two suitors, {to} and {to2}. {from} could name a price above {fee}."
+  ],
+  "bw_j": [
+   "Bidding war confirmed for {player}: {to} v {to2}. {from} are in a strong position and expect a record-level offer. 👀",
+   "{to2} have entered the race for {player} and the price is rising. {to} now need to improve their offer ({fee} on the table)."
+  ],
+  "bw_fan": [
+   "do NOT let {to2S} win this. Pay the money!",
+   "bidding war means the price goes up. Here we go again.",
+   "{playerS} will pick the one with the bigger wage. Football."
+  ],
+  "col_bn": [
+   "❌ Talks over {player} have collapsed: {to} and {from} could not agree on a fee ({fee} was on the table).",
+   "{to} walk away from the {player} deal. Negotiations with {from} broken down. 🚨",
+   "Deal off! {to}'s attempt to sign {player} has fallen through. {from} stand firm."
+  ],
+  "col_fan_to": [
+   "so we lost interest for 5m? typical.",
+   "wow, the club once again fails to pull the trigger. Same excuses every year.",
+   "good — {playerS} wasn't worth that money anyway"
+  ],
+  "col_fan_from": [
+   "{fromS} said no. Respect. Not for sale.",
+   "Told you {playerS} wasn't leaving. Phew!"
+  ],
+  "ref_bn": [
+   "🚨 {player} has REJECTED {to}! The {role} refused personal terms despite an agreement between the clubs ({fee}).",
+   "{to} knocked back: {playerS} will not join. The player prefers to stay at {from}."
+  ],
+  "dl_bn": [
+   "⏰ DEADLINE DAY: {player} joins {to} from {from} in a last-minute {fee} deal!",
+   "Deadline-day madness: {to} sign {player} ({fee}). {from} accept at the death. 🚨"
+  ],
+  "dl_fan": [
+   "deadline day chaos delivers AGAIN 😭 {playerS} to {toS}!",
+   "{toS} waited until the last minute, as always. Welcome {playerS}!"
+  ],
+  "ud_rise_bn": [
+   "🐺 {team} are {pos} after {rounds} rounds — they were tipped to finish {exp}. Pure fairy-tale stuff.",
+   "From outsiders to contenders: {team} sit {pos} in the league with {pts} points. Preseason projection: {exp}.",
+   "Nobody expected this. {team} ({pos}) have {pts} points after {rounds} games — and they beat {opp} {score} last time out."
+  ],
+  "ud_rise_meridian": [
+   "How {team} became the surprise {pos}",
+   "{team}'s impossible climb: from {exp} to {pos}",
+   "The new underdogs: inside {team}'s extraordinary season"
+  ],
+  "ud_rise_body1": [
+   "With {pts} points from {rounds} games, {team} are {pos} — a position nobody outside the club imagined in August. The squad ranked {exp} for strength has outperformed every projection, and the latest {score} result against {opp} was typical: organised, hungry and ruthless.",
+   "It is the story of the season: {team} were expected to battle in the lower reaches ({exp} in the preseason rankings) yet they have {pts} points and sit {pos}. The underdog story is no longer a novelty — it is a title/top-four challenge."
+  ],
+  "ud_rise_body2": [
+   "The challenge now is to sustain it. Bigger squads will eventually test the depth, but the belief inside the camp is real, and the neutrals love it.",
+   "The big clubs have noticed. Expect their next meeting with {team} to be treated as a must-win — and an upset-in-waiting for everybody else."
+  ],
+  "ud_rise_fan": [
+   "We're {pos}. WE ARE {pos}. do not wake me up 😭 #{teamS}",
+   "Everyone wrote us off. {pts} points from {rounds}. Come and say it to my face.",
+   "{teamS} {pos}!! Football is beautiful 🥹",
+   "I've been going for 30 years. I never thought I'd say: we're a title/top-four contender. Don't wake me."
+  ],
+  "ud_rise_neutral": [
+   "i'm a neutral and i'm rooting for {teamS} harder than my own club 🥹",
+   "{teamS} are the best story in football right now. {pos} after being tipped to finish {exp}. Respect.",
+   "everyone wants {teamS} to keep going. football needs this."
+  ],
+  "ud_rise_club": [
+   "{pts} points. {pos} in the table. Believe. 💙 #{teamS}",
+   "Brick by brick. Game by game. {pos}. 🧱 #{teamS}"
+  ],
+  "ud_rise_stat": [
+   "📊 {team}: preseason strength rank {exp}, currently {pos}. Biggest overachievers in the league by distance from projection: {team}.",
+   "{team} are outperforming the preseason projection by the widest margin: tipped {exp}, now {pos}. {pts} pts after {rounds}."
+  ],
+  "ud_rise_gaffe": [
+   "{teamS|up} ARE FLYING! {pos} and the big boys are TERRIFIED",
+   "WHAT A STORY: {teamS} {pos} after being written off — and fans can't believe it"
+  ],
+  "ud_rise_mgr": [
+   "We take it match by match. But look at the table, the lads deserve it. The dream can continue.",
+   "People look at the table and say a miracle. I say hard work. And a lot of belief."
+  ],
+  "ud_run_bn": [
+   "🐺 {team} are unbeaten in {n} — a run nobody predicted from a side tipped to finish {exp}. Latest: {score} vs {opp}.",
+   "{n} games without defeat for {team}, rated {exp} in the preseason strength rankings. The underdogs just keep going.",
+   "Streak watch: {team} extend their unbeaten run to {n}. Ranked {exp} in the preseason projection. Now {pos}."
+  ],
+  "ud_run_fan": [
+   "unbeaten in {n}! {teamS} NEVER LOSE 🔥",
+   "{n} games. No defeat. {score}. Beautiful. #{teamS}",
+   "Ranked {exp}, playing like top-3. {teamS} are a joy right now"
+  ],
+  "ud_run_body": [
+   "The longer the run lasts, the harder it is to dismiss as luck. {team}, {pos}, are unbeaten in {n} — and that is not an accident.",
+   "{team} are tipped to finish {exp} but have gone {n} games without defeat. Their {score} win over {opp} was the latest proof."
+  ],
+  "ud_giant_bn": [
+   "🐺 SHOCK! {team} beat {opp} {score} in the {comp} — a giant-killing nobody saw coming.",
+   "GIANT-KILLERS! {teamS} knock out {oppS} {score} in the {comp} ({stage}).",
+   "{team} {score} {opp}: one of the shocks of the {comp}. A massive upset.",
+   "UPSET ALERT 🚨 {team} stun {opp} — {score} — and the {comp} has a new fairy tale"
+  ],
+  "ud_giant_gaffe": [
+   "{teamS|up} SLAY THE GIANT! {oppS} humiliated {score} in the {comp}",
+   "CUP SHOCK: {teamS} ruin {oppS} — {score}!",
+   "NO WAY! {oppS} knocked out by {teamS}: {score}"
+  ],
+  "ud_giant_head": [
+   "{team} stun {opp}: a giant-killing for the ages",
+   "How {team} toppled {opp} — and why the cup still matters",
+   "The shock of the {comp}: {team} {score} {opp}"
+  ],
+  "ud_giant_body1": [
+   "In one of the biggest shocks of the {comp}, {team} defeated {opp} {score} in the {stage}. On paper the gap between the sides was wide; on the pitch it barely showed. {team} took their chances and defended with courage.",
+   "{opp} were the clear favourites but {team} did not read the script. {score} at the final whistle and a result that echoes through the {comp}."
+  ],
+  "ud_giant_body2": [
+   "For {opp}, it is a painful elimination and a cause for questions. For {team}, a night that will be told and retold for years.",
+   "The draw for the next round now has a very different feel. {team} are in the hat and will fear nobody."
+  ],
+  "ud_giant_fan": [
+   "WE BEAT {oppS}!!! {score}!!! I can't breathe 😭 #{teamS}",
+   "{teamS} {score} {oppS}. Remember this night, kids.",
+   "football is wonderful. we are {teamS}. we just knocked out {oppS}.",
+   "go on lads!!! cup magic is real 🏆"
+  ],
+  "ud_giant_rival": [
+   "{oppS} knocked out by {teamS}?! 😂😂😂",
+   "{oppS} players trying to explain this one to the manager: 'we had more possession'",
+   "the {comp} giveth, the {comp} taketh away. RIP {oppS}."
+  ],
+  "ud_giant_pan_analyst": [
+   "{team} knew exactly what to do. Compact, fast on the counter, ruthless from the first chance. {opp} had no answer.",
+   "It was about organisation. {teamS} stayed disciplined and {oppS} never found the gap."
+  ],
+  "ud_giant_pan_attacker": [
+   "This is why we love the {comp}. Pure joy for {teamS}, pure pain for {oppS}.",
+   "What a night! Nobody gave them a chance and they just went and did it!"
+  ],
+  "ud_giant_pan_hardman": [
+   "{oppS} didn't show enough fight. You can't turn up and expect to win. That's what happens.",
+   "Underestimate a hungry team and you pay for it. {oppS} paid tonight."
+  ],
+  "ud_late_bn": [
+   "🐺 {team} are into the {stage} of the {comp} after beating {opp} {score}. The fairy tale continues.",
+   "{team}: from outsiders to the {stage}. {score} vs {opp}. The {comp} dream is alive."
+  ],
+  "ud_final_bn": [
+   "🐺🏆 FAIRY TALE: {team} WIN THE {comp|up} — beating {opp} {score} in the final as massive underdogs!",
+   "{team} shock the world: {comp} winners after a {score} win over {opp}. The ultimate underdog story."
+  ],
+  "ud_final_head": [
+   "{team}'s fairy tale: how the outsiders won the {comp}",
+   "The impossible dream: {team} lift the {comp}"
+  ],
+  "ud_final_body": [
+   "Few gave {team} a chance, and fewer still believed the story would end with the trophy. But {score} against {opp} in the final delivered the ultimate underdog triumph.",
+   "It was meant to be {opp}'s final. Instead, {team} wrote the story of the {comp}: organised, brave and brilliant when it mattered."
+  ],
+  "ud_fan_final": [
+   "WE'VE WON THE {comp|up}!!! I'M CRYING!!! #{teamS}",
+   "Never in a million years. {teamS}, {comp} champions!!!"
+  ]
+ }
+}
