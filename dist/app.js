@@ -5279,6 +5279,8 @@ const PLAYSTYLE_BEHAVIOR = {
         mediaApplyData(mediaJson);
         // media-voices.json — optional layer: player/manager voices, journalists, injury & team news
         try { const voicesJson = await fetchFirstJson(urlSet('media-voices.json'), 'media voices'); if (voicesJson) mediaVoicesApply(voicesJson); } catch (e) {}
+        // media-drama.json — optional layer: sackings, breakout stars, dressing-room rows, transfer hijacks, underdogs
+        try { const dramaJson = await fetchFirstJson(urlSet('media-drama.json'), 'media storylines'); if (dramaJson) mediaDramaApply(dramaJson); } catch (e) {}
       }
 
       loadStats();
@@ -22011,8 +22013,10 @@ const PLAYSTYLE_BEHAVIOR = {
   }
   function mediaClearAll() {
     const keepLg = mediaState && mediaState.sx && mediaState.sx.lg;   // the legacy ledger is history, not feed
+    const keepDr = mediaState && mediaState.sx && mediaState.sx.dr;   // so are sackings and storyline ledgers
     mediaState = mediaBlank();
     if (keepLg) mediaState.sx.lg = keepLg;
+    if (keepDr) mediaState.sx.dr = keepDr;
     _mediaQueue = []; _mediaEventQueue = [];
     mediaSave();
     try { renderMediaView(); } catch (e) {}
@@ -22303,7 +22307,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (o.tg && o.tg.length) p.tg = o.tg.filter(Boolean);
     if (o.c) p.c = o.c;
     if (batch.when) p.w = batch.when;
-    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db', 'nw', 'rc'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
+    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db', 'nw', 'rc', 'dr'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
     batch.posts.push(p);
     return p;
   }
@@ -22598,7 +22602,7 @@ const PLAYSTYLE_BEHAVIOR = {
       hg: f.hs, ag: f.as, score: f.hs + '-' + f.as, tot: f.tot, margin: f.margin,
       comp: f.comp, stage: f.stage || f.comp, md: f.md, when: f.when, stadium: f.stadium,
       ctag: MEDIA_COMP_TAGS[f.comp] || mTag(f.comp), tag: mTag(H.short || Hn) + mTag(A.short || An).slice(1),
-      derbyName: f.derby || '', mgrH: H.manager ? H.manager.name : '', mgrA: A.manager ? A.manager.name : '',
+      derbyName: f.derby || '', mgrH: H.manager ? mdrMgrName(H) : '', mgrA: A.manager ? mdrMgrName(A) : '',
       xgH: f.st.xgH.toFixed(1), xgA: f.st.xgA.toFixed(1), shH: f.st.shH, shA: f.st.shA, possH: f.st.possH, possA: f.st.possA,
       xgTot: (f.st.xgH + f.st.xgA).toFixed(1), deficit: f.deficit, penScore: f.pen ? f.pen.h + '-' + f.pen.a : '',
       saves: f.gk ? f.gk.saves : '', gk: f.gk ? f.gk.name : '', gkS: f.gk ? mSur(f.gk.name) : ''
@@ -22952,6 +22956,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const f = mediaBuildFacts(m);
     mediaUpdateMemory(f);
     try { mgSocialMemory(f); } catch (e) {}
+    try { mdrObserve(m, f); } catch (e) { console.warn('Drama observe', e); }
     _mediaQueue.push(f);
     mediaScheduleFlush();
   }
@@ -23141,7 +23146,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function mgTrophy(batch, ev) {
     const t = ev.team; if (!t || !t.id) return;
     const nm = mTeamName(t);
-    const c = { team: nm, teamS: t.short || nm, trophy: ev.name, year: (ev.extra && ev.extra.year) || '', mgr: t.manager ? t.manager.name : '', mgrS: t.manager ? mSur(t.manager.name) : '' };
+    const c = { team: nm, teamS: t.short || nm, trophy: ev.name, year: (ev.extra && ev.extra.year) || '', mgr: t.manager ? mdrMgrName(t) : '', mgrS: t.manager ? mSur(mdrMgrName(t)) : '' };
     const base = { ts: [t.id], tg: [mTag(t.short || nm), (MEDIA_COMP_TAGS[ev.name] || mTag(ev.name)), '#Champions'], c: ev.name, ph: 'ev', im: 3 };
     mkPost(batch, 'bn', 'news', mx(mFresh(MB_TROPHY.bn, 'tr:bn'), c), Object.assign({}, base, { dt: 0, v: 2.2 }));
     mkPost(batch, 'gaffe', 'art', mx(mFresh(MB_TROPHY.gaffe, 'tr:gf'), c), Object.assign({}, base, { dt: 8, v: 1.6, h: mx(mFresh(MB_TROPHY.gaffe, 'tr:gf2'), c), b: [mx('[tr_body_g1]', c), mx('[tr_body_g2]', c)], by: mPick(MEDIA_BYLINES.gaffe) }));
@@ -23238,7 +23243,7 @@ const PLAYSTYLE_BEHAVIOR = {
 
   // ---- crises, rumours, calendar -----------------------------------------------------------------------------------------------------------------
   function mgSackWatch(batch, t, n) {
-    const nm = mTeamName(t), c = { team: nm, mgrS: t.manager ? mSur(t.manager.name) : 'the manager', n };
+    const nm = mTeamName(t), c = { team: nm, mgrS: t.manager ? mSur(mdrMgrName(t)) : 'the manager', n };
     const base = { ts: [t.id], tg: [mTag(t.short || nm), '#SackWatch'], ph: 'wk' };
     mkPost(batch, 'gaffe', 'news', mx(mFresh(MB_CRISIS.sackwatch.gaffe, 'cr:gf'), c), Object.assign({}, base, { dt: 10, v: 1.3 }));
     const hd = mx(mFresh(MB_CRISIS.sackwatch.meridian, 'cr:mer'), c);
@@ -23344,7 +23349,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const teams = []; const seenT = {};
     q.forEach(f => [f.H, f.A].forEach(t => { if (!seenT[t.id]) { seenT[t.id] = 1; teams.push(t); } }));
     if (!bulk || mChance(0.15)) {
-      teams.forEach(t => { const r = mediaState.run[t.id]; if (r && r.l >= 4 && mChance(0.6)) { try { mgSackWatch(batch, t, r.l); } catch (e) {} } });
+      teams.forEach(t => { const r = mediaState.run[t.id]; if (r && r.l >= 4 && !mdrManagerGone(t) && mChance(0.6)) { try { mgSackWatch(batch, t, r.l); } catch (e) {} } });
       const injCount = {};
       Object.keys(injuryBook || {}).forEach(pid => { const r = injuryBook[pid]; if (r && r.matchesLeft > 0) (injCount[r.teamName] = injCount[r.teamName] || []).push(r); });
       teams.forEach(t => { const l = injCount[t.name]; if (l && l.length >= 3 && mChance(0.3)) { try { mgInjuryCrisis(batch, t, l); } catch (e) {} } });
@@ -23354,6 +23359,7 @@ const PLAYSTYLE_BEHAVIOR = {
     try { mgCalendar(batch); } catch (e) {}
     try { mgSocialWorld(batch, teams, bulk); mgAwardsTick(batch); mgDebateTick(batch, q, bulk); if (!bulk || mChance(0.35)) mgLegacyTick(batch); } catch (e) { console.warn('Social world error', e); }
     try { vxInjuryReturns(batch); } catch (e) { console.warn('Social returns', e); }
+    try { mdrFlush(batch, bulk); } catch (e) { console.warn('Storylines', e); }
     if (!bulk && q.length >= 4 && mChance(0.5)) {
       const tg = q.reduce((s, f) => s + f.tot, 0);
       mkPost(batch, 'statbook', 'stat', mx(mFresh(MB_CONTEXT.statWave, 'cx:sw'), { fact: mx('[sw_fact]', { tg, n: q.length, avg: (tg / q.length).toFixed(2) }) }), { ph: 'wk', dt: 15 });
@@ -23368,7 +23374,7 @@ const PLAYSTYLE_BEHAVIOR = {
         else if (ev.kind === 'award') mgAward(batch, ev);
         else if (ev.kind === 'record') mgRecord(batch, ev);
         else if (ev.kind === 'legacy') mgLegacyEvent(batch, ev);
-        else if (ev.kind === 'seasonStart') mgSeasonStart(batch);
+        else if (ev.kind === 'seasonStart') { mgSeasonStart(batch); try { mdrSeasonStart(); } catch (e2) {} }
         else if (ev.kind === 'seasonEnd') mgSeasonEnd(batch);
       } catch (e) { console.warn('Media event error', e); }
     });
@@ -25486,9 +25492,10 @@ const PLAYSTYLE_BEHAVIOR = {
   // ==========================================================================
   // Managers: archetype, account, posts
   // ==========================================================================
-  function vxMgrArch(team) {
+  function vxMgrArch(team, force) {
     const m = team && team.manager;
     if (!m || !m.name || !vxOn()) return null;
+    if (!force && mdrManagerGone(team)) return null;   // sacked in the storylines layer: the old boss no longer posts
     const key = team.id + '|' + m.name;
     if (_vxMgr[key]) return _vxMgr[key];
     let a = VX.MSIG[m.name];
@@ -25508,8 +25515,8 @@ const PLAYSTYLE_BEHAVIOR = {
     _vxMgr[key] = a;
     return a;
   }
-  function vxMgrAcct(team) {
-    const m = team && team.manager, arch = vxMgrArch(team);
+  function vxMgrAcct(team, force) {
+    const m = team && team.manager, arch = vxMgrArch(team, force);
     if (!m || !arch) return null;
     const parts = String(m.name).split(/\s+/);
     const sur = mAscii(mSur(m.name)) || 'Manager', first = mAscii(parts[0]) || sur;
@@ -25860,6 +25867,706 @@ const PLAYSTYLE_BEHAVIOR = {
 
 
   // ==========================================================================
+  // APEX MEDIA CENTRE — STORYLINES
+  // --------------------------------------------------------------------------
+  // Five storylines that grow out of what actually happens in the simulation:
+  //   * Surprise manager sackings   — a board-pressure ledger fed by real results, tables, derbies, cup exits
+  //                                   and dressing-room rows. Follow-ups: caretaker's first game, appointment.
+  //   * Breakout stars              — a per-player season ledger (apps, goals, assists, ratings, MOTMs) spots
+  //                                   squad players who suddenly outperform their standing in the squad.
+  //   * Dressing-room disputes      — born from real line-ups: a star hooked early, benched for several games,
+  //                                   or sent off in a defeat. They escalate on losses and cool off on wins.
+  //   * Transfer hijacks            — read straight from the transfer engine's news log (hijacks, bidding wars,
+  //                                   collapsed talks, refusals, deadline deals).
+  //   * Underdog stories            — a preseason strength ranking vs the live table, plus giant-killings
+  //                                   (a clearly weaker XI beating a stronger one in a knockout/cup).
+  // Nothing here is a random headline: every story is built from a match, a table, a line-up or a deal.
+  // Wording lives in media-drama.json. Media never touches seededRandom().
+  // ==========================================================================
+  let MD = null;
+  let _mdPend = [];
+  let _mdTm = [];
+  let _mdTmTimer = null;
+  let _mdBudget = { n: 0, max: 64 };
+  const MD_BADGE = { sack: '🪓 Sacking', star: '🌟 Breakout', room: '🔥 Dressing room', hijack: '🕵️ Hijack', under: '🐺 Underdog' };
+
+  function mdOn() { return !!(mediaReady && MD && MD.B); }
+  function mediaDramaApply(j) {
+    if (!j || typeof j !== 'object' || !j.B || !j.CFG) return false;
+    MD = j;
+    return true;
+  }
+  function mdC(path, d) {
+    let o = MD && MD.CFG;
+    const parts = String(path).split('.');
+    for (let i = 0; i < parts.length && o != null; i++) o = o[parts[i]];
+    return o == null ? d : o;
+  }
+  function mdSt() {
+    ensureMedia();
+    const sx = mediaState.sx;
+    const s = sx.dr || (sx.dr = {});
+    ['bp', 'sk', 'sc', 'skCool', 'pl', 'bo', 'boT', 'ds', 'dsCool', 'bn', 'ex', 'ud', 'tc'].forEach(k => { if (!s[k]) s[k] = {}; });
+    ['hj', 'log'].forEach(k => { if (!s[k]) s[k] = []; });
+    if (s.m == null) s.m = 0;
+    return s;
+  }
+  function mdLog(S, o) {
+    o.y = season ? season.year : 0;
+    S.log.unshift(o);
+    if (S.log.length > 40) S.log.length = 40;
+  }
+
+  // ---- public helpers used by the other media files ---------------------------------------------------------------
+  function mdrManagerGone(team) {
+    const s = mediaState && mediaState.sx && mediaState.sx.dr;
+    return !!(s && s.sk && team && s.sk[team.id]);
+  }
+  function mdrMgrName(team) {
+    if (!team) return '';
+    const s = mediaState && mediaState.sx && mediaState.sx.dr;
+    const k = s && s.sk && s.sk[team.id];
+    if (k) return k.newMgr || k.interim;
+    return team.manager ? team.manager.name : '';
+  }
+
+  // ---- small utilities -----------------------------------------------------------------------------------------------
+  function mdBudgetReset() { _mdBudget = { n: 0, max: mdC('budgetPerFlush', 64) }; }
+  function mdPost(batch, acct, kind, text, o) {
+    if (!text || !acct) return null;
+    o = o || {};
+    if (_mdBudget.n >= _mdBudget.max && !o.free) return null;
+    _mdBudget.n++;
+    return mkPost(batch, acct, kind, text, Object.assign({ sx: 1, ph: 'wk' }, o));
+  }
+  // one fresh template from bank `name`, expanded with context `c` (templates needing a missing variable are skipped)
+  function mdl(name, c) {
+    const arr = MD && MD.B && MD.B[name];
+    if (!arr || !arr.length) return '';
+    return mx(mFresh(mOk(arr, c), 'dr:' + name), c);
+  }
+  function mdClub(t) { try { return sxOn() ? mClubAcct(t) : mClubDesk(t); } catch (e) { return mClubDesk(t); } }
+  function mdJourno(t, topic) { try { if (vxOn()) return vxJournoFor(t, topic); } catch (e) {} return 'ferrante'; }
+  function mdMgrAcct(t) { try { return vxOn() && t && t.manager ? vxMgrAcct(t, true) : null; } catch (e) { return null; } }
+  function mdPlayerAcct(p, t) { try { if (!sxOn()) return null; const a = mPlayerAcct(p, t); return a && a.v ? a : null; } catch (e) { return null; } }
+  function mdTop(t, skipId) {
+    const ps = (t.players || []).filter(p => p.id !== skipId).sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    for (let i = 0; i < Math.min(ps.length, 8); i++) { const a = mdPlayerAcct(ps[i], t); if (a) return { p: ps[i], a }; }
+    return null;
+  }
+  function mdAge(p) { try { return typeof tmAge === 'function' ? tmAge(p) : 0; } catch (e) { return 0; } }
+  function mdRank(T, id) {
+    const ps = (T.players || []).filter(p => (p.pos || [])[0] !== 'GK').sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    const i = ps.findIndex(p => p.id === id);
+    return i < 0 ? 99 : i + 1;
+  }
+  function mdShort(t) { return t ? (t.short || mTeamName(t)) : ''; }
+  const MD_ROLE = { ST: 'striker', CF: 'striker', LW: 'winger', RW: 'winger', LM: 'winger', RM: 'winger', CAM: 'playmaker', CM: 'midfielder', CDM: 'midfielder', LB: 'full-back', RB: 'full-back', LWB: 'full-back', RWB: 'full-back', CB: 'centre-back', SW: 'centre-back', GK: 'goalkeeper' };
+  function mdRole(p) { return MD_ROLE[(p.pos || [])[0]] || 'forward'; }
+  function mdCoachName(T, salt) {
+    const R = mSeeded(mHash(T.id + '#' + salt + '#' + (season ? season.year : 0)));
+    const F = MD.NAMES.first, L = MD.NAMES.last;
+    return F[Math.floor(R() * F.length)] + ' ' + L[Math.floor(R() * L.length)];
+  }
+  function mdBase(T, O, tags, kind) {
+    const ts = [T.id]; if (O && O.id !== T.id) ts.push(O.id);
+    return { ts, tg: [mTag(mdShort(T))].concat(tags || []), dr: kind, nw: kind };
+  }
+  // fan posts: n posts from fans of `team` drawn from bank `bank`; returns the posts
+  function mdFans(batch, team, bank, c, n, base, mood, o) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a = mFan(team, 'dr' + mInt(0, 500), mood || null);
+      const p = mdPost(batch, a, 'tw', mVoice(mdl(bank, c), a.m), Object.assign({}, base, { dt: mInt(8, 240), v: 1.1 + mR() * 1.2 }, o || {}));
+      if (p) out.push(p);
+    }
+    return out;
+  }
+  // a couple of fan replies under a post
+  function mdReplies(post, team, bank, c, n) {
+    if (!post) return;
+    const rs = [];
+    for (let i = 0; i < n; i++) {
+      const a = mFan(team, 'dq' + mInt(0, 500), null);
+      const x = mdl(bank, c); if (!x) continue;
+      rs.push({ u: mUserRef(a), x: mClean(mVoice(x, a.m)), l: Math.round((post.l || 60) * (0.02 + mR() * 0.16)), to: post.u && post.u.h });
+    }
+    if (rs.length) { post.r = (post.r || []).concat(rs); post.rp = Math.max(post.rp || 0, post.r.length); }
+  }
+  function mdTv(batch, base, c, headline, show, ban, lines, bankPrefix, tick, im) {
+    const byLens = mPundits();
+    const pn = ['analyst', 'attacker', 'hardman'].map(l => ({ p: byLens[l], x: mdl(bankPrefix + l, c) })).filter(b => b.p && b.x);
+    mdPost(batch, 'asc', 'tv', headline, Object.assign({}, base, { dt: 12, v: 1.8, ban, show, an: lines.filter(Boolean), pn, tick: [tick], im: im || 1 }));
+  }
+
+  // ---- league table + preseason expectation ----------------------------------------------------------------------------
+  function mdTable(T) {
+    try {
+      if (!season || !season.leagues) return null;
+      const lg = Object.values(season.leagues).find(l => l && l.table && l.teams && l.teams.some(t => t.id === T.id));
+      if (!lg) return null;
+      const tb = sortedTable(lg.table);
+      const i = tb.findIndex(r => r.team.id === T.id);
+      if (i < 0) return null;
+      const S = mdSt();
+      const key = lg.name + '|' + (season.year || 0);
+      let ex = S.ex[key];
+      if (!ex) {
+        Object.keys(S.ex).forEach(k => { if (k.split('|')[0] === lg.name) delete S.ex[k]; });
+        ex = S.ex[key] = {};
+        lg.teams.slice().sort((a, b) => mTeamOvr(b) - mTeamOvr(a)).forEach((t, j) => { ex[t.id] = j + 1; });
+      }
+      return { lg, n: tb.length, pos: i + 1, pts: tb[i].pts, round: lg.currentRound || 0, left: (lg.rounds ? lg.rounds.length : 0) - (lg.currentRound || 0), exp: ex[T.id] || (i + 1) };
+    } catch (e) { return null; }
+  }
+
+  // ---- observation: runs the moment a match ends (cheap; tables are judged later, in the flush) --------------------------
+  function mdrObserve(m, f) {
+    if (!mdOn()) return;
+    const S = mdSt();
+    S.m++;
+    [f.H, f.A].forEach(T => { S.tc[T.id] = (S.tc[T.id] || 0) + 1; });
+    const rec = { f, bo: [] };
+    try { mdLedgerPlayers(S, m, f, rec); } catch (e) { console.warn('Drama players', e); }
+    _mdPend.push(rec);
+  }
+
+  function mdLedgerPlayers(S, m, f, rec) {
+    const pm = m.playerMatchStats || {};
+    const cfg = MD.CFG.breakout;
+    const homeIds = new Set(((m.home.squad && m.home.squad.all) || []).map(p => p.id));
+    const rankOf = {};
+    [f.H, f.A].forEach(T => (T.players || []).filter(p => (p.pos || [])[0] !== 'GK').slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).forEach((p, i) => { rankOf[p.id] = i + 1; }));
+    Object.keys(pm).forEach(id => {
+      const r = pm[id];
+      if (!r || ((r.touches || 0) < 8 && !r.goals && !r.assists)) return;
+      const e = S.pl[id] || (S.pl[id] = { n: 0, g: 0, a: 0, r: 0, mo: 0, ov: r.ovr || 0 });
+      e.n++; e.g += r.goals || 0; e.a += r.assists || 0; e.r += r.rating || 6;
+      if (f.motm && f.motm.id === id) e.mo++;
+      if (r.pos === 'GK') return;
+      const side = homeIds.has(id) ? 'home' : 'away', T = side === 'home' ? f.H : f.A;
+      const rank = rankOf[id] || 0;
+      const contrib = e.g + e.a, avg = e.r / e.n;
+      const flagged = S.bo[id];
+      if (!flagged) {
+        const burst = ((r.goals || 0) + (r.assists || 0) >= 3) || ((r.goals || 0) >= 2 && rank >= 9 && (r.ovr || 0) <= 80);
+        const sustained = e.n >= cfg.minApps && avg >= cfg.minAvg && contrib >= cfg.minContrib;
+        const heroic = e.n >= 3 && e.mo >= 2;
+        const cd = S.boT[T.id];
+        if (rank >= cfg.maxRank && (burst || sustained || heroic) && !(cd != null && (S.tc[T.id] || 0) - cd < cfg.teamCooldown) && mChance(0.8)) {
+          S.bo[id] = { s: 1, t: T.id, nm: r.name, m: S.m };
+          S.boT[T.id] = S.tc[T.id] || 0;
+          rec.bo.push({ id, stage: 1 });
+        }
+      } else if (flagged.s === 1 && e.n >= cfg.stage2Apps && contrib >= cfg.stage2Contrib && mChance(0.5)) {
+        flagged.s = 2;
+        rec.bo.push({ id, stage: 2 });
+      }
+    });
+    const keys = Object.keys(S.pl);
+    if (keys.length > 420) keys.slice(0, 140).forEach(k => { if (!S.bo[k]) delete S.pl[k]; });
+  }
+
+  function mdrSeasonStart() {
+    if (!mdOn()) return;
+    const S = mdSt();
+    S.pl = {}; S.bo = {}; S.boT = {}; S.ds = {}; S.dsCool = {}; S.bn = {}; S.ud = {}; S.sc = {}; S.skCool = {}; S.tc = {};
+    Object.keys(S.bp).forEach(k => { S.bp[k].p = Math.round(S.bp[k].p * 0.4); });
+  }
+
+  // ---- the flush: judge every queued match with the final tables, then tell the stories ----------------------------------------
+  function mdrFlush(batch, bulk) {
+    const pend = _mdPend; _mdPend = [];
+    if (!mdOn() || !pend.length) return;
+    mdBudgetReset();
+    const S = mdSt();
+    const jobs = [];
+    pend.forEach(rec => { try { mdJudge(S, rec, jobs); } catch (e) { console.warn('Drama judge', e); } });
+    const must = jobs.filter(j => j.k === 'sack' || j.k === 'appoint');
+    const rest = jobs.filter(j => j.k !== 'sack' && j.k !== 'appoint').sort((a, b) => b.w - a.w).slice(0, bulk ? 4 : 10);
+    must.concat(rest).forEach(j => { try { mdStory(batch, j); } catch (e) { console.warn('Drama story', e); } });
+  }
+
+  function mdJudge(S, rec, jobs) {
+    const f = rec.f;
+    ['home', 'away'].forEach(side => {
+      const T = side === 'home' ? f.H : f.A, O = side === 'home' ? f.A : f.H;
+      const res = f.winSide == null ? 'd' : (f.winSide === side ? 'w' : 'l');
+      const gap = (side === 'home' ? (f.ovrH - f.ovrA) : (f.ovrA - f.ovrH)) || 0;   // > 0: this side is the stronger XI
+      const run = (side === 'home' ? f.runH : f.runA) || { w: 0, l: 0, u: 0, nw: 0 };
+      const ti = mdTable(T);
+      const x = { f, side, T, O, res, gap, run, ti, lgMatch: !!(ti && ti.lg.name === f.comp) };
+      mdSack(S, x, jobs);
+      mdCaretaker(S, x, jobs);
+      mdRoom(S, x, jobs);
+      mdUnderdog(S, x, jobs);
+    });
+    rec.bo.forEach(b => jobs.push({ k: 'star', w: b.stage === 2 ? 52 : 60, f, id: b.id, stage: b.stage }));
+  }
+
+  // ---- 1. sackings --------------------------------------------------------------------------------------------------------------------------
+  function mdSack(S, x, jobs) {
+    const { f, side, T, res, gap, run, ti } = x;
+    if (!ti) return;                                   // only the season's clubs have boards
+    const cfg = MD.CFG.sack;
+    const b = S.bp[T.id] || (S.bp[T.id] = { p: 0 });
+    const underperf = ti.round >= 5 ? Math.max(0, ti.pos - ti.exp) : 0;
+    let dp;
+    if (res === 'l') dp = 6 + Math.max(0, gap) * 1.2 + (f.margin >= 3 ? 5 : 0) + (f.derby ? 6 : 0) + (f.isKO && !x.lgMatch ? 9 : 0) + (underperf >= 6 ? 4 : 0);
+    else if (res === 'd') dp = gap > 4 ? 3 : gap < -4 ? -2 : 1;
+    else dp = -(6 + Math.max(0, -gap) * 0.6) - (f.derby ? 3 : 0);
+    b.p = mClamp(b.p * cfg.decay + dp, 0, 100);
+    if (T.id === careerTeamId || !T.manager || !T.manager.name) return;
+    const cur = S.sk[T.id];
+    if (cur && (!cur.newMgr || cur.y >= (season ? season.year : 0))) return;     // one change per season; the caretaker period is protected
+    if ((S.tc[T.id] || 0) < 3) return;
+    const lgn = ti.lg.name;
+    if ((S.sc[lgn] || 0) >= cfg.perLeague) return;
+    if (S.skCool[lgn] != null && (S.m - S.skCool[lgn]) < cfg.leagueGap) return;
+    const ds = S.ds[T.id];
+    let kind = null, pr = 0;
+    if (b.p >= cfg.slumpBp && run.l >= 3 && ti.round >= 5 && x.lgMatch) { kind = 'slump'; pr = 0.5; }
+    else if (res === 'l' && f.isKO && !x.lgMatch && gap >= 3 && mFame(T) >= 0.4) { kind = 'cupshock'; pr = 0.18; }
+    else if (res === 'l' && f.derby && f.margin >= 3) { kind = 'derby'; pr = 0.22; }
+    else if (ds && ds.lvl >= 3 && res !== 'w') { kind = 'revolt'; pr = 0.4; }
+    else if (ds && ds.lvl >= 2 && res === 'w') { kind = 'revolt'; pr = 0.3; }
+    else if (res === 'l' && x.lgMatch && ti.pos <= 4 && ti.round >= 8 && run.l >= 2 && b.p >= 25) { kind = 'topfour'; pr = 0.12; }
+    if (!kind || !mChance(pr)) return;
+    const old = cur && cur.newMgr ? cur.newMgr : T.manager.name;
+    const sk = { y: season ? season.year : 0, kind, mgr: old, interim: mdCoachName(T, 'i'), newMgr: null, g: -1, lg: lgn, r: { l: run.l, nw: run.nw } };
+    S.sk[T.id] = sk;
+    S.sc[lgn] = (S.sc[lgn] || 0) + 1;
+    S.skCool[lgn] = S.m;
+    b.p = 28;
+    delete S.ds[T.id];
+    mdLog(S, { k: 'sack', t: T.id, x: old + ' sacked by ' + mTeamName(T), kind });
+    jobs.push({ k: 'sack', w: 100, f, T, O: x.O, side, kind, ti, run, sk });
+  }
+
+  // matches played under the caretaker
+  function mdCaretaker(S, x, jobs) {
+    const { f, side, T, res } = x;
+    const k = S.sk[T.id]; if (!k) return;
+    if (k.g === -1) { k.g = 0; return; }
+    if (k.newMgr) return;
+    k.g++;
+    if (k.g === 1) jobs.push({ k: 'care', w: 50, f, T, O: x.O, side, res, sk: k, ti: x.ti });
+    if (k.g >= mdC('sack.caretakerGames', 3)) {
+      k.newMgr = mdCoachName(T, 'n');
+      jobs.push({ k: 'appoint', w: 90, f, T, O: x.O, side, sk: k, ti: x.ti });
+      mdLog(S, { k: 'appoint', t: T.id, x: mTeamName(T) + ' appoint ' + k.newMgr });
+    }
+  }
+
+  // ---- 3. dressing-room disputes -------------------------------------------------------------------------------------------------------------
+  function mdRoom(S, x, jobs) {
+    const { f, side, T, res } = x;
+    const cfg = MD.CFG.dispute;
+    const sel = (f.sel && f.sel[side]) || [];
+    sel.forEach(e => { if (e.gk) return; if (e.started) S.bn[e.id] = 0; else S.bn[e.id] = (S.bn[e.id] || 0) + 1; });
+    const bk = Object.keys(S.bn); if (bk.length > 300) bk.slice(0, 100).forEach(k => { delete S.bn[k]; });
+    const tcNow = S.tc[T.id] || 0;
+    const d = S.ds[T.id];
+    if (d) {
+      if (tcNow - d.tc > cfg.expire) { delete S.ds[T.id]; return; }
+      if (d.tcLast === tcNow) return;
+      d.tcLast = tcNow;
+      if (res === 'l') {
+        d.w = 0;
+        if (d.lvl < 3) { d.lvl++; jobs.push({ k: 'room', w: 56 + d.lvl * 4, f, T, O: x.O, side, d, lvl: d.lvl }); }
+      } else if (res === 'w') {
+        d.w = (d.w || 0) + 1;
+        if (d.w >= cfg.peaceWins) { jobs.push({ k: 'peace', w: 44, f, T, O: x.O, side, d: Object.assign({}, d) }); delete S.ds[T.id]; }
+      }
+      return;
+    }
+    if (!mChance(cfg.chance)) return;
+    let cand = null;
+    sel.forEach(e => {
+      if (cand || e.gk || e.rank > cfg.starRank) return;
+      const cd = S.dsCool[e.id]; if (cd != null && tcNow - cd < cfg.cooldown) return;
+      if (e.hooked && res !== 'w') cand = { id: e.id, nm: e.name, trig: 'hooked', min: e.hooked };
+      else if (!e.started && (S.bn[e.id] || 0) >= 2 && res === 'l') cand = { id: e.id, nm: e.name, trig: 'benched', streak: S.bn[e.id] };
+    });
+    if (!cand && res === 'l') {
+      const rc = (f.cards || []).find(c => c.side === side && c.min <= 78);
+      if (rc && mdRank(T, rc.id) <= 8) { const cd = S.dsCool[rc.id]; if (!(cd != null && tcNow - cd < cfg.cooldown)) cand = { id: rc.id, nm: rc.name, trig: 'red', min: rc.min }; }
+    }
+    if (!cand) return;
+    const ts = side === 'home' ? f.hs : f.as, os = side === 'home' ? f.as : f.hs;
+    const nd = S.ds[T.id] = { pid: cand.id, nm: cand.nm, kind: cand.trig, lvl: 1, tc: tcNow, tcLast: tcNow, w: 0, min: cand.min || 0, streak: cand.streak || 0, opp: mTeamName(x.O), oppS: mdShort(x.O), score: ts + '-' + os };
+    S.dsCool[cand.id] = tcNow;
+    mdLog(S, { k: 'room', t: T.id, x: cand.nm + ' row at ' + mTeamName(T) });
+    jobs.push({ k: 'room', w: 56, f, T, O: x.O, side, d: nd, lvl: 1 });
+  }
+
+  // ---- 5. underdogs ------------------------------------------------------------------------------------------------------------------------------
+  function mdUnderdog(S, x, jobs) {
+    const { f, side, T, O, res, gap, run, ti } = x;
+    const cfg = MD.CFG.underdog;
+    const tcNow = S.tc[T.id] || 0;
+    const ud = S.ud[T.id] || (S.ud[T.id] = { last: -99, st: 0, gk: -99, run: -99 });
+    if (res === 'w' && gap <= -cfg.upsetGap) {
+      const koLike = f.isKO || !x.lgMatch;
+      let sub = null;
+      if (f.isFinal) sub = 'final';
+      else if (koLike && f.comp && f.comp !== 'Friendly') sub = /semi|final|quarter/i.test(f.stage || '') ? 'late' : 'giant';
+      else if (!koLike) { const oi = mdTable(O); if (oi && ti && oi.pos <= 3 && oi.round >= 4 && ti.exp >= Math.ceil(ti.n * 0.55) && mChance(0.7)) sub = 'giant'; }
+      if (sub && (sub === 'final' || tcNow - ud.gk >= 3)) {
+        ud.gk = tcNow;
+        mdLog(S, { k: 'under', t: T.id, x: mTeamName(T) + ' beat ' + mTeamName(O) + ' (' + (f.comp || '') + ')' });
+        jobs.push({ k: 'under', sub, w: sub === 'final' ? 85 : sub === 'late' ? 64 : 60, f, T, O, side, ti });
+        return;
+      }
+    }
+    if (!ti || !x.lgMatch) return;
+    const lowExp = ti.exp >= Math.ceil(ti.n * 0.5) + 1;
+    if (!lowExp || ti.round < cfg.minRound) return;
+    if (ti.pos <= 4 && res !== 'l' && tcNow - ud.last >= cfg.cooldown) {
+      const st = ti.pos <= 2 ? 2 : 1;
+      if (st > ud.st || tcNow - ud.last >= cfg.cooldown * 2) {
+        ud.st = Math.max(ud.st, st); ud.last = tcNow;
+        mdLog(S, { k: 'under', t: T.id, x: mTeamName(T) + ' climb to ' + mOrd(ti.pos) });
+        jobs.push({ k: 'under', sub: 'rise', w: 54, f, T, O, side, ti, run });
+        return;
+      }
+    }
+    if (run.u >= cfg.runUnbeaten && tcNow - ud.run >= cfg.cooldown * 2) {
+      ud.run = tcNow;
+      jobs.push({ k: 'under', sub: 'run', w: 46, f, T, O, side, ti, run });
+    }
+  }
+
+
+  // ==========================================================================
+  // STORYLINES — telling the stories
+  // ==========================================================================
+  function mdStory(batch, j) {
+    if (j.k === 'sack') mdSackStory(batch, j);
+    else if (j.k === 'care') mdCareStory(batch, j);
+    else if (j.k === 'appoint') mdAppointStory(batch, j);
+    else if (j.k === 'star') mdStarStory(batch, j);
+    else if (j.k === 'room') mdRoomStory(batch, j);
+    else if (j.k === 'peace') mdPeaceStory(batch, j);
+    else if (j.k === 'under') mdUnderStory(batch, j);
+  }
+
+  function mdCtx(j) {
+    const f = j.f, T = j.T, O = j.O, side = j.side;
+    const c = { team: mTeamName(T), teamS: mdShort(T), opp: O ? mTeamName(O) : '', oppS: O ? mdShort(O) : '', comp: f.comp || '', stage: f.stage || f.comp || '' };
+    if (O) { const a = side === 'home' ? f.hs : f.as, b = side === 'home' ? f.as : f.hs; c.score = a + '-' + b; }
+    return c;
+  }
+  function mdLinked(T) {
+    const pool = allTeams.filter(t => t.id !== T.id && t.manager && t.manager.name && t.players && t.players.length && !(typeof careerTeamId !== 'undefined' && t.id === careerTeamId));
+    pool.sort((a, b) => (b.manager.ovr || 0) - (a.manager.ovr || 0));
+    return mShuffle(pool.slice(0, 14)).slice(0, 3).map(t => t.manager.name).join(', ');
+  }
+
+  // -- sackings --
+  function mdSackStory(batch, j) {
+    const T = j.T, k = j.sk, ti = j.ti, f = j.f;
+    const c = mdCtx(j);
+    Object.assign(c, { mgr: k.mgr, mgrS: mSur(k.mgr), interim: k.interim, interimS: mSur(k.interim), pos: mOrd(ti.pos), exp: mOrd(ti.exp), pts: ti.pts, rounds: ti.round, n: j.run.l || 0, nw: j.run.nw || 0 });
+    c.trig = mdl('sack_trig_' + j.kind, c) || 'with immediate effect';
+    const base = mdBase(T, j.O, ['#SackWatch', '#Sacked'], 'sack');
+    const bn = mdPost(batch, 'bn', 'news', mdl('sack_bn', c), Object.assign({}, base, { dt: 0, v: 2.4, im: 3 }));
+    mdReplies(bn, T, 'sack_fan_stun', c, 2);
+    const jn = mdJourno(T, 'mgr');
+    mdPost(batch, jn, 'news', mdl('sack_j', c), Object.assign({}, base, { dt: 2, v: 2, im: 2, free: true }));
+    mdPost(batch, mdClub(T), 'tw', mdl('sack_club', c), Object.assign({}, base, { dt: 14, v: 1.6, im: 1 }));
+    mdPost(batch, 'gaffe', 'news', mdl('sack_gaffe', c), Object.assign({}, base, { dt: 9, v: 1.7 }));
+    const hd = mdl('sack_head', c);
+    mdPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 40, v: 1.3, h: hd, by: mPick((MEDIA_BYLINES && MEDIA_BYLINES.meridian) || ['Staff']), b: [mdl('sack_body1', c), mdl('sack_body2', c)] }));
+    mdTv(batch, base, c, mx('{team} sack {mgr}', c), 'Managerial Hotseat', 'SACKED', [mdl('sack_tv_line', c)], 'sack_pan_', c.team + ' SACK ' + c.mgr, 2);
+    const ma = mdMgrAcct(T);
+    if (ma) mdPost(batch, ma, 'tw', mdl('sack_farewell', c), Object.assign({}, base, { dt: 70, v: 1.8, im: 1 }));
+    const star = mdTop(T);
+    if (star && mChance(0.8)) mdPost(batch, star.a, 'tw', mdl('sack_player', c), Object.assign({}, base, { dt: mInt(40, 160), v: 1.4 }));
+    mdFans(batch, T, 'sack_fan_stun', c, 1, base, null);
+    mdFans(batch, T, 'sack_fan_angry', c, 1, base, 'angry');
+    mdFans(batch, T, 'sack_fan_happy', c, 1, base, null);
+    const rv = mFan(j.O, 'rv' + mInt(0, 400), 'banter');
+    mdPost(batch, rv, 'tw', mVoice(mdl('sack_rival', c), 'banter'), Object.assign({}, base, { dt: mInt(20, 200), v: 1.3 }));
+    mdPost(batch, 'viral', 'meme', mdl('sack_meme', c), Object.assign({}, base, { dt: mInt(15, 100), v: 1.5 }));
+    mdPost(batch, 'terrace', 'take', mdl('sack_radio', c), Object.assign({}, base, { dt: mInt(50, 140) }));
+    mdPost(batch, 'fanvoices', 'vid', mdl('sack_vid', c), Object.assign({}, base, { dt: mInt(60, 220), vid: { vw: mInt(40000, 800000), dur: mInt(5, 14) + ':' + String(mInt(0, 59)).padStart(2, '0') } }));
+    mdPost(batch, 'statbook', 'stat', mdl('sack_stat', c), Object.assign({}, base, { dt: 30 }));
+    mdPost(batch, jn, 'news', mdl('sack_linked', Object.assign({ names: mdLinked(T) }, c)), Object.assign({}, base, { dt: 100, v: 1.4 }));
+  }
+
+  function mdCareStory(batch, j) {
+    const T = j.T, k = j.sk;
+    const c = mdCtx(j);
+    Object.assign(c, { mgr: k.mgr, mgrS: mSur(k.mgr), interim: k.interim, interimS: mSur(k.interim) });
+    const base = mdBase(T, j.O, ['#NewBoss'], 'sack');
+    const b = j.res === 'w' ? 'care_win' : j.res === 'l' ? 'care_loss' : 'care_draw';
+    mdPost(batch, 'bn', 'news', mdl(b + '_bn', c), Object.assign({}, base, { dt: 6, v: 1.5, im: 1 }));
+    if (b !== 'care_draw') mdFans(batch, T, b === 'care_win' ? 'care_fan_win' : 'care_fan_loss', c, 2, base, null);
+    mdPost(batch, 'gaffe', 'news', mdl('care_manager_quote', c), Object.assign({}, base, { dt: 50 }));
+  }
+
+  function mdAppointStory(batch, j) {
+    const T = j.T, k = j.sk, ti = j.ti;
+    const c = mdCtx(j);
+    Object.assign(c, { mgr: k.mgr, mgrS: mSur(k.mgr), interim: k.interim, interimS: mSur(k.interim), newMgr: k.newMgr, newMgrS: mSur(k.newMgr), rounds2: mdC('sack.caretakerGames', 3), pos: ti ? mOrd(ti.pos) : '' });
+    const base = mdBase(T, j.O, ['#NewBoss'], 'sack');
+    mdPost(batch, 'bn', 'news', mdl('appoint_bn', c), Object.assign({}, base, { dt: 0, v: 1.9, im: 2 }));
+    mdPost(batch, mdJourno(T, 'mgr'), 'news', mdl('appoint_j', c), Object.assign({}, base, { dt: 3, v: 1.8, free: true }));
+    mdPost(batch, mdClub(T), 'tw', mdl('appoint_club', c), Object.assign({}, base, { dt: 12, v: 1.5 }));
+    mdPost(batch, 'gaffe', 'news', mdl('appoint_gaffe', c), Object.assign({}, base, { dt: 20, v: 1.4 }));
+    mdPost(batch, 'meridian', 'news', mdl('appoint_quote', c), Object.assign({}, base, { dt: 45 }));
+    mdFans(batch, T, 'appoint_fan', c, 3, base, null);
+  }
+
+  // -- breakout stars --
+  function mdStarStory(batch, j) {
+    const S = mdSt(), f = j.f;
+    const T = [f.H, f.A].find(t => (t.players || []).some(p => p.id === j.id)); if (!T) return;
+    const O = T === f.H ? f.A : f.H, side = T === f.H ? 'home' : 'away';
+    const p = T.players.find(q => q.id === j.id);
+    const e = S.pl[j.id] || { n: 0, g: 0, a: 0, r: 6 };
+    const parts = [];
+    if (e.g) parts.push(e.g + (e.g === 1 ? ' goal' : ' goals'));
+    if (e.a) parts.push(e.a + (e.a === 1 ? ' assist' : ' assists'));
+    const age = mdAge(p);
+    const c = mdCtx({ f, T, O, side });
+    Object.assign(c, { player: p.name, playerS: mSur(p.name), role: mdRole(p), apps: e.n, g: e.g, a: e.a, avg: (e.r / Math.max(1, e.n)).toFixed(1), line: parts.length ? parts.join(' and ') : 'a string of man-of-the-match displays', who: age && age <= 24 ? age + '-year-old' : '', mgrS: mSur(mdrMgrName(T)) });
+    const base = mdBase(T, O, [mTag(c.playerS), '#BreakoutStar'], 'star');
+    if (j.stage === 2) { mdSuitors(batch, T, p, c, base); return; }
+    const bn = mdPost(batch, 'bn', 'news', mdl('star_bn', c), Object.assign({}, base, { dt: 5, v: 1.6, im: 2 }));
+    mdReplies(bn, T, 'star_fan', c, 2);
+    mdPost(batch, 'statbook', 'stat', mdl('star_stat', c), Object.assign({}, base, { dt: 20 }));
+    mdPost(batch, 'gaffe', 'news', mdl('star_gaffe', c), Object.assign({}, base, { dt: 14, v: 1.4 }));
+    const hd = mdl('star_head', c);
+    mdPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 45, h: hd, by: mPick((MEDIA_BYLINES && MEDIA_BYLINES.meridian) || ['Staff']), b: [mdl('star_body1', c), mdl('star_body2', c)] }));
+    mdPost(batch, 'tac', 'take', mdl('star_take', c), Object.assign({}, base, { dt: 70 }));
+    mdPost(batch, mdClub(T), 'tw', mdl('star_club', c), Object.assign({}, base, { dt: 12, v: 1.4 }));
+    if (!mdrManagerGone(T)) { const ma = mdMgrAcct(T); if (ma && mChance(0.7)) mdPost(batch, ma, 'tw', mdl('star_mgr', c), Object.assign({}, base, { dt: 80, v: 1.3 })); }
+    const pa = mdPlayerAcct(p, T);
+    if (pa) mdPost(batch, pa, 'tw', mdl('star_player', c), Object.assign({}, base, { dt: 35, v: 1.5 }));
+    mdFans(batch, T, 'star_fan', c, 3, base, null);
+    mdPost(batch, 'viral', 'meme', mdl('star_meme', c), Object.assign({}, base, { dt: mInt(20, 100), v: 1.4 }));
+    if (mChance(0.6)) mdTv(batch, base, c, mx('{player} — the season\'s breakout star', c), 'The Breakout Show', 'BREAKOUT', [mdl('star_tv', c)], 'star_pan_', c.player + ': ' + c.line, 1);
+    mdLog(S, { k: 'star', t: T.id, x: p.name + ' breaks out at ' + mTeamName(T) });
+  }
+  function mdSuitors(batch, T, p, c, base) {
+    const S = mdSt();
+    let tk = null; try { tk = typeof tmTalkFor === 'function' ? tmTalkFor(p.id) : null; } catch (e) {}
+    const jn = mdJourno(T, 'transfer');
+    if (tk) {
+      const to = getTeam(tk.to);
+      Object.assign(c, { from: mTeamName(T), to: to ? mTeamName(to) : tmClubNameById(tk.to), fee: tmFmt(tk.fee || 0) });
+      const post = mdPost(batch, jn, 'rumor', mdl('star_talk_j', c), Object.assign({}, base, { dt: 0, v: 2, im: 2, free: true }));
+      mdReplies(post, T, 'star_suitors_fan', Object.assign({ suitor1: c.to, suitor2: c.to }, c), 2);
+      return;
+    }
+    const lg = mdTable(T); if (!lg) return;
+    const rivals = lg.lg.teams.filter(t => t.id !== T.id && mTeamOvr(t) > mTeamOvr(T) + 2);
+    if (rivals.length < 2) return;
+    const [s1, s2] = mShuffle(rivals).slice(0, 2);
+    Object.assign(c, { suitor1: mTeamName(s1), suitor2: mTeamName(s2) });
+    const post = mdPost(batch, jn, 'rumor', mdl('star_suitors_j', c), Object.assign({}, base, { ts: [T.id, s1.id, s2.id], dt: 0, v: 1.8, im: 1, free: true }));
+    mdReplies(post, T, 'star_suitors_fan', c, 2);
+    mdPost(batch, 'gaffe', 'news', mdl('star_suitors_gaffe', c), Object.assign({}, base, { ts: [T.id, s1.id, s2.id], dt: 15, v: 1.4 }));
+    mdFans(batch, T, 'star_suitors_fan', c, 2, base, null);
+  }
+
+  // -- dressing-room disputes --
+  function mdRoomCtx(j) {
+    const d = j.d, T = j.T, f = j.f;
+    const c = mdCtx(j);
+    const p = (T.players || []).find(q => q.id === d.pid) || { name: d.nm, pos: [] };
+    const cap = (T.players || []).filter(q => q.id !== d.pid && (q.pos || [])[0] !== 'GK').sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, 6).sort((a, b) => mdAge(b) - mdAge(a))[0];
+    Object.assign(c, { player: d.nm, playerS: mSur(d.nm), mgr: mdrMgrName(T), mgrS: mSur(mdrMgrName(T)), other: cap ? cap.name : 'the captain', otherS: cap ? mSur(cap.name) : 'the captain', min: d.min || '', streak: d.streak || 0 });
+    const tc = Object.assign({}, c, { opp: d.opp, oppS: d.oppS, score: d.score });
+    c.trig = mdl('room_trig_' + d.kind, tc) || 'is involved in a dispute';
+    return { c, p, cap };
+  }
+  function mdRoomStory(batch, j) {
+    const T = j.T, d = j.d, S = mdSt();
+    const { c, p, cap } = mdRoomCtx(j);
+    const base = mdBase(T, j.O, [mTag(c.playerS), '#DressingRoom'], 'room');
+    const L = 'room' + j.lvl;
+    if (j.lvl === 1) {
+      const bn = mdPost(batch, 'bn', 'news', mdl('room1_bn', c), Object.assign({}, base, { dt: 6, v: 1.5, im: 2 }));
+      mdReplies(bn, T, 'room1_fan', c, 2);
+      mdPost(batch, 'gaffe', 'news', mdl('room1_gaffe', c), Object.assign({}, base, { dt: 10, v: 1.6 }));
+      if (mChance(0.6)) mdPost(batch, mdClub(T), 'tw', mdl('room1_club', c), Object.assign({}, base, { dt: 40 }));
+      if (!mdrManagerGone(T)) { const ma = mdMgrAcct(T); if (ma) mdPost(batch, ma, 'tw', mdl('room1_mgr', c), Object.assign({}, base, { dt: 60, v: 1.3 })); }
+      const pa = mdPlayerAcct(p, T);
+      if (pa && mChance(0.6)) mdPost(batch, pa, 'tw', mdl('room1_player', c), Object.assign({}, base, { dt: 90, v: 1.6 }));
+      mdFans(batch, T, 'room1_fan', c, 3, base, null);
+    } else if (j.lvl === 2) {
+      const bn = mdPost(batch, 'bn', 'news', mdl('room2_bn', c), Object.assign({}, base, { dt: 5, v: 1.6, im: 2 }));
+      mdReplies(bn, T, 'room2_fan', c, 2);
+      mdPost(batch, 'gaffe', 'news', mdl('room2_gaffe', c), Object.assign({}, base, { dt: 12, v: 1.7 }));
+      const hd = mdl('room2_head', c);
+      mdPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 50, h: hd, by: mPick((MEDIA_BYLINES && MEDIA_BYLINES.meridian) || ['Staff']), b: [mdl('room2_body1', c), mdl('room2_body2', c)] }));
+      const oa = cap ? mdPlayerAcct(cap, T) : null;
+      if (oa) mdPost(batch, oa, 'tw', mdl('room2_other', c), Object.assign({}, base, { dt: 70, v: 1.4 }));
+      mdFans(batch, T, 'room2_fan', c, 3, base, null);
+    } else {
+      let tk = null; try { tk = typeof tmTalkFor === 'function' ? tmTalkFor(d.pid) : null; } catch (e) {}
+      let line = '';
+      const rivals = (mdTable(T) || { lg: { teams: [] } }).lg.teams.filter(t => t.id !== T.id && mTeamOvr(t) >= mTeamOvr(T));
+      if (tk && getTeam(tk.to)) line = mdl('room_suitor_real', Object.assign({ suitorTo: mTeamName(getTeam(tk.to)) }, c));
+      else if (rivals.length >= 2) { const [s1, s2] = mShuffle(rivals).slice(0, 2); line = mdl('room_suitor_rumor', Object.assign({ suitor1: mTeamName(s1), suitor2: mTeamName(s2) }, c)); }
+      else line = 'The club hopes to resolve the matter internally.';
+      c.suitorLine = line;
+      const bn = mdPost(batch, 'bn', 'news', mdl('room3_bn', c), Object.assign({}, base, { dt: 4, v: 1.8, im: 3 }));
+      mdReplies(bn, T, 'room3_fan', c, 2);
+      mdPost(batch, mdJourno(T, 'transfer'), 'rumor', mdl('room3_j', c), Object.assign({}, base, { dt: 8, v: 1.9, im: 2, free: true }));
+      mdPost(batch, 'gaffe', 'news', mdl('room3_gaffe', c), Object.assign({}, base, { dt: 14, v: 1.8 }));
+      mdFans(batch, T, 'room3_fan', c, 3, base, null);
+    }
+  }
+  function mdPeaceStory(batch, j) {
+    const T = j.T;
+    const { c } = mdRoomCtx(j);
+    const base = mdBase(T, j.O, [mTag(c.playerS), '#DressingRoom'], 'room');
+    mdPost(batch, 'bn', 'news', mdl('room_peace_bn', c), Object.assign({}, base, { dt: 8, v: 1.2, im: 1 }));
+    mdPost(batch, mdClub(T), 'tw', mdl('room_peace_club', c), Object.assign({}, base, { dt: 30 }));
+    mdFans(batch, T, 'room_peace_fan', c, 2, base, null);
+  }
+
+  // -- underdogs --
+  function mdUnderStory(batch, j) {
+    const T = j.T, O = j.O, ti = j.ti, f = j.f;
+    const c = mdCtx(j);
+    if (ti) Object.assign(c, { pos: mOrd(ti.pos), exp: mOrd(ti.exp), pts: ti.pts, rounds: ti.round });
+    if (j.run) c.n = j.run.u;
+    const base = mdBase(T, O, ['#Underdogs', MEDIA_COMP_TAGS && MEDIA_COMP_TAGS[f.comp] ? MEDIA_COMP_TAGS[f.comp] : null].filter(Boolean), 'under');
+    const mg = mSur(mdrMgrName(T)); c.mgrS = mg;
+    if (j.sub === 'giant' || j.sub === 'late') {
+      const bn = mdPost(batch, 'bn', 'news', mdl(j.sub === 'late' ? 'ud_late_bn' : 'ud_giant_bn', c), Object.assign({}, base, { dt: 3, v: 1.9, im: j.sub === 'late' ? 2 : 1 }));
+      mdReplies(bn, T, 'ud_giant_fan', c, 2);
+      mdPost(batch, 'gaffe', 'news', mdl('ud_giant_gaffe', c), Object.assign({}, base, { dt: 9, v: 1.6 }));
+      const hd = mdl('ud_giant_head', c);
+      mdPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 40, h: hd, by: mPick((MEDIA_BYLINES && MEDIA_BYLINES.meridian) || ['Staff']), b: [mdl('ud_giant_body1', c), mdl('ud_giant_body2', c)] }));
+      mdFans(batch, T, 'ud_giant_fan', c, 3, base, null, { v: 1.6 });
+      const rv = mFan(O, 'rv' + mInt(0, 400), 'banter');
+      mdPost(batch, rv, 'tw', mVoice(mdl('ud_giant_rival', c), 'banter'), Object.assign({}, base, { dt: mInt(15, 160), v: 1.3 }));
+      if (j.sub === 'giant') mdTv(batch, base, c, mx('{team} {score} {opp}', c), 'Cup Shock Special', 'UPSET', [mx('A giant-killing in the {comp}: {team} have beaten {opp}.', c)], 'ud_giant_pan_', c.team + ' ' + c.score + ' ' + c.opp, 1);
+    } else if (j.sub === 'final') {
+      const bn = mdPost(batch, 'bn', 'news', mdl('ud_final_bn', c), Object.assign({}, base, { dt: 0, v: 2.3, im: 3 }));
+      mdReplies(bn, T, 'ud_fan_final', c, 2);
+      const hd = mdl('ud_final_head', c);
+      mdPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 40, h: hd, by: mPick((MEDIA_BYLINES && MEDIA_BYLINES.meridian) || ['Staff']), b: [mdl('ud_final_body', c), mdl('ud_final_body', c)], im: 3 }));
+      mdFans(batch, T, 'ud_fan_final', c, 3, base, 'delusional', { v: 1.8 });
+    } else if (j.sub === 'rise') {
+      const bn = mdPost(batch, 'bn', 'news', mdl('ud_rise_bn', c), Object.assign({}, base, { dt: 8, v: 1.5, im: 1 }));
+      mdReplies(bn, T, 'ud_rise_fan', c, 2);
+      const hd = mdl('ud_rise_meridian', c);
+      mdPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 45, h: hd, by: mPick((MEDIA_BYLINES && MEDIA_BYLINES.meridian) || ['Staff']), b: [mdl('ud_rise_body1', c), mdl('ud_rise_body2', c)] }));
+      mdPost(batch, mdClub(T), 'tw', mdl('ud_rise_club', c), Object.assign({}, base, { dt: 30 }));
+      mdPost(batch, 'statbook', 'stat', mdl('ud_rise_stat', c), Object.assign({}, base, { dt: 20 }));
+      mdPost(batch, 'gaffe', 'news', mdl('ud_rise_gaffe', c), Object.assign({}, base, { dt: 12 }));
+      if (!mdrManagerGone(T)) { const ma = mdMgrAcct(T); if (ma && mChance(0.6)) mdPost(batch, ma, 'tw', mdl('ud_rise_mgr', c), Object.assign({}, base, { dt: 80 })); }
+      mdFans(batch, T, 'ud_rise_fan', c, 3, base, 'delusional');
+      mdFans(batch, null, 'ud_rise_neutral', c, 2, base, 'wholesome');
+    } else if (j.sub === 'run') {
+      const bn = mdPost(batch, 'bn', 'news', mdl('ud_run_bn', c), Object.assign({}, base, { dt: 8, v: 1.4 }));
+      mdReplies(bn, T, 'ud_run_fan', c, 2);
+      mdPost(batch, 'tac', 'take', mdl('ud_run_body', c), Object.assign({}, base, { dt: 60 }));
+      mdFans(batch, T, 'ud_run_fan', c, 2, base, null);
+    }
+  }
+
+  // -- transfer hijacks: read straight from the transfer engine's news log ------------------------------------------------------------------------------
+  function mediaOnTransferNews(e) {
+    if (!mediaReady || !MD || !e) return;
+    if (['hijack', 'bidwar', 'collapse', 'refused', 'deadline'].indexOf(e.k) === -1) return;
+    _mdTm.push(Object.assign({}, e));
+    if (_mdTmTimer) return;
+    _mdTmTimer = setTimeout(function () {
+      _mdTmTimer = null;
+      try { mdrTmFlush(); } catch (er) { console.warn('Drama transfers', er); }
+    }, 0);
+  }
+  function mdTmWorthy(e) {
+    const big = (e.ovr || 0) >= 88 || (e.fee || 0) >= 45;
+    if (e.k === 'hijack') return true;
+    if (e.k === 'bidwar') return big || mChance(0.5);
+    if (e.k === 'collapse') return big && mChance(0.7);
+    if (e.k === 'refused') return (e.ovr || 0) >= 85 || !!e.u;
+    if (e.k === 'deadline') return ((e.fee || 0) >= 60 || (e.ovr || 0) >= 90) && mChance(0.7);
+    return false;
+  }
+  function mdrTmFlush() {
+    const list = _mdTm; _mdTm = [];
+    if (!mdOn() || !list.length) return;
+    ensureMedia(); mdBudgetReset();
+    const batch = mBatch(mWhenLabel());
+    let n = 0; const max = mdC('hijack.maxPerFlush', 4);
+    list.forEach(e => { if (n >= max || !mdTmWorthy(e)) return; try { if (mdHijackStory(batch, e)) n++; } catch (er) { console.warn('Drama hijack', er); } });
+    mCommit(batch);
+    mediaSave();
+    try { const v = document.getElementById('view-media'); if (v && v.classList.contains('active')) renderMediaView(); } catch (er) {}
+  }
+  function mdHijackStory(batch, e) {
+    const S = mdSt();
+    const hit = (typeof tmFind === 'function') ? tmFind(e.pid) : null;
+    const P = hit ? hit.p : { name: e.nm, pos: [] };
+    const from = e.f ? getTeam(e.f) : null, to = e.t ? getTeam(e.t) : null, to2 = e.t2 ? getTeam(e.t2) : null;
+    const nm = id => (id ? tmClubNameById(id) : '');
+    const sh = (t, id) => (t ? mdShort(t) : nm(id));
+    const c = { player: e.nm, playerS: mSur(e.nm), role: mdRole(P), from: nm(e.f), fromS: sh(from, e.f), to: nm(e.t), toS: sh(to, e.t), to2: nm(e.t2), to2S: sh(to2, e.t2), fee: e.fee > 0 ? tmFmt(e.fee) : 'an undisclosed fee', ovr: e.ovr };
+    const ts = [e.f, e.t, e.t2].filter(Boolean);
+    const tags = [mTag(c.playerS), '#TransferNews'];
+    const base = { ts, tg: tags, dr: 'hijack', nw: 'hijack' };
+    const jn = mdJourno(to2 || to || from || allTeams[0], 'transfer');
+    if (e.k === 'hijack') {
+      if (!to2 || !to) return false;
+      const bn = mdPost(batch, 'bn', 'rumor', mdl('hj_bn', c), Object.assign({}, base, { dt: 0, v: 2.2, im: 3, free: true }));
+      mdReplies(bn, to, 'hj_fan_victim', c, 2);
+      mdPost(batch, jn, 'rumor', mdl('hj_j', c), Object.assign({}, base, { dt: 2, v: 2, im: 2, free: true }));
+      mdPost(batch, 'gaffe', 'news', mdl('hj_gaffe', c), Object.assign({}, base, { dt: 9, v: 1.7 }));
+      const hd = mdl('hj_head', c);
+      mdPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 45, h: hd, by: mPick((MEDIA_BYLINES && MEDIA_BYLINES.meridian) || ['Staff']), b: [mdl('hj_body1', c), mdl('hj_body2', c)] }));
+      mdPost(batch, mdClub(to2), 'tw', mdl('hj_club_hijacker', c), Object.assign({}, base, { dt: 20, v: 1.6 }));
+      if (mChance(0.5)) mdPost(batch, mdClub(to), 'tw', mdl('hj_club_victim', c), Object.assign({}, base, { dt: 60 }));
+      mdFans(batch, to2, 'hj_fan_hijacker', c, 2, base, 'banter');
+      mdFans(batch, to, 'hj_fan_victim', c, 2, base, 'angry');
+      if (from) mdFans(batch, from, 'hj_fan_from', c, 1, base, null);
+      mdPost(batch, 'viral', 'meme', mdl('hj_meme', c), Object.assign({}, base, { dt: mInt(20, 100), v: 1.5 }));
+      mdPost(batch, 'terrace', 'take', mdl('hj_radio', c), Object.assign({}, base, { dt: mInt(50, 140) }));
+      if (mChance(0.5)) {
+        const byLens = mPundits();
+        const pn = ['analyst', 'hardman'].map(l => ({ p: byLens[l], x: mdl('hj_pan', c) })).filter(b => b.p && b.x);
+        mdPost(batch, 'asc', 'tv', mdl('hj_tv', c), Object.assign({}, base, { dt: 14, ban: 'HIJACKED', show: 'Transfer Centre Live', an: [mdl('hj_tv', c)], pn, tick: [c.player + ' → ' + c.to2], im: 1 }));
+      }
+    } else if (e.k === 'bidwar') {
+      if (!to || !to2) return false;
+      const bn = mdPost(batch, 'bn', 'rumor', mdl('bw_bn', c), Object.assign({}, base, { dt: 0, v: 1.8, im: 2, free: true }));
+      mdReplies(bn, to2, 'bw_fan', c, 2);
+      mdPost(batch, jn, 'rumor', mdl('bw_j', c), Object.assign({}, base, { dt: 4, v: 1.6, free: true }));
+      mdFans(batch, to, 'bw_fan', c, 1, base, null);
+      mdFans(batch, to2, 'bw_fan', c, 1, base, null);
+    } else if (e.k === 'collapse') {
+      if (!to) return false;
+      const bn = mdPost(batch, 'bn', 'rumor', mdl('col_bn', c), Object.assign({}, base, { dt: 0, v: 1.6, im: 1, free: true }));
+      mdReplies(bn, to, 'col_fan_to', c, 2);
+      mdFans(batch, to, 'col_fan_to', c, 2, base, null);
+      if (from) mdFans(batch, from, 'col_fan_from', c, 1, base, null);
+    } else if (e.k === 'refused') {
+      if (!to) return false;
+      mdPost(batch, 'bn', 'rumor', mdl('ref_bn', c), Object.assign({}, base, { dt: 0, v: 1.7, im: 2, free: true }));
+      mdFans(batch, to, 'col_fan_to', c, 2, base, null);
+      if (from) mdFans(batch, from, 'col_fan_from', c, 1, base, null);
+    } else if (e.k === 'deadline') {
+      if (!to) return false;
+      mdPost(batch, 'bn', 'rumor', mdl('dl_bn', c), Object.assign({}, base, { dt: 0, v: 1.8, im: 2, free: true }));
+      mdFans(batch, to, 'dl_fan', c, 2, base, null);
+    } else return false;
+    S.hj.unshift({ y: season ? season.year : 0, k: e.k, nm: e.nm, f: e.f, t: e.t, t2: e.t2, fee: e.fee || 0 });
+    if (S.hj.length > 16) S.hj.length = 16;
+    mdLog(S, { k: 'hijack', t: e.t2 || e.t, x: e.k + ': ' + e.nm });
+    return true;
+  }
+
+
+  // ==========================================================================
   // APEX MEDIA CENTRE — Media tab UI
   // ==========================================================================
   let mediaTabId = 'feed';
@@ -25874,7 +26581,7 @@ const PLAYSTYLE_BEHAVIOR = {
   const MEDIA_KIND_FILTERS = [
     ['all', 'All'], ['scores', 'Scores'], ['previews', 'Previews'], ['news', 'News'],
     ['social', 'Fans & takes'], ['transfers', 'Transfers'], ['events', 'Awards & trophies'],
-    ['verified', 'Players & clubs'], ['journalists', 'Journalists'], ['managers', 'Managers'], ['teamnews', 'Team news & injuries'], ['hype', 'Awards hype'], ['records', 'Records & milestones']
+    ['verified', 'Players & clubs'], ['journalists', 'Journalists'], ['managers', 'Managers'], ['teamnews', 'Team news & injuries'], ['hype', 'Awards hype'], ['records', 'Records & milestones'], ['storylines', 'Storylines']
   ];
 
   function mUserView(u) {
@@ -25946,7 +26653,7 @@ const PLAYSTYLE_BEHAVIOR = {
     return '<article class="mp' + (p.im >= 3 ? ' big' : '') + (compact ? ' compact' : '') + '" data-pid="' + p.id + '">' +
       '<div class="mp-av" style="background:' + u.color + '">' + u.avatar + '</div>' +
       '<div class="mp-main"><div class="mp-head"><b>' + mNameLink(u) + '</b>' + (u.verified ? ' <span class="mp-ver" title="Verified">✔</span>' : '') + mRoleTag(u.kind) +
-      ' <span class="mp-handle">' + mEsc(u.handle) + '</span><span class="mp-time">· ' + mEsc(mTimeLabel(p)) + '</span>' + (p.c ? '<span class="mp-comp">' + mEsc(p.c) + '</span>' : '') + '<span class="mp-teams">' + teams + '</span></div>' +
+      ' <span class="mp-handle">' + mEsc(u.handle) + '</span><span class="mp-time">· ' + mEsc(mTimeLabel(p)) + '</span>' + (p.dr && MD_BADGE[p.dr] ? '<span class="mp-storyline">' + MD_BADGE[p.dr] + '</span>' : '') + (p.c ? '<span class="mp-comp">' + mEsc(p.c) + '</span>' : '') + '<span class="mp-teams">' + teams + '</span></div>' +
       '<div class="mp-text">' + (p.k === 'vid' ? '🎥 ' : '') + ((p.k === 'tv' || (p.k === 'art' && p.h)) ? '' : text) + '</div>' + extra +
       '<div class="mp-acts"><span onclick="App.mediaToggleThread(' + p.id + ')" class="mp-act' + (p.r && p.r.length ? ' has' : '') + '">💬 ' + mFmt(p.rp) + '</span><span class="mp-act">🔁 ' + mFmt(p.rt) + '</span><span class="mp-act">❤️ ' + mFmt(p.l) + '</span><span class="mp-act">📊 ' + mFmt(p.vw) + '</span></div>' +
       replies + '</div></article>';
@@ -25970,6 +26677,7 @@ const PLAYSTYLE_BEHAVIOR = {
     else if (k === 'managers') list = list.filter(p => p.u && p.u.k === 'm');
     else if (k === 'teamnews') list = list.filter(p => p.nw === 'inj' || p.nw === 'bench' || p.nw === 'sus' || p.nw === 'tn');
     else if (k === 'hype') list = list.filter(p => p.ph === 'aw' || p.aw);
+    else if (k === 'storylines') list = list.filter(p => p.dr);
     return list;
   }
 
@@ -26044,6 +26752,7 @@ const PLAYSTYLE_BEHAVIOR = {
     else if (mediaTabId === 'accounts' && sxOn()) html = mAccountsHtml();
     else if (mediaTabId === 'records' && sxOn()) html = mRecordsHtml();
     else if (mediaTabId === 'fame' && sxOn()) html = mFameHtml();
+    else if (mediaTabId === 'storylines') html = mStorylinesHtml();
     else {
       const list = mFilteredPosts();
       html = list.length
@@ -26166,9 +26875,28 @@ const PLAYSTYLE_BEHAVIOR = {
       '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">✍️ Journalists</div>' +
       jn.map(x => '<div class="mx-row"><span style="font-size:1.2rem;margin-right:8px">' + x.o.icon + '</span><div class="mx-who"><b>' + mEsc(x.o.name) + '</b> <span class="mp-ver">✔</span><small>' + mEsc(x.o.handle) + ' · ' + mEsc(x.o.bio) + '</small></div><b>' + mFmt(x.o.followers) + '</b></div>').join('') + '</div></div>';
   }
+  // ---- storylines tab: sack race, managerial changes, breakout watch, dressing rooms, hijacks, underdogs ----------------------------
+  function mStorylinesHtml() {
+    if (!mdOn()) return '<div class="empty-state"><div class="icon">🎭</div><p>media-drama.json was not loaded, so storylines are off.</p></div>';
+    const S = mdSt();
+    const tn = id => { const t = getTeam(id); return t ? mTeamName(t) : (typeof tmClubNameById === 'function' ? tmClubNameById(id) : id); };
+    const mk = id => mMark(id, 18);
+    const card = (title, body) => '<div class="card mc-card"><div class="card-title" style="font-size:0.95rem">' + title + '</div>' + (body || '<p class="mc-empty">Nothing yet — these appear as results come in.</p>') + '</div>';
+    const hot = Object.keys(S.bp).filter(id => S.bp[id].p >= 12 && getTeam(id) && !S.sk[id]).sort((a, b) => S.bp[b].p - S.bp[a].p).slice(0, 6);
+    const hotH = hot.map(id => { const t = getTeam(id), p = Math.round(S.bp[id].p); return '<div class="mx-row">' + mk(id) + '<div class="mx-who"><b>' + mEsc(mTeamName(t)) + '</b><small>' + mEsc(mdrMgrName(t)) + '</small></div><div class="mx-bar"><i style="width:' + p + '%;background:' + (p > 60 ? 'var(--red,#ef4444)' : p > 35 ? 'var(--gold,#f0c14b)' : 'var(--blue)') + '"></i></div><b class="mx-pct">' + p + '</b></div>'; }).join('');
+    const chg = Object.keys(S.sk).sort((a, b) => S.sk[b].y - S.sk[a].y).slice(0, 8).map(id => { const k = S.sk[id]; return '<div class="mx-row">' + mk(id) + '<div class="mx-who"><b>' + mEsc(tn(id)) + '</b><small>' + mEsc(k.mgr) + ' sacked · ' + (k.newMgr ? 'new boss ' + mEsc(k.newMgr) : 'interim ' + mEsc(k.interim)) + '</small></div><span class="mx-chip">' + mEsc(k.kind) + '</span></div>'; }).join('');
+    const star = Object.keys(S.bo).slice(-8).reverse().map(id => { const b = S.bo[id], e = S.pl[id] || { n: 0, g: 0, a: 0, r: 0 }; return '<div class="mx-row">' + mk(b.t) + '<div class="mx-who"><b>' + mEsc(b.nm) + '</b><small>' + e.g + 'G ' + e.a + 'A · ' + e.n + ' apps · avg ' + (e.r / Math.max(1, e.n)).toFixed(1) + '</small></div>' + (b.s === 2 ? '<span class="mx-chip hot">suitors</span>' : '') + '</div>'; }).join('');
+    const room = Object.keys(S.ds).map(id => { const d = S.ds[id]; return '<div class="mx-row">' + mk(id) + '<div class="mx-who"><b>' + mEsc(d.nm) + '</b><small>' + mEsc(tn(id)) + ' · ' + mEsc(d.kind) + '</small></div><span class="dr-pips">' + '🔥'.repeat(d.lvl) + '</span></div>'; }).join('');
+    const hj = S.hj.slice(0, 8).map(h => '<div class="mx-row">' + mk(h.t2 || h.t) + '<div class="mx-who"><b>' + mEsc(h.nm) + '</b><small>' + mEsc(h.k) + ' · ' + mEsc(tn(h.f)) + ' → ' + mEsc(tn(h.t2 || h.t)) + (h.fee ? ' · ' + mEsc(tmFmt(h.fee)) : '') + '</small></div></div>').join('');
+    const ud = Object.keys(S.ud).filter(id => S.ud[id].st > 0 && getTeam(id)).map(id => { const ti = mdTable(getTeam(id)); return '<div class="mx-row">' + mk(id) + '<div class="mx-who"><b>' + mEsc(tn(id)) + '</b><small>' + (ti ? mOrd(ti.pos) + ' · tipped ' + mOrd(ti.exp) : '') + '</small></div></div>'; }).join('');
+    const log = S.log.slice(0, 10).map(l => '<div class="mx-row"><span class="mx-chip">Y' + l.y + '</span><div class="mx-who"><small>' + mEsc(l.x) + '</small></div></div>').join('');
+    return '<div class="mx-banner">Storylines are generated from real results, line-ups, tables and transfer deals. <a class="mc-link" style="float:none" onclick="App.mediaFilter(\'kind\',\'storylines\');App.mediaTab(\'feed\')">Open storyline posts ▸</a></div><div class="mx-grid">' +
+      card('🪓 Sack race <small>(board pressure)</small>', hotH) + card('🧢 Managerial changes', chg) + card('🌟 Breakout watch', star) +
+      card('🔥 Dressing rooms', room) + card('🕵️ Transfer hijacks &amp; bidding wars', hj) + card('🐺 Underdogs', ud) + card('📜 Timeline', log) + '</div>';
+  }
   function mediaTab(id) { mediaTabId = id; mediaShown = 40; renderMediaView(); }
   function mediaFilter(kind, v) { if (kind === 'team') mediaFilterTeam = v; else mediaFilterKind = v; mediaShown = 40; renderMediaView(); }
-  function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (['trending', 'awards', 'debates', 'accounts', 'records', 'fame'].indexOf(mediaTabId) !== -1) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
+  function mediaTag(tag) { mediaFilterTag = tag || ''; mediaShown = 40; if (['trending', 'awards', 'debates', 'accounts', 'records', 'fame', 'storylines'].indexOf(mediaTabId) !== -1) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
   function mediaAcct(handle) { mediaFilterAcct = handle || ''; mediaShown = 40; if (handle) mediaTabId = 'feed'; try { switchView('media'); } catch (e) {} renderMediaView(); }
   function mediaMore() { mediaShown += 40; renderMediaView(); }
   function mediaToggleThread(id) { if (mediaOpenThreads.has(id)) mediaOpenThreads.delete(id); else mediaOpenThreads.add(id); renderMediaView(); }
@@ -26952,6 +27680,7 @@ const PLAYSTYLE_BEHAVIOR = {
       fee: Math.round((fee || 0) * 100) / 100, v: Math.floor(tmR('nw' + n) * 97) }, extra || {});
     tm.news.push(e);
     if (tm.news.length > TM_CFG.newsMax) tm.news.splice(0, tm.news.length - TM_CFG.newsMax);
+    try { if (typeof mediaOnTransferNews === 'function') mediaOnTransferNews(e); } catch (er) {}   // storylines: hijacks, bidding wars, collapsed talks
     return e;
   }
   function tmNewsText(e) {
