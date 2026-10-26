@@ -1,0 +1,3 @@
+## 2026-10-26 - Hoisting Spatial and Context Lookups in Simulation Decision Loop
+**Learning:** `evaluateBallActions()` runs on every possession decision during match ticks. Inside its action evaluation loop, calls like `playerSideData`, `halfSpaceOf`, `localOverload`, and skill/personality array searches were executed for every candidate action (`pass`, `dribble`, `carry`, `shoot`, `cross`, `throughball`, `backpass`, `switch`, `hold`). Since these evaluations depend solely on the ball handler and pitch zone, calculating them once prior to the loop eliminates redundant squad array traversals and spatial model lookups.
+**Action:** Always check simulation decision loops for loop-invariant spatial/squad lookups and hoist them before iterating over candidate actions.
