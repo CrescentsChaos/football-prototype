@@ -60,7 +60,6 @@
         <div class="teams-toolbar">
           <input type="search" id="players-search" placeholder="Search players..." oninput="App.searchPlayers(this.value)" autocomplete="off" aria-label="Search players">
           <select id="players-sort" onchange="App.sortPlayers(this.value)" aria-label="Sort players">
-            <option value="ovr">Sort: OVR</option>
             <option value="liveRating">Sort: Live Rating</option>
             <option value="name">Sort: Name</option>
             <option value="goals">Sort: Goals</option>
@@ -100,13 +99,6 @@
             <option value="all">All teams</option>
             <option value="national">National</option>
             <option value="club">Clubs</option>
-          </select>
-          <select id="players-rating" onchange="App.filterPlayersRating(this.value)" aria-label="Filter by rating">
-            <option value="all">All ratings</option>
-            <option value="elite">Elite (85+)</option>
-            <option value="great">Great (75-84)</option>
-            <option value="good">Good (65-74)</option>
-            <option value="dev">Development (&lt;65)</option>
           </select>
           <button type="button" class="btn btn-secondary btn-sm" id="players-compare-toggle" onclick="App.togglePlayersCompareMode()">Compare players</button>
         </div>
