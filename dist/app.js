@@ -5324,6 +5324,7 @@ const PLAYSTYLE_BEHAVIOR = {
         if (savedView && savedView !== 'home' && document.getElementById('view-' + savedView)) switchView(savedView);
       }
       setupAutoSave();
+      try { galaOnInit(); } catch (e) {}
       try {
         if (sessionStorage.getItem('apexJustReset') === '1') {
           sessionStorage.removeItem('apexJustReset');
@@ -5369,7 +5370,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const tabEl = document.querySelector(`.nav-tab[data-view="${view}"]`);
     if (tabEl) { tabEl.classList.add('active'); tabEl.setAttribute('aria-current', 'page'); }
     if (view === 'leaderboard') showLeaderboard('goals');
-    if (view === 'awards') showAwards('overview');
+    if (view === 'awards') { let un = 0; try { un = galaUnseen().length; } catch (e) {} showAwards(un ? 'ceremony' : 'overview'); }
     if (view === 'history') showHistory(historyActiveTab || 'team');
     if (view === 'teams') renderTeamsList();
     if (view === 'players') renderPlayersList(false);
@@ -6491,7 +6492,7 @@ const PLAYSTYLE_BEHAVIOR = {
         const aFit = (a.pos || []).includes(slot) ? 1 : 0;
         const bFit = (b.pos || []).includes(slot) ? 1 : 0;
         if (bFit !== aFit) return bFit - aFit;
-        return (b.ovr || 70) - (a.ovr || 70);
+        return String(a.name).localeCompare(String(b.name));
       });
     let picker = document.getElementById('sb-picker');
     if (!picker) return;
@@ -6503,7 +6504,7 @@ const PLAYSTYLE_BEHAVIOR = {
         return '<button type="button" class="sb-picker-item' + (p.id === selected ? ' selected' : '') + '" onclick="App.setSquadSlot(' + index + ',\'' + p.id + '\')">' +
           '<span class="sb-bench-num">' + (p.num || '?') + '</span>' +
           '<span class="sb-bench-name">' + p.name + '</span>' +
-          '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + (fit ? ' · fit' : '') + '</span></button>';
+          '<span class="sb-bench-meta">' + ((p.pos || [])[0] || '') + (fit ? ' · fit' : '') + '</span></button>';
       }).join('') + '</div>';
     picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -6590,7 +6591,7 @@ const PLAYSTYLE_BEHAVIOR = {
       ' onpointerdown="event.stopPropagation();App.sbGrab(event,\'' + kind + '\',\'' + p.id + '\')">' +
       '<span class="sb-chip-num">' + (p.num || '?') + '</span>' +
       '<span class="sb-chip-name">' + p.name + (inj ? ' 🩹' : '') + (susp ? ' ' + emojiImg('red_card', 'Suspended') : '') + '</span>' +
-      '<span class="sb-chip-meta">' + ((p.pos || [])[0] || '') + ' · ' + p.ovr + '</span>' +
+      '<span class="sb-chip-meta">' + ((p.pos || [])[0] || '') + '</span>' +
       sbRoleTagHTML(p.id) + moveBtn +
       '</div>';
   }
@@ -6598,7 +6599,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function renderSquadBuilderBenchHTML() {
     const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
     const benchArr = sbDraft.players.filter(function(p) { return sbDraft.bench.has(p.id) && !starterIds.has(p.id); });
-    benchArr.sort(function(a, b) { return (b.ovr || 0) - (a.ovr || 0); });
+    benchArr.sort(function(a, b) { return String(a.name).localeCompare(String(b.name)); });
     if (!benchArr.length) return '<p class="sb-empty-hint">Drag starters here to bench them, or drag a reserve up.</p>';
     return benchArr.map(function(p) { return sbChipRowHTML(p, 'bench'); }).join('');
   }
@@ -6606,7 +6607,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function renderSquadBuilderReserveHTML() {
     const starterIds = new Set(Object.values(sbDraft.slots).filter(Boolean));
     const reserveArr = sbDraft.players.filter(function(p) { return !starterIds.has(p.id) && !sbDraft.bench.has(p.id); });
-    reserveArr.sort(function(a, b) { return (b.ovr || 0) - (a.ovr || 0); });
+    reserveArr.sort(function(a, b) { return String(a.name).localeCompare(String(b.name)); });
     if (!reserveArr.length) return '<p class="sb-empty-hint">Everyone is in the matchday squad.</p>';
     return reserveArr.map(function(p) { return sbChipRowHTML(p, 'reserve'); }).join('');
   }
@@ -14061,6 +14062,868 @@ const PLAYSTYLE_BEHAVIOR = {
       .filter(p => p.saves > 0 || p.clean > 0)
       .sort((a,b) => b.pts - a.pts || b.clean - a.clean || b.saves - a.saves);
   }
+  // ========== AWARDS GALA: storage ==========
+  const GALA_KEY = 'apexCeremonies';
+  const GALA_KEEP = 40;
+  let galaBook = [];
+  let galaRaw = null;
+
+  function galaLoad() {
+    let raw = null;
+    try { raw = localStorage.getItem(GALA_KEY); } catch (e) {}
+    if (raw === galaRaw) return galaBook;       // unchanged since we last looked
+    galaRaw = raw;
+    galaBook = [];
+    try { const v = raw ? JSON.parse(raw) : []; if (Array.isArray(v)) galaBook = v; } catch (e) { galaBook = []; }
+    return galaBook;
+  }
+  function galaSave() {
+    try {
+      if (galaBook.length > GALA_KEEP) galaBook = galaBook.slice(-GALA_KEEP);
+      const s = JSON.stringify(galaBook);
+      if (safeSetItem(GALA_KEY, s)) galaRaw = s;
+    } catch (e) {}
+  }
+  function galaStore(rec) {
+    galaLoad();
+    galaBook = galaBook.filter(r => r.id !== rec.id);
+    galaBook.push(rec);
+    galaSave();
+    return rec;
+  }
+  function galaAll() { return galaLoad().slice(); }
+  function galaGet(id) { return galaLoad().find(r => r.id === id) || null; }
+  function galaFind(year, standalone) {
+    return galaLoad().find(r => r.year === year && (r.category === 'standalone-global') === !!standalone) || null;
+  }
+  function galaLatest() { const b = galaLoad(); return b.length ? b[b.length - 1] : null; }
+  function galaUnseen() { return galaLoad().filter(r => r.status !== 'seen'); }
+  function galaMarkSeen(id) {
+    const r = galaGet(id);
+    if (r && r.status !== 'seen') { r.status = 'seen'; galaSave(); }
+  }
+  // ========== AWARDS GALA: small maths helpers ==========
+  function galaGauss() {
+    let u = 0;
+    while (u === 0) u = seededRandom();
+    const v = seededRandom();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+  function galaMean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
+  function galaSd(a) {
+    if (a.length < 2) return 0;
+    const m = galaMean(a);
+    return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / a.length);
+  }
+  function galaZ(arr) {
+    const m = galaMean(arr), sd = galaSd(arr) || 1;
+    return arr.map(x => (x - m) / sd);
+  }
+  // Residuals of y after a straight-line fit on x (what a result "should" have been given the squad).
+  function galaResiduals(xs, ys) {
+    const mx = galaMean(xs), my = galaMean(ys);
+    let cov = 0, vx = 0;
+    for (let i = 0; i < xs.length; i++) { cov += (xs[i] - mx) * (ys[i] - my); vx += (xs[i] - mx) * (xs[i] - mx); }
+    const b = vx > 1e-9 ? cov / vx : 0;
+    return ys.map((y, i) => y - (my + b * (xs[i] - mx)));
+  }
+  function galaClamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  function galaEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function galaTeamByName(name) { return (allTeams || []).find(t => t.name === name) || null; }
+  function galaTeamRating(t) {
+    const ps = ((t && t.players) || []).map(p => p.ovr || 0).filter(x => x > 0).sort((a, b) => b - a).slice(0, 16);
+    return ps.length ? galaMean(ps) : 70;
+  }
+  function galaPosGroup(id) {
+    try {
+      buildPlayerTeamIndexes();
+      const p = _playerByIdIdx[id];
+      const pos = ((p && p.pos) || [])[0] || '';
+      if (pos === 'GK') return 'gk';
+      if (/^(CB|LB|RB|LWB|RWB|SW)$/.test(pos)) return 'def';
+      if (/^(CDM|CM|CAM|LM|RM)$/.test(pos)) return 'mid';
+      return 'att';
+    } catch (e) { return 'att'; }
+  }
+  function galaPosLabel(id) {
+    try { buildPlayerTeamIndexes(); const p = _playerByIdIdx[id]; return ((p && p.pos) || [])[0] || ''; } catch (e) { return ''; }
+  }
+  // ========== AWARDS GALA: the jury ==========
+  // Each ballot ranks the voter's top N; places are worth `points`. Voters see the real performance score,
+  // but perceive it through:
+  //   shared  - one media-narrative swing per candidate that EVERY voter feels (this is what makes a tight
+  //             race genuinely unpredictable: independent voter noise alone would average out over 100 ballots)
+  //   posBias - voters lean towards attackers and away from goalkeepers
+  //   taste   - each voter's own lean towards a position group
+  //   nation  - a voter from the candidate's country favours him
+  //   noise   - plain per-ballot noise
+  // Because everything is RELATIVE to the candidate's score, a runaway leader (20%+ clear) is out of reach
+  // of these swings, while a leader 3-8% ahead can easily lose.
+  const GALA_BALLOTS = {
+    ballon:  { voters: 100, points: [12, 10, 8, 7, 6, 5, 4, 3, 2, 1], shared: 0.085, noise: 0.06, nation: 0.04, taste: 0.025, posScale: 1 },
+    manager: { voters: 60,  points: [8, 6, 4, 2, 1],                   shared: 0.10,  noise: 0.07, nation: 0,    taste: 0,     posScale: 0 }
+  };
+  const GALA_POS_BIAS = { att: 0.025, mid: 0.01, def: -0.03, gk: -0.09 };
+
+  function galaRunVote(cands, cfg) {
+    const rows = cands.map(c => ({ c, votes: 0, first: 0 }));
+    if (!cands.length) return rows;
+    const shared = cands.map(() => galaGauss() * cfg.shared);
+    const nations = [...new Set(cands.slice(0, 15).map(c => c.nation).filter(Boolean))];
+    for (let v = 0; v < cfg.voters; v++) {
+      const home = (cfg.nation && nations.length && seededRandom() < 0.55) ? nations[Math.floor(seededRandom() * nations.length)] : null;
+      const taste = { att: galaGauss() * cfg.taste, mid: galaGauss() * cfg.taste, def: galaGauss() * cfg.taste, gk: galaGauss() * cfg.taste };
+      const perceived = cands.map((c, i) => {
+        const g = c.group || 'att';
+        const f = 1 + shared[i] + (GALA_POS_BIAS[g] || 0) * cfg.posScale + (taste[g] || 0) + (home && c.nation === home ? cfg.nation : 0) + galaGauss() * cfg.noise;
+        return { i, p: c.score * f };
+      }).sort((a, b) => b.p - a.p);
+      perceived.slice(0, cfg.points.length).forEach((x, k) => {
+        rows[x.i].votes += cfg.points[k];
+        if (k === 0) rows[x.i].first++;
+      });
+    }
+    const total = rows.reduce((s, r) => s + r.votes, 0) || 1;
+    rows.forEach(r => { r.pct = Math.round(r.votes / total * 1000) / 10; });
+    rows.sort((a, b) => b.votes - a.votes || b.first - a.first || b.c.score - a.c.score);
+    return rows;
+  }
+
+  // How far ahead the leader is, as a share of his own score. >= GALA_RUNAWAY counts as "clearly outshone everyone".
+  const GALA_RUNAWAY = 0.2;
+  function galaLeadGap(sortedScores) {
+    if (!sortedScores.length) return 0;
+    if (sortedScores.length < 2) return 1;
+    const a = sortedScores[0], b = sortedScores[1];
+    return a > 0 ? Math.max(0, (a - b) / a) : 0;
+  }
+  // ========== AWARDS GALA: Ballon d'Or ==========
+  function galaStatLine(r) {
+    const bits = [];
+    if (r.apps) bits.push(r.apps + ' apps');
+    if (r.goals) bits.push(r.goals + ' goals');
+    if (r.assists) bits.push(r.assists + ' assists');
+    if (r.motm) bits.push(r.motm + ' MOTM');
+    if (r.avg) bits.push(r.avg.toFixed(2) + ' avg');
+    return bits.join(' · ');
+  }
+
+  function galaPlayerFinalist(r, extra) {
+    const aff = findPlayerTeams(r.id) || {};
+    return Object.assign({
+      id: r.id, name: r.name, team: r.team || aff.club || aff.national || '', club: aff.club || null, national: aff.national || null,
+      pos: galaPosLabel(r.id), line: galaStatLine(r)
+    }, extra || {});
+  }
+
+  // The jury's pool: the top 30 by performance. Returns null if nobody has played enough.
+  function galaBallonVote() {
+    const ranking = computeBallonRanking(stats) || [];
+    if (!ranking.length) return null;
+    const pool = ranking.slice(0, 30);
+    const cands = pool.map((r, i) => {
+      const aff = findPlayerTeams(r.id) || {};
+      return { key: r.id, score: Math.max(1, r.pts), r, seed: i + 1, group: galaPosGroup(r.id), nation: aff.national || null };
+    });
+    const rows = galaRunVote(cands, GALA_BALLOTS.ballon);
+    const gap = galaLeadGap(pool.map(r => r.pts));
+    return { pool, rows, gap };
+  }
+
+  function galaBuildBallon() {
+    const v = galaBallonVote();
+    if (!v) return null;
+    const finalists = v.rows.slice(0, 10).map((row, i) => galaPlayerFinalist(row.c.r, {
+      rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, seed: row.c.seed,
+      trophies: row.c.r.trophyPts || 0
+    }));
+    const nominees = v.pool.map(r => ({ id: r.id, name: r.name, team: r.team })).sort((a, b) => a.name.localeCompare(b.name));
+    const winner = finalists[0];
+    const favourite = v.pool[0];
+    return {
+      key: 'ballon', award: "Ballon d'Or", title: "Ballon d'Or", type: 'player', vote: true, voters: GALA_BALLOTS.ballon.voters,
+      ballot: GALA_BALLOTS.ballon.points.length, finalists, nominees, winner,
+      runaway: v.gap >= GALA_RUNAWAY, gap: Math.round(v.gap * 1000) / 10,
+      favourite: { id: favourite.id, name: favourite.name }, upset: winner.id !== favourite.id,
+      runnerUp: finalists[1] ? finalists[1].name : null
+    };
+  }
+
+  // Live "race" card for the Awards tab: contenders WITHOUT order or points, so the winner can't be read off the
+  // table. A favourite is only named when somebody has clearly outshone everyone.
+  function galaBallonRace() {
+    const ranking = computeBallonRanking(stats) || [];
+    if (!ranking.length) return null;
+    const gap = galaLeadGap(ranking.map(r => r.pts));
+    const contenders = ranking.slice(0, 12).map(r => galaPlayerFinalist(r, { apps: r.apps, goals: r.goals, assists: r.assists, avg: r.avg }));
+    contenders.sort((a, b) => a.name.localeCompare(b.name));
+    return { contenders, runaway: gap >= GALA_RUNAWAY, favourite: gap >= GALA_RUNAWAY ? galaPlayerFinalist(ranking[0]) : null };
+  }
+  // ========== AWARDS GALA: Manager of the Year ==========
+  // Judged on what the manager got out of his squad, not on who lifted a trophy:
+  //   perf   - points per game, points vs what a squad of that quality "should" earn (fitted on the league
+  //            itself), and goal-difference vs the same expectation
+  //   tactic - his style proficiency plus how far his players' match ratings sit above what their level predicts
+  //   cont   - the Champions League run, worth more to a side nobody expected there
+  //   cup    - a small bonus for silverware, deliberately NOT decisive
+  const GALA_UCL_STAGE_PTS = { 1: 0, 2: 0.25, 3: 0.5, 4: 0.8, 5: 1.2 };
+
+  function galaUclStage(teamId) {
+    const u = season && season.ucl;
+    if (!u) return 0;
+    if (u.champion && u.champion.id === teamId) return 5;
+    const k = u.knockout || {};
+    const inRound = (r) => !!(r && (r.fixtures || []).some(f => f.home === teamId || f.away === teamId));
+    if (inRound(k.final)) return 4;
+    if (inRound(k.sf)) return 3;
+    if (inRound(k.qf)) return 2;
+    return (u.table || []).some(r => r.team && r.team.id === teamId) ? 1 : 0;
+  }
+
+  // Scores every manager in a pool of table rows (one league, or a whole standalone tournament).
+  function galaScoreRows(rows, compStats, opts) {
+    opts = opts || {};
+    const maxPlayed = Math.max(0, ...rows.map(r => r.played || 0));
+    const elig = rows.filter(r => r.team && r.team.manager && r.team.manager.name && (r.played || 0) >= Math.max(1, maxPlayed * 0.6));
+    if (elig.length < 4) return [];
+    const ppg = elig.map(r => (r.won * 3 + r.drawn) / r.played);
+    const gdpg = elig.map(r => (r.gf - r.ga) / r.played);
+    const rating = elig.map(r => galaTeamRating(r.team));
+    const resZ = galaZ(galaResiduals(rating, ppg));
+    const gdResZ = galaZ(galaResiduals(rating, gdpg));
+    const rankZ = galaZ(ppg);
+    const prof = galaZ(elig.map(r => { try { return getManagerStyleProficiency(r.team); } catch (e) { return 0.7; } }));
+
+    // how far each team's players out-play their level (average match rating residual)
+    const rByTeam = {};
+    Object.values((compStats && compStats.ratings) || {}).forEach(e => {
+      if ((e.count || 0) < 3 || !e.avg) return;
+      const t = rByTeam[e.teamId] || (rByTeam[e.teamId] = { w: 0, s: 0 });
+      t.w += e.count; t.s += e.avg * e.count;
+    });
+    const haveR = elig.map(r => !!(rByTeam[r.team.id] && rByTeam[r.team.id].w >= 20));
+    const idxR = elig.map((r, i) => i).filter(i => haveR[i]);
+    const squadZ = elig.map(() => 0);
+    if (idxR.length >= 4) {
+      const z = galaZ(galaResiduals(idxR.map(i => rating[i]), idxR.map(i => rByTeam[elig[i].team.id].s / rByTeam[elig[i].team.id].w)));
+      idxR.forEach((i, k) => { squadZ[i] = z[k]; });
+    }
+
+    const order = elig.map((r, i) => i).sort((a, b) => ppg[b] - ppg[a] || gdpg[b] - gdpg[a]);
+    const finishOf = {}; order.forEach((i, k) => { finishOf[i] = k + 1; });
+    const ratingRank = elig.map((r, i) => i).sort((a, b) => rating[b] - rating[a]);
+    const rrOf = {}; ratingRank.forEach((i, k) => { rrOf[i] = k + 1; });
+    const bestGF = Math.max(...elig.map(r => r.gf)), bestGA = Math.min(...elig.map(r => r.ga));
+    const fitted = galaResiduals(rating, ppg).map((res, i) => ppg[i] - res);   // expected ppg
+
+    return elig.map((r, i) => {
+      const t = r.team;
+      const fame = galaClamp((rating[i] - 62) / 30, 0.05, 1);
+      let cont = 0, stage = 0;
+      if (!opts.leagueOnly) { stage = galaUclStage(t.id); cont = (GALA_UCL_STAGE_PTS[stage] || 0) * (1.25 - 0.6 * fame); }
+      let cup = 0;
+      if (opts.champion && opts.champion.id === t.id) cup += 0.35;
+      if (!opts.leagueOnly && opts.cupChampion && opts.cupChampion.id === t.id) cup += 0.25;
+      const perf = 0.45 * resZ[i] + 0.35 * rankZ[i] + 0.20 * gdResZ[i];
+      const tactic = 0.55 * prof[i] + 0.45 * squadZ[i];
+      const score = perf + 0.45 * tactic + cont + cup;
+      const tags = [];
+      if (finishOf[i] === 1) tags.push('Won the league');
+      const over = (ppg[i] - fitted[i]) * r.played;
+      if (over >= 6) tags.push('+' + Math.round(over) + ' pts above squad level');
+      if (finishOf[i] <= 4 && rrOf[i] > Math.ceil(elig.length / 2)) tags.push('Top 4 with a bottom-half squad');
+      if (r.gf === bestGF) tags.push('Best attack');
+      if (r.ga === bestGA) tags.push('Best defence');
+      if (stage >= 3) tags.push(stage === 5 ? 'Champions League winner' : stage === 4 ? 'Champions League finalist' : 'Champions League semi-finalist');
+      if (opts.cupChampion && opts.cupChampion.id === t.id && !opts.leagueOnly) tags.push('Cup winner');
+      let style = ''; try { style = getManagerPlaystyle(t); } catch (e) {}
+      return {
+        team: t, score, perf, tactic, cont, cup, tags, style,
+        record: r.won + '-' + r.drawn + '-' + r.lost, gd: r.gf - r.ga, ppg: Math.round(ppg[i] * 100) / 100,
+        finish: finishOf[i], of: elig.length, squadRank: rrOf[i], over: Math.round(over * 10) / 10, stage
+      };
+    });
+  }
+
+  // League-level "Manager of the Season": best performer in that league's table (champion gets a small bonus only).
+  function galaLeagueManager(comp) {
+    try {
+      if (!comp || !comp.table) return null;
+      const scored = galaScoreRows(comp.table, comp.stats, { leagueOnly: true, champion: comp.champion });
+      if (!scored.length) return null;
+      scored.sort((a, b) => b.score - a.score);
+      return scored[0].team;
+    } catch (e) { return null; }
+  }
+
+  function galaManagerPool() {
+    const out = [];
+    if (season && season.leagues) {
+      SEASON_LEAGUE_DEFS.forEach(def => {
+        const comp = season.leagues[def.key];
+        if (!comp || !comp.table) return;
+        const cup = season.cups && season.cups[def.key];
+        galaScoreRows(comp.table, comp.stats, { champion: comp.champion, cupChampion: cup && cup.champion }).forEach(x => { x.comp = comp.name; out.push(x); });
+      });
+    } else if (tournament) {
+      let rows = [];
+      if (tournament.table && tournament.table.length) rows = tournament.table;
+      else {
+        if (tournament.league && tournament.league.length) rows = rows.concat(tournament.league);
+        (tournament.groups || []).forEach(g => { rows = rows.concat(g.teams || []); });
+      }
+      galaScoreRows(rows, tournamentStats, { leagueOnly: true, champion: tournament.champion }).forEach(x => { x.comp = tournament.competitionName || 'Tournament'; out.push(x); });
+    }
+    return out;
+  }
+
+  function galaBuildManager() {
+    let pool = [];
+    try { pool = galaManagerPool(); } catch (e) { console.warn('gala manager pool', e); }
+    if (pool.length < 4) return null;
+    pool.sort((a, b) => b.score - a.score);
+    const top = pool.slice(0, 20);
+    const lo = top[top.length - 1].score;
+    const cands = top.map((x, i) => ({ key: x.team.id, score: 100 + 28 * (x.score - Math.min(lo, 0)), x, seed: i + 1, group: 'mgr', nation: null }));
+    const rows = galaRunVote(cands, GALA_BALLOTS.manager);
+    const gap = galaLeadGap(cands.map(c => c.score));
+    const finalists = rows.slice(0, 6).map((row, i) => {
+      const x = row.c.x, t = x.team;
+      return {
+        id: t.manager.name, name: t.manager.name, team: t.name, teamId: t.id, comp: x.comp, style: x.style,
+        rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, seed: row.c.seed,
+        line: x.record + ' · GD ' + (x.gd >= 0 ? '+' : '') + x.gd + ' · ' + x.finish + (x.finish === 1 ? 'st' : x.finish === 2 ? 'nd' : x.finish === 3 ? 'rd' : 'th') + ' of ' + x.of,
+        tags: x.tags.slice(0, 3)
+      };
+    });
+    const winner = finalists[0];
+    const favourite = top[0];
+    return {
+      key: 'manager', award: 'Manager of the Year', title: 'Manager of the Year', type: 'manager', vote: true, voters: GALA_BALLOTS.manager.voters,
+      ballot: GALA_BALLOTS.manager.points.length, finalists, nominees: top.map(x => ({ id: x.team.manager.name, name: x.team.manager.name, team: x.team.name })).sort((a, b) => a.name.localeCompare(b.name)),
+      winner, runaway: gap >= GALA_RUNAWAY, gap: Math.round(gap * 1000) / 10,
+      favourite: { id: favourite.team.manager.name, name: favourite.team.manager.name }, upset: winner.id !== favourite.team.manager.name,
+      runnerUp: finalists[1] ? finalists[1].name : null
+    };
+  }
+  // ========== AWARDS GALA: the full ceremony record ==========
+  // Reuses the existing ranking algorithms for the statistical awards (so they always agree with the Awards tabs)
+  // and adds the voted ones. Must be called BEFORE the leaderboard is reset.
+  function galaCountRow(r) {
+    const aff = findPlayerTeams(r.id) || {};
+    return { id: r.id, name: r.name, team: r.team || '', club: aff.club || null, national: aff.national || null, pos: galaPosLabel(r.id) };
+  }
+
+  function galaBuild(year, category) {
+    const standalone = category === 'standalone-global';
+    const rec = {
+      id: category + ':' + year, year, category, status: 'new', ts: Date.now(),
+      label: standalone ? 'Awards Round ' + year : 'Season Y' + year, cats: []
+    };
+    const top = (key) => Object.values(stats[key] || {}).sort((a, b) => b.count - a.count);
+
+    // --- statistical honours (no vote) ---
+    const honours = [];
+    [['Top Assists', 'assists', 'assists'], ['Most MOTM', 'motm', 'Man of the Match awards'], ['Clean Sheet King', 'cleanSheets', 'clean sheets']].forEach(([name, key, unit]) => {
+      const w = top(key)[0];
+      if (w) honours.push(Object.assign(galaCountRow(w), { award: name, line: w.count + ' ' + unit }));
+    });
+    if (honours.length) rec.cats.push({ key: 'honours', title: 'Statistical Honours', type: 'honours', vote: false, items: honours });
+
+    // --- Puskás, Yashin, Gerd Müller (existing algorithms) ---
+    const pus = top('puskas');
+    if (pus.length) {
+      rec.cats.push({
+        key: 'puskas', award: 'Puskás Award', title: 'Puskás Award', type: 'player', vote: false, blurb: 'The most spectacular goal of the year',
+        finalists: pus.slice(0, 5).map((r, i) => Object.assign(galaCountRow(r), { rank: i + 1, line: r.count + ' nomination' + (r.count === 1 ? '' : 's') })),
+        winner: null
+      });
+    }
+    const yas = computeYashinRanking(stats);
+    if (yas.length) {
+      rec.cats.push({
+        key: 'yashin', award: 'Yashin Trophy', title: 'Yashin Trophy', type: 'player', vote: false, blurb: 'The best goalkeeper of the year',
+        finalists: yas.slice(0, 5).map((r, i) => Object.assign(galaCountRow(r), { rank: i + 1, line: r.saves + ' saves · ' + r.clean + ' clean sheets' })),
+        winner: null
+      });
+    }
+    const gm = computeGerdMullerRanking(stats);
+    if (gm.length) {
+      rec.cats.push({
+        key: 'gerd', award: 'Gerd Müller Award', title: 'Gerd Müller Award', type: 'player', vote: false, blurb: 'The best striker of the year',
+        finalists: gm.slice(0, 5).map((r, i) => Object.assign(galaCountRow(r), { rank: i + 1, line: r.goals + ' goals · ' + r.assists + ' assists' })),
+        winner: null
+      });
+    }
+    rec.cats.forEach(c => { if (c.finalists && !c.winner) c.winner = c.finalists[0]; });
+
+    // --- voted awards ---
+    let mgr = null, ballon = null;
+    try { mgr = galaBuildManager(); } catch (e) { console.warn('gala manager', e); }
+    if (mgr) rec.cats.push(mgr);
+    try { ballon = galaBuildBallon(); } catch (e) { console.warn('gala ballon', e); }
+    if (ballon) rec.cats.push(ballon);
+    return rec;
+  }
+
+  function galaCat(rec, key) { return rec && (rec.cats || []).find(c => c.key === key) || null; }
+  // ========== AWARDS GALA: look & feel (gold, black, red carpet) ==========
+  const GALA_CSS = `
+.gala{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;overflow:hidden;color:#f6efdc;background:#050406;font-family:'Playfair Display',Georgia,'Times New Roman',serif;animation:galaIn .5s ease}
+.gala *{box-sizing:border-box}
+.gala-bg{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 40% at 50% 0%,rgba(246,215,122,.20),transparent 70%),radial-gradient(ellipse 90% 55% at 50% 118%,rgba(150,14,32,.62),transparent 66%),linear-gradient(#050406,#0c0809)}
+.gala-beam{position:absolute;top:-8%;width:46vmax;height:118%;background:linear-gradient(180deg,rgba(255,236,170,.22),rgba(255,236,170,0) 82%);clip-path:polygon(47% 0,53% 0,100% 100%,0 100%);transform-origin:50% 0;opacity:.65}
+.gala-beam.b1{left:-18vmax;animation:galaSweepA 9s ease-in-out infinite alternate}
+.gala-beam.b2{right:-18vmax;animation:galaSweepB 11s ease-in-out infinite alternate}
+.gala-dust{position:absolute;inset:0;background-image:radial-gradient(1.5px 1.5px at 12% 22%,rgba(255,226,140,.8),transparent),radial-gradient(1.5px 1.5px at 78% 14%,rgba(255,226,140,.7),transparent),radial-gradient(2px 2px at 34% 62%,rgba(255,226,140,.5),transparent),radial-gradient(1.5px 1.5px at 90% 70%,rgba(255,226,140,.6),transparent),radial-gradient(1.5px 1.5px at 56% 36%,rgba(255,226,140,.6),transparent);animation:galaTwinkle 4s ease-in-out infinite alternate}
+.gala-head{position:relative;text-align:center;padding:14px 52px 4px;flex:none}
+.gala-brand{font-family:'Cinzel','Playfair Display',serif;font-weight:900;letter-spacing:.3em;font-size:clamp(1rem,4.6vw,1.65rem);background:linear-gradient(180deg,#fff4c9,#e8bd48 48%,#97701a);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 24px rgba(232,189,72,.25)}
+.gala-sub{font-size:.7rem;letter-spacing:.24em;text-transform:uppercase;color:#bda566;margin-top:3px}
+.gala-x{position:absolute;right:12px;top:12px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(232,189,72,.5);background:rgba(0,0,0,.5);color:#e8bd48;font-size:1rem;cursor:pointer}
+.gala-prog{display:flex;gap:4px;justify-content:center;margin:8px auto 0;max-width:340px}
+.gala-prog i{flex:1;height:3px;border-radius:2px;background:rgba(232,189,72,.18)}
+.gala-prog i.on{background:linear-gradient(90deg,#97701a,#f6d77a)}
+.gala-main{position:relative;flex:1;overflow-y:auto;width:100%;max-width:640px;margin:0 auto;padding:10px 14px 18px;-webkit-overflow-scrolling:touch}
+.gala-foot{position:relative;flex:none;display:flex;gap:10px;justify-content:center;padding:8px 14px 8px;z-index:2}
+.gala-btn{font-family:'Cinzel','Playfair Display',serif;font-weight:700;letter-spacing:.12em;font-size:.82rem;text-transform:uppercase;cursor:pointer;border-radius:999px;padding:12px 24px;border:1px solid #e8bd48;color:#1a1204;background:linear-gradient(180deg,#fff0b8,#e8bd48 55%,#b88a22);box-shadow:0 4px 18px rgba(232,189,72,.28)}
+.gala-btn:active{transform:translateY(1px)}
+.gala-btn.ghost{background:rgba(0,0,0,.45);color:#e8bd48;box-shadow:none}
+.gala-card{position:relative;border:1px solid rgba(232,189,72,.42);border-radius:16px;padding:16px 14px;margin:8px 0;background:linear-gradient(180deg,rgba(28,22,12,.92),rgba(9,7,6,.94));box-shadow:0 0 0 1px rgba(0,0,0,.7) inset,0 12px 34px rgba(0,0,0,.65)}
+.gala-kicker{font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:.28em;text-transform:uppercase;color:#bda566;text-align:center}
+.gala-title{font-family:'Cinzel','Playfair Display',serif;font-weight:900;text-align:center;font-size:clamp(1.25rem,6vw,1.85rem);margin:6px 0;background:linear-gradient(180deg,#fff4c9,#e8bd48 55%,#97701a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.gala-blurb{text-align:center;color:#cdbd8c;font-style:italic;margin:2px 0 10px;font-size:.92rem}
+.gala-note{text-align:center;color:#9d8a58;font-size:.76rem;margin-top:10px;letter-spacing:.04em}
+.gala-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
+.gala-chip{border:1px solid rgba(232,189,72,.35);border-radius:999px;padding:4px 10px;font-size:.76rem;color:#eadfb9;background:rgba(232,189,72,.07)}
+.gala-chip small{color:#9d8a58;margin-left:4px}
+.gala-row{position:relative;display:grid;grid-template-columns:28px 42px 1fr auto;align-items:center;gap:10px;padding:9px 10px;margin:6px 0;border-radius:12px;border:1px solid rgba(232,189,72,.22);background:rgba(18,14,9,.9);overflow:hidden}
+.gala-row.new{animation:galaRowIn .7s cubic-bezier(.2,.9,.3,1.2) both;border-color:rgba(255,226,140,.8);box-shadow:0 0 22px rgba(232,189,72,.35)}
+.gala-row.locked{opacity:.45;border-style:dashed}
+.gala-row.top{border-color:#e8bd48}
+.gala-rank{font-family:'Cinzel',serif;font-weight:900;color:#e8bd48;text-align:center;font-size:1.05rem}
+.gala-who b{display:block;font-weight:700;color:#fff6d8;line-height:1.15}
+.gala-who small{display:block;color:#a89868;font-size:.72rem;margin-top:2px;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.gala-votes{text-align:right;line-height:1.1}
+.gala-votes b{font-family:'Cinzel',serif;font-size:1.05rem;color:#f6d77a}
+.gala-votes small{display:block;color:#a89868;font-size:.68rem;font-family:system-ui,sans-serif}
+.gala-bar{position:absolute;left:0;bottom:0;height:3px;background:linear-gradient(90deg,#97701a,#f6d77a);border-radius:0 3px 0 0}
+.gala-suspense{text-align:center;font-family:'Cinzel',serif;letter-spacing:.2em;font-size:1rem;color:#f6d77a;padding:26px 0 8px;animation:galaSuspense 1.9s ease forwards}
+.gala-winner{position:relative;text-align:center;border:2px solid #e8bd48;border-radius:20px;padding:20px 14px 18px;margin:6px 0 10px;background:radial-gradient(ellipse at 50% 0%,rgba(246,215,122,.28),transparent 65%),linear-gradient(180deg,#1b1408,#070504);box-shadow:0 0 44px rgba(232,189,72,.38),0 14px 40px rgba(0,0,0,.7);animation:galaPop .9s 1.9s cubic-bezier(.2,.9,.3,1.25) both}
+.gala-winner.instant{animation:galaPop .6s both}
+.gala-winner h1{font-family:'Cinzel','Playfair Display',serif;font-weight:900;font-size:clamp(1.5rem,7.4vw,2.3rem);margin:10px 0 2px;background:linear-gradient(180deg,#fff4c9,#e8bd48 55%,#97701a);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.1}
+.gala-winner .gala-team{color:#d6c691;font-size:.95rem;display:flex;align-items:center;gap:8px;justify-content:center}
+.gala-winner .gala-line{color:#a89868;font-size:.8rem;margin-top:6px;font-family:system-ui,sans-serif}
+.gala-av{display:inline-flex;justify-content:center;filter:drop-shadow(0 0 14px rgba(232,189,72,.5))}
+.gala-av .lb-avatar,.gala-av .mgr-avatar{border:2px solid #e8bd48;border-radius:50%}
+.gala-badge{display:inline-block;margin:8px 4px 0;padding:4px 12px;border-radius:999px;font-size:.72rem;letter-spacing:.06em;border:1px solid rgba(232,189,72,.6);color:#f6d77a;background:rgba(232,189,72,.1);font-family:system-ui,sans-serif}
+.gala-badge.hot{border-color:#ff6b7c;color:#ffb0b9;background:rgba(190,20,45,.2)}
+.gala-honour{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:center;padding:10px;margin:8px 0;border:1px solid rgba(232,189,72,.3);border-radius:12px;background:rgba(18,14,9,.9)}
+.gala-honour b{display:block;color:#fff6d8}
+.gala-honour small{display:block;color:#a89868;font-size:.75rem;font-family:system-ui,sans-serif}
+.gala-honour .k{font-family:'Cinzel',serif;font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;color:#e8bd48}
+.gala-arrive{display:flex;align-items:center;gap:10px;padding:8px 10px;margin:6px 0;border-radius:12px;background:rgba(18,14,9,.85);border:1px solid rgba(232,189,72,.18);animation:galaWalk .7s both}
+.gala-arrive small{color:#a89868;font-family:system-ui,sans-serif}
+.gala-carpet{position:relative;flex:none;height:50px}
+.gala-carpet::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#f6d77a,#97701a);clip-path:polygon(17% 0,83% 0,100% 100%,0 100%)}
+.gala-carpet::after{content:"";position:absolute;left:0;right:0;top:3px;bottom:0;background:repeating-linear-gradient(90deg,rgba(0,0,0,.0) 0 22px,rgba(0,0,0,.10) 22px 24px),linear-gradient(180deg,#9b1022,#c8142f 55%,#7a0b1a);clip-path:polygon(17.6% 0,82.4% 0,98.4% 100%,1.6% 100%)}
+.gala-post{position:absolute;bottom:14px;width:11px;height:30px;border-radius:5px 5px 2px 2px;background:linear-gradient(90deg,#97701a,#fff0b8 45%,#97701a);z-index:1}
+.gala-post::before{content:"";position:absolute;top:-6px;left:-1px;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff7d6,#e8bd48 60%,#8a6615)}
+.gala-rope{position:absolute;bottom:34px;height:12px;border-bottom:3px solid #a3122b;border-radius:0 0 50% 50%;z-index:1}
+.gala-flash{position:absolute;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,#fff,rgba(255,244,200,.6) 30%,rgba(255,255,255,0) 66%);animation:galaFlash .55s ease-out forwards;z-index:3}
+.gala-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+.gala-confetti i{position:absolute;top:-16px;width:8px;height:14px;opacity:.95;animation:galaFall linear forwards}
+.gala-invite{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9000;width:min(92vw,420px);padding:14px 16px;border-radius:16px;text-align:center;color:#f6efdc;border:1px solid #e8bd48;background:linear-gradient(180deg,#1d1608,#080605);box-shadow:0 0 34px rgba(232,189,72,.35),0 14px 40px rgba(0,0,0,.7);animation:galaInvite .6s cubic-bezier(.2,.9,.3,1.2) both;font-family:'Playfair Display',Georgia,serif}
+.gala-invite-t{font-family:'Cinzel',serif;font-weight:900;letter-spacing:.2em;color:#f6d77a;font-size:.95rem}
+.gala-invite-s{font-size:.86rem;color:#d6c691;margin:6px 0 10px}
+.gala-invite-b{display:flex;gap:8px;justify-content:center}
+.gala-invite .gala-btn{padding:9px 16px;font-size:.72rem}
+.gala-race{border:1px solid rgba(232,189,72,.5);border-radius:16px;padding:16px 14px;margin-bottom:14px;color:#f6efdc;background:radial-gradient(ellipse at 50% 0%,rgba(246,215,122,.16),transparent 65%),linear-gradient(180deg,#14100a,#070605)}
+.gala-race h3{font-family:'Cinzel','Playfair Display',serif;font-weight:900;letter-spacing:.14em;margin:0 0 6px;background:linear-gradient(180deg,#fff4c9,#e8bd48 55%,#97701a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.gala-race p{color:#cdbd8c;font-size:.86rem;margin:4px 0 10px}
+.gala-race .gala-fav{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;border:1px solid #ff6b7c;background:rgba(190,20,45,.14);margin:8px 0;color:#ffd5da}
+.gala-race .gala-wide{padding:10px;border-radius:12px;border:1px dashed rgba(232,189,72,.5);margin:8px 0;color:#e8d9a4}
+.gala-race .lb-table{color:#f6efdc}
+.gala-hist{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:8px 0;border-radius:12px;border:1px solid rgba(232,189,72,.3);background:rgba(18,14,9,.9);color:#f6efdc}
+.gala-hist b{color:#f6d77a}
+.gala-hist small{display:block;color:#a89868}
+.gala-hist .gala-btn{margin-left:auto;padding:8px 14px;font-size:.68rem;white-space:nowrap}
+@keyframes galaIn{from{opacity:0}to{opacity:1}}
+@keyframes galaSweepA{from{transform:rotate(-26deg)}to{transform:rotate(-4deg)}}
+@keyframes galaSweepB{from{transform:rotate(26deg)}to{transform:rotate(4deg)}}
+@keyframes galaTwinkle{from{opacity:.35}to{opacity:1}}
+@keyframes galaRowIn{from{opacity:0;transform:translateY(-14px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes galaSuspense{0%{opacity:0}18%{opacity:1}80%{opacity:1}100%{opacity:0;height:0;padding:0;margin:0;overflow:hidden}}
+@keyframes galaPop{0%{opacity:0;transform:scale(.7)}100%{opacity:1;transform:none}}
+@keyframes galaWalk{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
+@keyframes galaFlash{0%{opacity:0;transform:scale(.3)}25%{opacity:1}100%{opacity:0;transform:scale(1.5)}}
+@keyframes galaFall{to{transform:translateY(110vh) rotate(720deg)}}
+@keyframes galaInvite{from{opacity:0;transform:translate(-50%,40px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (prefers-reduced-motion:reduce){.gala *,.gala-invite{animation-duration:.01s!important;animation-delay:0s!important}}
+`;
+
+  function galaEnsureStyle() {
+    try {
+      if (document.getElementById('gala-style')) return;
+      const st = document.createElement('style');
+      st.id = 'gala-style';
+      st.textContent = GALA_CSS;
+      document.head.appendChild(st);
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap';
+      document.head.appendChild(l);
+    } catch (e) {}
+  }
+  // ========== AWARDS GALA: the show ==========
+  let galaS = null;   // { rec, steps, i, timers:[], keyFn }
+
+  function galaSteps(rec) {
+    const steps = [{ t: 'arrive' }];
+    const cats = rec.cats || [];
+    cats.forEach((c, ci) => {
+      const meta = { c, ci, n: cats.length };
+      if (c.type === 'honours') { steps.push(Object.assign({ t: 'honours' }, meta)); return; }
+      steps.push(Object.assign({ t: 'nominees' }, meta));
+      const reveals = c.vote ? c.finalists.length : 1;
+      for (let k = 0; k < reveals; k++) steps.push(Object.assign({ t: 'reveal', k, reveals }, meta));
+    });
+    steps.push({ t: 'summary' });
+    return steps;
+  }
+
+  function galaAvatar(c, f, size) {
+    if (c && c.type === 'manager') return managerAvatarMark({ name: f.name }, size);
+    return lbAvatar({ id: f.id, name: f.name }, size);
+  }
+  function galaTeamBit(f, size) {
+    const t = f.teamId ? getTeam(f.teamId) : galaTeamByName(f.team);
+    return (t ? teamMark(t, size || 18) : '') + '<span>' + galaEsc(f.team || '') + '</span>';
+  }
+  function galaClearTimers() {
+    if (!galaS) return;
+    galaS.timers.forEach(t => { try { clearTimeout(t); clearInterval(t); } catch (e) {} });
+    galaS.timers = [];
+  }
+  function galaLater(fn, ms) { if (galaS) galaS.timers.push(setTimeout(fn, ms)); }
+
+  function galaFlashAt(x, y) {
+    const host = document.getElementById('gala-stage');
+    if (!host) return;
+    const f = document.createElement('i');
+    f.className = 'gala-flash';
+    f.style.left = x + '%'; f.style.top = y + '%';
+    host.appendChild(f);
+    setTimeout(() => { try { f.remove(); } catch (e) {} }, 650);
+  }
+  function galaFlashBurst(n, spread) {
+    for (let i = 0; i < n; i++) setTimeout(() => galaFlashAt(10 + Math.random() * 80, spread ? 10 + Math.random() * 70 : 55 + Math.random() * 35), i * 160 + Math.random() * 120);
+  }
+  function galaConfetti(count) {
+    const host = document.getElementById('gala-stage');
+    if (!host) return;
+    const box = document.createElement('div');
+    box.className = 'gala-confetti';
+    const cols = ['#fff0b8', '#e8bd48', '#c8142f', '#f6d77a', '#ffffff', '#b88a22'];
+    let h = '';
+    for (let i = 0; i < (count || 90); i++) {
+      h += '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;background:' + cols[i % cols.length] + ';animation-duration:' + (2.4 + Math.random() * 2.4).toFixed(2) + 's;animation-delay:' + (Math.random() * 0.9).toFixed(2) + 's;width:' + (5 + Math.random() * 6).toFixed(0) + 'px"></i>';
+    }
+    box.innerHTML = h;
+    host.appendChild(box);
+    setTimeout(() => { try { box.remove(); } catch (e) {} }, 5600);
+  }
+
+  function galaOpen(id) {
+    const rec = id ? galaGet(id) : (galaUnseen()[0] || galaLatest());
+    if (!rec) { toast('No gala yet — finish a season and the Apex Awards will be held'); return; }
+    galaEnsureStyle();
+    galaRemoveInvite();
+    galaCloseStage(true);
+    galaS = { rec, steps: galaSteps(rec), i: 0, timers: [], keyFn: null };
+    const el = document.createElement('div');
+    el.id = 'gala-stage';
+    el.className = 'gala';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', 'Apex Awards ceremony');
+    el.innerHTML =
+      '<div class="gala-bg"><span class="gala-beam b1"></span><span class="gala-beam b2"></span><span class="gala-dust"></span></div>' +
+      '<div class="gala-head"><button type="button" class="gala-x" aria-label="Close ceremony" onclick="App.galaClose()">✕</button>' +
+      '<div class="gala-brand">THE APEX AWARDS</div><div class="gala-sub" id="gala-sub"></div><div class="gala-prog" id="gala-prog"></div></div>' +
+      '<div class="gala-main" id="gala-main"></div>' +
+      '<div class="gala-foot" id="gala-foot"></div>' +
+      '<div class="gala-carpet"><i class="gala-post" style="left:9%"></i><i class="gala-post" style="left:21%"></i><i class="gala-post" style="right:21%"></i><i class="gala-post" style="right:9%"></i>' +
+      '<i class="gala-rope" style="left:10%;width:11.5%"></i><i class="gala-rope" style="right:10%;width:11.5%"></i></div>';
+    document.body.appendChild(el);
+    try { document.body.style.overflow = 'hidden'; } catch (e) {}
+    galaS.keyFn = (e) => {
+      if (e.key === 'Escape') galaCloseStage();
+      else if (e.key === 'Enter' || e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); galaNext(); }
+    };
+    document.addEventListener('keydown', galaS.keyFn);
+    galaRender();
+  }
+
+  function galaCloseStage(silent) {
+    if (galaS) {
+      galaClearTimers();
+      try { document.removeEventListener('keydown', galaS.keyFn); } catch (e) {}
+      if (!silent) galaMarkSeen(galaS.rec.id);
+    }
+    galaS = null;
+    try { const el = document.getElementById('gala-stage'); if (el) el.remove(); document.body.style.overflow = ''; } catch (e) {}
+    if (!silent) { try { const v = document.querySelector('.award-tab.active'); if (v && v.dataset.award === 'ceremony') showAwards('ceremony'); } catch (e) {} }
+  }
+
+  function galaNext() {
+    if (!galaS) return;
+    if (galaS.i < galaS.steps.length - 1) { galaS.i++; galaRender(); }
+    else galaCloseStage();
+  }
+  function galaSkipToEnd() {
+    if (!galaS) return;
+    galaS.i = galaS.steps.length - 1;
+    galaRender();
+  }
+  function galaDismissInvite() {
+    try {
+      const e = document.getElementById('gala-invite'); const id = e && e.dataset ? e.dataset.rec : '';
+      const seen = JSON.parse(sessionStorage.getItem('apexGalaLater') || '[]');
+      if (id && seen.indexOf(id) === -1) { seen.push(id); sessionStorage.setItem('apexGalaLater', JSON.stringify(seen)); }
+    } catch (e) {}
+    galaRemoveInvite();
+  }
+  function galaRemoveInvite() { try { const e = document.getElementById('gala-invite'); if (e) e.remove(); } catch (e) {} }
+
+  function galaInvite(rec) {
+    if (!rec || !document.body) return;
+    galaEnsureStyle();
+    galaRemoveInvite();
+    const el = document.createElement('div');
+    el.id = 'gala-invite';
+    el.className = 'gala-invite';
+    el.dataset.rec = rec.id;
+    el.innerHTML = '<div class="gala-invite-t">🏆 GALA NIGHT</div>' +
+      '<div class="gala-invite-s">The ' + galaEsc(rec.label) + ' Apex Awards are ready — the envelopes are sealed.</div>' +
+      '<div class="gala-invite-b"><button type="button" class="gala-btn" onclick="App.galaOpen(\'' + rec.id + '\')">Walk the red carpet</button>' +
+      '<button type="button" class="gala-btn ghost" onclick="App.galaDismissInvite()">Later</button></div>';
+    document.body.appendChild(el);
+  }
+  // On page load: remind about a ceremony nobody has watched yet (once per browser session per ceremony).
+  function galaOnInit() {
+    try {
+      const un = galaUnseen();
+      if (!un.length) return;
+      const rec = un[un.length - 1];
+      let later = [];
+      try { later = JSON.parse(sessionStorage.getItem('apexGalaLater') || '[]'); } catch (e) {}
+      if (later.indexOf(rec.id) !== -1) return;
+      const pv = document.body && document.body.dataset ? document.body.dataset.view : '';
+      if (pv === 'match' || pv === 'home') return;
+      setTimeout(() => { if (!document.getElementById('gala-stage')) galaInvite(rec); }, 900);
+    } catch (e) {}
+  }
+  // ========== AWARDS GALA: rendering each step ==========
+  function galaPlayerRow(c, f, o) {
+    o = o || {};
+    const sub = [f.team, f.pos, o.noLine ? '' : f.line].filter(Boolean).map(galaEsc).join(' · ');
+    const right = o.noVotes ? '' : '<div class="gala-votes"><b>' + f.votes + '</b><small>' + (f.pct != null ? f.pct + '%' : '') + '</small></div>';
+    return '<div class="gala-row' + (o.fresh ? ' new' : '') + (f.rank === 1 ? ' top' : '') + '"' + (o.noVotes ? ' style="grid-template-columns:28px 42px 1fr"' : '') + '>' +
+      '<div class="gala-rank">' + f.rank + '</div>' + galaAvatar(c, f, 40) +
+      '<div class="gala-who"><b>' + galaEsc(f.name) + '</b><small>' + sub + (f.tags && f.tags.length ? ' · ' + f.tags.map(galaEsc).join(' · ') : '') + '</small></div>' + right +
+      (o.bar != null ? '<span class="gala-bar" style="width:' + o.bar + '%"></span>' : '') + '</div>';
+  }
+  function galaLockedRow(rank) {
+    return '<div class="gala-row locked" style="grid-template-columns:28px 1fr"><div class="gala-rank">' + rank + '</div><div class="gala-who"><b>• • •</b></div></div>';
+  }
+
+  function galaWinnerCard(c, instant) {
+    const w = c.winner;
+    const sub = [w.pos, w.line].filter(Boolean).map(galaEsc).join(' · ');
+    let badges = '';
+    if (c.vote) {
+      const second = c.finalists[1];
+      const margin = second ? w.votes - second.votes : w.votes;
+      badges += '<span class="gala-badge">' + w.votes + ' jury points · ' + w.pct + '%</span>';
+      if (second) badges += '<span class="gala-badge' + (margin <= 12 ? ' hot' : '') + '">' + (margin <= 12 ? 'Photo finish — won by ' + margin : margin >= 120 ? 'Landslide — won by ' + margin : 'Won by ' + margin + ' points') + '</span>';
+      if (c.upset && c.favourite) badges += '<span class="gala-badge hot">Surprise! ' + galaEsc(c.favourite.name) + ' led the performance table</span>';
+      else if (c.runaway) badges += '<span class="gala-badge">The runaway favourite delivers</span>';
+    }
+    return '<div class="gala-winner' + (instant ? ' instant' : '') + '">' +
+      '<div class="gala-kicker">' + galaEsc(c.award) + ' winner</div>' +
+      '<div style="margin:10px 0 2px">' + trophyMark(c.award, 70) + '</div>' +
+      '<div class="gala-av">' + galaAvatar(c, w, 92) + '</div>' +
+      '<h1>' + galaEsc(w.name) + '</h1>' +
+      '<div class="gala-team">' + galaTeamBit(w, 22) + '</div>' +
+      (sub ? '<div class="gala-line">' + sub + '</div>' : '') +
+      '<div>' + badges + '</div></div>';
+  }
+
+  function galaStepHTML(st) {
+    const rec = galaS.rec;
+    if (st.t === 'arrive') {
+      const bal = galaCat(rec, 'ballon'), mg = galaCat(rec, 'manager');
+      let pool = [];
+      if (bal) pool = pool.concat(bal.nominees.map(n => ({ c: bal, f: n })));
+      if (mg) pool = pool.concat(mg.nominees.slice(0, 8).map(n => ({ c: mg, f: n })));
+      const pick = pool.sort(() => Math.random() - 0.5).slice(0, 8);
+      let h = '<div class="gala-card"><div class="gala-kicker">Gala Night · ' + galaEsc(rec.label) + '</div><div class="gala-title">The Red Carpet</div>' +
+        '<p class="gala-blurb">Cameras flash as tonight\'s nominees arrive. Every envelope is sealed — nobody knows who will walk away with the gold.</p>';
+      pick.forEach((p, i) => { h += '<div class="gala-arrive" style="animation-delay:' + (0.25 + i * 0.32).toFixed(2) + 's">' + galaAvatar(p.c, p.f, 36) + '<div><b>' + galaEsc(p.f.name) + '</b><br><small>' + galaEsc(p.f.team || '') + ' · ' + (p.c.type === 'manager' ? 'Manager' : 'Nominee') + '</small></div></div>'; });
+      return h + '</div>';
+    }
+    if (st.t === 'honours') {
+      const c = st.c;
+      let h = '<div class="gala-card"><div class="gala-kicker">Award ' + (st.ci + 1) + ' of ' + st.n + '</div><div class="gala-title">' + galaEsc(c.title) + '</div><p class="gala-blurb">The numbers speak for themselves</p>';
+      c.items.forEach(it => {
+        h += '<div class="gala-honour"><div>' + trophyMark(it.award, 44) + '</div><div><span class="k">' + galaEsc(it.award) + '</span><b>' + galaEsc(it.name) + '</b><small>' + galaEsc(it.team) + ' · ' + galaEsc(it.line) + '</small></div></div>';
+      });
+      return h + '</div>';
+    }
+    const c = st.c;
+    if (st.t === 'nominees') {
+      let h = '<div class="gala-card"><div class="gala-kicker">Award ' + (st.ci + 1) + ' of ' + st.n + '</div><div class="gala-title">' + trophyMark(c.award, 40) + ' ' + galaEsc(c.title) + '</div>';
+      if (c.blurb) h += '<p class="gala-blurb">' + galaEsc(c.blurb) + '</p>';
+      if (c.vote) {
+        h += '<div class="gala-kicker" style="margin-top:6px">The nominees</div><div class="gala-chips">' +
+          c.nominees.map(n => '<span class="gala-chip">' + galaEsc(n.name) + '<small>' + galaEsc(n.team || '') + '</small></span>').join('') + '</div>' +
+          '<p class="gala-note">Decided by a jury of ' + c.voters + ' · each ballot ranks its top ' + c.ballot + '</p>';
+      } else {
+        h += '<div class="gala-kicker" style="margin:6px 0">The finalists</div>' + c.finalists.map(f => galaPlayerRow(c, f, { noVotes: true })).join('');
+      }
+      return h + '</div>';
+    }
+    // reveal
+    if (c.vote) {
+      const K = c.finalists.length, last = st.k === K - 1;
+      const showFrom = K - 1 - st.k;               // lowest index (best rank) revealed so far
+      const maxV = c.finalists[0].votes || 1;
+      let h = '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + ' · jury count</div>';
+      if (last) {
+        h += '<div class="gala-suspense">AND THE WINNER IS…</div>' + galaWinnerCard(c, false) + '<div class="gala-kicker" style="margin:12px 0 2px">Final jury table</div>';
+      }
+      c.finalists.forEach((f, idx) => {
+        if (idx < showFrom) h += galaLockedRow(f.rank);
+        else h += galaPlayerRow(c, f, { fresh: idx === showFrom && !last, bar: Math.round(f.votes / maxV * 100) });
+      });
+      return h + '</div>';
+    }
+    return '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + '</div><div class="gala-suspense">AND THE WINNER IS…</div>' + galaWinnerCard(c, false) +
+      '<div class="gala-kicker" style="margin:12px 0 2px">Also in the running</div>' +
+      c.finalists.slice(1).map(f => galaPlayerRow(c, f, { noVotes: true })).join('') + '</div>';
+  }
+
+  function galaSummaryHTML() {
+    const rec = galaS.rec;
+    let h = '<div class="gala-card"><div class="gala-kicker">' + galaEsc(rec.label) + '</div><div class="gala-title">Tonight\'s Winners</div>';
+    rec.cats.forEach(c => {
+      if (c.type === 'honours') {
+        c.items.forEach(it => { h += '<div class="gala-honour"><div>' + trophyMark(it.award, 40) + '</div><div><span class="k">' + galaEsc(it.award) + '</span><b>' + galaEsc(it.name) + '</b><small>' + galaEsc(it.team) + ' · ' + galaEsc(it.line) + '</small></div></div>'; });
+      } else if (c.winner) {
+        h += '<div class="gala-honour"><div>' + trophyMark(c.award, 40) + '</div><div><span class="k">' + galaEsc(c.award) + '</span><b>' + galaEsc(c.winner.name) + '</b><small>' + galaEsc(c.winner.team || '') + (c.winner.line ? ' · ' + galaEsc(c.winner.line) : '') + '</small></div></div>';
+      }
+    });
+    return h + '<p class="gala-note">All awards are in the trophy cabinets and the History tab.</p></div>';
+  }
+
+  function galaRender() {
+    if (!galaS) return;
+    galaClearTimers();
+    const st = galaS.steps[galaS.i];
+    const main = document.getElementById('gala-main'), foot = document.getElementById('gala-foot');
+    const sub = document.getElementById('gala-sub'), prog = document.getElementById('gala-prog');
+    if (!main || !foot) return;
+    main.innerHTML = st.t === 'summary' ? galaSummaryHTML() : galaStepHTML(st);
+    main.scrollTop = 0;
+    if (sub) sub.textContent = galaS.rec.label + ' · Gala Night';
+    if (prog) {
+      const n = galaS.rec.cats.length + 2, at = st.t === 'arrive' ? 0 : st.t === 'summary' ? n - 1 : st.ci + 1;
+      prog.innerHTML = Array.from({ length: n }, (x, i) => '<i class="' + (i <= at ? 'on' : '') + '"></i>').join('');
+    }
+    const last = galaS.i === galaS.steps.length - 1;
+    let label = 'Next ▶';
+    if (st.t === 'arrive') label = 'Take your seats ▶';
+    else if (st.t === 'nominees') label = (st.c.vote ? 'Start the count' : 'Open the envelope') + ' ▶';
+    else if (st.t === 'reveal' && st.c.vote) label = st.k === st.reveals - 2 ? 'And the winner is… ▶' : st.k === st.reveals - 1 ? (st.ci === st.n - 1 ? 'Finish ▶' : 'Next award ▶') : 'Reveal #' + (st.c.finalists.length - 1 - st.k) + ' ▶';
+    else if (st.t === 'reveal') label = st.ci === st.n - 1 ? 'Finish ▶' : 'Next award ▶';
+    else if (st.t === 'honours') label = 'Next award ▶';
+    if (last) label = 'Close ✕';
+    foot.innerHTML = (last ? '<button type="button" class="gala-btn ghost" onclick="App.galaOpen(\'' + galaS.rec.id + '\')">Replay</button>' : '<button type="button" class="gala-btn ghost" onclick="App.galaSkip()">Skip to results</button>') +
+      '<button type="button" class="gala-btn" onclick="App.galaNext()">' + label + '</button>';
+
+    // stage effects
+    if (st.t === 'arrive') {
+      galaFlashBurst(14, false);
+      galaS.timers.push(setInterval(() => galaFlashBurst(3, false), 1500));
+    } else if (st.t === 'reveal') {
+      const winnerNow = st.c.vote ? st.k === st.reveals - 1 : true;
+      if (winnerNow) { galaLater(() => { galaConfetti(110); galaFlashBurst(8, true); }, 2000); }
+      else galaFlashBurst(2, true);
+    } else if (st.t === 'summary') {
+      galaMarkSeen(galaS.rec.id);
+      galaConfetti(50);
+    }
+  }
+  // ========== AWARDS GALA: Awards-tab views ==========
+  function galaBallonTabHTML() {
+    galaEnsureStyle();
+    const race = galaBallonRace();
+    const past = trophies.filter(t => t.name === "Ballon d'Or" && t.player).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 5);
+    const latest = galaLatest();
+    let h = '<div class="gala-race"><h3>THE RACE FOR THE BALLON D\'OR</h3>';
+    if (!race) {
+      h += '<p>Nobody has played enough yet. Contenders appear here once the season gets going.</p>';
+    } else {
+      h += '<p>Contenders are listed A–Z on purpose. The winner is chosen by a 100-strong jury at Gala Night — a tight race can go either way, and only a player who has truly outshone everyone is a safe bet.</p>';
+      if (race.runaway && race.favourite) {
+        h += '<div class="gala-fav">🔥 ' + lbAvatar(race.favourite, 38) + '<div><b>' + galaEsc(race.favourite.name) + '</b> has clearly outshone everyone this season — the overwhelming favourite.</div></div>';
+      } else {
+        h += '<div class="gala-wide">⚖️ <b>Wide open.</b> Nobody has pulled clear — several players have a genuine case.</div>';
+      }
+      h += '<div class="table-scroll"><table class="lb-table"><thead><tr><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th></tr></thead><tbody>' +
+        race.contenders.map(p => '<tr><td class="lb-player">' + lbPlayerCell(p) + '</td><td class="lb-team">' + galaEsc(p.team) + '</td><td>' + (p.apps || 0) + '</td><td>' + (p.goals || 0) + '</td><td>' + (p.assists || 0) + '</td><td>' + (p.avg ? p.avg.toFixed(2) : '—') + '</td></tr>').join('') +
+        '</tbody></table></div>';
+    }
+    if (past.length) {
+      h += '<h3 style="margin-top:14px;font-size:.9rem">PAST WINNERS</h3>' + past.map(t => '<div class="gala-hist">' + trophyMark("Ballon d'Or", 34) + '<div><b>' + galaEsc(t.player) + '</b><small>' + galaEsc(t.team || '') + ' · ' + galaEsc(t.type || '') + '</small></div></div>').join('');
+    }
+    if (latest) h += '<div style="text-align:center;margin-top:12px"><button type="button" class="gala-btn" onclick="App.galaOpen(\'' + latest.id + '\')">Watch the latest ceremony</button></div>';
+    return h + '</div>';
+  }
+
+  function galaManagerTabHTML() {
+    galaEnsureStyle();
+    const wins = trophies.filter(t => t.name === 'Manager of the Year').sort((a, b) => (b.date || 0) - (a.date || 0));
+    if (!wins.length) {
+      return '<div class="gala-race"><h3>MANAGER OF THE YEAR</h3><p>Voted at Gala Night on results against squad quality, tactics, goal difference and Europe — not simply on who lifted the trophy.</p></div>';
+    }
+    return '<div class="gala-race"><h3>MANAGER OF THE YEAR</h3><p>Voted on results against squad quality, tactics, goal difference and Europe — not simply on who lifted the trophy.</p>' +
+      wins.slice(0, 8).map(t => {
+        const team = galaTeamByName(t.team);
+        const rec = galaFind(t.year, t.category === 'standalone-global');
+        return '<div class="gala-hist">' + managerAvatarMark(team && team.manager ? team.manager : { name: t.manager }, 38) + '<div><b>' + galaEsc(t.manager) + '</b><small>' + galaEsc(t.team || '') + ' · ' + galaEsc((t.type || '').replace(' (Global)', '')) + '</small></div>' +
+          (rec ? '<button type="button" class="gala-btn" onclick="App.galaOpen(\'' + rec.id + '\')">Gala</button>' : '') + '</div>';
+      }).join('') + '</div>';
+  }
+
+  function galaCeremonyTabHTML() {
+    galaEnsureStyle();
+    const all = galaAll().reverse();
+    let h = '<div class="gala-race"><h3>APEX AWARDS · GALA NIGHT</h3>';
+    if (!all.length) {
+      return h + '<p>The gala is held when a season ends: red carpet, Puskás, Yashin, Gerd Müller, Manager of the Year and the Ballon d\'Or — all decided by the season you just played. Finish a season to host the first one.</p></div>';
+    }
+    h += '<p>Relive the red carpet, the jury count and the winners.</p>';
+    h += all.map(r => {
+      const b = galaCat(r, 'ballon'), m = galaCat(r, 'manager');
+      return '<div class="gala-hist">' + trophyMark("Ballon d'Or", 38) + '<div><b>' + galaEsc(r.label) + (r.status !== 'seen' ? ' · NEW' : '') + '</b>' +
+        '<small>' + (b ? "Ballon d'Or: " + galaEsc(b.winner.name) : 'No Ballon d\'Or') + (m ? ' · Manager: ' + galaEsc(m.winner.name) : '') + '</small></div>' +
+        '<button type="button" class="gala-btn" onclick="App.galaOpen(\'' + r.id + '\')">' + (r.status !== 'seen' ? 'Walk the carpet' : 'Watch again') + '</button></div>';
+    }).join('');
+    return h + '</div>';
+  }
 
   // Snapshots the current global leaderboard leaders (Ballon d'Or, Top
   // Assists, Most MOTM, Clean Sheet King, Puskás Award, Gerd Müller Award,
@@ -14083,14 +14946,29 @@ const PLAYSTYLE_BEHAVIOR = {
     const extra = { category, year };
     const type = (category === 'standalone-global' ? 'Awards Round ' + year : 'Season Y' + year) + ' (Global)';
     const topOf = (key) => Object.values(stats[key] || {}).sort((a,b) => b.count - a.count)[0] || null;
+    // The gala decides the voted awards (Ballon d'Or, Manager of the Year) and records the whole ceremony. It has to
+    // run BEFORE the leaderboard is wiped below. If anything goes wrong we fall back to the plain rankings.
+    let gala = null;
+    try { gala = galaBuild(year, category); } catch (e) { console.error('gala:', e); }
+    const galaWin = (key) => { const c = galaCat(gala, key); return c && c.winner ? c.winner : null; };
     pushIndividualTrophy('Top Assists', topOf('assists'), type, extra);
     pushIndividualTrophy('Most MOTM', topOf('motm'), type, extra);
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
     pushIndividualTrophy('Puskás Award', topOf('puskas'), type, extra);
     pushIndividualTrophy('Gerd Müller Award', computeGerdMullerRanking(stats)[0] || null, type, extra);
     pushIndividualTrophy('Yashin Trophy', computeYashinRanking(stats)[0] || null, type, extra);
-    const ballon = computeBallonRanking(stats)[0] || null;
-    pushIndividualTrophy("Ballon d'Or", ballon, type, extra);
+    const ballonCat = galaCat(gala, 'ballon');
+    const ballon = galaWin('ballon') || computeBallonRanking(stats)[0] || null;
+    pushIndividualTrophy("Ballon d'Or", ballon, type, ballonCat ? Object.assign({}, extra, { runner: ballonCat.runnerUp || undefined, statLine: ballon.line || undefined, votes: ballon.votes }) : extra);
+    const mgrCat = galaCat(gala, 'manager');
+    if (mgrCat && mgrCat.winner) {
+      const mt = getTeam(mgrCat.winner.teamId);
+      if (mt) pushManagerAward('Manager of the Year', mt, type, extra);
+    }
+    if (gala) {
+      galaStore(gala);
+      try { galaInvite(gala); } catch (e) {}
+    }
     try { mediaLegacySeason(year, category, stats); } catch (e) {}
     // Only the season-scoped `stats` leaderboard bucket resets here — it's
     // what feeds each new season's Ballon d'Or/Gerd Müller/Yashin race from
@@ -18133,7 +19011,7 @@ const PLAYSTYLE_BEHAVIOR = {
       ? `<span class="attr-boost-badge" title="Overall derived from expanded attribute data and position">★ Enhanced</span>`
       : '';
     const signatureNote = (boosted && player.signatureBonus > 0)
-      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">+${player.signatureBonus} OVR — signature attributes for their playstyle run well above the rest of their sheet</div>`
+      ? `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">Signature attributes for their playstyle run well above the rest of their sheet</div>`
       : '';
     // When the overall is based on a known position other than the main
     // one (see bestPositionalOverall in data/playerDatabase.js), say so and
@@ -18143,7 +19021,7 @@ const PLAYSTYLE_BEHAVIOR = {
       ? (function () {
           const others = Object.keys(player.ovrByPos || {}).filter(k => k !== player.ovrPos)
             .map(k => `${k} ${player.ovrByPos[k]}`).join(' · ');
-          return `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">OVR rated at ${player.ovrPos} — his best known position${others ? ' (' + others + ')' : ''}</div>`;
+          return `<div style="color:var(--text-2);font-size:0.75rem;margin-top:2px">Best known position: ${player.ovrPos}</div>`;
         })()
       : '';
     // Playstyle tags render for ANY player who carries one — an enhanced
@@ -18195,7 +19073,7 @@ const PLAYSTYLE_BEHAVIOR = {
             }
             return `${team ? teamMark(team, 18) : ''} ${(team && team.name) || ''}`;
           })()} · ${(player.pos||[])[0] || ''}</div>
-          <div style="color:var(--gold);font-weight:700;margin-top:4px">OVR ${player.ovr || '—'} ${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
+          <div style="color:var(--gold);font-weight:700;margin-top:4px">${formArrow(player)} <span style="color:var(--text-2);font-weight:400;font-size:0.78rem">${formLabel(player)}</span>${boostBadge}</div>
           ${signatureNote}
           ${positionNote}
           ${playstyleTagsHTML}
@@ -18256,7 +19134,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const mgr = team.manager || {};
     const mgrStyle = getManagerPlaystyle(team);
     const mgrAwardCount = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
-    const players = [...(team.players || [])].sort((a,b) => (b.ovr||0)-(a.ovr||0));
+    const players = [...(team.players || [])].sort((a,b) => String(a.name).localeCompare(String(b.name)));
     const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
     const formKey = pickTeamFormation(team);
     const formation = (FORMATIONS[formKey] && FORMATIONS[formKey].name) || formKey;
@@ -18278,7 +19156,7 @@ const PLAYSTYLE_BEHAVIOR = {
         ${managerAvatarMark(mgr, 56)}
         <div style="flex:1;min-width:0">
           <div style="font-weight:700">${mgr.name || '—'}</div>
-          <div style="color:var(--text-2);font-size:0.8rem">${mgr.ovr ? mgr.ovr + ' OVR · ' : ''}<span class="playstyle-tag">${mgrStyle}</span></div>
+          <div style="color:var(--text-2);font-size:0.8rem"><span class="playstyle-tag">${mgrStyle}</span></div>
           <div style="color:var(--gold);font-size:0.78rem;margin-top:2px">🏅 ${mgrAwardCount} manager award${mgrAwardCount === 1 ? '' : 's'}</div>
         </div>
       </div>
@@ -18292,7 +19170,6 @@ const PLAYSTYLE_BEHAVIOR = {
             <span class="tsr-name">${playerNameHTML(p)}${wonCount ? ` <span class="tsr-trophy-badge" title="${wonCount} award${wonCount===1?'':'s'} won">🏆${wonCount > 1 ? '×' + wonCount : ''}</span>` : ''}</span>
             <span class="tsr-pos">${(p.pos||[])[0] || ''}</span>
             ${formArrow(p)}
-            <span class="player-ovr">${p.ovr || ''}</span>
           </button>`;
         }).join('')}
       </div>
@@ -18405,7 +19282,7 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function ppSquadTable(team) {
-    const players = [...(team.players || [])].sort((a, b) => ppPosGroup(a) - ppPosGroup(b) || (b.ovr || 0) - (a.ovr || 0));
+    const players = [...(team.players || [])].sort((a, b) => ppPosGroup(a) - ppPosGroup(b) || (a.name || '').localeCompare(b.name || ''));
     if (!players.length) return '<p class="pp-muted">No players registered.</p>';
     let html = '';
     let group = -1;
@@ -18427,12 +19304,11 @@ const PLAYSTYLE_BEHAVIOR = {
         <td class="pp-num">${goals || '–'}</td>
         <td class="pp-num">${assists || '–'}</td>
         <td class="pp-c-form">${formArrow(p)}</td>
-        <td class="pp-num pp-ovr"><span class="player-ovr">${p.ovr || ''}</span></td>
       </tr>`;
     });
     html += '</tbody>';
     return `<div class="pp-table-wrap"><table class="pp-table">
-      <thead><tr><th>Pos</th><th>Player</th><th class="pp-num" title="Competitive appearances">Apps</th><th class="pp-num">Goals</th><th class="pp-num">Assists</th><th>Form</th><th class="pp-num">OVR</th></tr></thead>
+      <thead><tr><th>Pos</th><th>Player</th><th class="pp-num" title="Competitive appearances">Apps</th><th class="pp-num">Goals</th><th class="pp-num">Assists</th><th>Form</th></tr></thead>
       ${html}</table></div>`;
   }
 
@@ -18447,7 +19323,7 @@ const PLAYSTYLE_BEHAVIOR = {
     }
     document.title = team.name + ' — Apex Sim';
     const th = ppTheme(team);
-    const players = [...(team.players || [])].sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    const players = [...(team.players || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const rating = Math.round(teamAvgOvr(team));
     const mgr = team.manager || {};
     const mgrStyle = getManagerPlaystyle(team);
@@ -18472,7 +19348,6 @@ const PLAYSTYLE_BEHAVIOR = {
 
       <dl class="pp-facts">
         ${ppStat('Squad', players.length)}
-        ${top ? ppStat('Best player', `${ppEsc(top.name)} <small>${top.ovr || ''}</small>`) : ''}
         ${ppStat('Manager', ppEsc(mgr.name || 'None'))}
         ${ppStat('Style', ppEsc(mgrStyle))}
         ${ppFormStrip(team.id) ? `<div class="pp-stat"><dd>${ppFormStrip(team.id)}</dd><dt>Last five</dt></div>` : ''}
@@ -18492,7 +19367,6 @@ const PLAYSTYLE_BEHAVIOR = {
               ${managerAvatarMark(mgr, 56)}
               <div class="pp-mgr">
                 <strong>${ppEsc(mgr.name || 'No manager')}</strong>
-                <span>${mgr.ovr ? mgr.ovr + ' rating' : ''}</span>
                 <span class="playstyle-tag">${ppEsc(mgrStyle)}</span>
                 ${mgrAwards ? `<span class="pp-muted">${mgrAwards} manager award${mgrAwards === 1 ? '' : 's'}</span>` : ''}
               </div>
@@ -18597,7 +19471,7 @@ const PLAYSTYLE_BEHAVIOR = {
           </p>
           <p class="pp-hero-meta">${pos.map(ppEsc).join(', ') || 'No position'}${boosted ? ' · Enhanced profile' : ''}</p>
         </div>
-        <div class="pp-hero-score" aria-label="Overall ${player.ovr || 0}"><b>${player.ovr || '–'}</b><span>${formArrow(player)} ${ppEsc(formLabel(player))}</span></div>
+        <div class="pp-hero-score"><span>${formArrow(player)} ${ppEsc(formLabel(player))}</span></div>
       </header>
 
       ${injuryBanner}
@@ -18657,19 +19531,12 @@ const PLAYSTYLE_BEHAVIOR = {
     document.querySelectorAll('.award-tab').forEach(t => t.classList.toggle('active', t.dataset.award === type));
     const el = document.getElementById('awards-content');
     if (!el) return;
-    if (type === 'ballon') {
-      // Ballon d'Or: need meaningful sample size — min 3 competitive appearances
-      const MIN_APPS = BALLON_MIN_APPS;
-      const data = computeBallonRanking(stats);
-      if (!data.length) {
-        el.innerHTML = '<div class="empty-state"><div class="icon">🥇</div><p>Need players with at least ' + MIN_APPS + ' competitive appearances (or strong goal/assist tallies) for Ballon d\'Or.</p></div>';
-        return;
-      }
-      const leader = data[0];
-      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + leader.id + '\')">' + lbAvatar(leader, 64) + '<div class="award-info"><h4>' + trophyMark("Ballon d'Or", 34) + ' Ballon d\'Or</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.goals + 'G ' + leader.assists + 'A · ' + leader.motm + ' MOTM · ' + leader.apps + ' apps' + (leader.avg ? ' · Avg ' + leader.avg.toFixed(2) : '') + (leader.noms >= 2 ? ' · ' + leader.noms + ' award-show nods' : '') + '</p><p style="color:var(--gold);font-weight:700;margin-top:4px">' + Math.round(leader.pts) + ' Ballon points</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Min ' + MIN_APPS + ' appearances required for rating weight</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th><th>Noms</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+p.apps+'</td><td>'+p.goals+'</td><td>'+p.assists+'</td><td>'+(p.avg?p.avg.toFixed(2):'—')+'</td><td>'+(p.noms||0)+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table></div>';
+    if (type === 'ceremony') {
+      el.innerHTML = galaCeremonyTabHTML();
+    } else if (type === 'ballon') {
+      // The Ballon d'Or is decided by the jury at Gala Night, so the live tab shows the contenders A-Z with no
+      // points or ranking — the leader is only named when someone has clearly outshone everyone.
+      el.innerHTML = galaBallonTabHTML();
     } else if (type === 'puskas') {
       // Puskás Award — best/most spectacular individual goal, tallied by nominee count
       const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
@@ -18765,7 +19632,8 @@ const PLAYSTYLE_BEHAVIOR = {
       // Champions League, World Cup) into a leaderboard, crediting the
       // manager currently in charge of the team that earned each award.
       const mgrTrophies = trophies.filter(t => t.manager);
-      if (!mgrTrophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">👔</div><p>No manager awards yet — win a league, Champions League or World Cup.</p></div>'; return; }
+      const moyHead = galaManagerTabHTML();
+      if (!mgrTrophies.length) { el.innerHTML = moyHead + '<div class="empty-state"><div class="icon">👔</div><p>No manager awards yet — win a league, Champions League or World Cup.</p></div>'; return; }
       const byMgr = {};
       mgrTrophies.forEach(t => {
         if (!byMgr[t.manager]) byMgr[t.manager] = { name: t.manager, team: t.team, count: 0, latest: 0 };
@@ -18776,7 +19644,7 @@ const PLAYSTYLE_BEHAVIOR = {
       const data = Object.values(byMgr).sort((a,b) => b.count - a.count || b.latest - a.latest).slice(0, 50);
       const leader = data[0];
       const leaderTeam = allTeams.find(t => t.manager && t.manager.name === leader.name);
-      el.innerHTML = '<div class="award-card">' + managerAvatarMark(leaderTeam ? leaderTeam.manager : { name: leader.name }, 64) + '<div class="award-info"><h4>👔 Manager of the Moment</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.count + ' award' + (leader.count===1?'':'s') + ' won</p></div></div>' +
+      el.innerHTML = moyHead + '<div class="award-card">' + managerAvatarMark(leaderTeam ? leaderTeam.manager : { name: leader.name }, 64) + '<div class="award-info"><h4>👔 Most decorated manager</h4><p class="award-winner">' + leader.name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + leader.team + ' · ' + leader.count + ' award' + (leader.count===1?'':'s') + ' won</p></div></div>' +
         '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Manager</th><th>Team</th><th>Awards</th></tr></thead><tbody>' +
         data.map((m,i) => {
           const t = allTeams.find(tt => tt.manager && tt.manager.name === m.name);
@@ -18846,6 +19714,11 @@ const PLAYSTYLE_BEHAVIOR = {
     h += summary.globalAwards.length
       ? `<div class="awards-row">${summary.globalAwards.map(awardMini).join('')}</div>`
       : '<p style="color:var(--text-muted);font-size:0.85rem">No individual awards were recorded this season.</p>';
+    try {
+      const gr = galaFind(summary.year, !!summary.standalone);
+      if (gr) galaEnsureStyle();
+      if (gr) h += `<div style="text-align:center;margin-top:14px"><button type="button" class="gala-btn" onclick="App.galaOpen('${gr.id}')">🏆 Watch the Gala Night</button></div>`;
+    } catch (e) {}
     h += summary.standalone
       ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px">The leaderboard has been reset — the full record is saved under the History tab.</p>`
       : `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px">Season Y${summary.year + 1} is already underway — the full record is saved under the History tab.</p>`;
@@ -19335,7 +20208,9 @@ const PLAYSTYLE_BEHAVIOR = {
       const year = season ? season.year : 1;
       const extra = { category: 'season', year };
       pushTeamTrophy(comp.name, comp.champion, 'League (Y' + year + ')', extra);
-      pushManagerAward(comp.name + ' Manager of the Season', comp.champion, 'League (Y' + year + ')', extra);
+      // Manager of the Season = the manager who got the most out of his squad in this league (results vs squad
+      // quality, tactics, goal difference) — usually a contender, but NOT automatically the champion.
+      pushManagerAward(comp.name + ' Manager of the Season', galaLeagueManager(comp) || comp.champion, 'League (Y' + year + ')', extra);
       recordIndividualAwardsFromAwardsObject(assignCompAwards(comp), comp.name + ' (Y' + year + ')', extra);
       try { mediaLegacyComp(comp.name, year, comp.stats, 'league'); } catch (e) {}
     }
@@ -20846,7 +21721,7 @@ const PLAYSTYLE_BEHAVIOR = {
   let playersPosFilter = 'all';
   let playersRatingFilter = 'all'; // 'all' | 'elite' | 'great' | 'good' | 'dev' — see ovrTierMatches()
   let playersSearch = '';
-  let playersSort = 'ovr';
+  let playersSort = 'name';
   const PLAYERS_PAGE_SIZE = 40;
   let playersShown = PLAYERS_PAGE_SIZE;
   let playersCompareMode = false;
@@ -20959,7 +21834,7 @@ const PLAYSTYLE_BEHAVIOR = {
       }
     }
     if (playersRatingFilter !== 'all') {
-      list = list.filter(e => ovrTierMatches(e.player.ovr, playersRatingFilter));
+      /* player rating tiers are hidden: no filtering by overall */
     }
     if (playersSearch) {
       list = list.filter(e => {
@@ -21028,10 +21903,10 @@ const PLAYSTYLE_BEHAVIOR = {
         const av = TIER_RANK[a.player.liveRating] || 0;
         const bv = TIER_RANK[b.player.liveRating] || 0;
         if (bv !== av) return bv - av;
-        return (b.player.ovr || 0) - (a.player.ovr || 0);
+        return String(a.player.name).localeCompare(String(b.player.name));
       });
     }
-    else list.sort((a, b) => (b.player.ovr || 0) - (a.player.ovr || 0));
+    else list.sort((a, b) => String(a.player.name).localeCompare(String(b.player.name)));
     return list;
   }
 
@@ -21048,7 +21923,7 @@ const PLAYSTYLE_BEHAVIOR = {
 
 
   function sortPlayers(mode) {
-    playersSort = mode || 'ovr';
+    playersSort = mode || 'name';
     renderPlayersList(true);
   }
 
@@ -21103,7 +21978,7 @@ const PLAYSTYLE_BEHAVIOR = {
         <span class="dir-col-pos">${(p.pos || [])[0] || ''}</span>
         ${playersCompareMode ? `<span class="compare-check${selected ? ' checked' : ''}">${selected ? '✓' : ''}</span>` : ''}
         <span class="dir-col-form">${formArrow(p)}</span>
-        <span class="dir-col-ovr"><span class="player-ovr">${p.ovr || ''}</span></span>`;
+        <span class="dir-col-ovr"></span>`;
     if (playersCompareMode) {
       return `<div class="dir-row dir-row-player${selected ? ' selected' : ''}" role="button" tabindex="0" style="--row-accent:${primary}" onclick="${clickAction}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${clickAction}}">${inner}</div>`;
     }
@@ -21248,12 +22123,11 @@ const PLAYSTYLE_BEHAVIOR = {
     const commonStyles = styleLists.reduce((acc, list) => acc.filter(s => list.includes(s)));
     if (!commonStyles.length) return null;
     let bestIdx = 0;
-    entries.forEach((e, i) => { if ((e.player.ovr || 0) > (entries[bestIdx].player.ovr || 0)) bestIdx = i; });
-    return { position: positions[0], styles: commonStyles, bestIdx };
+    return { position: positions[0], styles: commonStyles, bestIdx: -1 };
   }
 
   function bestPickBannerHTML(entries, match) {
-    if (!match) return '';
+    if (!match || match.bestIdx < 0) return '';
     const best = entries[match.bestIdx].player;
     return `<div class="compare-best-pick">🏆 Best pick at <strong>${match.position}</strong> (${match.styles.join(', ')}): ${playerNameHTML(best)} — ${best.ovr || '—'} OVR</div>`;
   }
@@ -21269,7 +22143,6 @@ const PLAYSTYLE_BEHAVIOR = {
         <div class="profile-avatar" style="width:52px;height:52px;margin:0 auto 6px;background:${e.team.color || '#d4af37'};border:2px solid ${e.team.secondary || '#fff'};color:${e.team.secondary || '#fff'}">${playerAvatarMark(e.player)}</div>
         <div style="font-weight:700;font-size:0.82rem;line-height:1.2">${playerNameHTML(e.player)}</div>
         <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px">${teamMark(e.team, 14)} ${e.team.short || ''} · ${(e.player.pos || [])[0] || ''}</div>
-        <div style="color:var(--gold);font-weight:800;margin-top:3px">${e.player.ovr || '—'} <span style="font-size:0.6rem;font-weight:600;color:var(--text-3)">OVR</span></div>
       </div>`).join('');
 
     // Core (att/def/pac/phy/tec) rows — these already reflect an enhanced
@@ -23422,14 +24295,17 @@ const PLAYSTYLE_BEHAVIOR = {
     ensureMedia();
     const ev = { kind: 'award', name, player: playerObj, type, extra };
     try {
-      if (name === "Ballon d'Or" && typeof computeBallonRanking === 'function') {
+      // The gala passes the jury's runner-up and the winner's stat line along (the live leaderboard may already be reset).
+      if (extra && extra.runner) ev.runner = extra.runner;
+      if (extra && extra.statLine) ev.statLine = extra.statLine;
+      if (!ev.runner && name === "Ballon d'Or" && typeof computeBallonRanking === 'function') {
         const r = computeBallonRanking(stats) || [];
         const other = r.find(x => x && x.name && x.name !== playerObj.name);
         if (other) ev.runner = other.name;
       }
       const g = stats.goals && stats.goals[playerObj.id];
       const as = stats.assists && stats.assists[playerObj.id];
-      if (g || as) ev.statLine = (g ? g.count + ' goals' : '') + (g && as ? ', ' : '') + (as ? as.count + ' assists' : '');
+      if (!ev.statLine && (g || as)) ev.statLine = (g ? g.count + ' goals' : '') + (g && as ? ', ' : '') + (as ? as.count + ' assists' : '');
     } catch (e) {}
     _mediaEventQueue.push(ev);
     mediaScheduleFlush();
@@ -28710,7 +29586,7 @@ const PLAYSTYLE_BEHAVIOR = {
   }
   const tmUI = {
     sub: 'hub', q: '', league: 'all', club: 'all', line: 'all', role: 'all', minOvr: 0, maxAge: 0, contract: 'any',
-    maxPrice: 0, sort: 'ovr', dir: -1, shown: 30, flags: {}, view: 'list', faQ: '', faLine: 'all', faMin: 0, faShown: 30,
+    maxPrice: 0, sort: 'value', dir: -1, shown: 30, flags: {}, view: 'list', faQ: '', faLine: 'all', faMin: 0, faShown: 30,
     dealsFilter: 'all', dealsShown: 30, newsFilter: 'all', newsShown: 40, clubsLg: 'all', clubsArch: 'all', clubsQ: ''
   };
   let tmOffer = null;   // the open dialog: { mode:'offer'|'renew'|'player'|'club', pid|cid, kind, fee, years, wageMult, role, result }
@@ -28725,11 +29601,10 @@ const PLAYSTYLE_BEHAVIOR = {
 
   // ---------- small pieces ----------
   function tmTier(p) {
-    const f = tmRankFrac(p.ovr || 0);
-    return f >= 0.99 ? 'icon' : f >= 0.95 ? 'elite' : f >= 0.8 ? 'gold' : f >= 0.4 ? 'silver' : 'bronze';
+    return 'silver';   // tier colours would reveal overall ratings
   }
   function tmShield(p, big) {
-    return '<div class="tm-shield tier-' + tmTier(p) + (big ? ' big' : '') + '"><b>' + (p.ovr || 0) + '</b><i>' + tmEsc((p.pos || [])[0] || '') + '</i></div>';
+    return '<div class="tm-shield tier-' + tmTier(p) + (big ? ' big' : '') + '"><b>' + tmEsc((p.pos || [])[0] || '') + '</b></div>';
   }
   function tmPosBadge(p) { return '<span class="tm-pos tm-pos-' + tmLine(p) + '">' + tmEsc((p.pos || [])[0] || '') + '</span>'; }
   function tmStars(x) { const n = Math.round(tmClamp(x, 0, 1) * 5 * 2) / 2; let s = ''; for (let i = 1; i <= 5; i++) s += i <= n ? '★' : (i - 0.5 === n ? '⯨' : '☆'); return '<span class="tm-stars" title="Club stature">' + s + '</span>'; }
@@ -28845,7 +29720,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const t = getTeam(e.t), f = getTeam(e.f), p = e.pid ? tmFind(e.pid) : null;
     return '<div class="tm-news k-' + e.k + (e.u ? ' mine' : '') + '"><span class="tm-news-ico">' + ico + '</span><div class="tm-news-body">' +
       (lab ? '<span class="tm-news-tag">' + lab + '</span>' : '') + '<span>' + tmEsc(tmNewsText(e)) + '</span><small>' + (f ? teamMark(f, 12) + ' ' : '') + (f && t ? '→ ' : '') + (t ? teamMark(t, 12) + ' ' : '') +
-      (e.ovr ? e.ovr + ' OVR · ' : '') + tmEsc(tmWindowLabel(e.win) || ('Year ' + e.y)) + (e.fee ? ' · ' + tmFmt(e.fee) : '') + '</small></div>' +
+      tmEsc(tmWindowLabel(e.win) || ('Year ' + e.y)) + (e.fee ? ' · ' + tmFmt(e.fee) : '') + '</small></div>' +
       (p ? '<button class="tm-mini" onclick="App.tmOpenPlayer(\'' + e.pid + '\')">View</button>' : '') + '</div>';
   }
   function tmTalksHTML() {
@@ -28864,7 +29739,7 @@ const PLAYSTYLE_BEHAVIOR = {
     h += '<div class="tm-prof"><div class="tm-prof-top">' + teamMark(me, 34) + '<div><b>' + tmEsc(tmClubName(me)) + '</b> ' + tmStars(tmPrestige(me)) + '<br>' + tmArchChip(me) + '</div></div><p class="tm-note">' + tmEsc(tmArch(me).blurb) + ' ' + tmEsc(tmProfile(me).tag) + '</p></div>';
     const wants = tmClubWants(me, 4);
     h += '<div class="card tm-card"><div class="card-title">🧭 Where you need help</div>' + (wants.length ? wants.map(n =>
-      '<div class="tm-need sev' + n.urgency + '"><div><b>' + tmEsc(n.name) + '</b><small>' + tmEsc(n.why) + ' · look for ' + n.minOvr + '+ OVR, age ≤ ' + n.ageMax + '</small></div><button class="btn btn-secondary btn-sm" onclick="App.tmFindRole(\'' + n.role + '\')">Find targets</button></div>').join('')
+      '<div class="tm-need sev' + n.urgency + '"><div><b>' + tmEsc(n.name) + '</b><small>' + tmEsc(n.why) + ' · age ≤ ' + n.ageMax + '</small></div><button class="btn btn-secondary btn-sm" onclick="App.tmFindRole(\'' + n.role + '\')">Find targets</button></div>').join('')
       : '<p class="tm-note">No obvious weak spots — your squad is balanced.</p>') + '</div>';
     const picks = tmScoutPicks(me, 5);
     h += '<div class="card tm-card"><div class="card-title">🔭 Scout recommends <small>(fits your club, affordable, willing to join)</small></div>' +
@@ -28929,11 +29804,10 @@ const PLAYSTYLE_BEHAVIOR = {
       '<div class="tm-viewtog"><button class="' + (u.view === 'list' ? 'on' : '') + '" onclick="App.tmView(\'list\')" title="List">☰</button><button class="' + (u.view === 'cards' ? 'on' : '') + '" onclick="App.tmView(\'cards\')" title="Cards">▦</button></div></div>' +
       '<div class="tm-linechips">' + [['all', 'All'], ['GK', 'GK'], ['DEF', 'DEF'], ['MID', 'MID'], ['FWD', 'FWD']].map(l => '<button class="tm-chip-btn ' + (u.line === l[0] ? 'on' : '') + '" onclick="App.tmFilter(\'line\',\'' + l[0] + '\')">' + l[1] + '</button>').join('') + '</div>' +
       '<div class="tm-fgrid">' + sel('League', leagues, u.league, 'league') + sel('Club', clubs, u.club, 'club') + sel('Position', roles, u.role, 'role') +
-      sel('Min OVR', [[0, 'Any'], [75, '75+'], [80, '80+'], [90, '90+'], [100, '100+'], [105, '105+']], u.minOvr, 'minOvr') +
       sel('Max age', [[0, 'Any'], [21, '21'], [23, '23'], [26, '26'], [29, '29'], [32, '32']], u.maxAge, 'maxAge') +
       sel('Contract', [['any', 'Any'], ['expiring', 'Expiring'], ['long', '3+ years']], u.contract, 'contract') +
       sel('Max price', [[0, 'Any'], [5, '€5m'], [15, '€15m'], [30, '€30m'], [60, '€60m'], [100, '€100m']], u.maxPrice, 'maxPrice') +
-      sel('Sort by', [['ovr', 'Overall'], ['pot', 'Potential'], ['value', 'Value'], ['ask', 'Asking price'], ['age', 'Age'], ['contract', 'Contract'], ['name', 'Name']], u.sort, 'sort') + '</div>' +
+      sel('Sort by', [['pot', 'Potential'], ['value', 'Value'], ['ask', 'Asking price'], ['age', 'Age'], ['contract', 'Contract'], ['name', 'Name']], u.sort, 'sort') + '</div>' +
       '<div class="tm-chiprow">' + chip('afford', '💰 Affordable') + chip('u23', '🌱 Under 23') + chip('loanable', '🔄 Loanable') + chip('listed', '🏷 Listed') + chip('talks', '🔥 In talks') + chip('short', '★ Shortlist') +
       '<button class="tm-chip-btn" onclick="App.tmDir()">' + (u.dir < 0 ? '⬇ High first' : '⬆ Low first') + '</button><button class="tm-chip-btn" onclick="App.tmResetFilters()">✖ Reset</button></div></div>';
   }
@@ -28962,7 +29836,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function tmToggle(k) { tmUI.flags[k] = !tmUI.flags[k]; tmUI.shown = 30; tmRefreshAll(); }
   function tmDir() { tmUI.dir = -tmUI.dir; tmRefreshAll(); }
   function tmMore() { tmUI.shown += 30; tmRenderList(); }
-  function tmResetFilters() { Object.assign(tmUI, { q: '', league: 'all', club: 'all', line: 'all', role: 'all', minOvr: 0, maxAge: 0, contract: 'any', maxPrice: 0, sort: 'ovr', dir: -1, shown: 30, flags: {} }); tmRefreshAll(); }
+  function tmResetFilters() { Object.assign(tmUI, { q: '', league: 'all', club: 'all', line: 'all', role: 'all', minOvr: 0, maxAge: 0, contract: 'any', maxPrice: 0, sort: 'value', dir: -1, shown: 30, flags: {} }); tmRefreshAll(); }
   function tmFindRole(role) { tmResetFilters(); tmUI.role = role; tmUI.flags.afford = true; tmUI.sub = 'market'; tmRefreshAll(); }
   function tmStar(pid) { tmToggleShort(pid); if (tmUI.sub === 'market') tmRenderList(); else tmRefreshAll(); }
 
@@ -28975,7 +29849,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const groups = [['GK', 'Goalkeepers'], ['DEF', 'Defenders'], ['MID', 'Midfielders'], ['FWD', 'Forwards']];
     let h = tmKpiHTML(me);
     groups.forEach(g => {
-      const ps = me.players.filter(p => tmLine(p) === g[0]).sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+      const ps = me.players.filter(p => tmLine(p) === g[0]).sort((a, b) => String(a.name).localeCompare(String(b.name)));
       h += '<div class="card tm-card"><div class="card-title">' + g[1] + ' (' + ps.length + ')</div>' + ps.map(p => {
         const yl = tmYearsLeft(p), loan = loanedIn.has(p.id), rank = tmRank(p, me);
         const tags = [];
@@ -29089,11 +29963,11 @@ const PLAYSTYLE_BEHAVIOR = {
   // ---------- Free agents ----------
   function tmFreeHTML() {
     const q = tmUI.faQ.trim().toLowerCase();
-    const list = tmFA.filter(p => (!q || p.name.toLowerCase().indexOf(q) >= 0) && (tmUI.faLine === 'all' || tmLine(p) === tmUI.faLine) && (p.ovr || 0) >= tmUI.faMin).sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+    const list = tmFA.filter(p => (!q || p.name.toLowerCase().indexOf(q) >= 0) && (tmUI.faLine === 'all' || tmLine(p) === tmUI.faLine) && true).sort((a, b) => String(a.name).localeCompare(String(b.name)));
     const shown = list.slice(0, tmUI.faShown);
     return '<div class="card tm-card tm-filters"><input class="tm-search" type="search" placeholder="Search free agents…" value="' + tmEsc(tmUI.faQ) + '" oninput="App.tmFaFilter(\'faQ\',this.value)">' +
       '<div class="tm-linechips">' + [['all', 'All'], ['GK', 'GK'], ['DEF', 'DEF'], ['MID', 'MID'], ['FWD', 'FWD']].map(l => '<button class="tm-chip-btn ' + (tmUI.faLine === l[0] ? 'on' : '') + '" onclick="App.tmFaFilter(\'faLine\',\'' + l[0] + '\',1)">' + l[1] + '</button>').join('') +
-      '<select class="tm-sel" onchange="App.tmFaFilter(\'faMin\',this.value,1)">' + [[0, 'Any OVR'], [65, '65+'], [70, '70+'], [75, '75+'], [80, '80+']].map(o => '<option value="' + o[0] + '"' + (o[0] === tmUI.faMin ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div></div>' +
+      '</div></div>' +
       '<div id="tm-fa-list"><div class="tm-count">' + list.length + ' free agent' + (list.length === 1 ? '' : 's') + ' — signable any time</div><div class="tm-list">' +
       (shown.length ? shown.map(p => tmRowHTML(p, null, { list: true })).join('') : '<div class="empty-state"><div class="icon">🆓</div>No free agents match.</div>') + '</div>' +
       (list.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="App.tmFaMore()">Show more</button></div>' : '') + '</div>';
@@ -29120,7 +29994,7 @@ const PLAYSTYLE_BEHAVIOR = {
     else if (d.k === 'academy') txt = '<b>' + tmEsc(d.nm) + '</b> promoted from the academy at ' + tmEsc(to);
     else txt = '<b>' + tmEsc(d.nm) + '</b> returns to ' + tmEsc(to);
     return '<div class="tm-deal' + (d.u ? ' mine' : '') + '"><span class="tm-deal-ico">' + ico + '</span><div>' + txt +
-      '<small>' + tmEsc(d.pos) + ' · ' + d.ovr + ' OVR · ' + d.age + 'y · ' + tmEsc(tmWindowLabel(d.win) || ('Year ' + d.y)) + '</small></div></div>';
+      '<small>' + tmEsc(d.pos) + ' · ' + d.age + 'y · ' + tmEsc(tmWindowLabel(d.win) || ('Year ' + d.y)) + '</small></div></div>';
   }
   function tmDealsHTML() {
     const me = tmMeTeam(), f = tmUI.dealsFilter;
@@ -29229,7 +30103,7 @@ const PLAYSTYLE_BEHAVIOR = {
       '<div class="tm-lines"><div><span>Transfer budget</span><b>' + tmFmt(tmBudget(t)) + '</b></div><div><span>Wage bill / cap</span><b>' + tmFmt(tmWageBill(t)) + ' / ' + tmFmt(tmCapOf(t)) + '</b></div><div><span>Ideal age</span><b>' + A.age[0] + '–' + A.age[1] + ' (max ' + A.ageMax + ')</b></div>' +
       '<div><span>Champions League</span><b>' + (tmInCL(t) ? 'Yes' : 'No') + '</b></div>' + (r ? '<div><span>Last season</span><b>' + r.pos + tmOrd(r.pos) + (r.clWin ? ' · 🏆 CL winners' : '') + '</b></div>' : '') +
       (pf.domOnly ? '<div><span>Policy</span><b>Own league only</b></div>' : '') + (rivals.length ? '<div><span>Rivals</span><b>' + rivals.map(x => tmEsc(tmClubName(x))).join(', ') + '</b></div>' : '') + '</div>' +
-      '<div class="tm-sect">Looking for</div>' + (wants.length ? wants.map(n => '<div class="tm-need sev' + n.urgency + '"><div><b>' + tmEsc(n.name) + '</b><small>' + tmEsc(n.why) + ' · ' + n.minOvr + '+ OVR · age ≤ ' + n.ageMax + ' · up to ' + tmFmt(n.maxFee) + '</small></div></div>').join('') : '<p class="tm-note">Nothing pressing.</p>') +
+      '<div class="tm-sect">Looking for</div>' + (wants.length ? wants.map(n => '<div class="tm-need sev' + n.urgency + '"><div><b>' + tmEsc(n.name) + '</b><small>' + tmEsc(n.why) + ' · age ≤ ' + n.ageMax + ' · up to ' + tmFmt(n.maxFee) + '</small></div></div>').join('') : '<p class="tm-note">Nothing pressing.</p>') +
       '<div class="tm-sect">Key players</div>' + key.map(p => '<div class="tm-deal">' + tmShield(p) + '<div>' + tmPlayerLink(p) + '<small>' + tmAge(p) + 'y · ' + tmContractLabel(p) + ' · value ' + tmFmt(tmValue(p)) + '</small></div></div>').join('') +
       (biz.length ? '<div class="tm-sect">Recent business</div>' + biz.map(tmDealLine).join('') : '') +
       '<div class="modal-actions"><button class="btn btn-secondary btn-sm" onclick="App.tmClubBrowse(\'' + cid + '\')">Browse squad</button></div>');
@@ -29382,6 +30256,7 @@ const PLAYSTYLE_BEHAVIOR = {
     tmSub, tmSetClub, tmSearch, tmFilter, tmToggle, tmDir, tmMore, tmResetFilters, tmFindRole, tmStar, tmList, tmShop, tmRelease,
     tmOfferAct, tmFaFilter, tmFaMore, tmDealsFilter, tmDealsMore, tmOpenOffer, tmOpenRenew, tmCloseModal, tmOfferChange,
     tmOfferSubmit, tmAcceptCounter, tmView, tmNewsFilter, tmNewsMore, tmClubsFilter, tmOpenPlayer, tmOpenClub, tmClubBrowse,
+    galaOpen, galaNext, galaSkip: galaSkipToEnd, galaClose: galaCloseStage, galaDismissInvite, galaAll, galaGet,
     tmTick, tmWindowInfo, __tmDebug: () => ({ tm, tmFA })
   };
 })();
