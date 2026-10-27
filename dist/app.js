@@ -5369,7 +5369,7 @@ const PLAYSTYLE_BEHAVIOR = {
     if (viewEl) viewEl.classList.add('active');
     const tabEl = document.querySelector(`.nav-tab[data-view="${view}"]`);
     if (tabEl) { tabEl.classList.add('active'); tabEl.setAttribute('aria-current', 'page'); }
-    if (view === 'leaderboard') showLeaderboard('goals');
+    if (view === 'leaderboard') showLeaderboard(lbTypeFromHash() || (lbState && lbState.type) || 'goals');
     if (view === 'awards') { let un = 0; try { un = galaUnseen().length; } catch (e) {} showAwards(un ? 'ceremony' : 'overview'); }
     if (view === 'history') showHistory(historyActiveTab || 'team');
     if (view === 'teams') renderTeamsList();
@@ -14062,6 +14062,29 @@ const PLAYSTYLE_BEHAVIOR = {
       .filter(p => p.saves > 0 || p.clean > 0)
       .sort((a,b) => b.pts - a.pts || b.clean - a.clean || b.saves - a.saves);
   }
+  // Defenders' Award: the best defensive campaign. Shared by the gala and the archive so the ceremony and the
+  // trophy case always agree. Only genuine defenders (CB/RB/LB/RWB/LWB/SW) are eligible - a busy midfielder
+  // racking up tackles should not take it - unless fewer than three defenders have any numbers yet.
+  function computeDefendersRanking(statsSource) {
+    const src = statsSource || stats;
+    const scores = {};
+    const ensure = (p) => scores[p.id] || (scores[p.id] = { id: p.id, name: p.name, team: p.team, interceptions: 0, tackles: 0, blocks: 0, apps: 0, avg: 0, pts: 0 });
+    Object.values(src.interceptions || {}).forEach(p => { const e = ensure(p); e.interceptions = p.count; e.pts += p.count * 1.4; });
+    Object.values(src.tackles || {}).forEach(p => { const e = ensure(p); e.tackles = p.count; e.pts += p.count * 1.1; });
+    Object.values(src.blocks || {}).forEach(p => { const e = ensure(p); e.blocks = p.count; e.pts += p.count * 0.7; });
+    Object.values(src.motm || {}).forEach(p => { if (scores[p.id]) scores[p.id].pts += p.count * 1.5; });
+    Object.values(src.ratings || {}).forEach(p => {
+      const e = scores[p.id];
+      if (!e) return;
+      e.apps = p.count || 0; e.avg = p.avg || 0;
+      e.pts += (p.avg || 0) * Math.min(p.count || 0, 10) * 0.25;
+    });
+    const isDef = (id) => { try { return galaPosGroup(id) === 'def'; } catch (e) { return false; } };
+    const all = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0 || p.blocks > 0);
+    const defs = all.filter(p => isDef(p.id));
+    const pool = defs.length >= 3 ? defs : all.map(p => { if (isDef(p.id)) p.pts += 3; return p; });
+    return pool.sort((a, b) => b.pts - a.pts);
+  }
   // ========== AWARDS GALA: storage ==========
   const GALA_KEY = 'apexCeremonies';
   const GALA_KEEP = 40;
@@ -14100,7 +14123,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function galaUnseen() { return galaLoad().filter(r => r.status !== 'seen'); }
   function galaMarkSeen(id) {
     const r = galaGet(id);
-    if (r && r.status !== 'seen') { r.status = 'seen'; galaSave(); }
+    if (r && r.status !== 'seen') { r.status = 'seen'; galaSave(); galaReleaseHeldAwards(r.id); }
   }
   // ========== AWARDS GALA: small maths helpers ==========
   function galaGauss() {
@@ -14168,7 +14191,7 @@ const PLAYSTYLE_BEHAVIOR = {
   const GALA_POS_BIAS = { att: 0.025, mid: 0.01, def: -0.03, gk: -0.09 };
 
   function galaRunVote(cands, cfg) {
-    const rows = cands.map(c => ({ c, votes: 0, first: 0 }));
+    const rows = cands.map(c => ({ c, votes: 0, first: 0, appear: 0 }));
     if (!cands.length) return rows;
     const shared = cands.map(() => galaGauss() * cfg.shared);
     const nations = [...new Set(cands.slice(0, 15).map(c => c.nation).filter(Boolean))];
@@ -14182,6 +14205,7 @@ const PLAYSTYLE_BEHAVIOR = {
       }).sort((a, b) => b.p - a.p);
       perceived.slice(0, cfg.points.length).forEach((x, k) => {
         rows[x.i].votes += cfg.points[k];
+        rows[x.i].appear++;
         if (k === 0) rows[x.i].first++;
       });
     }
@@ -14236,15 +14260,23 @@ const PLAYSTYLE_BEHAVIOR = {
     const v = galaBallonVote();
     if (!v) return null;
     const finalists = v.rows.slice(0, 10).map((row, i) => galaPlayerFinalist(row.c.r, {
-      rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, seed: row.c.seed,
+      rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, appear: row.appear, seed: row.c.seed,
       trophies: row.c.r.trophyPts || 0
     }));
-    const nominees = v.pool.map(r => ({ id: r.id, name: r.name, team: r.team })).sort((a, b) => a.name.localeCompare(b.name));
+    // The whole top-30 table (compact), published after the ceremony like the real thing.
+    const full = v.rows.map((row, i) => ({
+      id: row.c.r.id, name: row.c.r.name, team: row.c.r.team || '', pos: galaPosLabel(row.c.r.id),
+      rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, appear: row.appear
+    }));
+    const nominees = v.pool.map(r => {
+      const aff = findPlayerTeams(r.id) || {};
+      return { id: r.id, name: r.name, team: r.team || aff.club || '', club: aff.club || null, national: aff.national || null, pos: galaPosLabel(r.id) };
+    }).sort((a, b) => a.name.localeCompare(b.name));
     const winner = finalists[0];
     const favourite = v.pool[0];
     return {
       key: 'ballon', award: "Ballon d'Or", title: "Ballon d'Or", type: 'player', vote: true, voters: GALA_BALLOTS.ballon.voters,
-      ballot: GALA_BALLOTS.ballon.points.length, finalists, nominees, winner,
+      ballot: GALA_BALLOTS.ballon.points.length, finalists, full, nominees, winner,
       runaway: v.gap >= GALA_RUNAWAY, gap: Math.round(v.gap * 1000) / 10,
       favourite: { id: favourite.id, name: favourite.name }, upset: winner.id !== favourite.id,
       runnerUp: finalists[1] ? finalists[1].name : null
@@ -14393,16 +14425,20 @@ const PLAYSTYLE_BEHAVIOR = {
       const x = row.c.x, t = x.team;
       return {
         id: t.manager.name, name: t.manager.name, team: t.name, teamId: t.id, comp: x.comp, style: x.style,
-        rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, seed: row.c.seed,
+        rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, appear: row.appear, seed: row.c.seed,
         line: x.record + ' · GD ' + (x.gd >= 0 ? '+' : '') + x.gd + ' · ' + x.finish + (x.finish === 1 ? 'st' : x.finish === 2 ? 'nd' : x.finish === 3 ? 'rd' : 'th') + ' of ' + x.of,
         tags: x.tags.slice(0, 3)
       };
     });
     const winner = finalists[0];
     const favourite = top[0];
+    const full = rows.map((row, i) => ({
+      id: row.c.x.team.manager.name, name: row.c.x.team.manager.name, team: row.c.x.team.name, teamId: row.c.x.team.id,
+      rank: i + 1, votes: row.votes, first: row.first, pct: row.pct, appear: row.appear
+    }));
     return {
       key: 'manager', award: 'Manager of the Year', title: 'Manager of the Year', type: 'manager', vote: true, voters: GALA_BALLOTS.manager.voters,
-      ballot: GALA_BALLOTS.manager.points.length, finalists, nominees: top.map(x => ({ id: x.team.manager.name, name: x.team.manager.name, team: x.team.name })).sort((a, b) => a.name.localeCompare(b.name)),
+      ballot: GALA_BALLOTS.manager.points.length, finalists, full, nominees: top.map(x => ({ id: x.team.manager.name, name: x.team.manager.name, team: x.team.name })).sort((a, b) => a.name.localeCompare(b.name)),
       winner, runaway: gap >= GALA_RUNAWAY, gap: Math.round(gap * 1000) / 10,
       favourite: { id: favourite.team.manager.name, name: favourite.team.manager.name }, upset: winner.id !== favourite.team.manager.name,
       runnerUp: finalists[1] ? finalists[1].name : null
@@ -14423,6 +14459,11 @@ const PLAYSTYLE_BEHAVIOR = {
       label: standalone ? 'Awards Round ' + year : 'Season Y' + year, cats: []
     };
     const top = (key) => Object.values(stats[key] || {}).sort((a, b) => b.count - a.count);
+    // a little scene-setting for the host's opening monologue
+    const sumOf = (key) => Object.values(stats[key] || {}).reduce((t, x) => t + (x.count || 0), 0);
+    const ts = top('goals')[0];
+    rec.v = 2;
+    rec.intro = { goals: sumOf('goals'), assists: sumOf('assists'), players: Object.keys(stats.ratings || {}).length, topScorer: ts ? { name: ts.name, count: ts.count, team: ts.team || '' } : null };
 
     // --- statistical honours (no vote) ---
     const honours = [];
@@ -14432,29 +14473,34 @@ const PLAYSTYLE_BEHAVIOR = {
     });
     if (honours.length) rec.cats.push({ key: 'honours', title: 'Statistical Honours', type: 'honours', vote: false, items: honours });
 
-    // --- Puskás, Yashin, Gerd Müller (existing algorithms) ---
+    // --- Puskás, Defenders', Gerd Müller, Yashin (existing ranking algorithms) ---
+    const fin5 = (list, lineFn) => list.slice(0, 5).map((r, i) => Object.assign(galaCountRow(r), { rank: i + 1, line: lineFn(r) }));
     const pus = top('puskas');
     if (pus.length) {
       rec.cats.push({
         key: 'puskas', award: 'Puskás Award', title: 'Puskás Award', type: 'player', vote: false, blurb: 'The most spectacular goal of the year',
-        finalists: pus.slice(0, 5).map((r, i) => Object.assign(galaCountRow(r), { rank: i + 1, line: r.count + ' nomination' + (r.count === 1 ? '' : 's') })),
-        winner: null
+        finalists: fin5(pus, r => r.count + ' nomination' + (r.count === 1 ? '' : 's')), winner: null
       });
     }
-    const yas = computeYashinRanking(stats);
-    if (yas.length) {
+    const dfn = computeDefendersRanking(stats);
+    if (dfn.length) {
       rec.cats.push({
-        key: 'yashin', award: 'Yashin Trophy', title: 'Yashin Trophy', type: 'player', vote: false, blurb: 'The best goalkeeper of the year',
-        finalists: yas.slice(0, 5).map((r, i) => Object.assign(galaCountRow(r), { rank: i + 1, line: r.saves + ' saves · ' + r.clean + ' clean sheets' })),
-        winner: null
+        key: 'defenders', award: "Defenders' Award", title: "Defenders' Award", type: 'player', vote: false, blurb: 'The best defensive campaign of the year',
+        finalists: fin5(dfn, r => r.interceptions + ' interceptions · ' + r.tackles + ' tackles' + (r.blocks ? ' · ' + r.blocks + ' blocks' : '')), winner: null
       });
     }
     const gm = computeGerdMullerRanking(stats);
     if (gm.length) {
       rec.cats.push({
         key: 'gerd', award: 'Gerd Müller Award', title: 'Gerd Müller Award', type: 'player', vote: false, blurb: 'The best striker of the year',
-        finalists: gm.slice(0, 5).map((r, i) => Object.assign(galaCountRow(r), { rank: i + 1, line: r.goals + ' goals · ' + r.assists + ' assists' })),
-        winner: null
+        finalists: fin5(gm, r => r.goals + ' goals · ' + r.assists + ' assists'), winner: null
+      });
+    }
+    const yas = computeYashinRanking(stats);
+    if (yas.length) {
+      rec.cats.push({
+        key: 'yashin', award: 'Yashin Trophy', title: 'Yashin Trophy', type: 'player', vote: false, blurb: 'The best goalkeeper of the year',
+        finalists: fin5(yas, r => r.saves + ' saves · ' + r.clean + ' clean sheets'), winner: null
       });
     }
     rec.cats.forEach(c => { if (c.finalists && !c.winner) c.winner = c.finalists[0]; });
@@ -14469,6 +14515,125 @@ const PLAYSTYLE_BEHAVIOR = {
   }
 
   function galaCat(rec, key) { return rec && (rec.cats || []).find(c => c.key === key) || null; }
+  // ========== AWARDS GALA: sealed envelopes ==========
+  // Until the gala for a season has been watched (or skipped to the results), its individual awards stay sealed:
+  // History, the Awards tabs and the season summary hide the winners. Stats live on the Leaderboard.
+  function galaIsSealed(t) {
+    try {
+      if (!t || !(t.player || t.manager)) return false;
+      if (t.category !== 'season-global' && t.category !== 'standalone-global') return false;
+      const r = galaFind(t.year, t.category === 'standalone-global');
+      return !!(r && r.status !== 'seen');
+    } catch (e) { return false; }
+  }
+  function galaSealedCount() { try { return galaUnseen().length; } catch (e) { return 0; } }
+  function galaVisibleTrophies(list) { return (list || trophies || []).filter(t => !galaIsSealed(t)); }
+
+  // The media feed holds back the award stories for a sealed gala, so the news cannot spoil the ceremony. They are
+  // parked in localStorage (survives a reload) and posted once the gala has been watched.
+  const GALA_HELD_KEY = 'apexMediaHeldAwards';
+  let galaHoldMedia = false;
+  function galaHoldAward(name, playerObj, type, extra) {
+    if (!galaHoldMedia || !playerObj || !extra || (extra.category !== 'season-global' && extra.category !== 'standalone-global')) return false;
+    try {
+      const raw = localStorage.getItem(GALA_HELD_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      list.push({ rec: extra.category + ':' + extra.year, name, player: { id: playerObj.id, name: playerObj.name, team: playerObj.team }, type, extra });
+      return !!safeSetItem(GALA_HELD_KEY, JSON.stringify(list.slice(-80)));
+    } catch (e) { return false; }
+  }
+  function galaReleaseHeldAwards(recId) {
+    try {
+      const raw = localStorage.getItem(GALA_HELD_KEY);
+      if (!raw) return;
+      const keep = [], send = [];
+      JSON.parse(raw).forEach(x => (x.rec === recId ? send : keep).push(x));
+      safeSetItem(GALA_HELD_KEY, JSON.stringify(keep));
+      send.forEach(x => { try { mediaOnAward(x.name, x.player, x.type, x.extra); } catch (e) {} });
+    } catch (e) {}
+  }
+
+  // ========== AWARDS GALA: deterministic flavour (same ceremony always reads the same on replay) ==========
+  function galaHash(str) {
+    let h = 2166136261;
+    str = String(str);
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function galaPickSeeded(arr, seed, salt) {
+    if (!arr || !arr.length) return '';
+    return arr[galaHash(seed + '|' + (salt || 0)) % arr.length];
+  }
+
+  // The winner's acceptance speech. Built from what we actually know about the winner (club, manager, country,
+  // the runner-up), so it never mentions something that is not in the record.
+  function galaSpeech(rec, cat) {
+    try {
+      const w = cat && cat.winner;
+      if (!w) return '';
+      const seed = (rec && rec.id || '') + '|' + cat.key + '|' + (w.id || w.name);
+      const first = String(w.name || '').split(' ')[0];
+      const t = w.teamId ? getTeam(w.teamId) : galaTeamByName(w.team);
+      const mgr = cat.type === 'manager' ? '' : (t && t.manager && t.manager.name) || '';
+      const club = w.club || w.team || '';
+      const nation = w.national || '';
+      const runner = cat.runnerUp || '';
+      const pick = (arr, salt) => galaPickSeeded(arr, seed, salt);
+      const parts = [];
+      if (cat.key === 'ballon') {
+        parts.push(pick([
+          "I don't even know where to start. As a kid I dreamed of holding this, and now it's actually in my hands.",
+          "Honestly, I'm still shaking. Standing up here tonight is something I'll never forget.",
+          "This is the proudest moment of my career, and I won't pretend otherwise.",
+          "Thank you to the jury. I never imagined my name would be read out in this room."
+        ], 1));
+        const mids = [];
+        if (club) mids.push(club + " gave me everything this season. Every goal, every save, every tackle had ten teammates behind it.");
+        if (club) mids.push("None of this happens without my teammates at " + club + ". This is their trophy as much as mine.");
+        if (mgr) mids.push("Thank you to " + mgr + " for believing in me every single day.");
+        if (nation) mids.push("And to everyone back home in " + nation + ": this one is for you.");
+        if (runner) mids.push(runner + " pushed me all year. He deserves to be up here just as much as I do.");
+        if (mids.length) parts.push(pick(mids, 2));
+        if (mids.length > 1) { const m2 = pick(mids, 3); if (parts.indexOf(m2) === -1) parts.push(m2); }
+        parts.push(pick(["Now let's go and win more.", "I promise to keep working as hard as I can.", "Thank you, and let's enjoy tonight!", "Now, if you'll excuse me, I'd like to hold this for a bit longer."], 4));
+      } else if (cat.key === 'manager') {
+        parts.push(pick([
+          "The players did the hard part. I mostly just pointed in the right direction.",
+          "A manager is only as good as his dressing room, and mine never stopped believing.",
+          "Awards like this belong to the whole staff. I just get to carry it home."
+        ], 1));
+        if (club) parts.push("Thank you to everybody at " + club + " for the trust.");
+      } else if (cat.key === 'yashin') {
+        parts.push(pick([
+          "A goalkeeper is only as good as the defence in front of him. Thank you, lads, for making my job interesting.",
+          "Every keeper dreams of this. I'm honoured to stand next to the names on this trophy.",
+          "Saves win you games, but it's the team that wins you trophies. This one is for all of us."
+        ], 1));
+      } else if (cat.key === 'gerd') {
+        parts.push(pick([
+          "Goals are my job and I love my job. Thank you to everyone who put the ball on a plate for me.",
+          "A striker lives for nights like this. I'll keep scoring, I promise.",
+          "I only score because my teammates find me. This award is shared."
+        ], 1));
+        if (club) parts.push("Thank you, " + club + ".");
+      } else if (cat.key === 'defenders') {
+        parts.push(pick([
+          "Defending is a team art, so this belongs to the whole back line.",
+          "Nobody dreams of being a defender on the posters, so it means the world to be recognised tonight.",
+          "A clean sheet feels better than a goal to me. Thank you for noticing the dirty work."
+        ], 1));
+      } else if (cat.key === 'puskas') {
+        parts.push(pick([
+          "Honestly, I just hit it and hoped. I'm so glad that many people enjoyed it.",
+          "Some goals you plan, some goals just happen. That one just happened.",
+          "I've watched that one back more times than I'll admit. Thank you for choosing it."
+        ], 1));
+      } else {
+        parts.push(pick(["Thank you. I'm honoured.", "This means a lot. Thank you to everyone who helped along the way."], 1));
+      }
+      return parts.join(' ');
+    } catch (e) { return ''; }
+  }
   // ========== AWARDS GALA: look & feel (gold, black, red carpet) ==========
   const GALA_CSS = `
 .gala{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;overflow:hidden;color:#f6efdc;background:#050406;font-family:'Playfair Display',Georgia,'Times New Roman',serif;animation:galaIn .5s ease}
@@ -14549,6 +14714,42 @@ const PLAYSTYLE_BEHAVIOR = {
 .gala-hist b{color:#f6d77a}
 .gala-hist small{display:block;color:#a89868}
 .gala-hist .gala-btn{margin-left:auto;padding:8px 14px;font-size:.68rem;white-space:nowrap}
+.gala-host{display:flex;gap:10px;align-items:flex-start;margin:10px 2px 12px;padding:10px 12px;border-left:3px solid #e8bd48;background:rgba(232,189,72,.06);border-radius:0 10px 10px 0;animation:galaWalk .6s both}
+.gala-mic{flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(232,189,72,.15);border:1px solid rgba(232,189,72,.5);font-size:.9rem}
+.gala-host p{margin:0;color:#e9dfba;font-style:italic;font-size:.92rem;line-height:1.4}
+.gala-host small{display:block;font-style:normal;letter-spacing:.2em;text-transform:uppercase;font-size:.58rem;color:#9d8a58;margin-bottom:2px;font-family:'Cinzel',serif}
+.gala-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.gala-nom{border:1px solid rgba(232,189,72,.25);border-radius:10px;padding:7px 9px;background:rgba(18,14,9,.9);animation:galaWalk .5s both}
+.gala-nom b{display:block;font-size:.82rem;color:#fff6d8;line-height:1.15}
+.gala-nom small{display:block;color:#a89868;font-size:.66rem;font-family:system-ui,sans-serif;margin-top:2px}
+.gala-pos{display:inline-block;font-family:system-ui,sans-serif;font-size:.58rem;padding:0 5px;border-radius:4px;border:1px solid rgba(232,189,72,.4);color:#e8bd48;margin-right:4px;letter-spacing:.04em}
+.gala-say{color:#cdbd8c!important;font-style:italic}
+.gala-row.drop{animation:galaRowIn .7s cubic-bezier(.2,.9,.3,1.2) both}
+.gala-mini{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:6px 9px;margin:4px 0;border-radius:9px;border:1px solid rgba(232,189,72,.16);background:rgba(18,14,9,.85);animation:galaRowIn .5s both}
+.gala-mini.top{border-color:rgba(232,189,72,.7);background:rgba(40,30,10,.9)}
+.gala-mini .gala-who b{font-size:.86rem}
+.gala-mini .gala-votes b{font-size:.92rem}
+.gala-quote{position:relative;margin:12px 4px 4px;padding:14px 16px 12px 18px;border-radius:12px;border:1px solid rgba(232,189,72,.3);background:rgba(232,189,72,.05);color:#eadfb9;font-style:italic;font-size:.9rem;line-height:1.55;animation:galaPop .8s 2.7s both}
+.gala-quote::before{content:"\\201C";position:absolute;left:6px;top:-6px;font-size:2.2rem;color:#e8bd48;font-family:'Playfair Display',serif;line-height:1}
+.gala-quote small{display:block;margin-top:8px;font-style:normal;color:#a89868;font-size:.7rem;letter-spacing:.08em;font-family:system-ui,sans-serif}
+.gala-env{text-align:center;padding:14px 0 4px;animation:galaSuspense 2.1s ease forwards}
+.gala-env-art{position:relative;width:132px;height:88px;margin:0 auto 12px;perspective:420px;filter:drop-shadow(0 8px 22px rgba(0,0,0,.65))}
+.gala-env-body{position:absolute;inset:0;border-radius:6px;background:linear-gradient(160deg,#f6d77a,#b88a22);border:1px solid #fff0b8;z-index:1}
+.gala-env-card{position:absolute;left:14px;right:14px;top:10px;height:62px;border-radius:3px;background:#fff8e0;z-index:0;animation:galaCardOut 1s .9s ease forwards}
+.gala-env-flap{position:absolute;left:0;right:0;top:0;height:50px;z-index:2;background:linear-gradient(180deg,#ffe9a0,#e8bd48);clip-path:polygon(0 0,100% 0,50% 100%);transform-origin:50% 0;animation:galaFlap .9s .25s ease forwards}
+.gala-env-seal{position:absolute;left:50%;top:38px;width:22px;height:22px;margin-left:-11px;border-radius:50%;z-index:3;background:radial-gradient(circle at 35% 30%,#ff6b7c,#a3122b);box-shadow:0 2px 6px rgba(0,0,0,.5);animation:galaSealOut .4s .25s ease forwards}
+.gala-env-text{font-family:'Cinzel',serif;letter-spacing:.2em;font-size:1rem;color:#f6d77a}
+.gala-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:10px 0}
+.gala-tile{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;border:1px solid rgba(232,189,72,.3);background:rgba(18,14,9,.9);color:#f6efdc;cursor:pointer;text-align:left;font:inherit;text-decoration:none}
+.gala-tile:hover{border-color:#e8bd48}
+.gala-tile b{display:block;font-size:.86rem;line-height:1.15;color:#fff6d8}
+.gala-tile small{display:block;color:#a89868;font-size:.7rem;margin-top:2px;font-family:system-ui,sans-serif}
+.gala-seal{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px dashed rgba(232,189,72,.55);background:rgba(232,189,72,.06);margin:8px 0}
+.gala-seal-ico{flex:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:radial-gradient(circle at 35% 30%,#ff6b7c,#a3122b);box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.gala-seal b{display:block;color:#f6d77a;letter-spacing:.06em}
+.gala-seal small{display:block;color:#cdbd8c;font-size:.78rem}
+a.gala-chip{text-decoration:none;color:#eadfb9}
+a.gala-chip:hover{border-color:#e8bd48}
 @keyframes galaIn{from{opacity:0}to{opacity:1}}
 @keyframes galaSweepA{from{transform:rotate(-26deg)}to{transform:rotate(-4deg)}}
 @keyframes galaSweepB{from{transform:rotate(26deg)}to{transform:rotate(4deg)}}
@@ -14560,6 +14761,9 @@ const PLAYSTYLE_BEHAVIOR = {
 @keyframes galaFlash{0%{opacity:0;transform:scale(.3)}25%{opacity:1}100%{opacity:0;transform:scale(1.5)}}
 @keyframes galaFall{to{transform:translateY(110vh) rotate(720deg)}}
 @keyframes galaInvite{from{opacity:0;transform:translate(-50%,40px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes galaFlap{0%{transform:rotateX(0)}100%{transform:rotateX(180deg);z-index:0}}
+@keyframes galaCardOut{0%{transform:translateY(0)}100%{transform:translateY(-30px)}}
+@keyframes galaSealOut{0%{opacity:1}100%{opacity:0;transform:scale(1.6)}}
 @media (prefers-reduced-motion:reduce){.gala *,.gala-invite{animation-duration:.01s!important;animation-delay:0s!important}}
 `;
 
@@ -14580,15 +14784,22 @@ const PLAYSTYLE_BEHAVIOR = {
   let galaS = null;   // { rec, steps, i, timers:[], keyFn }
 
   function galaSteps(rec) {
-    const steps = [{ t: 'arrive' }];
+    const steps = [{ t: 'arrive' }, { t: 'welcome' }];
     const cats = rec.cats || [];
     cats.forEach((c, ci) => {
       const meta = { c, ci, n: cats.length };
       if (c.type === 'honours') { steps.push(Object.assign({ t: 'honours' }, meta)); return; }
       steps.push(Object.assign({ t: 'nominees' }, meta));
-      const reveals = c.vote ? c.finalists.length : 1;
-      for (let k = 0; k < reveals; k++) steps.push(Object.assign({ t: 'reveal', k, reveals }, meta));
+      if (!c.vote) { steps.push(Object.assign({ t: 'reveal' }, meta)); return; }
+      // The count, the way the real night runs it: the rest of the field, the lower finalists in a run,
+      // then the top three one envelope at a time.
+      const K = c.finalists.length;
+      if ((c.full || []).length > K) steps.push(Object.assign({ t: 'field' }, meta));
+      if (K > 3) steps.push(Object.assign({ t: 'batch', from: K, to: 4 }, meta));
+      for (let r = Math.min(3, K); r >= 2; r--) steps.push(Object.assign({ t: 'place', rank: r }, meta));
+      steps.push(Object.assign({ t: 'winner' }, meta));
     });
+    if (cats.some(c => c.vote)) steps.push({ t: 'results' });
     steps.push({ t: 'summary' });
     return steps;
   }
@@ -14725,18 +14936,84 @@ const PLAYSTYLE_BEHAVIOR = {
       setTimeout(() => { if (!document.getElementById('gala-stage')) galaInvite(rec); }, 900);
     } catch (e) {}
   }
+  // ========== AWARDS GALA: the host's script ==========
+  const GALA_HOST = {
+    welcome: [
+      'Good evening, ladies and gentlemen, and welcome to a night football will remember.',
+      'Welcome, everybody, to the Apex Awards. The suits are pressed and the envelopes are sealed.',
+      'Good evening, and welcome to the biggest night in the footballing calendar.'
+    ],
+    intro: {
+      honours: ['We open with the statistical honours. No jury and no debate, just the numbers.', 'First, the facts. These awards are decided by the stat sheet alone.'],
+      puskas: ['Every year one goal makes the whole world stop and stare. Tonight we celebrate the very best.', 'A great goal is worth a thousand words. Here are the finalists for the Puskás Award.'],
+      defenders: ['They rarely get the glory, but nothing is won without them. The Defenders\' Award.', 'A perfectly timed tackle can be as beautiful as any goal. Our finalists for the Defenders\' Award.'],
+      gerd: ['Goals win games. These are the finest finishers of the year: the Gerd Müller Award.', 'When the ball drops in the box, these are the names defenders fear.'],
+      yashin: ['The last line of defence. The Yashin Trophy honours the goalkeeper of the year.', 'Quick hands, sharp reflexes and nerves of steel. The finalists for the Yashin Trophy.'],
+      manager: ['Behind every great team is someone pacing the touchline. Tonight, the Manager of the Year.', 'Our jury weighed results against squad quality, tactics, goal difference and Europe.'],
+      ballon: ['And now, the moment everyone has been waiting for. The most prestigious individual prize in football.', 'Ladies and gentlemen, the Ballon d\'Or. The jury has voted and the envelope is sealed.']
+    }
+  };
+  const GALA_SAY = [
+    'Whatever happens, it\'s an honour to be here.',
+    'Nerves? Plenty. But it\'s been a special season.',
+    'I\'m just happy to be in the room with these names.',
+    'Ask me again at the end of the night.',
+    'My family are here, so no pressure at all.',
+    'It\'s the team that got me here, honestly.'
+  ];
+  function galaOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+  function galaSeed() { return (galaS && galaS.rec ? galaS.rec.id : 'gala'); }
+  function galaHostPick(arr, salt) { return galaPickSeeded(arr, galaSeed(), salt); }
+  function galaHostHTML(text, delay) {
+    return '<div class="gala-host"' + (delay ? ' style="animation-delay:' + delay + 's"' : '') + '><span class="gala-mic">🎙</span><div><small>The host</small><p>' + galaEsc(text) + '</p></div></div>';
+  }
+  function galaPlaceLine(rank, award) {
+    if (rank === 1) return 'And the ' + award + ' goes to…';
+    if (rank === 2) return 'In second place…';
+    if (rank === 3) return 'In third place…';
+    return 'In ' + galaOrd(rank) + ' place…';
+  }
+  // A drawn envelope that opens (flap lifts, card slides out) while the line hangs in the air, then collapses.
+  function galaEnvelopeHTML(text) {
+    return '<div class="gala-env"><div class="gala-env-art"><i class="gala-env-card"></i><i class="gala-env-body"></i><i class="gala-env-flap"></i><i class="gala-env-seal"></i></div><div class="gala-env-text">' + galaEsc(text) + '</div></div>';
+  }
+  function galaWinnerComment(c) {
+    const w = c.winner, second = c.finalists && c.finalists[1];
+    if (!c.vote) return 'A deserved winner, and a big night for ' + (w.team || 'the club') + '.';
+    const margin = second ? w.votes - second.votes : w.votes;
+    if (c.upset && c.favourite) return 'A surprise tonight. The performance table pointed to ' + c.favourite.name + ', but the jury had other ideas.';
+    if (second && margin <= 12) return 'Just ' + margin + ' point' + (margin === 1 ? '' : 's') + ' separated the top two. It could not have been closer.';
+    if (margin >= 120 || c.runaway) return 'Never in doubt. The jury made its mind up early.';
+    return 'A clear verdict from the jury, and a fine night for ' + (w.team || 'the club') + '.';
+  }
+
   // ========== AWARDS GALA: rendering each step ==========
   function galaPlayerRow(c, f, o) {
     o = o || {};
-    const sub = [f.team, f.pos, o.noLine ? '' : f.line].filter(Boolean).map(galaEsc).join(' · ');
+    const bits = [f.team, f.pos, o.noLine ? '' : f.line];
+    if (o.showFirst && f.first != null) bits.push(f.first + ' first-place vote' + (f.first === 1 ? '' : 's'));
+    const sub = bits.filter(Boolean).map(galaEsc).join(' · ');
     const right = o.noVotes ? '' : '<div class="gala-votes"><b>' + f.votes + '</b><small>' + (f.pct != null ? f.pct + '%' : '') + '</small></div>';
-    return '<div class="gala-row' + (o.fresh ? ' new' : '') + (f.rank === 1 ? ' top' : '') + '"' + (o.noVotes ? ' style="grid-template-columns:28px 42px 1fr"' : '') + '>' +
-      '<div class="gala-rank">' + f.rank + '</div>' + galaAvatar(c, f, 40) +
+    const st = [];
+    if (o.noVotes) st.push('grid-template-columns:28px 42px 1fr');
+    if (o.delay) st.push('animation-delay:' + o.delay + 's');
+    return '<div class="gala-row' + (o.fresh ? ' new' : '') + (o.drop ? ' drop' : '') + (f.rank === 1 && !o.noRank ? ' top' : '') + '"' + (st.length ? ' style="' + st.join(';') + '"' : '') + '>' +
+      '<div class="gala-rank">' + (o.noRank ? '★' : f.rank) + '</div>' + galaAvatar(c, f, 40) +
       '<div class="gala-who"><b>' + galaEsc(f.name) + '</b><small>' + sub + (f.tags && f.tags.length ? ' · ' + f.tags.map(galaEsc).join(' · ') : '') + '</small></div>' + right +
       (o.bar != null ? '<span class="gala-bar" style="width:' + o.bar + '%"></span>' : '') + '</div>';
   }
   function galaLockedRow(rank) {
     return '<div class="gala-row locked" style="grid-template-columns:28px 1fr"><div class="gala-rank">' + rank + '</div><div class="gala-who"><b>• • •</b></div></div>';
+  }
+  // The finalists' table: ranks below `minRank` are still sealed, the rest are showing.
+  function galaTable(c, minRank, o) {
+    o = o || {};
+    const maxV = c.finalists[0].votes || 1;
+    return c.finalists.map(f => {
+      if (f.rank < minRank) return galaLockedRow(f.rank);
+      const fresh = o.freshRank === f.rank;
+      return galaPlayerRow(c, f, { fresh, drop: !!o.drop, delay: fresh ? (o.freshDelay || 0) : (o.delay ? o.delay(f) : 0), bar: Math.round(f.votes / maxV * 100), showFirst: true });
+    }).join('');
   }
 
   function galaWinnerCard(c, instant) {
@@ -14747,6 +15024,7 @@ const PLAYSTYLE_BEHAVIOR = {
       const second = c.finalists[1];
       const margin = second ? w.votes - second.votes : w.votes;
       badges += '<span class="gala-badge">' + w.votes + ' jury points · ' + w.pct + '%</span>';
+      if (w.first != null) badges += '<span class="gala-badge">' + w.first + ' first-place vote' + (w.first === 1 ? '' : 's') + '</span>';
       if (second) badges += '<span class="gala-badge' + (margin <= 12 ? ' hot' : '') + '">' + (margin <= 12 ? 'Photo finish — won by ' + margin : margin >= 120 ? 'Landslide — won by ' + margin : 'Won by ' + margin + ' points') + '</span>';
       if (c.upset && c.favourite) badges += '<span class="gala-badge hot">Surprise! ' + galaEsc(c.favourite.name) + ' led the performance table</span>';
       else if (c.runaway) badges += '<span class="gala-badge">The runaway favourite delivers</span>';
@@ -14760,59 +15038,121 @@ const PLAYSTYLE_BEHAVIOR = {
       (sub ? '<div class="gala-line">' + sub + '</div>' : '') +
       '<div>' + badges + '</div></div>';
   }
+  function galaSpeechHTML(c) {
+    const sp = galaSpeech(galaS.rec, c);
+    if (!sp) return '';
+    return '<div class="gala-quote">' + galaEsc(sp) + '<small>' + galaEsc(c.winner.name).toUpperCase() + ' · ACCEPTING THE ' + galaEsc(c.award).toUpperCase() + '</small></div>';
+  }
+  function galaMiniRow(f, i, delay) {
+    return '<div class="gala-mini' + (f.rank <= 3 ? ' top' : '') + '" style="animation-delay:' + delay.toFixed(2) + 's"><div class="gala-rank">' + f.rank + '</div>' +
+      '<div class="gala-who"><b>' + galaEsc(f.name) + '</b><small>' + [f.team, f.pos].filter(Boolean).map(galaEsc).join(' · ') + '</small></div>' +
+      (f.votes != null ? '<div class="gala-votes"><b>' + f.votes + '</b><small>' + (f.first != null ? f.first + ' firsts' : '') + '</small></div>' : '<div></div>') + '</div>';
+  }
 
   function galaStepHTML(st) {
     const rec = galaS.rec;
-    if (st.t === 'arrive') {
+    const kind = st.t;
+    if (kind === 'arrive') {
       const bal = galaCat(rec, 'ballon'), mg = galaCat(rec, 'manager');
       let pool = [];
       if (bal) pool = pool.concat(bal.nominees.map(n => ({ c: bal, f: n })));
       if (mg) pool = pool.concat(mg.nominees.slice(0, 8).map(n => ({ c: mg, f: n })));
-      const pick = pool.sort(() => Math.random() - 0.5).slice(0, 8);
+      const pick = pool.slice().sort((a, b) => galaHash(rec.id + a.f.name) - galaHash(rec.id + b.f.name)).slice(0, 8);
       let h = '<div class="gala-card"><div class="gala-kicker">Gala Night · ' + galaEsc(rec.label) + '</div><div class="gala-title">The Red Carpet</div>' +
         '<p class="gala-blurb">Cameras flash as tonight\'s nominees arrive. Every envelope is sealed — nobody knows who will walk away with the gold.</p>';
-      pick.forEach((p, i) => { h += '<div class="gala-arrive" style="animation-delay:' + (0.25 + i * 0.32).toFixed(2) + 's">' + galaAvatar(p.c, p.f, 36) + '<div><b>' + galaEsc(p.f.name) + '</b><br><small>' + galaEsc(p.f.team || '') + ' · ' + (p.c.type === 'manager' ? 'Manager' : 'Nominee') + '</small></div></div>'; });
+      pick.forEach((p, i) => {
+        const where = p.c.type === 'manager' ? 'Manager · ' + (p.f.team || '') : [p.f.club || p.f.team, p.f.national, p.f.pos].filter(Boolean).join(' · ');
+        h += '<div class="gala-arrive" style="animation-delay:' + (0.25 + i * 0.32).toFixed(2) + 's">' + galaAvatar(p.c, p.f, 36) +
+          '<div><b>' + galaEsc(p.f.name) + '</b><br><small>' + galaEsc(where) + '</small><br><small class="gala-say">“' + galaEsc(galaPickSeeded(GALA_SAY, rec.id + '|' + p.f.name, 7)) + '”</small></div></div>';
+      });
       return h + '</div>';
     }
-    if (st.t === 'honours') {
+    if (kind === 'welcome') {
+      const intro = rec.intro || null;
+      let recap = '';
+      if (intro && intro.goals) {
+        recap = ' This season brought ' + intro.goals + ' goals' + (intro.assists ? ' and ' + intro.assists + ' assists' : '') + (intro.players ? ' from ' + intro.players + ' players' : '') + '.' +
+          (intro.topScorer ? ' ' + intro.topScorer.name + ' led the scoring charts with ' + intro.topScorer.count + '.' : '');
+      }
+      const cats = rec.cats || [];
+      let h = '<div class="gala-card"><div class="gala-kicker">Gala Night · ' + galaEsc(rec.label) + '</div><div class="gala-title">Welcome</div>' +
+        galaHostHTML(galaHostPick(GALA_HOST.welcome, 1) + recap) +
+        '<div class="gala-kicker" style="margin-top:6px">Tonight\'s programme</div><div class="gala-chips">' +
+        cats.map(c => '<span class="gala-chip">' + trophyMark(c.award || c.title, 16) + ' ' + galaEsc(c.title) + '</span>').join('') + '</div>';
+      const bal = galaCat(rec, 'ballon');
+      if (bal) {
+        const pts = GALA_BALLOTS.ballon.points;
+        h += '<p class="gala-note">How the Ballon d\'Or is decided: ' + bal.voters + ' journalists each rank their top ' + bal.ballot + '. A first-place vote is worth ' + pts[0] + ' points, down to ' + pts[pts.length - 1] + ' for tenth. The count is revealed from the bottom up.</p>';
+      }
+      return h + '</div>';
+    }
+    if (kind === 'honours') {
       const c = st.c;
-      let h = '<div class="gala-card"><div class="gala-kicker">Award ' + (st.ci + 1) + ' of ' + st.n + '</div><div class="gala-title">' + galaEsc(c.title) + '</div><p class="gala-blurb">The numbers speak for themselves</p>';
+      let h = '<div class="gala-card"><div class="gala-kicker">Award ' + (st.ci + 1) + ' of ' + st.n + '</div><div class="gala-title">' + galaEsc(c.title) + '</div>' + galaHostHTML(galaHostPick(GALA_HOST.intro.honours, 2));
       c.items.forEach(it => {
         h += '<div class="gala-honour"><div>' + trophyMark(it.award, 44) + '</div><div><span class="k">' + galaEsc(it.award) + '</span><b>' + galaEsc(it.name) + '</b><small>' + galaEsc(it.team) + ' · ' + galaEsc(it.line) + '</small></div></div>';
       });
       return h + '</div>';
     }
+    if (kind === 'results') {
+      let h = '<div class="gala-card"><div class="gala-kicker">Official results</div><div class="gala-title">The Final Jury Tables</div>';
+      (rec.cats || []).filter(c => c.vote).forEach(c => {
+        const list = (c.full && c.full.length ? c.full : c.finalists);
+        h += '<div class="gala-kicker" style="margin:14px 0 4px">' + galaEsc(c.title) + ' · ' + c.voters + ' voters · top ' + c.ballot + ' per ballot</div>';
+        h += list.map((f, i) => galaMiniRow(f, i, Math.min(i * 0.04, 1.2))).join('');
+      });
+      return h + '<p class="gala-note">Rankings below the top ten are published with the full results.</p></div>';
+    }
     const c = st.c;
-    if (st.t === 'nominees') {
-      let h = '<div class="gala-card"><div class="gala-kicker">Award ' + (st.ci + 1) + ' of ' + st.n + '</div><div class="gala-title">' + trophyMark(c.award, 40) + ' ' + galaEsc(c.title) + '</div>';
+    const award = c.award;
+    if (kind === 'nominees') {
+      let h = '<div class="gala-card"><div class="gala-kicker">Award ' + (st.ci + 1) + ' of ' + st.n + '</div><div class="gala-title">' + trophyMark(award, 40) + ' ' + galaEsc(c.title) + '</div>';
       if (c.blurb) h += '<p class="gala-blurb">' + galaEsc(c.blurb) + '</p>';
+      h += galaHostHTML(galaHostPick(GALA_HOST.intro[c.key] || GALA_HOST.intro.honours, 3 + st.ci));
       if (c.vote) {
-        h += '<div class="gala-kicker" style="margin-top:6px">The nominees</div><div class="gala-chips">' +
-          c.nominees.map(n => '<span class="gala-chip">' + galaEsc(n.name) + '<small>' + galaEsc(n.team || '') + '</small></span>').join('') + '</div>' +
+        h += '<div class="gala-kicker" style="margin-top:6px">The ' + c.nominees.length + ' nominees</div><div class="gala-grid">' +
+          c.nominees.map((n, i) => '<div class="gala-nom" style="animation-delay:' + Math.min(i * 0.03, 0.9).toFixed(2) + 's"><b>' + galaEsc(n.name) + '</b><small>' +
+            (n.pos ? '<span class="gala-pos">' + galaEsc(n.pos) + '</span>' : '') + galaEsc(n.club || n.team || '') + (n.national && n.national !== n.club ? ' · ' + galaEsc(n.national) : '') + '</small></div>').join('') + '</div>' +
           '<p class="gala-note">Decided by a jury of ' + c.voters + ' · each ballot ranks its top ' + c.ballot + '</p>';
       } else {
-        h += '<div class="gala-kicker" style="margin:6px 0">The finalists</div>' + c.finalists.map(f => galaPlayerRow(c, f, { noVotes: true })).join('');
+        // finalists in alphabetical order with no ranks, so the order cannot give the winner away
+        const three = c.finalists.slice(0, 3).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        h += '<div class="gala-kicker" style="margin:6px 0">The finalists</div>' + three.map(f => galaPlayerRow(c, f, { noVotes: true, noRank: true })).join('');
       }
       return h + '</div>';
     }
-    // reveal
-    if (c.vote) {
-      const K = c.finalists.length, last = st.k === K - 1;
-      const showFrom = K - 1 - st.k;               // lowest index (best rank) revealed so far
-      const maxV = c.finalists[0].votes || 1;
-      let h = '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + ' · jury count</div>';
-      if (last) {
-        h += '<div class="gala-suspense">AND THE WINNER IS…</div>' + galaWinnerCard(c, false) + '<div class="gala-kicker" style="margin:12px 0 2px">Final jury table</div>';
-      }
-      c.finalists.forEach((f, idx) => {
-        if (idx < showFrom) h += galaLockedRow(f.rank);
-        else h += galaPlayerRow(c, f, { fresh: idx === showFrom && !last, bar: Math.round(f.votes / maxV * 100) });
-      });
+    if (kind === 'field') {
+      const K = c.finalists.length;
+      const rest = c.full.slice(K).slice().reverse();      // lowest place first
+      let h = '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + ' · jury count</div><div class="gala-title">Places ' + c.full.length + ' to ' + (K + 1) + '</div>' +
+        galaHostHTML('We begin the count at the bottom of the table. These players all made the nominees\' list and fell just short of the top ' + K + '.');
+      h += rest.map((f, i) => galaMiniRow(Object.assign({}, f, { votes: null, first: null }), i, 0.3 + Math.min(i * 0.11, 2.4))).join('');
       return h + '</div>';
     }
-    return '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + '</div><div class="gala-suspense">AND THE WINNER IS…</div>' + galaWinnerCard(c, false) +
+    if (kind === 'batch') {
+      const K = st.from;
+      let h = '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + ' · jury count</div>' +
+        galaHostHTML('Now the finalists. Places ' + galaOrd(K) + ' to ' + galaOrd(st.to) + ', in that order.', 0) +
+        galaTable(c, st.to, { drop: true, delay: f => 0.5 + (K - f.rank) * 0.9 });
+      return h + '</div>';
+    }
+    if (kind === 'place') {
+      let h = '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + ' · jury count</div>' + galaEnvelopeHTML(galaPlaceLine(st.rank, award));
+      h += galaTable(c, st.rank, { freshRank: st.rank, freshDelay: 1.9 });
+      const f = c.finalists[st.rank - 1];
+      h += galaHostHTML(f.name + ' takes ' + (st.rank === 3 ? 'third' : 'second') + ' with ' + f.votes + ' points' + (f.first != null ? ' and ' + f.first + ' first-place vote' + (f.first === 1 ? '' : 's') : '') + (f.appear != null ? ', named on ' + f.appear + ' of ' + c.voters + ' ballots' : '') + '.', 2.5);
+      return h + '</div>';
+    }
+    if (kind === 'winner') {
+      let h = '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + ' · jury count</div>' + galaEnvelopeHTML(galaPlaceLine(1, award)) + galaWinnerCard(c, false) + galaSpeechHTML(c) +
+        galaHostHTML(galaWinnerComment(c), 3.2) + '<div class="gala-kicker" style="margin:12px 0 2px">Final jury table</div>' + galaTable(c, 1, {});
+      return h + '</div>';
+    }
+    // reveal (awards with no vote)
+    return '<div class="gala-card"><div class="gala-kicker">' + galaEsc(c.title) + '</div>' + galaEnvelopeHTML('And the winner is…') + galaWinnerCard(c, false) + galaSpeechHTML(c) +
+      galaHostHTML(galaWinnerComment(c), 3.2) +
       '<div class="gala-kicker" style="margin:12px 0 2px">Also in the running</div>' +
-      c.finalists.slice(1).map(f => galaPlayerRow(c, f, { noVotes: true })).join('') + '</div>';
+      c.finalists.slice(1, 3).map(f => galaPlayerRow(c, f, { noVotes: true })).join('') + '</div>';
   }
 
   function galaSummaryHTML() {
@@ -14828,6 +15168,25 @@ const PLAYSTYLE_BEHAVIOR = {
     return h + '<p class="gala-note">All awards are in the trophy cabinets and the History tab.</p></div>';
   }
 
+  function galaNextLabel(st) {
+    const nx = galaS.steps[galaS.i + 1];
+    if (!nx) return 'Close ✕';
+    if (st.t === 'nominees' && st.c.vote) return 'Open the ballot box ▶';
+    switch (nx.t) {
+      case 'welcome': return 'Welcome ▶';
+      case 'honours': return 'First award ▶';
+      case 'nominees': return st.t === 'welcome' ? 'First award ▶' : 'Next award ▶';
+      case 'reveal': return 'Open the envelope ▶';
+      case 'field': return 'Start the count ▶';
+      case 'batch': return 'Places ' + galaOrd(nx.from) + ' to ' + galaOrd(nx.to) + ' ▶';
+      case 'place': return (nx.rank === 3 ? 'Third place' : nx.rank === 2 ? 'Second place' : 'Place ' + nx.rank) + ' ▶';
+      case 'winner': return 'And the winner is… ▶';
+      case 'results': return 'Full results ▶';
+      case 'summary': return 'Tonight\'s winners ▶';
+      default: return 'Next ▶';
+    }
+  }
+
   function galaRender() {
     if (!galaS) return;
     galaClearTimers();
@@ -14839,17 +15198,12 @@ const PLAYSTYLE_BEHAVIOR = {
     main.scrollTop = 0;
     if (sub) sub.textContent = galaS.rec.label + ' · Gala Night';
     if (prog) {
-      const n = galaS.rec.cats.length + 2, at = st.t === 'arrive' ? 0 : st.t === 'summary' ? n - 1 : st.ci + 1;
+      const n = galaS.rec.cats.length + 2;
+      const at = (st.t === 'arrive' || st.t === 'welcome') ? 0 : (st.t === 'summary' || st.t === 'results') ? n - 1 : st.ci + 1;
       prog.innerHTML = Array.from({ length: n }, (x, i) => '<i class="' + (i <= at ? 'on' : '') + '"></i>').join('');
     }
     const last = galaS.i === galaS.steps.length - 1;
-    let label = 'Next ▶';
-    if (st.t === 'arrive') label = 'Take your seats ▶';
-    else if (st.t === 'nominees') label = (st.c.vote ? 'Start the count' : 'Open the envelope') + ' ▶';
-    else if (st.t === 'reveal' && st.c.vote) label = st.k === st.reveals - 2 ? 'And the winner is… ▶' : st.k === st.reveals - 1 ? (st.ci === st.n - 1 ? 'Finish ▶' : 'Next award ▶') : 'Reveal #' + (st.c.finalists.length - 1 - st.k) + ' ▶';
-    else if (st.t === 'reveal') label = st.ci === st.n - 1 ? 'Finish ▶' : 'Next award ▶';
-    else if (st.t === 'honours') label = 'Next award ▶';
-    if (last) label = 'Close ✕';
+    const label = galaNextLabel(st);
     foot.innerHTML = (last ? '<button type="button" class="gala-btn ghost" onclick="App.galaOpen(\'' + galaS.rec.id + '\')">Replay</button>' : '<button type="button" class="gala-btn ghost" onclick="App.galaSkip()">Skip to results</button>') +
       '<button type="button" class="gala-btn" onclick="App.galaNext()">' + label + '</button>';
 
@@ -14857,20 +15211,88 @@ const PLAYSTYLE_BEHAVIOR = {
     if (st.t === 'arrive') {
       galaFlashBurst(14, false);
       galaS.timers.push(setInterval(() => galaFlashBurst(3, false), 1500));
-    } else if (st.t === 'reveal') {
-      const winnerNow = st.c.vote ? st.k === st.reveals - 1 : true;
-      if (winnerNow) { galaLater(() => { galaConfetti(110); galaFlashBurst(8, true); }, 2000); }
-      else galaFlashBurst(2, true);
+    } else if (st.t === 'welcome') {
+      galaFlashBurst(5, true);
+    } else if (st.t === 'field') {
+      galaFlashBurst(3, true);
+    } else if (st.t === 'batch') {
+      for (let r = st.from; r >= st.to; r--) galaLater(() => galaFlashBurst(1, true), (0.5 + (st.from - r) * 0.9) * 1000 + 350);
+    } else if (st.t === 'place') {
+      galaLater(() => galaFlashBurst(4, true), 2000);
+    } else if (st.t === 'winner' || st.t === 'reveal') {
+      galaLater(() => { galaConfetti(110); galaFlashBurst(8, true); }, 2000);
     } else if (st.t === 'summary') {
       galaMarkSeen(galaS.rec.id);
       galaConfetti(50);
     }
   }
   // ========== AWARDS GALA: Awards-tab views ==========
+  // Every individual award is a sealed envelope until the gala has been watched. The tabs explain how the award
+  // is decided and point at the Leaderboard for the numbers; they never name a leader.
+  const GALA_SEALED_AWARDS = {
+    puskas: { name: 'Puskás Award', how: 'The most spectacular goal of the year, picked from every goal that was nominated during matches.', stats: [['Puskás nominees', 'puskas'], ['Goals', 'goals'], ['xG', 'xg']] },
+    muller: { name: 'Gerd Müller Award', how: 'The best striker of the year. Goals count for the most, assists add to the case, and out-and-out strikers get a nod.', stats: [['Goals', 'goals'], ['Assists', 'assists'], ['Goals + assists', 'ga'], ['xG', 'xg']] },
+    yashin: { name: 'Yashin Trophy', how: 'The best goalkeeper of the year. Clean sheets and saves lead the case, with match-winning displays and form on top.', stats: [['Saves', 'saves'], ['Clean sheets', 'cleanSheets'], ['Man of the Match', 'motm']] },
+    defenders: { name: "Defenders' Award", how: 'The best defender of the year: interceptions, tackles and blocks, backed by consistent match ratings. Only defenders are eligible.', stats: [['Interceptions', 'interceptions'], ['Tackles', 'tackles'], ['Blocks', 'blocks'], ['Average rating', 'ratings']] }
+  };
+
+  function galaLbLinks(stats) {
+    return '<div class="gala-chips" style="justify-content:flex-start">' + stats.map(s => '<a class="gala-chip" href="leaderboard.html#' + s[1] + '">📊 ' + galaEsc(s[0]) + '</a>').join('') + '</div>';
+  }
+  function galaPastWinnersHTML(awardName, limit) {
+    const past = galaVisibleTrophies(trophies).filter(t => t.name === awardName && (t.player || t.manager)).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, limit || 5);
+    if (!past.length) return '';
+    return '<h3 style="margin-top:14px;font-size:.9rem">PAST WINNERS</h3>' + past.map(t => '<div class="gala-hist">' + trophyMark(awardName, 34) + '<div><b>' + galaEsc(t.player || t.manager) + '</b><small>' + galaEsc(t.team || '') + ' · ' + galaEsc((t.type || '').replace(' (Global)', '')) + '</small></div></div>').join('');
+  }
+  function galaWatchButton() {
+    const un = galaUnseen();
+    const rec = un.length ? un[un.length - 1] : galaLatest();
+    if (!rec) return '';
+    return '<div style="text-align:center;margin-top:12px"><button type="button" class="gala-btn" onclick="App.galaOpen(\'' + rec.id + '\')">' + (rec.status !== 'seen' ? 'Walk the red carpet' : 'Watch the latest ceremony') + '</button></div>';
+  }
+
+  function galaSealedAwardTabHTML(key) {
+    galaEnsureStyle();
+    const cfg = GALA_SEALED_AWARDS[key];
+    if (!cfg) return '';
+    return '<div class="gala-race"><h3>' + galaEsc(cfg.name).toUpperCase() + '</h3>' +
+      '<div class="gala-seal"><span class="gala-seal-ico">✉</span><div><b>Envelope sealed</b><small>The winner is revealed at Gala Night, when the season ends.</small></div></div>' +
+      '<p>' + galaEsc(cfg.how) + '</p>' +
+      '<p style="margin-bottom:4px">Want the numbers? Follow the race on the leaderboard:</p>' + galaLbLinks(cfg.stats) +
+      galaPastWinnersHTML(cfg.name, 6) + galaWatchButton() + '</div>';
+  }
+
+  function galaOverviewTabHTML() {
+    galaEnsureStyle();
+    const tiles = [
+      ["Ballon d'Or", 'ballon'], ['Manager of the Year', 'manager'], ['Puskás Award', 'puskas'], ["Defenders' Award", 'defenders'],
+      ['Gerd Müller Award', 'muller'], ['Yashin Trophy', 'yashin'], ['Top Assists', 'lb:assists'], ['Most MOTM', 'lb:motm'], ['Clean Sheet King', 'lb:cleanSheets']
+    ];
+    let h = '<div class="gala-race"><h3>THE AWARDS</h3><p>Every individual award is handed out at the end-of-season Gala Night, so the winners stay secret until the envelopes are opened. For the numbers, check the leaderboard.</p><div class="gala-tiles">';
+    h += tiles.map(t => {
+      const isLb = t[1].indexOf('lb:') === 0;
+      const inner = trophyMark(t[0], 34) + '<div><b>' + galaEsc(t[0]) + '</b><small>' + (isLb ? '📊 See the leaderboard' : '🔒 Sealed until Gala Night') + '</small></div>';
+      return isLb ? '<a class="gala-tile" href="leaderboard.html#' + t[1].slice(3) + '">' + inner + '</a>' : '<button type="button" class="gala-tile" onclick="App.showAwards(\'' + t[1] + '\')">' + inner + '</button>';
+    }).join('');
+    h += '</div>';
+    const won = galaVisibleTrophies(trophies).length;
+    h += '<p style="margin-top:10px">' + (won ? won + ' trophies and awards in the cabinet.' : 'No trophies in the cabinet yet.') + '</p>';
+    h += '<div class="gala-chips" style="justify-content:flex-start"><a class="gala-chip" href="leaderboard.html">📊 Open the leaderboard</a></div>';
+    return h + galaWatchButton() + '</div>';
+  }
+
+  function galaSealedNoticeHTML() {
+    const un = galaUnseen();
+    if (!un.length) return '';
+    const rec = un[un.length - 1];
+    galaEnsureStyle();
+    return '<div class="gala-hist" style="margin-bottom:12px"><span style="font-size:1.4rem">🔒</span><div><b>' + un.length + ' gala' + (un.length === 1 ? '' : 's') + ' not watched yet</b><small>Individual award winners for ' + galaEsc(rec.label) + ' are sealed until you attend Gala Night.</small></div>' +
+      '<button type="button" class="gala-btn" onclick="App.galaOpen(\'' + rec.id + '\')">Watch</button></div>';
+  }
+
   function galaBallonTabHTML() {
     galaEnsureStyle();
     const race = galaBallonRace();
-    const past = trophies.filter(t => t.name === "Ballon d'Or" && t.player).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 5);
     const latest = galaLatest();
     let h = '<div class="gala-race"><h3>THE RACE FOR THE BALLON D\'OR</h3>';
     if (!race) {
@@ -14885,21 +15307,19 @@ const PLAYSTYLE_BEHAVIOR = {
       h += '<div class="table-scroll"><table class="lb-table"><thead><tr><th>Player</th><th>Team</th><th>Apps</th><th>G</th><th>A</th><th>Avg</th></tr></thead><tbody>' +
         race.contenders.map(p => '<tr><td class="lb-player">' + lbPlayerCell(p) + '</td><td class="lb-team">' + galaEsc(p.team) + '</td><td>' + (p.apps || 0) + '</td><td>' + (p.goals || 0) + '</td><td>' + (p.assists || 0) + '</td><td>' + (p.avg ? p.avg.toFixed(2) : '—') + '</td></tr>').join('') +
         '</tbody></table></div>';
+      h += '<p style="margin-top:10px;margin-bottom:4px">Full numbers on the leaderboard:</p>' + galaLbLinks([['Goals', 'goals'], ['Assists', 'assists'], ['Man of the Match', 'motm'], ['Average rating', 'ratings']]);
     }
-    if (past.length) {
-      h += '<h3 style="margin-top:14px;font-size:.9rem">PAST WINNERS</h3>' + past.map(t => '<div class="gala-hist">' + trophyMark("Ballon d'Or", 34) + '<div><b>' + galaEsc(t.player) + '</b><small>' + galaEsc(t.team || '') + ' · ' + galaEsc(t.type || '') + '</small></div></div>').join('');
-    }
-    if (latest) h += '<div style="text-align:center;margin-top:12px"><button type="button" class="gala-btn" onclick="App.galaOpen(\'' + latest.id + '\')">Watch the latest ceremony</button></div>';
+    h += galaPastWinnersHTML("Ballon d'Or", 5);
+    if (latest) h += galaWatchButton();
     return h + '</div>';
   }
 
   function galaManagerTabHTML() {
     galaEnsureStyle();
-    const wins = trophies.filter(t => t.name === 'Manager of the Year').sort((a, b) => (b.date || 0) - (a.date || 0));
-    if (!wins.length) {
-      return '<div class="gala-race"><h3>MANAGER OF THE YEAR</h3><p>Voted at Gala Night on results against squad quality, tactics, goal difference and Europe — not simply on who lifted the trophy.</p></div>';
-    }
-    return '<div class="gala-race"><h3>MANAGER OF THE YEAR</h3><p>Voted on results against squad quality, tactics, goal difference and Europe — not simply on who lifted the trophy.</p>' +
+    const wins = galaVisibleTrophies(trophies).filter(t => t.name === 'Manager of the Year').sort((a, b) => (b.date || 0) - (a.date || 0));
+    const intro = '<p>Voted at Gala Night on results against squad quality, tactics, goal difference and Europe — not simply on who lifted the trophy. The winner stays sealed until the ceremony.</p>';
+    if (!wins.length) return '<div class="gala-race"><h3>MANAGER OF THE YEAR</h3>' + intro + '</div>';
+    return '<div class="gala-race"><h3>MANAGER OF THE YEAR</h3>' + intro +
       wins.slice(0, 8).map(t => {
         const team = galaTeamByName(t.team);
         const rec = galaFind(t.year, t.category === 'standalone-global');
@@ -14913,21 +15333,24 @@ const PLAYSTYLE_BEHAVIOR = {
     const all = galaAll().reverse();
     let h = '<div class="gala-race"><h3>APEX AWARDS · GALA NIGHT</h3>';
     if (!all.length) {
-      return h + '<p>The gala is held when a season ends: red carpet, Puskás, Yashin, Gerd Müller, Manager of the Year and the Ballon d\'Or — all decided by the season you just played. Finish a season to host the first one.</p></div>';
+      return h + '<p>The gala is held when a season ends: red carpet, Puskás, Defenders\' Award, Gerd Müller, Yashin, Manager of the Year and the Ballon d\'Or — all decided by the season you just played. Finish a season to host the first one.</p></div>';
     }
     h += '<p>Relive the red carpet, the jury count and the winners.</p>';
     h += all.map(r => {
       const b = galaCat(r, 'ballon'), m = galaCat(r, 'manager');
-      return '<div class="gala-hist">' + trophyMark("Ballon d'Or", 38) + '<div><b>' + galaEsc(r.label) + (r.status !== 'seen' ? ' · NEW' : '') + '</b>' +
-        '<small>' + (b ? "Ballon d'Or: " + galaEsc(b.winner.name) : 'No Ballon d\'Or') + (m ? ' · Manager: ' + galaEsc(m.winner.name) : '') + '</small></div>' +
-        '<button type="button" class="gala-btn" onclick="App.galaOpen(\'' + r.id + '\')">' + (r.status !== 'seen' ? 'Walk the carpet' : 'Watch again') + '</button></div>';
+      const seen = r.status === 'seen';
+      const line = seen
+        ? (b ? 'Ballon d\'Or: ' + galaEsc(b.winner.name) : 'No Ballon d\'Or') + (m ? ' · Manager: ' + galaEsc(m.winner.name) : '')
+        : '🔒 Envelopes sealed — winners are revealed on the night';
+      return '<div class="gala-hist">' + trophyMark("Ballon d'Or", 38) + '<div><b>' + galaEsc(r.label) + (!seen ? ' · NEW' : '') + '</b><small>' + line + '</small></div>' +
+        '<button type="button" class="gala-btn" onclick="App.galaOpen(\'' + r.id + '\')">' + (!seen ? 'Walk the carpet' : 'Watch again') + '</button></div>';
     }).join('');
     return h + '</div>';
   }
 
   // Snapshots the current global leaderboard leaders (Ballon d'Or, Top
   // Assists, Most MOTM, Clean Sheet King, Puskás Award, Gerd Müller Award,
-  // Yashin Trophy) into the trophy case as individual awards for the season
+  // Yashin Trophy, Defenders' Award) into the trophy case as individual awards for the season
   // that just ended, then wipes `stats` and `tournamentStats` so the new
   // season's leaderboard & Awards tab start from zero. Team trophies
   // (league/UCL winners) are left untouched — the trophy case is a
@@ -14951,12 +15374,14 @@ const PLAYSTYLE_BEHAVIOR = {
     let gala = null;
     try { gala = galaBuild(year, category); } catch (e) { console.error('gala:', e); }
     const galaWin = (key) => { const c = galaCat(gala, key); return c && c.winner ? c.winner : null; };
+    galaHoldMedia = !!gala;      // the news feed waits for the ceremony (see galaHoldAward)
     pushIndividualTrophy('Top Assists', topOf('assists'), type, extra);
     pushIndividualTrophy('Most MOTM', topOf('motm'), type, extra);
     pushIndividualTrophy('Clean Sheet King', topOf('cleanSheets'), type, extra);
     pushIndividualTrophy('Puskás Award', topOf('puskas'), type, extra);
     pushIndividualTrophy('Gerd Müller Award', computeGerdMullerRanking(stats)[0] || null, type, extra);
     pushIndividualTrophy('Yashin Trophy', computeYashinRanking(stats)[0] || null, type, extra);
+    pushIndividualTrophy("Defenders' Award", galaWin('defenders') || computeDefendersRanking(stats)[0] || null, type, extra);
     const ballonCat = galaCat(gala, 'ballon');
     const ballon = galaWin('ballon') || computeBallonRanking(stats)[0] || null;
     pushIndividualTrophy("Ballon d'Or", ballon, type, ballonCat ? Object.assign({}, extra, { runner: ballonCat.runnerUp || undefined, statLine: ballon.line || undefined, votes: ballon.votes }) : extra);
@@ -14965,6 +15390,7 @@ const PLAYSTYLE_BEHAVIOR = {
       const mt = getTeam(mgrCat.winner.teamId);
       if (mt) pushManagerAward('Manager of the Year', mt, type, extra);
     }
+    galaHoldMedia = false;
     if (gala) {
       galaStore(gala);
       try { galaInvite(gala); } catch (e) {}
@@ -15598,61 +16024,217 @@ const PLAYSTYLE_BEHAVIOR = {
     location.reload();
   }
 
-  function showLeaderboard(type) {
-    document.querySelectorAll('.lb-tab').forEach(t => t.classList.toggle('active', t.dataset.lb === type));
-    let data;
-    if (type === 'ratings') {
-      // Avg Rating should only reward players with a genuine sample of playing
-      // time, not someone who popped up for 10 minutes and got a lucky rating.
-      // Threshold: at least 60% of the minutes the competitions' busiest
-      // player has racked up so far (the best available stand-in for "total
-      // minutes played in the competitions" without needing a separate
-      // match-count counter).
-      const minutesMap = stats.minutes || {};
-      const maxMinutes = Object.values(minutesMap).reduce((m, x) => Math.max(m, x.count || 0), 0);
-      const minMinutesRequired = maxMinutes * 0.6;
-      data = Object.values(stats.ratings || {}).filter(x => {
-        if (!(x.count > 0)) return false;
-        if (!maxMinutes) return true; // no minutes recorded yet (e.g. older save) — don't hide everyone
-        const played = (minutesMap[x.id] && minutesMap[x.id].count) || 0;
-        return played >= minMinutesRequired;
-      }).sort((a, b) => b.avg - a.avg || b.count - a.count).slice(0, 20);
+  // ========== LEADERBOARD ==========
+  // Every stat the game tracks, grouped. `derived`/`source` stats are built from other buckets.
+  const LB_GROUPS = [
+    ['attack', '⚽ Attack'], ['creative', '🎯 Creativity'], ['defence', '🧱 Defence'],
+    ['goalkeeping', '🧤 Goalkeeping'], ['discipline', '🟨 Discipline'], ['overall', '⭐ Overall']
+  ];
+  const LB_STATS = [
+    { key: 'goals', label: 'Goals', group: 'attack' },
+    { key: 'assists', label: 'Assists', group: 'attack' },
+    { key: 'ga', label: 'Goals + assists', group: 'attack' },
+    { key: 'xg', label: 'xG', group: 'attack', decimal: true },
+    { key: 'bigChancesMissed', label: 'Big chances missed', group: 'attack' },
+    { key: 'chancesCreated', label: 'Chances created', group: 'creative' },
+    { key: 'xa', label: 'xA', group: 'creative', decimal: true },
+    { key: 'interceptions', label: 'Interceptions', group: 'defence' },
+    { key: 'tackles', label: 'Tackles', group: 'defence' },
+    { key: 'blocks', label: 'Blocks', group: 'defence' },
+    { key: 'saves', label: 'Saves', group: 'goalkeeping' },
+    { key: 'cleanSheets', label: 'Clean sheets', group: 'goalkeeping' },
+    { key: 'yellows', label: 'Yellow cards', group: 'discipline' },
+    { key: 'reds', label: 'Red cards', group: 'discipline' },
+    { key: 'motm', label: 'Man of the Match', group: 'overall' },
+    { key: 'ratings', label: 'Average rating', group: 'overall', noP90: true },
+    { key: 'apps', label: 'Appearances', group: 'overall', noP90: true },
+    { key: 'minutes', label: 'Minutes played', group: 'overall', noP90: true },
+    { key: 'puskas', label: 'Puskás nominees', group: 'overall' }
+  ];
+  const LB_PER90_MIN = 270;      // minutes needed before a per-90 figure is shown / ranked
+  const LB_PAGE = 50;
+  let lbState = { type: 'goals', group: 'attack', scope: 'season', q: '', pos: 'all', limit: LB_PAGE, sortBy: 'total', qualified: true };
+
+  function lbStatDef(key) { return LB_STATS.find(s => s.key === key) || LB_STATS[0]; }
+  function lbBook() { return (lbState.scope === 'career' ? careerStats : stats) || {}; }
+  function lbTypeFromHash() {
+    try {
+      const h = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+      return LB_STATS.some(s => s.key === h) ? h : null;
+    } catch (e) { return null; }
+  }
+  function lbPosOf(id) {
+    try { return { group: galaPosGroup(id), label: galaPosLabel(id) }; } catch (e) { return { group: 'att', label: '' }; }
+  }
+
+  // Turns the chosen stat into one flat, filtered, sorted list of rows.
+  function lbRows(def, book) {
+    const ratings = book.ratings || {}, minutes = book.minutes || {};
+    let rows = [];
+    if (def.key === 'ratings') {
+      rows = Object.values(ratings).filter(x => x.count > 0).map(x => Object.assign({}, x, { count: x.count }));
+    } else if (def.key === 'ga') {
+      const m = {};
+      Object.values(book.goals || {}).forEach(p => { m[p.id] = Object.assign({}, p, { g: p.count, a: 0 }); });
+      Object.values(book.assists || {}).forEach(p => {
+        if (!m[p.id]) m[p.id] = Object.assign({}, p, { g: 0, a: 0, count: 0 });
+        m[p.id].a = p.count; m[p.id].count = (m[p.id].g || 0) + p.count;
+      });
+      rows = Object.values(m);
+    } else if (def.key === 'apps') {
+      rows = Object.values(ratings).filter(x => x.count > 0).map(x => Object.assign({}, x));
     } else {
-      data = Object.values(stats[type] || {}).sort((a, b) => b.count - a.count).slice(0, 20);
+      rows = Object.values(book[def.key] || {}).map(x => Object.assign({}, x));
     }
+    let maxMin = 0;
+    Object.values(minutes).forEach(x => { if ((x.count || 0) > maxMin) maxMin = x.count; });
+    rows.forEach(r => {
+      r.apps = (ratings[r.id] && ratings[r.id].count) || 0;
+      r.mins = (minutes[r.id] && minutes[r.id].count) || 0;
+      if (def.key === 'apps') r.count = r.apps;
+      const ps = lbPosOf(r.id); r.posG = ps.group; r.posL = ps.label;
+      r.p90 = (!def.noP90 && r.mins >= LB_PER90_MIN) ? r.count / r.mins * 90 : null;
+    });
+    // filters
+    const q = (lbState.q || '').trim().toLowerCase();
+    if (q) rows = rows.filter(r => [r.name, r.team, r.club, r.national].some(v => v && String(v).toLowerCase().indexOf(q) !== -1));
+    if (lbState.pos !== 'all') rows = rows.filter(r => r.posG === lbState.pos);
+    if (def.key === 'ratings') {
+      // Average rating only means something with a real sample of playing time.
+      if (lbState.qualified && maxMin) rows = rows.filter(r => r.mins >= maxMin * 0.6);
+      else rows = rows.filter(r => r.count >= 2);
+    }
+    // sort (ties: fewer appearances first, then name)
+    const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+    const fewerApps = (a, b) => (a.apps || 9999) - (b.apps || 9999);
+    let keyOf;
+    if (def.key === 'ratings') { rows.sort((a, b) => b.avg - a.avg || b.count - a.count || byName(a, b)); keyOf = r => r.avg + '|' + r.count; }
+    else if (lbState.sortBy === 'p90' && !def.noP90) { rows = rows.filter(r => r.p90 != null); rows.sort((a, b) => b.p90 - a.p90 || b.count - a.count || byName(a, b)); keyOf = r => r.p90.toFixed(3); }
+    else { rows.sort((a, b) => b.count - a.count || fewerApps(a, b) || byName(a, b)); keyOf = r => r.count + '|' + r.apps; }
+    rows.forEach((r, i) => { r.rank = (i > 0 && keyOf(r) === keyOf(rows[i - 1])) ? rows[i - 1].rank : i + 1; });
+    return rows;
+  }
+
+  function lbFmt(def, v) {
+    if (v == null || isNaN(v)) return '—';
+    return def.decimal ? Number(v).toFixed(2) : String(Math.round(v * 100) / 100);
+  }
+
+  function lbEnsureControlsHost() {
+    let host = document.getElementById('leaderboard-controls');
+    if (host) return host;
+    const content = document.getElementById('leaderboard-content');
+    if (!content || !content.parentNode) return null;
+    host = document.createElement('div');
+    host.id = 'leaderboard-controls';
+    content.parentNode.insertBefore(host, content);
+    return host;
+  }
+
+  function lbRenderControls() {
+    const host = lbEnsureControlsHost();
+    if (!host) return;
+    const def = lbStatDef(lbState.type);
+    const seg = (label, active, fn) => `<button type="button" class="lb-seg-btn${active ? ' active' : ''}" onclick="${fn}">${label}</button>`;
+    const groups = LB_GROUPS.map(g => `<button type="button" class="lb-tab${g[0] === lbState.group ? ' active' : ''}" data-lbgroup="${g[0]}" onclick="App.lbSet('group','${g[0]}')">${g[1]}</button>`).join('');
+    const chips = LB_STATS.filter(s => s.group === lbState.group).map(s => `<button type="button" class="lb-chip${s.key === lbState.type ? ' active' : ''}" data-lb="${s.key}" onclick="App.showLeaderboard('${s.key}')">${s.label}</button>`).join('');
+    const posOpts = [['all', 'All positions'], ['gk', 'Goalkeepers'], ['def', 'Defenders'], ['mid', 'Midfielders'], ['att', 'Forwards']].map(o => `<option value="${o[0]}"${o[0] === lbState.pos ? ' selected' : ''}>${o[1]}</option>`).join('');
+    const limOpts = [[25, 'Top 25'], [50, 'Top 50'], [100, 'Top 100'], [250, 'Top 250'], [100000, 'Everyone']].map(o => `<option value="${o[0]}"${o[0] === lbState.limit ? ' selected' : ''}>${o[1]}</option>`).join('');
+    let extra = '';
+    if (def.key === 'ratings') {
+      extra = `<label class="lb-check"><input type="checkbox" ${lbState.qualified ? 'checked' : ''} onchange="App.lbSet('qualified', this.checked)"> Qualified players only <small>(60% of the busiest player's minutes)</small></label>`;
+    } else if (!def.noP90) {
+      extra = `<div class="lb-seg" aria-label="Sort by">${seg('Total', lbState.sortBy !== 'p90', "App.lbSet('sortBy','total')")}${seg('Per 90', lbState.sortBy === 'p90', "App.lbSet('sortBy','p90')")}</div>` +
+        (lbState.sortBy === 'p90' ? `<small class="lb-hint">Per-90 needs at least ${LB_PER90_MIN} minutes played.</small>` : '');
+    }
+    host.innerHTML = `<div class="lb-toolbar">
+        <div class="lb-seg" aria-label="Scope">${seg('This season', lbState.scope === 'season', "App.lbSet('scope','season')")}${seg('Career', lbState.scope === 'career', "App.lbSet('scope','career')")}</div>
+        <input type="search" class="lb-search" id="lb-search" placeholder="Search player, club or nation…" value="${String(lbState.q || '').replace(/"/g, '&quot;')}" oninput="App.lbSearch(this.value)" autocomplete="off">
+        <select class="lb-select" onchange="App.lbSet('pos', this.value)" aria-label="Position">${posOpts}</select>
+        <select class="lb-select" onchange="App.lbSet('limit', this.value)" aria-label="How many players">${limOpts}</select>
+        <button class="btn btn-danger btn-sm lb-reset" onclick="App.resetLeaderboard()">Reset stats</button>
+      </div>
+      <div class="leaderboard-tabs lb-groups">${groups}</div>
+      <div class="lb-chips">${chips}</div>
+      ${extra ? `<div class="lb-extra">${extra}</div>` : ''}`;
+  }
+
+  function lbRenderTable() {
     const el = document.getElementById('leaderboard-content');
     if (!el) return;
-    if (!data.length) {
-      el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No ${type} recorded yet. Simulate matches!</p></div>`;
+    const def = lbStatDef(lbState.type);
+    const rows = lbRows(def, lbBook());
+    const scopeWord = lbState.scope === 'career' ? 'career' : 'this season';
+    if (!rows.length) {
+      const filtered = lbState.q || lbState.pos !== 'all';
+      el.innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>${filtered ? 'No players match those filters.' : 'No ' + def.label.toLowerCase() + ' recorded ' + scopeWord + ' yet. Simulate some matches!'}</p></div>`;
       return;
     }
-    const labels = { goals: 'Goals', assists: 'Assists', saves: 'Saves', cleanSheets: 'Clean Sheets', yellows: 'Yellow Cards', reds: 'Red Cards', cards: 'Cards', motm: 'MOTM', puskas: 'Puskas Nominees', ratings: 'Avg Rating', interceptions: 'Interceptions', tackles: 'Tackles', blocks: 'Blocks', chancesCreated: 'Big Chances Created', bigChancesMissed: 'Big Chances Missed', xg: 'xG', xa: 'xA' };
-    const appsCol = type === 'ratings' ? '' : '<th>Apps</th>';
-    // xG/xA accumulate in fractional increments (a fraction of a goal/assist
-    // "expected" per chance, not a whole-number event like a tackle or an
-    // interception) — round those two to 2dp for display instead of
-    // printing a long raw float.
-    const isDecimalStat = type === 'xg' || type === 'xa';
-    const fmtCount = (v) => isDecimalStat ? (v || 0).toFixed(2) : v;
-    const top3 = data.slice(0, 3);
-    const podium = top3.length ? `<div class="lb-podium">
-      ${top3.map((p,i) => `<div class="lb-podium-slot slot-${i+1} player-clickable" onclick="App.showPlayerProfile('${p.id}')">
-          <div class="lb-podium-rank">${i===0?'🥇':i===1?'🥈':'🥉'}</div>
+    const isRating = def.key === 'ratings';
+    const valueOf = (r) => isRating ? (r.avg != null ? r.avg.toFixed(2) : '—') : (lbState.sortBy === 'p90' && !def.noP90 ? lbFmt({ decimal: true }, r.p90) : lbFmt(def, r.count));
+    const affOf = (r) => [r.national, r.club].filter(Boolean).join(' · ') || r.team || '';
+    const posPill = (r) => r.posL ? `<span class="lb-pos pos-${r.posG}">${r.posL}</span>` : '';
+    const shown = rows.slice(0, lbState.limit);
+    const top3 = shown.slice(0, 3);
+    const podium = `<div class="lb-podium">${top3.map((p, i) => `<div class="lb-podium-slot slot-${i + 1} player-clickable" onclick="App.showPlayerProfile('${p.id}')">
+          <div class="lb-podium-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
           ${lbAvatar(p, 56)}
           <div class="lb-podium-name">${playerNameHTML(p)}</div>
-          <div class="lb-podium-team">${[p.national, p.club].filter(Boolean).join(' · ') || p.team || ''}</div>
-          <div class="lb-podium-value">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—') : fmtCount(p.count)}</div>
-        </div>`).join('')}
-    </div>` : '';
-    el.innerHTML = `${podium}<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th>${appsCol}<th>${labels[type]||type}</th></tr></thead><tbody>
-      ${data.map((p,i) => {
-        const aff = [p.national, p.club].filter(Boolean).join(' · ') || p.team;
-        const apps = (stats.ratings && stats.ratings[p.id]) ? stats.ratings[p.id].count : 0;
-        const appsCell = type === 'ratings' ? '' : `<td>${apps}</td>`;
-        return `<tr class="${i<3?'lb-row-top rank-'+(i+1):''}"><td class="lb-rank">${rankBadge(i)}</td><td class="lb-player">${lbPlayerCell(p)}</td><td class="lb-team">${aff}</td>${appsCell}<td style="font-weight:700;color:var(--accent-gold)">${type==='ratings' ? (p.avg!=null?p.avg.toFixed(2):'—')+' ('+p.count+' apps)' : fmtCount(p.count)}</td></tr>`;
-      }).join('')}
-    </tbody></table></div>`;
+          <div class="lb-podium-team">${affOf(p)}</div>
+          <div class="lb-podium-value">${valueOf(p)}</div>
+        </div>`).join('')}</div>`;
+    const sumTotal = isRating ? 0 : rows.reduce((s, r) => s + (r.count || 0), 0);
+    const summary = `<div class="lb-summary"><span><b>${rows.length}</b> player${rows.length === 1 ? '' : 's'}</span>` +
+      (isRating ? '' : `<span>Combined <b>${lbFmt(def, sumTotal)}</b></span><span>Average <b>${(sumTotal / rows.length).toFixed(def.decimal ? 2 : 1)}</b> each</span>`) +
+      `<span class="lb-scope">${lbState.scope === 'career' ? 'Career · every competitive match' : 'This season · resets when the season ends'}</span></div>`;
+
+    let head, bodyRow;
+    if (isRating) {
+      head = '<th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Mins</th><th>Avg rating</th>';
+      bodyRow = (r) => `<td>${r.apps}</td><td>${r.mins || '—'}</td><td class="lb-val">${valueOf(r)}</td>`;
+    } else if (def.key === 'apps') {
+      head = '<th>#</th><th>Player</th><th>Team</th><th>Minutes</th><th>Appearances</th>';
+      bodyRow = (r) => `<td>${r.mins || '—'}</td><td class="lb-val">${r.count}</td>`;
+    } else if (def.key === 'minutes') {
+      head = '<th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Minutes</th>';
+      bodyRow = (r) => `<td>${r.apps}</td><td class="lb-val">${r.count}</td>`;
+    } else {
+      head = `<th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Mins</th><th>${lbState.sortBy === 'p90' ? 'Per 90' : def.label}</th><th class="lb-p90-col">${lbState.sortBy === 'p90' ? 'Total' : 'Per 90'}</th>`;
+      bodyRow = (r) => {
+        const main = valueOf(r) + (def.key === 'ga' ? `<small class="lb-sub">${r.g}G · ${r.a}A</small>` : '');
+        const alt = lbState.sortBy === 'p90' ? lbFmt(def, r.count) : (r.p90 != null ? r.p90.toFixed(2) : '—');
+        return `<td>${r.apps}</td><td>${r.mins || '—'}</td><td class="lb-val">${main}</td><td class="lb-p90-col">${alt}</td>`;
+      };
+    }
+    const body = shown.map(r => `<tr class="${r.rank <= 3 ? 'lb-row-top rank-' + r.rank : ''}"><td class="lb-rank">${rankBadge(r.rank - 1)}</td><td class="lb-player">${lbPlayerCell(r)} ${posPill(r)}</td><td class="lb-team">${affOf(r)}</td>${bodyRow(r)}</tr>`).join('');
+    const more = rows.length > shown.length
+      ? `<div class="lb-more"><button type="button" class="btn btn-sm" onclick="App.lbMore()">Show ${Math.min(LB_PAGE, rows.length - shown.length)} more</button> <button type="button" class="btn btn-sm" onclick="App.lbSet('limit', 100000)">Show all ${rows.length}</button><small>Showing ${shown.length} of ${rows.length}</small></div>`
+      : `<div class="lb-more"><small>Showing all ${rows.length}</small></div>`;
+    el.innerHTML = `${podium}${summary}<div class="table-scroll"><table class="lb-table lb-table-wide"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}`;
   }
+
+  function showLeaderboard(type) {
+    if (type && LB_STATS.some(s => s.key === type)) {
+      lbState.type = type;
+      lbState.group = lbStatDef(type).group;
+      if (lbStatDef(type).noP90) lbState.sortBy = 'total';
+    }
+    lbRenderControls();
+    lbRenderTable();
+  }
+  function lbSet(key, val) {
+    if (key === 'group') {
+      lbState.group = val;
+      const first = LB_STATS.find(s => s.group === val);
+      if (first) { lbState.type = first.key; if (first.noP90) lbState.sortBy = 'total'; }
+    } else if (key === 'limit') { lbState.limit = parseInt(val, 10) || LB_PAGE; }
+    else if (key === 'qualified') { lbState.qualified = !!val; }
+    else { lbState[key] = val; }
+    lbRenderControls();
+    lbRenderTable();
+  }
+  function lbMore() { lbState.limit += LB_PAGE; lbRenderControls(); lbRenderTable(); }
+  function lbSearch(v) { lbState.q = v || ''; lbRenderTable(); }
   // Formats whose real-world field size the Tournament Size picker can
   // scale past (see selectTournamentSize() below and startWorldCupTournament()
   // / startUCLTournament() in simulation/tournamentEngine.js, which read
@@ -18776,6 +19358,7 @@ const PLAYSTYLE_BEHAVIOR = {
   function playerWonTrophies(player) {
     if (!player) return [];
     return trophies.filter(t => {
+      if (galaIsSealed(t)) return false;      // sealed until Gala Night
       if (t.playerId != null) return t.playerId === player.id;
       if (Array.isArray(t.playerIds) && t.playerIds.length) return t.playerIds.includes(player.id);
       // Legacy entry from before ids were recorded — name is all we have.
@@ -19133,7 +19716,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const secondary = team.secondary || '#fff';
     const mgr = team.manager || {};
     const mgrStyle = getManagerPlaystyle(team);
-    const mgrAwardCount = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
+    const mgrAwardCount = mgr.name ? trophies.filter(t => t.manager === mgr.name && !galaIsSealed(t)).length : 0;
     const players = [...(team.players || [])].sort((a,b) => String(a.name).localeCompare(String(b.name)));
     const avg = players.length ? (players.reduce((s,p) => s + (p.ovr||70), 0) / players.length).toFixed(1) : '—';
     const formKey = pickTeamFormation(team);
@@ -19327,7 +19910,7 @@ const PLAYSTYLE_BEHAVIOR = {
     const rating = Math.round(teamAvgOvr(team));
     const mgr = team.manager || {};
     const mgrStyle = getManagerPlaystyle(team);
-    const mgrAwards = mgr.name ? trophies.filter(t => t.manager === mgr.name).length : 0;
+    const mgrAwards = mgr.name ? trophies.filter(t => t.manager === mgr.name && !galaIsSealed(t)).length : 0;
     const formKey = pickTeamFormation(team);
     const formation = (FORMATIONS[formKey] && FORMATIONS[formKey].name) || formKey;
     const league = ppTeamLeague(team);
@@ -19537,101 +20120,14 @@ const PLAYSTYLE_BEHAVIOR = {
       // The Ballon d'Or is decided by the jury at Gala Night, so the live tab shows the contenders A-Z with no
       // points or ranking — the leader is only named when someone has clearly outshone everyone.
       el.innerHTML = galaBallonTabHTML();
-    } else if (type === 'puskas') {
-      // Puskás Award — best/most spectacular individual goal, tallied by nominee count
-      const data = Object.values(stats.puskas || {}).sort((a,b) => b.count - a.count).slice(0, 30);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No standout goals nominated yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Puskás Award', 34) + ' Puskás Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">' + data[0].team + ' · ' + data[0].count + ' nominated goal' + (data[0].count === 1 ? '' : 's') + '</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Nominated Goals</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td style="font-weight:700;color:var(--accent-gold)">'+p.count+'</td></tr>').join('') +
-        '</tbody></table></div>';
-    } else if (type === 'muller') {
-      // Gerd Müller Award — best pure striker: goals heavily weighted, ST/CF preference
-      const scores = {};
-      Object.values(stats.goals || {}).forEach(p => {
-        scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: p.count, assists: 0, pts: p.count * 5 };
-      });
-      Object.values(stats.assists || {}).forEach(p => {
-        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, goals: 0, assists: 0, pts: 0 };
-        scores[p.id].assists = p.count;
-        scores[p.id].pts += p.count * 0.8;
-      });
-      // Bonus if player is a striker on roster
-      Object.values(scores).forEach(s => {
-        let isST = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['ST','CF','FW'].includes(pos))) { isST = true; break; }
-        }
-        if (isST) s.pts += 2;
-      });
-      const data = Object.values(scores).filter(p => p.goals > 0).sort((a,b) => b.pts - a.pts || b.goals - a.goals).slice(0, 50);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🎯</div><p>No strikers on the scoresheet yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Gerd Müller Award', 34) + ' Gerd Müller Award</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best striker · ' + data[0].goals + ' goals · ' + data[0].team + '</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Goals</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.goals+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table></div>';
-    } else if (type === 'yashin') {
-      // Yashin Award — best goalkeeper: saves + clean sheets
-      const scores = {};
-      Object.values(stats.saves || {}).forEach(p => {
-        scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: p.count, clean: 0, pts: p.count * 1.2 };
-      });
-      Object.values(stats.cleanSheets || {}).forEach(p => {
-        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, saves: 0, clean: 0, pts: 0 };
-        scores[p.id].clean = p.count;
-        scores[p.id].pts += p.count * 4;
-      });
-      Object.values(stats.motm || {}).forEach(p => {
-        if (scores[p.id]) scores[p.id].pts += p.count * 3;
-      });
-      Object.values(stats.ratings || {}).forEach(p => {
-        if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.3;
-      });
-      const data = Object.values(scores).filter(p => p.saves > 0 || p.clean > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧤</div><p>No goalkeeper stats yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark('Yashin Trophy', 34) + ' Yashin Trophy</h4><p class="award-winner">' + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best goalkeeper · ' + data[0].saves + ' saves · ' + data[0].clean + ' clean sheets · ' + data[0].team + '</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Saves</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.saves+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table></div>';
-    } else if (type === 'defenders') {
-      // Defenders' Award — best defensive campaign: interceptions + tackles,
-      // with clean sheets and a defensive-position bonus factored in.
-      const scores = {};
-      Object.values(stats.interceptions || {}).forEach(p => {
-        scores[p.id] = { id: p.id, name: p.name, team: p.team, interceptions: p.count, tackles: 0, clean: 0, pts: p.count * 1.4 };
-      });
-      Object.values(stats.tackles || {}).forEach(p => {
-        if (!scores[p.id]) scores[p.id] = { id: p.id, name: p.name, team: p.team, interceptions: 0, tackles: 0, clean: 0, pts: 0 };
-        scores[p.id].tackles = p.count;
-        scores[p.id].pts += p.count * 1.1;
-      });
-      Object.values(stats.cleanSheets || {}).forEach(p => {
-        if (scores[p.id]) { scores[p.id].clean = p.count; scores[p.id].pts += p.count * 1.5; }
-      });
-      Object.values(stats.ratings || {}).forEach(p => {
-        if (scores[p.id]) scores[p.id].pts += (p.avg || 0) * Math.min(p.count, 10) * 0.25;
-      });
-      // Bonus if the player is actually a defender on their roster (CB/RB/LB/RWB/LWB).
-      Object.values(scores).forEach(s => {
-        let isDef = false;
-        for (const t of allTeams) {
-          const pl = (t.players || []).find(x => x.id === s.id);
-          if (pl && (pl.pos || []).some(pos => ['CB','RB','LB','RWB','LWB'].includes(pos))) { isDef = true; break; }
-        }
-        if (isDef) s.pts += 3;
-      });
-      const data = Object.values(scores).filter(p => p.interceptions > 0 || p.tackles > 0).sort((a,b) => b.pts - a.pts).slice(0, 50);
-      if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🧱</div><p>No defensive stats yet.</p></div>'; return; }
-      el.innerHTML = '<div class="award-card player-clickable" onclick="App.showPlayerProfile(\'' + data[0].id + '\')">' + lbAvatar(data[0], 64) + '<div class="award-info"><h4>' + trophyMark("Defenders' Award", 34) + " Defenders' Award</h4><p class=\"award-winner\">" + data[0].name + '</p><p style="color:var(--text-2);font-size:0.85rem">Best defender · ' + data[0].interceptions + ' interceptions · ' + data[0].tackles + ' tackles · ' + data[0].team + '</p></div></div>' +
-        '<div class="table-scroll"><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Apps</th><th>Int</th><th>Tkl</th><th>CS</th><th>Pts</th></tr></thead><tbody>' +
-        data.map((p,i) => '<tr class="'+(i<3?'lb-row-top rank-'+(i+1):'')+'"><td class="lb-rank">'+rankBadge(i)+'</td><td class="lb-player">'+lbPlayerCell(p)+'</td><td class="lb-team">'+p.team+'</td><td>'+((stats.ratings&&stats.ratings[p.id])?stats.ratings[p.id].count:0)+'</td><td>'+p.interceptions+'</td><td>'+p.tackles+'</td><td>'+p.clean+'</td><td style="font-weight:700;color:var(--gold)">'+Math.round(p.pts)+'</td></tr>').join('') +
-        '</tbody></table></div>';
+    } else if (type === 'puskas' || type === 'muller' || type === 'yashin' || type === 'defenders') {
+      // Sealed until Gala Night: each tab explains the award and points at the leaderboard for the numbers.
+      el.innerHTML = galaSealedAwardTabHTML(type);
     } else if (type === 'manager') {
       // Manager Award — tallies every manager award won (league titles,
       // Champions League, World Cup) into a leaderboard, crediting the
       // manager currently in charge of the team that earned each award.
-      const mgrTrophies = trophies.filter(t => t.manager);
+      const mgrTrophies = galaVisibleTrophies(trophies).filter(t => t.manager);
       const moyHead = galaManagerTabHTML();
       if (!mgrTrophies.length) { el.innerHTML = moyHead + '<div class="empty-state"><div class="icon">👔</div><p>No manager awards yet — win a league, Champions League or World Cup.</p></div>'; return; }
       const byMgr = {};
@@ -19652,19 +20148,11 @@ const PLAYSTYLE_BEHAVIOR = {
         }).join('') +
         '</tbody></table></div>';
     } else if (type === 'trophies') {
-      if (!trophies.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
-      el.innerHTML = [...trophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 68) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.manager ? '👔 ' + t.manager + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
+      const shownTrophies = galaVisibleTrophies(trophies);
+      if (!shownTrophies.length) { el.innerHTML = galaSealedNoticeHTML() + '<div class="empty-state"><div class="icon">🏆</div><p>No trophies won yet. Complete a tournament!</p></div>'; return; }
+      el.innerHTML = galaSealedNoticeHTML() + [...shownTrophies].sort((a,b) => (b.date||0)-(a.date||0)).map(t => '<div class="award-card">' + trophyMark(t.name, 68) + '<div class="award-info"><h4>'+t.name+'</h4><p class="award-winner">'+(t.player ? t.player + (t.team ? ' ('+t.team+')' : '') : t.manager ? '👔 ' + t.manager + (t.team ? ' ('+t.team+')' : '') : t.team)+'</p><p>'+t.type+'</p></div></div>').join('');
     } else {
-      // overview — Golden Boot deliberately excluded here: it's redundant
-      // with the Gerd Müller Award (also goals-driven, its own tab below),
-      // so the Golden Boot leaderboard/tab only exists per-competition and
-      // per-tournament (Tournaments tab / Season Awards), not here.
-      const topAst = Object.values(stats.assists||{}).sort((a,b)=>b.count-a.count)[0];
-      const topMotm = Object.values(stats.motm||{}).sort((a,b)=>b.count-a.count)[0];
-      el.innerHTML = `
-        <div class="award-card${topAst ? ' player-clickable' : ''}"${topAst ? ` onclick="App.showPlayerProfile('${topAst.id}')"` : ''}>${topAst ? lbAvatar(topAst, 52) : trophyMark('Top Assists', 68)}<div class="award-info"><h4>${trophyMark('Top Assists', 30)} Top Assists</h4><p class="award-winner">${topAst ? topAst.name + ' — ' + topAst.count : '—'}</p></div></div>
-        <div class="award-card${topMotm ? ' player-clickable' : ''}"${topMotm ? ` onclick="App.showPlayerProfile('${topMotm.id}')"` : ''}>${topMotm ? lbAvatar(topMotm, 52) : trophyMark('Most MOTM', 68)}<div class="award-info"><h4>${trophyMark('Most MOTM', 30)} Most MOTM</h4><p class="award-winner">${topMotm ? topMotm.name + ' — ' + topMotm.count : '—'}</p></div></div>
-        <div class="award-card"><div class="award-icon">🏆</div><div class="award-info"><h4>Trophies</h4><p class="award-winner">${trophies.length} won</p></div></div>`;
+      el.innerHTML = galaOverviewTabHTML();
     }
   }
 
@@ -19711,13 +20199,19 @@ const PLAYSTYLE_BEHAVIOR = {
         : '<p style="color:var(--text-muted);font-size:0.85rem">No champions were crowned this season.</p>';
     }
     h += `<h4 style="margin-top:14px">⭐ Individual Awards</h4>`;
-    h += summary.globalAwards.length
-      ? `<div class="awards-row">${summary.globalAwards.map(awardMini).join('')}</div>`
-      : '<p style="color:var(--text-muted);font-size:0.85rem">No individual awards were recorded this season.</p>';
+    let gr = null;
+    try { gr = galaFind(summary.year, !!summary.standalone); } catch (e) {}
+    const sealed = !!(gr && gr.status !== 'seen');
+    if (sealed) {
+      h += '<p style="color:var(--text-2);font-size:0.9rem">🔒 The envelopes are sealed. The Ballon d\'Or, Manager of the Year, Puskás, Defenders\', Gerd Müller and Yashin winners are revealed at Gala Night. Until then the numbers are on the leaderboard.</p>';
+    } else {
+      h += summary.globalAwards.length
+        ? `<div class="awards-row">${summary.globalAwards.map(awardMini).join('')}</div>`
+        : '<p style="color:var(--text-muted);font-size:0.85rem">No individual awards were recorded this season.</p>';
+    }
     try {
-      const gr = galaFind(summary.year, !!summary.standalone);
       if (gr) galaEnsureStyle();
-      if (gr) h += `<div style="text-align:center;margin-top:14px"><button type="button" class="gala-btn" onclick="App.galaOpen('${gr.id}')">🏆 Watch the Gala Night</button></div>`;
+      if (gr) h += `<div style="text-align:center;margin-top:14px"><button type="button" class="gala-btn" onclick="App.galaOpen('${gr.id}')">🏆 ${sealed ? 'Walk the red carpet' : 'Watch the Gala Night'}</button></div>`;
     } catch (e) {}
     h += summary.standalone
       ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px">The leaderboard has been reset — the full record is saved under the History tab.</p>`
@@ -19757,23 +20251,25 @@ const PLAYSTYLE_BEHAVIOR = {
     const el = document.getElementById('history-content');
     if (!el) return;
 
+    const visible = galaVisibleTrophies(trophies);
+    const sealedNote = galaSealedNoticeHTML();
     const fullList = type === 'individual'
-      ? trophies.filter(t => t.player || t.manager)
-      : trophies.filter(t => !t.player && !t.manager);
+      ? visible.filter(t => t.player || t.manager)
+      : visible.filter(t => !t.player && !t.manager);
 
     renderHistoryAwardFilterOptions(fullList);
 
     if (!fullList.length) {
-      el.innerHTML = type === 'individual'
-        ? '<div class="empty-state"><div class="icon">⭐</div><p>No individual awards recorded yet — finish a tournament or a season.</p></div>'
-        : '<div class="empty-state"><div class="icon">🏆</div><p>No champions crowned yet — finish a tournament or a season.</p></div>';
+      el.innerHTML = sealedNote + (type === 'individual'
+        ? '<div class="empty-state"><div class="icon">⭐</div><p>No individual awards revealed yet — finish a tournament or a season, then attend Gala Night.</p></div>'
+        : '<div class="empty-state"><div class="icon">🏆</div><p>No champions crowned yet — finish a tournament or a season.</p></div>');
       return;
     }
 
     const list = historyAwardFilter === 'all' ? fullList : fullList.filter(t => t.name === historyAwardFilter);
 
     if (!list.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>No history yet for that award.</p></div>';
+      el.innerHTML = sealedNote + '<div class="empty-state"><div class="icon">🔍</div><p>No history yet for that award.</p></div>';
       return;
     }
 
@@ -19786,7 +20282,7 @@ const PLAYSTYLE_BEHAVIOR = {
     });
     const orderedKeys = Object.keys(groups).sort((a, b) => groups[b].sortKey - groups[a].sortKey);
 
-    el.innerHTML = orderedKeys.map(key => {
+    el.innerHTML = (type === 'individual' ? sealedNote : '') + orderedKeys.map(key => {
       const g = groups[key];
       const items = g.items.map(t => {
         if (t.player) {
@@ -21884,6 +22380,7 @@ const PLAYSTYLE_BEHAVIOR = {
       // far too slow run once per row across the whole player pool).
       const counts = {};
       trophies.forEach(t => {
+        if (galaIsSealed(t)) return;
         if (t.playerId != null) counts[t.playerId] = (counts[t.playerId] || 0) + 1;
         else if (Array.isArray(t.playerIds) && t.playerIds.length) {
           t.playerIds.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
@@ -24292,6 +24789,7 @@ const PLAYSTYLE_BEHAVIOR = {
   }
   function mediaOnAward(name, playerObj, type, extra) {
     if (!mediaReady) return;
+    if (galaHoldAward(name, playerObj, type, extra)) return;      // sealed until Gala Night
     ensureMedia();
     const ev = { kind: 'award', name, player: playerObj, type, extra };
     try {
@@ -30221,7 +30719,7 @@ const PLAYSTYLE_BEHAVIOR = {
     setRngSeed, getRngSeed,
     init, switchView, goToMatch, goToTournament, selectTournamentFormat, selectTournamentSize, updateTeamPreview,
     startMatch, quickSimMatch, toggleSim, setSpeed, simToEnd, finishMatch, resetMatch,
-    showLeaderboard, selectAllTeams, deselectAllTeams, startTournament,
+    showLeaderboard, lbSet, lbMore, lbSearch, selectAllTeams, deselectAllTeams, startTournament,
     simTournamentRound, simAllTournament, resetTournament, filterTeams, filterTeamsLeague, filterTeamsRating,
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     playLeagueTournamentFixture, simLeagueTournamentFixture,
