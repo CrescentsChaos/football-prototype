@@ -3809,37 +3809,64 @@ const PLAYSTYLE_BEHAVIOR = {
     return (p && p.expandedAttrs && p.expandedAttrs.playstyle) || [];
   }
 
+  // Lazily computes and caches compound action multipliers and edge sums on
+  // p.expandedAttrs._psCache (or p._psCache) to convert repeated tag iterations
+  // and PLAYSTYLE_BEHAVIOR lookups into O(1) cached property accesses across
+  // match simulation hot loops (evaluateBallActions, shooting, defending, etc).
+  function getPlaystyleCache(p) {
+    if (!p) return null;
+    const target = p.expandedAttrs || p;
+    if (target._psCache) return target._psCache;
+
+    const tags = (p.expandedAttrs && p.expandedAttrs.playstyle) || [];
+    const actions = {};
+    const edges = {};
+
+    if (tags.length) {
+      for (let i = 0; i < tags.length; i++) {
+        const entry = PLAYSTYLE_BEHAVIOR[tags[i]];
+        if (!entry) continue;
+        if (entry.actions) {
+          for (const act in entry.actions) {
+            actions[act] = (actions[act] || 1) * entry.actions[act];
+          }
+        }
+        for (const key in entry) {
+          if (key !== 'actions' && typeof entry[key] === 'number') {
+            edges[key] = (edges[key] || 0) + entry[key];
+          }
+        }
+      }
+      for (const act in actions) {
+        actions[act] = Math.max(0.25, Math.min(2.5, actions[act]));
+      }
+    }
+
+    const cache = { actions, edges, hasTags: tags.length > 0 };
+    target._psCache = cache;
+    return cache;
+  }
+
   // Compound action-weight multiplier for one BALL_ACTIONS entry, folding
   // in every playstyle tag the player carries (multiplicative — two
   // overlapping tags that both boost, say, "cross" compound). Clamped to
   // keep a heavily-tagged player's weights from spiralling out of the
   // range the rest of evaluateBallActions() expects. Returns 1 (no-op)
-  // for a player with no relevant tags.
+  // for a player with no relevant tags. Uses cached O(1) lookup.
   function playstyleActionMult(p, action) {
-    const tags = playstyleTagsOf(p);
-    if (!tags.length) return 1;
-    let mult = 1;
-    for (let i = 0; i < tags.length; i++) {
-      const entry = PLAYSTYLE_BEHAVIOR[tags[i]];
-      const m = entry && entry.actions && entry.actions[action];
-      if (typeof m === 'number') mult *= m;
-    }
-    return Math.max(0.25, Math.min(2.5, mult));
+    const cache = getPlaystyleCache(p);
+    if (!cache || !cache.hasTags) return 1;
+    return cache.actions[action] != null ? cache.actions[action] : 1;
   }
 
   // Flat additive edge for a named field (finishingEdge/aerialEdge/penEdge/
   // fkEdge/dribbleEdge/defChance/interceptBias/gkReflexEdge/
   // gkPositioningEdge), summed across every playstyle tag the player
-  // carries. Returns 0 for a player with no relevant tags.
+  // carries. Returns 0 for a player with no relevant tags. Uses cached O(1) lookup.
   function playstyleEdgeSum(p, field) {
-    const tags = playstyleTagsOf(p);
-    if (!tags.length) return 0;
-    let sum = 0;
-    for (let i = 0; i < tags.length; i++) {
-      const entry = PLAYSTYLE_BEHAVIOR[tags[i]];
-      if (entry && typeof entry[field] === 'number') sum += entry[field];
-    }
-    return sum;
+    const cache = getPlaystyleCache(p);
+    if (!cache || !cache.hasTags) return 0;
+    return cache.edges[field] || 0;
   }
 
   // ===== Player identity =======================================================
