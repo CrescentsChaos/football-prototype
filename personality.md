@@ -13,55 +13,71 @@ an existing tag's pattern (noted below).
 
 ---
 
+## Situation model (read this first)
+
+Every "big moment" trait used to key off one boolean, `computeStakes()` (derby OR final OR
+close-and-late), and fired at full strength whenever it was true - including a penalty at 4-0 up
+in a derby. They now read one of two continuous situation reads (`engine/matchEngine.js`,
+chunk `cstakes01`), each answering a different question:
+
+- `occasionLevel(m)` - what kind of FIXTURE is this? 0..1, fixed at kickoff: final 1, derby .7,
+  knockout (qf/sf/tournament knockout) .6, clash of two top sides .4. Scoreline never changes it.
+- `momentPressure(m, side)` - how much does THIS moment decide the result for `side`? 0..1,
+  moves with scoreline and clock. Level or one goal either way is decisive, two goals ahead or
+  three behind is not; the clock ramps from .5 (early) to 1 (85'+); the weight is the fixture's
+  occasion level, or .6 x lateness in an ordinary game. A dead rubber is 0 whatever the fixture.
+
+| Trait | Reads | Where it acts |
+|---|---|---|
+| Big-Game / Fragile | `momentPressure` | shot quality (+/-.10 x pressure), shoot appetite (+/-12% x pressure), technique preference once pressure >= .35 |
+| Ice-Cold / Bottler | `momentPressure` of the taker's side | penalty (+.09 / -.12 x pressure), direct free-kick (+.05 / -.07 x pressure) |
+| Big Occasion Riser / Flop | `occasionLevel` | passing and take-on fluency (+8% / -12% x occasion) - nothing to do with the scoreline |
+| Confidence Player | per-match scoring run | shot quality (+2%/stack, max 3), shoot appetite (+5%/stack), chip/curler preference |
+| Finisher's Instinct | clock only (ramps 75'-90') | shot quality on box chances (not long shots or headers), who is on the end of box chances |
+| Brittle / Iron Man | his live contact load | injury weight, see below |
+| Prodigy | live age < 22 | transfer potential, volatile form when Inconsistent |
+
+Overlap rules applied (each trait gets at most ONE quality channel and ONE volume channel):
+Big-Game / Fragile / Confidence Player no longer also get a "who is on the end of the chance"
+bonus (they already change how often they shoot); Finisher's Instinct no longer also raises
+shoot appetite; the combined shot-quality edge is capped at +/-.25 (was .5); the placed-finish
+technique preference is the stronger of Ice-Cold / Big-Game, not their product; dribble appetite
+from Mazing Run / Trickster / Showboat / Selfish / Incisive Run / Ball-carrying is one additive
+pool capped at x1.5 (was a chain reaching ~x2.5) and their success bonuses are capped at +/-.06;
+the Big Occasion Riser rating-cap bump is gone (the trait now changes play, so the rating follows).
+
 ## Composure & big moments
 
-**Big-Game** *(pre-existing)*
-Shot quality boosted in high-stakes moments (derby, final, close-and-late).
-`shooting.js` → `resolveShot`. Gated by `stakes` (`computeStakes`).
-Applied as headroom (closes a share of the gap to the shot-quality cap)
-rather than a flat multiplier, and combined additively with every other
-shot-quality personality edge below before being applied once — see the
-note at the top of that block in `resolveShot` for why. This keeps an
-already-elite finisher's Big-Game bump proportionate instead of an
-outsized swing, and stops several stacked traits (Big-Game + Confidence
-Player + Finisher's Instinct + Talisman, say) compounding into something
-far bigger than any one of them was tuned for.
+**Big-Game** *(pre-existing, reworked)*
+Finishes better and asks for the ball more in proportion to `momentPressure`. Nothing in a dead
+rubber. `shooting.js` -> `resolveShot` (quality), `playerIdentity.js` -> `identityActionMult`
+(appetite) and `idPersonalityTechMult` (placed finish).
 
-**Fragile** *(pre-existing)*
-The mirror of Big-Game — shot quality reduced under the same stakes gate.
-`shooting.js` → `resolveShot`. Gated by `stakes`. Same combined/headroom
-handling as Big-Game, just pulling toward the floor instead of the cap.
+**Fragile** *(pre-existing, reworked)*
+The exact mirror of Big-Game, scaled by the same `momentPressure`.
 
 **Ice-Cold**
-Penalty and free-kick conversion boosted. Scoped to set-piece finishing
-specifically, rather than open-play shot quality like Big-Game.
-`shooting.js` → `pickPenOutcome`, `pickFkOutcome`. Gated by `stakes`.
+Penalty and free-kick conversion boosted, scaled by how much the kick decides the match.
+`shooting.js` -> `pickPenOutcome`, `pickFkOutcome`.
 
 **Bottler**
-The mirror of Ice-Cold — penalty and free-kick conversion reduced.
-`shooting.js` → `pickPenOutcome`, `pickFkOutcome`. Gated by `stakes`.
+The mirror of Ice-Cold.
 
 **Big Occasion Flop**
-Passing accuracy — not just shooting — drops under stakes.
-`passing.js` → `passingAbility`. Gated by `stakes`.
+Passing and take-on fluency drops on the day of a big FIXTURE (`occasionLevel`), whatever the
+scoreline. `passing.js` -> `passingAbility`, `playerIdentity.js` -> `typedCarryAbility`.
 
 **Big Occasion Riser**
-Match-rating ceiling raised specifically in cup/knockout matches. Touches
-the rating formula itself, distinct from Big-Game's shot-quality focus.
-`matchEngine.js` → `calcPlayerRating`. Gated by `isBigGameContext`
-(`m.isBigGame`).
+The mirror of Flop: crisper passing and sharper take-ons on the day of a big fixture. It used to
+only raise the rating ceiling in "big game" matches, which changed no play and double-counted.
 
 **Confidence Player**
-Composure builds while he's on a live scoring run this match, and resets
-the moment an effort doesn't end in a goal. Runs on a new per-match
-momentum counter (`m.personalityMomentum`), capped at +9% shot quality.
-`shooting.js` → `resolveShot` (bump on goal, reset on miss/save). Gated by
-recent in-match events, not stakes.
+Composure builds while he's on a live scoring run this match and resets the moment an effort
+doesn't end in a goal (`m.personalityMomentum`). Gated by recent in-match events, not stakes.
 
 **Finisher's Instinct**
-Extra late-game shot-quality bump, unrelated to Big-Game's stakes gate —
-fires on the clock alone, any scoreline, including a dead rubber.
-`shooting.js` → `resolveShot`. Gated by `minute > 80`.
+Closing-minutes box finisher, any scoreline: shot quality on close-range chances and a larger
+share of box chances, ramping in from 75' to 90'. Long shots and headers are not affected.
 
 **Homebody**
 Lower shooting/passing/dribbling effectiveness in away fixtures.
@@ -125,15 +141,14 @@ pattern as Captaincy, no skill prerequisite.
 ## Physicality
 
 **Brittle**
-Personality-level injury-risk multiplier, layered on top of (not instead
-of) the `injury_res` stat — a player can be High injury_res on paper and
-still be Brittle.
-`injuries.js` → `injuryWeightMult`. No gate.
+Injury risk that scales with his live contact load (tackles, aerial duels, pressing, interceptions
+per minute): x1.10 when he is barely touched up to x1.58 in a duel-heavy game, layered on top of
+`injury_res`. The whole weight (all factors) is capped at x2.0.
+`injuries.js` → `injuryWeightMult`.
 
 **Iron Man**
-The mirror of Brittle — reduced injury chance, plus genuinely slower
-fatigue drain regardless of the `stam` rating.
-`injuries.js`, `fatigue.js`. No gate.
+The mirror of Brittle — x0.85 down to x0.70 with load, plus genuinely slower fatigue drain
+regardless of the `stam` rating. `injuries.js`, `fatigue.js`.
 
 **Determined** *(pre-existing)*
 Fatigue drain reduced late in a match specifically while losing.
@@ -203,8 +218,30 @@ Speeds up development of younger teammates who share his position group.
 `developmentEngine.js` → `mentorDevelopmentBonus`. Off-pitch, per season.
 
 **Prodigy**
-Faster own development curve while young, but genuinely more volatile
-in-match form during those same years — the volatility reuses Streaky's
-spread amplification rather than being a separate system.
-`developmentEngine.js` → `developmentRateMult`/`isYoungProdigy`,
-`form.js` → `rollPlayerCondition`. Gated by age < 21.
+A prospect while under 22 (live age, `tmAge`): bigger potential in the transfer market (x1.3 growth)
+and more volatile in-match form when his form type is Inconsistent (same amplification as Streaky;
+holding both is not a double dose). The old sheet-age gate (<21, a snapshot that never aged) and
+the market's <22 gate are now one function, `isYoungProdigy`. `developmentRateMult` is still not
+read by anything - there is no progression system yet.
+`developmentEngine.js`, `transferEngine.js`, `form.js`.
+
+---
+
+## Update: personality as behaviour, not just a shot-quality number
+
+(Superseded where it conflicts with the situation model at the top: the appetite / chance-share
+numbers quoted for Big-Game, Fragile, Confidence Player and Finisher's Instinct in earlier
+revisions are replaced by the pressure-scaled values in the table above.)
+
+Previously inert tags that now do something:
+
+**Long Ball Expert** - much larger lofted share of passing, more switches/
+crosses, better lofted completion.  **Early Crosser** - higher cross rate; on
+the flank in midfield sometimes crosses early (weaker delivery).
+**Playmaker** - leans through ball/pass, less likely to be the shooter.
+**Incisive Run** - carries more, is the runner through balls/cutbacks find.
+**Mazing Run** - more dribbles, better under heavy pressure, holds less.
+**Trickster** - more dribbles/chips, draws extra fouls.  **Speeding Bullet** -
+carries into space, gets in behind on through balls/counters.
+**Ball-carrying** - prefers to carry, slightly more secure.  **Aggressive** -
+slightly better tackle success, higher foul rate.
