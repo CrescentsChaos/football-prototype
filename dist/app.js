@@ -940,8 +940,12 @@ var App = (() => {
     // "more volatile form while young" IS a bigger spread multiplier, not
     // a separate system.
     const personality = (p.expandedAttrs && p.expandedAttrs.personality) || [];
-    if (personality.includes('Streaky') && p.form === 'Inconsistent') spread *= 1.35;
-    if (isYoungProdigy(p) && p.form === 'Inconsistent') spread *= 1.2;
+    // Streaky and a young Prodigy are the same kind of volatility; holding both is not a double dose
+    // (the bigger of the two applies, plus a small extra for the rare player who is both).
+    if (p.form === 'Inconsistent') {
+      const streaky = personality.includes('Streaky') ? 1.35 : 1, prodigy = isYoungProdigy(p) ? 1.2 : 1;
+      spread *= Math.max(streaky, prodigy) * (streaky > 1 && prodigy > 1 ? 1.05 : 1);
+    }
     const peakIdx = base.reduce((best, w, i) => (w > base[best] ? i : best), 0);
     // Stretch/compress each tier's weight by how far it sits from the
     // liveRating's own peak tier — see FORM_TYPE_SPREAD comment above.
@@ -2626,14 +2630,14 @@ var App = (() => {
   // whose expanded attribute sheet actually lists a personality array;
   // most players simply have none.
   const PERSONALITY_DESCRIPTIONS = {
-    'Big-Game':             'Steps up in high-stakes moments — derbies, finals, close games late on: takes the chance more often, trusts the composed placed finish, and finishes it better.',
-    'Fragile':              'The mirror of Big-Game — under those same high-stakes moments he shies away from the shot, snatches at it when it comes, and finishes it worse.',
-    'Ice-Cold':             'A cool head from the penalty spot and on free-kicks when the stakes are up.',
-    'Bottler':              'The mirror of Ice-Cold — penalty and free-kick conversion suffers when the stakes are up.',
-    'Big Occasion Flop':    'Passing accuracy drops specifically in high-stakes moments.',
-    'Big Occasion Riser':   'Match rating ceiling rises in cup and knockout fixtures.',
-    'Confidence Player':    'Grows in composure while on a scoring run this match — wants the ball more and tries bolder finishes — resetting the moment a chance goes begging.',
-    "Finisher's Instinct":  'Late in a match, whatever the scoreline, he hunts the ball in the box, pounces on close-range chances and finishes them better.',
+    'Big-Game':             'Rises to the moment that decides the match — a level or one-goal game late on, a final, a derby: finishes better and asks for the ball more, in proportion to how much the moment matters. Nothing extra in a dead rubber.',
+    'Fragile':              'The mirror of Big-Game — the heavier the moment, the more he snatches at the shot, avoids the composed finish and shoots less. Nothing different in a dead rubber.',
+    'Ice-Cold':             'A cool head from the penalty spot and on free-kicks — in proportion to how much the kick decides the match.',
+    'Bottler':              'The mirror of Ice-Cold — penalty and free-kick conversion suffers in proportion to how much the kick decides the match.',
+    'Big Occasion Flop':    'Loses fluency on the day of a big fixture — a final, a derby, a knockout tie, a clash of top sides: passing and take-ons get worse, whatever the scoreline.',
+    'Big Occasion Riser':   'Plays with extra fluency on the day of a big fixture — a final, a derby, a knockout tie, a clash of top sides: crisper passing and sharper take-ons, whatever the scoreline.',
+    'Confidence Player':    'Grows in composure while on a scoring run this match — shoots a little more and finishes a little better — resetting the moment a chance goes begging.',
+    "Finisher's Instinct":  'In the closing minutes, whatever the scoreline, he hunts the ball in the box: gets on the end of more close-range chances and finishes them better (long shots and headers he didn\'t win are not his thing).',
     'Homebody':             'Less effective in front of goal, in passing, and in dribbling away from home.',
     'Set-Piece Specialist': 'A composure boost at corners and free-kicks, at all times.',
     'Volatile':             'More likely to commit a foul himself.',
@@ -2643,14 +2647,14 @@ var App = (() => {
     'Cynical':              'More likely to concede a tactical foul to stop a breakaway, less likely to be carded for it.',
     'Leader':               'Deepens the captain\u2019s aura — extra fatigue-drain and form-spread dampening for the team.',
     'Talisman':             'A small composure lift for teammates and a fatigue-drain reduction for the side just by being on the pitch.',
-    'Brittle':              'A personal injury-risk multiplier layered on top of his raw injury resistance.',
-    'Iron Man':             'The mirror of Brittle — reduced injury chance and genuinely slower fatigue drain.',
+    'Brittle':              'Picks up knocks with contact and workload: his injury risk climbs with how many duels and tackles he is in during the match, on top of his raw injury resistance.',
+    'Iron Man':             'The mirror of Brittle — shrugs off the contact-heavy games, with slower fatigue drain.',
     'Determined':           'Fatigue drain eases late in a match specifically while his side is losing.',
     'Slow Starter':         'Reduced overall effectiveness in the first 15 minutes, recovering back to normal by then.',
     'Streaky':              'Runs hotter and colder than a normal Inconsistent player\u2019s form swings.',
     'Selfish':              'Leans toward shooting and dribbling over passing on the ball.',
     'Team Player':          'The mirror of Selfish — leans toward passing over personal shot/dribble volume.',
-    'Showboat':             'Attempts more dribbles, with a slightly higher turnover risk once he goes for it.',
+    'Showboat':             'Attempts more dribbles (pooled with any other take-on traits, so stacking tags makes him keen, not reckless), with a slightly higher turnover risk once he goes for it.',
     'Grinder':              'Tackle and interception success rises specifically while his team is behind.',
     'Loyal':                'Lower willingness to push for a move away from his current club.',
     'Journeyman':           'The mirror of Loyal — higher willingness to move clubs.',
@@ -2664,7 +2668,7 @@ var App = (() => {
     'Speeding Bullet':      'Pace is his weapon: carries into space more, gets in behind on through balls and counters, and is hardest to stop when there is room to run.',
     'Ball-carrying':        'Prefers to drive forward with the ball at his feet rather than pass it, and is a little more secure doing so.',
     'Aggressive':           'Throws himself into challenges: a little more success on the tackle, and a higher foul rate.',
-    'Prodigy':              'Faster development while young, at the cost of more volatile in-match form during those years.'
+    'Prodigy':              'A prospect while under 22: valued for his growth in the transfer market, and a more volatile match-to-match form (only when his form type is Inconsistent).'
   };
 
   // Individual eFootball-style playstyle tag -> which team manager
@@ -3934,6 +3938,8 @@ const PLAYSTYLE_BEHAVIOR = {
     if (!m) return false;
     return computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score);
   }
+  // Same situation read the shooting code uses (0 in a dead rubber .. 1 for a level game late in a final).
+  function idPressure(p) { return pressureOf(p); }
   function idMomentum(p) {
     const m = currentMatch;
     return Math.min(3, (m && m.personalityMomentum && p && m.personalityMomentum[p.id]) || 0);
@@ -4036,7 +4042,7 @@ const PLAYSTYLE_BEHAVIOR = {
       ? (ea.dribb + (ea.ball_con || 70) + (ea.bal || 70) + (ea.tight_pos || 70)) / 4
       : (ea.spd + (ea.accel || ea.spd) + (ea.bal || 70) + (ea.phy_con || 70)) / 4;
     const ratio = idClamp(curvedAttr(typeRaw, 70) / Math.max(40, blend), 0.86, 1.14);
-    return base * ratio;
+    return base * ratio * (action === 'dribble' ? occasionTraitMult(p) : 1);
   }
 
   // Personality-driven adjustment to the chance a carry/dribble comes off.
@@ -4048,7 +4054,8 @@ const PLAYSTYLE_BEHAVIOR = {
     if (hasTrait(p, 'Speeding Bullet') && action === 'carry') b += runPressure < 62 ? 0.035 : 0.01;
     if (hasTrait(p, 'Incisive Run') && fromThird === 'MID') b += 0.025;
     if (hasTrait(p, 'Ball-carrying') && action === 'carry') b += 0.02;
-    return b;
+    // Personality success bonuses are small nudges on top of Dribbling/Balance: never more than +/-6 points.
+    return idClamp(b, -0.06, 0.06);
   }
   // ----- Shot technique ------------------------------------------------------------
   // attrs   : the attributes that make this technique work (weights).
@@ -4164,12 +4171,16 @@ const PLAYSTYLE_BEHAVIOR = {
     if (per.indexOf('Calm') !== -1 && id === 'placed') m *= 1.1;
     if (per.indexOf('Volatile') !== -1 && (id === 'driven' || id === 'firsttime')) m *= 1.1;
     if (per.indexOf('Set-Piece Specialist') !== -1 && id === 'curled') m *= 1.15;
-    if (stakes) {
-      if (per.indexOf('Ice-Cold') !== -1) { if (id === 'placed') m *= 1.35; else if (id === 'driven') m *= 0.85; }
-      if (per.indexOf('Big-Game') !== -1) { if (id === 'placed') m *= 1.2; else if (id === 'chip') m *= 0.8; }
+    // `stakes` is the 0..1 moment pressure here; the technique preference only shifts
+    // once the moment is genuinely heavy (>= .35) and it is scaled by how heavy.
+    if (stakes >= 0.35) {
+      const k = stakes;
+      // One composure preference, not two: the stronger of Ice-Cold / Big-Game, not their product.
+      const placed = Math.max(per.indexOf('Ice-Cold') !== -1 ? 0.35 : 0, per.indexOf('Big-Game') !== -1 ? 0.2 : 0);
+      if (placed) { if (id === 'placed') m *= 1 + placed * k; else if (id === 'chip' && per.indexOf('Big-Game') !== -1) m *= 1 - 0.2 * k; else if (id === 'driven' && per.indexOf('Ice-Cold') !== -1) m *= 1 - 0.15 * k; }
       if (per.indexOf('Fragile') !== -1) {
-        if (id === 'firsttime') m *= 1.35; else if (id === 'driven') m *= 1.25;
-        else if (id === 'placed') m *= 0.75; else if (id === 'chip') m *= 0.7;
+        if (id === 'firsttime') m *= 1 + 0.35 * k; else if (id === 'driven') m *= 1 + 0.25 * k;
+        else if (id === 'placed') m *= 1 - 0.25 * k; else if (id === 'chip') m *= 1 - 0.3 * k;
       }
     }
     if (momentum > 0 && per.indexOf('Confidence Player') !== -1) {
@@ -4206,7 +4217,7 @@ const PLAYSTYLE_BEHAVIOR = {
   // Picks the technique for one (non-header) shot. Returns { id, spec }.
   function pickShotTechnique(shooter, chanceType, opts) {
     opts = opts || {};
-    const stakes = idStakes();
+    const stakes = idPressure(shooter);
     const momentum = idMomentum(shooter);
     const ids = Object.keys(SHOT_TECHNIQUES);
     const weights = [];
@@ -4390,10 +4401,12 @@ const PLAYSTYLE_BEHAVIOR = {
       if ((chanceType === 'throughball' || chanceType === 'counter') && per.indexOf('Incisive Run') !== -1) w *= 1.35;
       if ((chanceType === 'throughball' || chanceType === 'counter') && per.indexOf('Speeding Bullet') !== -1) w *= 1.3;
       if (chanceType === 'cutback' && per.indexOf('Incisive Run') !== -1) w *= 1.1;
-      if (per.indexOf('Big-Game') !== -1 && idStakes()) w *= 1.15;
-      if (per.indexOf('Fragile') !== -1 && idStakes()) w *= 0.85;
-      if (per.indexOf('Confidence Player') !== -1) w *= 1 + 0.06 * idMomentum(p);
-      if (per.indexOf("Finisher's Instinct") !== -1 && idMinute() > 80) w *= 1.2;
+      // Big-Game / Fragile / Confidence Player no longer get a "who is on the end of it" bonus:
+      // they already change how often they choose to shoot (identityActionMult) and how well
+      // they finish it (resolveShot) - a third channel only inflated their volume.
+      // Finisher's Instinct is the one that is genuinely about WHERE he is: the poacher lurking
+      // in the box in the closing minutes (a 'longshot' is not his chance).
+      if (per.indexOf("Finisher's Instinct") !== -1 && chanceType !== 'longshot' && idMinute() > 75) w *= 1 + 0.2 * Math.min(1, (idMinute() - 75) / 15);
     }
     return idClamp(w, 0.2, 3);
   }
@@ -4424,23 +4437,35 @@ const PLAYSTYLE_BEHAVIOR = {
       if (action === 'throughball') m *= 1.25; else if (action === 'pass') m *= 1.1; else if (action === 'shoot') m *= 0.85;
     }
     if (has('Incisive Run')) {
-      if (action === 'carry') m *= 1.2; else if (action === 'dribble') m *= 1.05; else if (action === 'backpass') m *= 0.85;
+      if (action === 'carry') m *= 1.2; else if (action === 'backpass') m *= 0.85;
     }
-    if (has('Mazing Run')) {
-      if (action === 'dribble') m *= 1.25; else if (action === 'hold') m *= 0.9;
-    }
-    if (has('Trickster') && action === 'dribble') m *= 1.15;
+    if (has('Mazing Run') && action === 'hold') m *= 0.9;
     if (has('Speeding Bullet') && action === 'carry') m *= 1.15;
     if (has('Ball-carrying')) {
-      if (action === 'carry') m *= 1.3; else if (action === 'dribble') m *= 1.05; else if (action === 'pass') m *= 0.92;
+      if (action === 'carry') m *= 1.3; else if (action === 'pass') m *= 0.92;
     }
-    // Taking responsibility: how often a player is willing to shoot depends on
-    // the moment, not only on whether his shots are better then.
+    // Dribble appetite from every tag that wants to take a man on is ONE additive pool, not
+    // a chain of multipliers: Mazing x1.25, Trickster x1.15, Showboat x1.25, Selfish x1.2, ... used to
+    // compound to ~x2.5 for a player holding three of them, which swamped the Dribbling attribute
+    // itself. The pool is capped so a stack is "keen", not "never passes".
+    if (action === 'dribble') {
+      let inc = 0;
+      if (has('Mazing Run')) inc += 0.25;
+      if (has('Trickster')) inc += 0.15;
+      if (has('Showboat')) inc += 0.2;
+      if (has('Selfish')) inc += 0.15;
+      if (has('Incisive Run')) inc += 0.05;
+      if (has('Ball-carrying')) inc += 0.05;
+      m *= Math.min(1.5, 1 + inc);
+    }
+    // Taking responsibility: willingness to shoot depends on the moment. Scaled by how much the
+    // moment decides the match (so a Big-Game player is not demanding the ball at 4-0), and
+    // only trusted to the player in the direction of his temperament.
     if (action === 'shoot') {
-      if (has('Big-Game') && idStakes()) m *= 1.15;
-      if (has('Fragile') && idStakes()) m *= 0.85;
-      if (has('Confidence Player')) m *= 1 + 0.06 * idMomentum(p);
-      if (has("Finisher's Instinct") && idMinute() > 80) m *= 1.2;
+      const pr = idPressure(p);
+      if (has('Big-Game')) m *= 1 + 0.12 * pr;
+      if (has('Fragile')) m *= 1 - 0.12 * pr;
+      if (has('Confidence Player')) m *= 1 + 0.05 * idMomentum(p);
     }
     return m;
   }
@@ -5087,10 +5112,28 @@ const PLAYSTYLE_BEHAVIOR = {
     // on top of (not instead of) the injury_res stat above — a player can
     // be rated High injury_res on paper and still carry the Brittle tag
     // (or vice versa), same as any other stat/personality combo elsewhere.
+    // Brittle is about how his body copes with CONTACT and WORKLOAD, so it is read off what he is
+    // actually doing this match - duels, tackles, pressing, minutes on the ball - rather than a flat
+    // x1.35 that stacked on top of injury_res, Physical Contact, style and fatigue. A Brittle winger
+    // who barely gets touched is only mildly more at risk; a Brittle holding midfielder in a
+    // fifty-fifty-heavy game is a lot more. Iron Man is the mirror.
     const personality = p.expandedAttrs.personality || [];
-    if (personality.includes('Brittle')) mult *= 1.35;
-    if (personality.includes('Iron Man')) mult *= 0.7;
-    return mult;
+    const brittle = personality.includes('Brittle'), iron = personality.includes('Iron Man');
+    if (brittle || iron) {
+      let load = 0.35;                                   // no live data (preview / unit probe): an average load
+      const m = currentMatch;
+      const ps = m && m.playerMatchStats && m.playerMatchStats[p.id];
+      if (ps) {
+        const contacts = (ps.tackles || 0) + (ps.aerialDuels || 0) + 0.5 * (ps.pressures || 0) + (ps.interceptions || 0) * 0.5;
+        const minutesIn = Math.max(10, m.minute || 0);
+        load = Math.max(0, Math.min(1.2, contacts / (minutesIn / 7.5)));   // ~1 contact every 7.5 min (12 a match, roughly a 90th-percentile player) = a full load
+      }
+      if (brittle) mult *= 1.1 + 0.4 * load;             // 1.10 (untouched) .. 1.58 (heavy contact)
+      if (iron) mult *= 0.85 - 0.15 * Math.min(1, load); // 0.85 .. 0.70
+    }
+    // Whatever stacks up (Low resistance x poor Physical Contact x aggressive style x exhaustion x Brittle),
+    // one player is never made more than twice as likely as an average one to be the one who goes down.
+    return Math.min(mult, 2.0);
   }
   // Like pickPlayer, but the caller supplies the weighting function directly
   // instead of the fixed ovr/att/tec composite — used where an expanded
@@ -7003,6 +7046,68 @@ const PLAYSTYLE_BEHAVIOR = {
     const isCloseLate = minute > 75 && Math.abs(scoreDiff) <= 1;
     return isDerby || isFinal || isCloseLate;
   }
+
+  // ===== Situation model for the "big moment" personalities =====================
+  // computeStakes() above is a single yes/no ("derby OR final OR close-and-late")
+  // and every trait that read it - Big-Game, Fragile, Ice-Cold, Bottler, Big
+  // Occasion Flop - got the same full-strength bonus whenever it was true, even at
+  // 4-0 in a derby. These two reads replace it, and they answer two DIFFERENT
+  // questions so a trait only fires for the situation it is actually about:
+  //
+  //   occasionLevel(m)      what kind of FIXTURE is this?        0..1, fixed at kickoff
+  //                         (final 1, derby .7, knockout .6, clash of two top sides .4)
+  //                         -> Big Occasion Riser / Flop (technical fluency on the day)
+  //   momentPressure(m,side) how much does THIS moment decide the result for `side`?
+  //                         0..1, moves with scoreline + clock
+  //                         -> Big-Game / Fragile (finishing), Ice-Cold / Bottler (dead balls)
+  //
+  // A dead rubber is worth 0 pressure whatever the fixture; a level game in the
+  // 85th minute of a final is worth 1.
+  function occasionLevel(m) {
+    m = m || currentMatch;
+    if (!m || !m.home || !m.away) return 0;
+    if (m._occ != null) return m._occ;
+    const comp = currentSeasonComp || tournament;
+    let o = 0;
+    const h = m.home.team || {}, a = m.away.team || {};
+    if (Array.isArray(h.rivals) && h.rivals.includes(a.id)) o = Math.max(o, 0.7);
+    if (comp && comp.stage === 'final') o = Math.max(o, 1);
+    else if (comp && ['qf', 'sf', 'knockout'].includes(comp.stage)) o = Math.max(o, 0.6);
+    const avgOvr = (side) => { const arr = (side && side.squad && side.squad.starting) || []; return arr.length ? arr.reduce((s, p) => s + (p.ovr || 70), 0) / arr.length : 0; };
+    if (avgOvr(m.home) >= 82 && avgOvr(m.away) >= 82) o = Math.max(o, 0.4);
+    m._occ = o;
+    return o;
+  }
+  function momentPressure(m, side) {
+    m = m || currentMatch;
+    if (!m || !m.home || !m.away) return 0;
+    const sd = side === 'away' ? -1 : 1;
+    const d = (m.home.score - m.away.score) * sd;           // + = this side is ahead
+    // how much a goal for this side now changes the result
+    const decisive = d <= -3 ? 0 : d === -2 ? 0.45 : d === -1 ? 1 : d === 0 ? 1 : d === 1 ? 0.55 : d === 2 ? 0.1 : 0;
+    const minute = m.minute || 0;
+    const late = Math.max(0, Math.min(1, (minute - 60) / 25));
+    const clock = 0.5 + 0.5 * late;                           // early goals matter, late ones more
+    const weight = Math.max(occasionLevel(m), 0.6 * late);    // a big fixture, or just the closing stages
+    return Math.max(0, Math.min(1, decisive * clock * weight));
+  }
+  function pressureOf(p) {
+    const m = currentMatch;
+    if (!m || !p) return 0;
+    return momentPressure(m, playerMatchSide(p) || 'home');
+  }
+  // Big Occasion Riser / Flop: technical fluency (passing, ball-carrying) on the day of a big fixture.
+  // Keyed to the FIXTURE, not the scoreline: a Flop is as shaky at 3-0 as at 0-0 in a final.
+  function occasionTraitMult(p) {
+    if (!p || !p.expandedAttrs) return 1;
+    const per = p.expandedAttrs.personality;
+    if (!per || !per.length) return 1;
+    const riser = per.includes('Big Occasion Riser'), flop = per.includes('Big Occasion Flop');
+    if (!riser && !flop) return 1;
+    const o = occasionLevel(currentMatch);
+    if (!o) return 1;
+    return 1 + (riser ? 0.08 : 0) * o - (flop ? 0.12 : 0) * o;
+  }
   // Slow Starter personality: reduced effectiveness in the first ~15
   // minutes of a match, partially offset as the half wears on. This is a
   // genuine per-minute (m.minute) read, so it lives here in matchEngine.js
@@ -8218,13 +8323,14 @@ const PLAYSTYLE_BEHAVIOR = {
     // moment actually carries stakes (same computeStakes gate as Big-Game/
     // Fragile in resolveShot above) — a genuinely ice-cold penalty taker in
     // a dead rubber reads no differently from anyone else.
-    const m0 = currentMatch;
-    const penStakes = m0 ? computeStakes(m0.home.team, m0.away.team, currentSeasonComp || tournament, m0.minute, m0.home.score - m0.away.score) : false;
+    // Scaled by how much the kick decides (momentPressure for the taker's side):
+    // a penalty at 4-0 up carries no more pressure than any other.
+    const penPressure = pressureOf(taker);
     let personalityEdge = 0;
-    if (penStakes) {
+    {
       const personality = (taker.expandedAttrs && taker.expandedAttrs.personality) || [];
-      if (personality.includes('Ice-Cold')) personalityEdge += 0.09;
-      if (personality.includes('Bottler')) personalityEdge -= 0.12;
+      if (personality.includes('Ice-Cold')) personalityEdge += 0.09 * penPressure;
+      if (personality.includes('Bottler')) personalityEdge -= 0.12 * penPressure;
     }
     const scoreProb = Math.max(0.35, Math.min(0.95, 0.72 + penTakerEdge(taker) - penGkEdge(gk) + personalityEdge));
     if (seededRandom() < scoreProb) return scoredOnes[Math.floor(seededRandom() * scoredOnes.length)];
@@ -8248,13 +8354,12 @@ const PLAYSTYLE_BEHAVIOR = {
     // Ice-Cold/Bottler: same stakes-gated composure edge as the penalty
     // version above, scaled down for the lower baseline conversion rate
     // a direct free-kick carries.
-    const m0 = currentMatch;
-    const fkStakes = m0 ? computeStakes(m0.home.team, m0.away.team, currentSeasonComp || tournament, m0.minute, m0.home.score - m0.away.score) : false;
+    const fkPressure = pressureOf(taker);
     let personalityEdge = 0;
-    if (fkStakes) {
+    {
       const personality = (taker.expandedAttrs && taker.expandedAttrs.personality) || [];
-      if (personality.includes('Ice-Cold')) personalityEdge += 0.05;
-      if (personality.includes('Bottler')) personalityEdge -= 0.07;
+      if (personality.includes('Ice-Cold')) personalityEdge += 0.05 * fkPressure;
+      if (personality.includes('Bottler')) personalityEdge -= 0.07 * fkPressure;
     }
     // `boost` — a small edge for a quick restart caught the defence
     // unorganised (see resolveFreeKickRoutine in engine/setpieces.js);
@@ -8403,9 +8508,9 @@ const PLAYSTYLE_BEHAVIOR = {
     // matters most, not just his shooting. ps.isBigGame/ps.personality are
     // set on the ratingInput copy by the caller below, right before this
     // function is invoked.
-    if (!isBreakout && ps.isBigGame && (ps.personality || []).includes('Big Occasion Riser')) {
-      cap = Math.min(10.0, cap + 0.5);
-    }
+    // (No cap bump for Big Occasion Riser any more: the trait now lifts his actual
+    // passing/carrying on the day - see occasionTraitMult - so the rating follows the play
+    // instead of being raised a second time on top of it.)
     return Math.max(2.5, Math.min(cap, Math.round(r * 10) / 10));
   }
 
@@ -9434,16 +9539,11 @@ const PLAYSTYLE_BEHAVIOR = {
     return (curvedAttr(p.tec || 70, 70) * 0.6 + curvedAttr(p.ovr || 75, 75) * 0.4) * staminaMultiplier(p) * conditionMultiplier(p);
   }
   function passingAbility(p) {
-    // Big Occasion Flop: passing accuracy (not just shooting, which is
-    // Fragile's domain in shooting.js) drops under stakes — same
-    // computeStakes gate as Big-Game/Fragile/Ice-Cold/Bottler.
-    let bigOccasionMult = 1;
-    if (p && p.expandedAttrs && ((p.expandedAttrs.personality) || []).includes('Big Occasion Flop')) {
-      const m = currentMatch;
-      if (m && computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score)) {
-        bigOccasionMult = 0.88;
-      }
-    }
+    // Big Occasion Flop / Riser: passing fluency on the day of a big FIXTURE (final, derby,
+    // knockout, clash of top sides) - see occasionTraitMult in engine/matchEngine.js. This used to
+    // be -12% for any "stakes" moment including a late 1-0 in a league game, and it overlapped
+    // Fragile/Bottler (all four traits keyed to the same boolean).
+    const bigOccasionMult = occasionTraitMult(p);
     if (p && p.expandedAttrs) {
       const vals = [p.expandedAttrs.low_pass, p.expandedAttrs.lofted_pass, p.expandedAttrs.ball_con, p.expandedAttrs.tight_pos].filter(v => typeof v === 'number');
       const base = vals.length
@@ -9659,56 +9759,37 @@ const PLAYSTYLE_BEHAVIOR = {
     // undefined for anyone without a hand-authored entry, so this is a
     // no-op for the vast majority of players).
     const personality = (shooter.expandedAttrs && shooter.expandedAttrs.personality) || [];
-    // Big-Game/Fragile only kick in when the moment actually carries
-    // stakes (derby / final / close-and-late).
-    const stakes = computeStakes(m.home.team, m.away.team, currentSeasonComp || tournament, m.minute, m.home.score - m.away.score);
-    // Every personality edge below used to be its own sequential
-    // `shotQuality *=` — fine for a single tag, but a player who legitimately
-    // holds several at once (Big-Game + Confidence Player + Finisher's
-    // Instinct + Talisman is a perfectly normal combination in a tight,
-    // late cup match) had those multipliers chain on top of each other
-    // (1.15 * 1.09 * 1.12 * 1.03 ≈ +45%) rather than simply add up. They're
-    // now collected as one combined relative edge and applied once, so five
-    // separate +15% tags add to +75%, not compound toward doubling.
+    // How much THIS shot decides the result for the shooting side (0 in a dead
+    // rubber, 1 for a level game late in a final) - see momentPressure() in
+    // engine/matchEngine.js. Big-Game / Fragile scale with it instead of switching
+    // on for any derby, final or late finish.
+    const pressure = momentPressure(m, attackingSide);
+    // Each personality below gets ONE quality channel here. Their other expressions
+    // (how often he shoots, which technique he trusts) live in playerIdentity.js and
+    // are no longer stacked on top with a chance-allocation bonus as well, so a
+    // Big-Game player is better *at* the moment, not simply handed more of the ball.
     //
-    // That combined edge is then applied as headroom — closing that share
-    // of the gap remaining to the quality cap/floor — instead of scaling
-    // shotQuality directly. A flat multiplier rewards an already-elite
-    // finisher (shotQuality already sitting close to the 0.98 ceiling) with
-    // a far bigger *absolute* jump than it gives a merely-good one, which is
-    // backwards from every curve elsewhere in this file and is what made
-    // Big-Game alone such an enormous swing for a team's best players —
-    // effectively a near-automatic finish in a big moment. Headroom scaling
-    // keeps the same "edge in a big moment" idea without a top-tier player
-    // basically guaranteeing the chance, and it naturally self-limits even
-    // when several bonuses stack.
+    // The edges are collected as one combined relative edge and applied once, as
+    // headroom toward the quality cap/floor, so several tags can never compound into
+    // a guaranteed goal or a guaranteed miss.
     let personalityEdge = 0;
-    if (stakes) {
-      // Half of the old flat quality edge: the rest of what Big-Game/Fragile
-      // mean now shows up as behaviour (he takes the shot more/less often and
-      // trusts a different technique - see playerIdentity.js).
-      if (personality.includes('Big-Game')) personalityEdge += 0.09;
-      if (personality.includes('Fragile')) personalityEdge -= 0.09;
-    }
-    // Confidence Player: composure builds while he's on a live scoring run
-    // this match and evaporates the moment an effort doesn't end in a goal
-    // (see the reset/bump at the miss/save/goal points below) — a genuine
-    // per-match momentum read, distinct from the season-long liveRating/
-    // condition system in form.js. Capped at 3 stacks so a hot streak is a
-    // meaningful edge without becoming a lock.
+    if (personality.includes('Big-Game')) personalityEdge += 0.10 * pressure;
+    if (personality.includes('Fragile')) personalityEdge -= 0.10 * pressure;
+    // Confidence Player: composure builds while he's on a live scoring run this
+    // match and evaporates the moment an effort doesn't end in a goal (see the
+    // reset/bump at the miss/save/goal points below). Capped at 3 stacks.
     if (personality.includes('Confidence Player')) {
       const momentum = Math.min(3, (m.personalityMomentum && m.personalityMomentum[shooter.id]) || 0);
       if (momentum > 0) personalityEdge += momentum * 0.02;
     }
-    // Finisher's Instinct: extra late-game shot-quality bump distinct from
-    // Big-Game's stakes gate above — fires purely off the clock, any
-    // scoreline, including a dead rubber Big-Game's derby/final/close-
-    // and-late gate would never trigger for.
-    if (personality.includes("Finisher's Instinct") && m.minute > 80) personalityEdge += 0.08;
-    // Talisman aura: teammates play with a touch more composure while
-    // he's out there with them — same aura pattern as the existing
-    // Captaincy fatigue/form hooks, just read locally here since it only
-    // touches shot quality.
+    // Finisher's Instinct: the closing minutes, any scoreline - but only the
+    // close-range chances he hunts (box finishes), not a speculative shot from range
+    // or a header he didn't win. Ramps in over 76-90 instead of a hard switch at 80.
+    if (personality.includes("Finisher's Instinct") && !isHeader && chanceType !== 'longshot' && m.minute > 75) {
+      personalityEdge += 0.09 * Math.min(1, (m.minute - 75) / 15);
+    }
+    // Talisman aura: teammates play with a touch more composure while he's out
+    // there with them.
     const onIdsTalisman = attackingSide === 'home' ? m.homeOnPitch : m.awayOnPitch;
     if ((attTeam.squad.all || []).some(x => onIdsTalisman.includes(x.id) && ((x.expandedAttrs && x.expandedAttrs.personality) || []).includes('Talisman'))) {
       personalityEdge += 0.03;
@@ -9718,7 +9799,7 @@ const PLAYSTYLE_BEHAVIOR = {
     // Belt-and-braces cap on the combined edge itself — even a player who
     // somehow holds every stacking tag at once can't turn this into a
     // guaranteed goal or a guaranteed miss.
-    personalityEdge = Math.max(-0.5, Math.min(0.5, personalityEdge));
+    personalityEdge = Math.max(-0.25, Math.min(0.25, personalityEdge));
     if (personalityEdge > 0) shotQuality += (0.98 - shotQuality) * personalityEdge;
     else if (personalityEdge < 0) shotQuality += (shotQuality - 0.05) * personalityEdge;
     shotQuality = Math.max(0.05, Math.min(0.98, shotQuality));
@@ -10774,7 +10855,7 @@ const PLAYSTYLE_BEHAVIOR = {
       // Selfish/Team Player: nudges the shoot-or-dribble vs. pass-or-
       // through-ball balance directly, independent of position/playstyle.
       if (personality.includes('Selfish')) {
-        if (action === 'shoot' || action === 'dribble') w *= 1.2;
+        if (action === 'shoot') w *= 1.2;   // (dribble appetite is pooled in identityActionMult)
         if (action === 'pass' || action === 'throughball' || action === 'cross') w *= 0.88;
       }
       if (personality.includes('Team Player')) {
@@ -10784,7 +10865,7 @@ const PLAYSTYLE_BEHAVIOR = {
       // Showboat: attempts more dribbles than the raw ability read alone
       // would justify — the higher turnover risk that comes with it lives
       // in the carryChance calc in engine/possession.js, not here.
-      if (personality.includes('Showboat') && action === 'dribble') w *= 1.25;
+      // (Showboat's extra dribbling is part of the pooled dribble appetite in identityActionMult.)
       // Homebody: a genuine dip in incisive/risky ball actions away from
       // home, nothing to do with pressure or tactics.
       if (personality.includes('Homebody')) {
@@ -21459,11 +21540,15 @@ a.gala-chip:hover{border-color:#e8bd48}
   // Inconsistent-spread amplification Streaky uses (engine/form.js:
   // rollPlayerCondition), not a separate system, since "more volatile form
   // while young" IS exactly what a bigger FORM_TYPE_SPREAD multiplier
-  // already models. ~21 is used as a generic "still a youth prospect"
+  // already models. <22 is used as a generic "still a youth prospect"
   // cutoff, matching how the rest of the sheet talks about young players.
   function isYoungProdigy(p) {
-    return !!(p && p.expandedAttrs && (p.expandedAttrs.personality || []).includes('Prodigy')
-      && typeof p.expandedAttrs.age === 'number' && p.expandedAttrs.age < 21);
+    if (!(p && p.expandedAttrs && (p.expandedAttrs.personality || []).includes('Prodigy'))) return false;
+    // Live age (the transfer market ages players with the season year) - the sheet's age is a snapshot
+    // from when it was authored, which used to keep a Prodigy "young" forever. Same <22 gate the
+    // transfer market's potential bonus already used, so the two systems agree on who is a prospect.
+    const age = (typeof tmAge === 'function') ? tmAge(p) : p.expandedAttrs.age;
+    return typeof age === 'number' && age < 22;
   }
 
   function showSeasonComp(key) {
@@ -28856,7 +28941,7 @@ a.gala-chip:hover{border-color:#e8bd48}
     const age = tmAge(p), ovr = p.ovr || 60;
     const base = age <= 18 ? 9 : age === 19 ? 8 : age === 20 ? 7 : age === 21 ? 5.5 : age === 22 ? 4 : age === 23 ? 3 : age === 24 ? 2 : age === 25 ? 1.2 : age === 26 ? 0.6 : 0;
     let g = base * tmClamp(1 - (tmRankFrac(ovr) - 0.5) * 0.9, 0.3, 1.1) * (0.8 + tmR(p.id + ':pot') * 0.45);
-    try { if (p.expandedAttrs && (p.expandedAttrs.personality || []).includes('Prodigy') && age < 22) g *= 1.3; } catch (e) {}
+    try { if (isYoungProdigy(p)) g *= 1.3; } catch (e) {}   // same gate as in-match volatility (developmentEngine.js)
     g = Math.round(g * 10) / 10;
     tmCache.pot[k] = g; return g;
   }
