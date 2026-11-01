@@ -1,0 +1,215 @@
+{
+ "_comment": "Apex honours news wording (Team of the Week/Month/Season etc). Same template syntax as media.json. Optional CFG block overrides honours tuning (see engine/honours.js HN_CFG).",
+ "CFG": {
+  "media": {
+   "clubWeekPosts": 3,
+   "clubMonthPosts": 6,
+   "clubSeasonPosts": 14
+  }
+ },
+ "B": {
+  "totw_bn": [
+   "⭐ {league} Team of the Week ({md}): {starS} ({starTS}) headlines it after {starLine}.",
+   "TEAM OF THE WEEK | {league}, {md}. {star} is the pick of the bunch with {starLine}.",
+   "The {league} {md} Team of the Week is out — {starS} leads the way for {starT}.",
+   "{starS} ({starTS}) named in the {league} Team of the Week after {starLine}. Full XI below. ⬇️"
+  ],
+  "totw_list": [
+   "📋 {league} Team of the Week, {md} ({formation}): {names}.",
+   "TEAM OF THE WEEK — {league} {md}\n{formation}: {names}",
+   "{league} · {md} · Team of the Week in a {formation}: {names}. Star man: {starS}."
+  ],
+  "totw_club": [
+   "{player} is in the {league} Team of the Week after {line}. 👏",
+   "Team of the Week ✅ {playerS} gets the nod after {line}.",
+   "Named in the {league} {md} Team of the Week: {player}. Well deserved! 🔥"
+  ],
+  "totw_fan": [
+   "{starS} in the Team of the Week AGAIN? Take a bow. {starTS} fans know what we have. 🙌",
+   "Told you {starS} was special. {league} Team of the Week, easy. #{starTS}",
+   "Team of the Week and {starT} has the star man. I'll take that all day."
+  ],
+  "totw_rival": [
+   "Team of the Week is a joke, it's just whoever played against a bad team. Always the same. 😴",
+   "{starS} star man? One good week against a poor side, let's see it again.",
+   "Every week the Team of the Week has someone nobody has heard of. Love the league. 😂"
+  ],
+  "totw_player": [
+   "Team of the Week! Thanks for all the messages, now back to work. 💪",
+   "Great to be in the Team of the Week, credit to the lads around me. {star} 🙏",
+   "Happy to be named in the XI. On to the next one."
+  ],
+  "totw_snub": [
+   "{snubS} with {snubLine} and NOT in the Team of the Week? Who picks this?! 😡",
+   "How is {snub} ({snubT}) not in the Team of the Week after {snubLine}?? Robbery.",
+   "Team of the Week snubbing {snubS} is criminal. {snubLine}!"
+  ],
+  "totw_tv": [
+   "{league} {md}: {starS} headlines the Team of the Week",
+   "Team of the Week — {formation}, with {starS} as the star man"
+  ],
+  "tv_banner_totw": [
+   "TEAM OF THE WEEK",
+   "THE BEST XI OF THE ROUND",
+   "{league} · TEAM OF THE WEEK"
+  ],
+  "studio_totw": [
+   "We have picked our {league} Team of the Week and {starS} is the headline name after {starLine}.",
+   "A {formation} this week, and the Team of the Week is led by {starS} of {starT}."
+  ],
+  "pan_analyst": [
+   "Look at the numbers, {starS} was sharp in every phase. Easy pick.",
+   "Great shape across the XI, a proper balanced side."
+  ],
+  "pan_attacker": [
+   "I love the front three here, pure quality.",
+   "{starS} makes it look easy. That is what confidence does."
+  ],
+  "potw_club": [
+   "Our Player of the Week: {player}! {line} against the odds. 🌟",
+   "⭐ PLAYER OF THE WEEK ⭐ {playerS} after {line}. Brilliant.",
+   "{player} is our Player of the Week ({md}) — {line}. Take a bow."
+  ],
+  "potw_fan": [
+   "{playerS} Player of the Week, fully earned. {teamS} needs more of that. 💪",
+   "Player of the Week: {playerS}. That is the standard, lads.",
+   "Can't argue with {playerS} as {teamS}'s Player of the Week. Great shift."
+  ],
+  "potw_player": [
+   "Thanks for the support! Proud to be Player of the Week, now we go again.",
+   "Team first, always. Player of the Week is a bonus. 🙌"
+  ],
+  "potm_bn": [
+   "📅 {league} Player of the Month for {month}: {player} ({teamS}) after {line}.",
+   "{playerS} wins the {league} Player of the Month award for {month} — {line} in {apps} games.",
+   "AWARD | {league} Player of the Month ({month}) goes to {player} of {team}."
+  ],
+  "potm_club": [
+   "Congratulations {player}, our Player of the Month for {month}! {line}. 🏅",
+   "{playerS} is Player of the Month for {month} ⭐ {line}.",
+   "Player of the Month ({month}): {player}. {apps} games, {line}."
+  ],
+  "potm_fan": [
+   "Player of the Month and not even close. {playerS} is unplayable right now. 🔥",
+   "{playerS} for {month}'s Player of the Month, no debate."
+  ],
+  "potm_player": [
+   "Honoured to win Player of the Month. Thanks to my teammates and staff. 🙏",
+   "Player of the Month for {month}! Keep going. 💪"
+  ],
+  "potm_tv": [
+   "{league} Player of the Month: {playerS}",
+   "{month}: {playerS} takes the monthly award"
+  ],
+  "tv_banner_potm": [
+   "PLAYER OF THE MONTH",
+   "{league} · PLAYER OF THE MONTH"
+  ],
+  "studio_potm": [
+   "Our {league} Player of the Month for {month} is {player} of {team} — {line}."
+  ],
+  "pots_club": [
+   "🏆 Our Player of the Season: {player}! {line} in {apps} games. Unbelievable year.",
+   "{season} Player of the Season: {playerS}. {line}. What a season.",
+   "PLAYER OF THE SEASON — {player}. {line}. Thank you for everything this year. 💙"
+  ],
+  "pots_fan": [
+   "{playerS} Player of the Season. Not a single doubt. 🏆",
+   "Best player we had all year, {playerS} deserves it."
+  ],
+  "pots_player": [
+   "Player of the Season at {team} — a dream. Thank you to the fans. 🙏",
+   "Proud to win this award. Now to go again next year."
+  ],
+  "tots_bn": [
+   "🌟 {season} TEAM OF THE SEASON: {mgr} ({mgrT}) named best manager, lining up in a {formation}. {starS} leads the XI.",
+   "THE {season} TEAM OF THE SEASON is out. Manager: {mgr}. Shape: {formation}. Star man: {star} ({starTS}).",
+   "{mgr} is the Manager of the Season and the Team of the Season is built around his {formation}. {starS} tops the XI."
+  ],
+  "tots_lg_bn": [
+   "{league} Team of the Season: {mgr} ({mgrT}) is the manager, formation {formation}. {starS} is the star.",
+   "🌟 {league} {season} Team of the Season — {formation} under {mgr}. {starS} ({starTS}) heads the XI.",
+   "The {league} Team of the Season is in a {formation}, picked under {mgr}. {star} is the standout."
+  ],
+  "tots_list": [
+   "📋 {scope} Team of the Season, {season} ({formation}, manager {mgr}): {names}.",
+   "{scope} TEAM OF THE SEASON — {formation}\nManager: {mgr} ({mgrT})\n{names}"
+  ],
+  "tots_tac": [
+   "{mgr} gets the Manager of the Season nod and his {formation} is the shape of the Team of the Season: {gp} games, {ppg} points per game in that setup.",
+   "The {formation} ({ppg} points per game under {mgrS} across {gp} games) is the formation of the {scope} Team of the Season. Shape matters. 📐"
+  ],
+  "tots_mgr": [
+   "Manager of the Season. All credit to the players and staff. The {formation} works because of them. 🧥",
+   "Thank you for the award, but this is a team honour. Proud of everyone at {mgrT}."
+  ],
+  "tots_mgr_club": [
+   "{mgr} is the Manager of the Season! 🧥 {gp} games in a {formation}, {ppg} points per game. Congratulations boss.",
+   "OFFICIAL: {mgrT} manager {mgr} named Manager of the Season. 👏"
+  ],
+  "tots_club": [
+   "{player} is in the {scope} Team of the Season! {line}. 🌟",
+   "Team of the Season ✅ {playerS}. A special year."
+  ],
+  "tots_player": [
+   "Team of the Season, thank you everyone. Blessed. 🙏",
+   "Great to be named in the Team of the Season among the best around."
+  ],
+  "tots_fan": [
+   "{starS} in the Team of the Season, as it should be. {topClub} fans, we ate this year. 😤",
+   "Team of the Season looks about right. {mgrS} was a genius with the {formation}."
+  ],
+  "tots_snub": [
+   "Team of the Season? Half these lads got in on name alone. Who is picking this? 🙄",
+   "Cannot believe who was left out of the Team of the Season. Absolute joke.",
+   "That {formation} has holes. Everyone has a snub they are fuming about. 😤"
+  ],
+  "tots_gaffe": [
+   "{mgr}'S MEN DOMINATE: {topN} of the Team of the Season come from {topClub}!",
+   "TEAM OF THE SEASON: Who is IN, who is OUT, and who is FUMING! {star} leads the way."
+  ],
+  "tots_meme": [
+   "Team of the Season dropped and every fanbase is in the comments at once. 🍿",
+   "Me checking the Team of the Season to see if my player is in it. 😬"
+  ],
+  "tots_radio": [
+   "Phone lines are lit up about the Team of the Season. Callers want to talk about the {formation} and who missed out."
+  ],
+  "tots_vid": [
+   "Reacting to the {season} Team of the Season — are {mgr}'s picks right?",
+   "Ranking the {season} Team of the Season XI, plus the biggest snubs."
+  ],
+  "tots_art_h": [
+   "The Meridian {season} Team of the Season: {mgr}'s {formation} and the players who defined the year",
+   "{season} Team of the Season: why {mgr} deserves the manager's crown"
+  ],
+  "tots_art_b1": [
+   "{mgr} of {mgrT} was named Manager of the Season, and the Team of the Season is cut to fit his best shape: a {formation} that took {ppg} points per game across {gp} matches."
+  ],
+  "tots_art_b2": [
+   "{star} ({starT}) leads the XI after {starLine}, with {topN} players from {topClub} rounding out one of the most decorated lists in recent memory."
+  ],
+  "tots_tv": [
+   "{season} Team of the Season: {mgr}'s {formation}"
+  ],
+  "tv_banner_tots": [
+   "TEAM OF THE SEASON",
+   "{season} · TEAM OF THE SEASON"
+  ],
+  "studio_tots": [
+   "Tonight, the {season} Team of the Season. We start with the manager: {mgr} of {mgrT}, and the {formation} he used so well."
+  ],
+  "studio_tots2": [
+   "Then the XI, led by {star} of {starT} with {starLine}. Let's get into it."
+  ],
+  "pan_tots_analyst": [
+   "The {formation} is the key. {ppg} points per game is serious, and the XI fits the shape perfectly."
+  ],
+  "pan_tots_attacker": [
+   "{starS} is a joy to watch, and that front line scares everyone."
+  ],
+  "pan_tots_hardman": [
+   "Good defenders in there, mind. You win leagues with those lads, not flashy stuff."
+  ]
+ }
+}

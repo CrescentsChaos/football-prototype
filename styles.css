@@ -3534,3 +3534,17 @@ table { border-collapse: collapse; }
   .lb-reset { margin-left: 0; }
   .lb-select { flex: 1 1 130px; }
 }
+
+/* ---- Honours (Team of the Week / Month / Season, club awards) ---- */
+.hn-sub { margin: 8px 0 12px; flex-wrap: wrap; }
+.hn-round { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 6px 0 10px; }
+.hn-mgr, .hn-star { margin: 10px 0; padding: 8px 12px; border: 1px solid var(--accent-gold); border-radius: 8px; font-size: 0.85rem; }
+.hn-mgr span, .hn-muted, .hn-row small { color: var(--text-muted); font-size: 0.75rem; }
+.hn-table { overflow-x: auto; margin-top: 10px; }
+.hn-clubs { margin-top: 14px; }
+.hn-clubs h4 { margin: 0 0 6px; }
+.hn-row { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 0.82rem; }
+.hn-club span:first-child { flex: 1.2; font-weight: 700; }
+.hn-club span { flex: 1; }
+.hn-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hn-chip { padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.78rem; font-weight: 700; }
