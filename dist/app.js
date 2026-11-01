@@ -5323,6 +5323,7 @@ const PLAYSTYLE_BEHAVIOR = {
         // media-voices.json — optional layer: player/manager voices, journalists, injury & team news
         try { const voicesJson = await fetchFirstJson(urlSet('media-voices.json'), 'media voices'); if (voicesJson) mediaVoicesApply(voicesJson); } catch (e) {}
         // media-drama.json — optional layer: sackings, breakout stars, dressing-room rows, transfer hijacks, underdogs
+        try { const hnJson = await fetchFirstJson(urlSet('media-honours.json'), 'media honours'); if (hnJson) mediaHonoursApply(hnJson); } catch (e) {}
         try { const dramaJson = await fetchFirstJson(urlSet('media-drama.json'), 'media storylines'); if (dramaJson) mediaDramaApply(dramaJson); } catch (e) {}
       }
 
@@ -12802,6 +12803,7 @@ const PLAYSTYLE_BEHAVIOR = {
     });
     try { localStorage.setItem('apexInjuryBook', JSON.stringify(injuryBook)); } catch(e) {}
     try { localStorage.setItem('apexSuspensionBook', JSON.stringify(suspensionBook)); } catch(e) {}
+    try { hnOnMatchComplete(m); } catch (e) { console.warn('honours hook', e); }
     try { mediaOnMatchComplete(m); } catch (e) { console.warn('media hook', e); }
     saveStats();
     updateScoreboard();
@@ -15498,10 +15500,12 @@ a.gala-chip:hover{border-color:#e8bd48}
   // League finished) — archives that season's individual award winners and
   // resets the global leaderboard/Awards tab for the new season ahead.
   function finalizeSeasonIfComplete() {
+    try { hnSweep(); } catch (e) { console.warn('honours sweep', e); }
     if (!season || season.archived) return;
     if (!seasonIsComplete()) return;
     season.archived = true;
     season.completedAt = Date.now();
+    try { hnOnSeasonEnd(); } catch (e) { console.warn('honours season end', e); }
     archiveAndResetGlobalAwards(season.year);
     try { mediaOnSeasonEvent('seasonEnd'); } catch (e) {}
     try { tmOnSeasonEnd(); } catch (e) { console.error('transfers:', e); }
@@ -15725,6 +15729,7 @@ a.gala-chip:hover{border-color:#e8bd48}
       if (sar) standaloneAwardsRound = parseInt(sar, 10) || 0;
     } catch(e) {}
     try { mediaLoad(); } catch (e) {}
+    try { hnLoad(); } catch (e) {}
   }
 
   // ========== FULL PROGRESS PERSISTENCE (survive a page refresh) ==========
@@ -15754,6 +15759,7 @@ a.gala-chip:hover{border-color:#e8bd48}
       if (tm) ok = safeSetItem(TM_KEY, JSON.stringify(tm)) && ok;
       ok = persistPlayerForms() && ok;
       if (mediaDirty) ok = mediaSave() && ok;
+      try { ok = hnSave() && ok; } catch (e) {}
       const activeTab = document.querySelector('.nav-tab.active');
       if (activeTab && activeTab.dataset.view) safeSetItem('apexActiveView', activeTab.dataset.view);
     } catch (e) { ok = false; }
@@ -20042,6 +20048,7 @@ a.gala-chip:hover{border-color:#e8bd48}
           </section>
           ${renderTeamMatchLogHTML(team.id) ? `<section class="pp-card pp-log">${renderTeamMatchLogHTML(team.id).replace('card-title', 'pp-card-title')}</section>` : ''}
           ${ppTeamHonours(team)}
+          ${hnClubSection(team)}
         </aside>
       </div>`;
   }
@@ -20160,6 +20167,7 @@ a.gala-chip:hover{border-color:#e8bd48}
           ${log ? `<section class="pp-card pp-log">${stripTitle(log)}</section>` : ''}
           ${injLog ? `<section class="pp-card pp-log">${stripTitle(injLog)}</section>` : ''}
           ${cabinet ? `<section class="pp-card">${stripTitle(cabinet).replace('🏆 ', '')}</section>` : ''}
+          ${hnPlayerSection(player)}
         </div>
         <aside class="pp-side">
           <section class="pp-card">
@@ -20809,6 +20817,7 @@ a.gala-chip:hover{border-color:#e8bd48}
     if (!round.every(f => f.played)) return;
     comp.currentRound++;
     if (comp.currentRound >= comp.rounds.length) { comp.finished = true; crownLeagueChampion(comp); }
+    try { hnSweep(); } catch (e) { console.warn('honours sweep', e); }
   }
   // Simulates one round of a single domestic cup (a whole round at once,
   // same as the league/UCL "Simulate Matchday" flow) — used by
@@ -20930,6 +20939,7 @@ a.gala-chip:hover{border-color:#e8bd48}
       }
     }
     currentSeasonComp = null;
+    try { hnSweep(); } catch (e) { console.warn('honours sweep', e); }
   }
 
   // Derives the season-wide "Matchday" counter from actual progress instead
@@ -21828,7 +21838,8 @@ a.gala-chip:hover{border-color:#e8bd48}
     const subTabs = [
       { key: 'table', name: 'Table & Fixtures' },
       { key: 'stats', name: 'Stats' },
-      { key: 'awards', name: 'Awards' }
+      { key: 'awards', name: 'Awards' },
+      { key: 'honours', name: 'Honours' }
     ];
     let h = '<div class="leaderboard-tabs" style="margin-bottom:12px">' + subTabs.map(st =>
       `<button class="lb-tab ${seasonActiveSubTab === st.key ? 'active' : ''}" onclick="App.showSeasonSubTab('${st.key}')">${st.name}</button>`
@@ -21838,6 +21849,8 @@ a.gala-chip:hover{border-color:#e8bd48}
       h += renderCompStatsHTML(comp);
     } else if (seasonActiveSubTab === 'awards') {
       h += renderCompAwardsHTML(comp);
+    } else if (seasonActiveSubTab === 'honours') {
+      h += renderHonoursHTML(seasonActiveTab);
     } else {
       h += seasonActiveTab === 'ucl' ? renderUCLSeasonHTML(comp) : renderLeagueCompHTML(comp, seasonActiveTab);
     }
@@ -23762,7 +23775,7 @@ a.gala-chip:hover{border-color:#e8bd48}
     if (o.tg && o.tg.length) p.tg = o.tg.filter(Boolean);
     if (o.c) p.c = o.c;
     if (batch.when) p.w = batch.when;
-    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db', 'nw', 'rc', 'dr'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
+    ['sc', 'h', 'b', 'by', 'poll', 'vid', 'qt', 'ban', 'an', 'pn', 'tick', 'show', 'ver', 'pic', 'sx', 'aw', 'db', 'nw', 'rc', 'dr', 'hn'].forEach(k => { if (o[k] != null) p[k] = o[k]; });
     batch.posts.push(p);
     return p;
   }
@@ -24671,7 +24684,7 @@ a.gala-chip:hover{border-color:#e8bd48}
       mkPost(batch, 'ftl', 'res', mx(mFresh(MB_CONTEXT.roundup, 'cx:ru'), { league: compName, results: res }), { tg: [tag], c: compName, ph: 'wk', dt: 5, v: 0.9 });
     }
     // team of the week
-    if (matches.length >= 5 && (!bulk || mChance(0.35))) {
+    if (!hnMediaOn() && matches.length >= 5 && (!bulk || mChance(0.35))) {
       const all = [];
       matches.forEach(f => (f.top || []).forEach(t => all.push(t)));
       all.sort((a, b) => b.r - a.r);
@@ -24831,6 +24844,7 @@ a.gala-chip:hover{border-color:#e8bd48}
         else if (ev.kind === 'legacy') mgLegacyEvent(batch, ev);
         else if (ev.kind === 'seasonStart') { mgSeasonStart(batch); try { mdrSeasonStart(); } catch (e2) {} }
         else if (ev.kind === 'seasonEnd') mgSeasonEnd(batch);
+        else if (ev.kind === 'honours') hnMediaFlush(batch, bulk);
       } catch (e) { console.warn('Media event error', e); }
     });
 
@@ -28040,7 +28054,7 @@ a.gala-chip:hover{border-color:#e8bd48}
   const MEDIA_KIND_FILTERS = [
     ['all', 'All'], ['scores', 'Scores'], ['previews', 'Previews'], ['news', 'News'],
     ['social', 'Fans & takes'], ['transfers', 'Transfers'], ['events', 'Awards & trophies'],
-    ['verified', 'Players & clubs'], ['journalists', 'Journalists'], ['managers', 'Managers'], ['teamnews', 'Team news & injuries'], ['hype', 'Awards hype'], ['records', 'Records & milestones'], ['storylines', 'Storylines']
+    ['verified', 'Players & clubs'], ['journalists', 'Journalists'], ['managers', 'Managers'], ['teamnews', 'Team news & injuries'], ['hype', 'Awards hype'], ['records', 'Records & milestones'], ['storylines', 'Storylines'], ['honours', 'Honours']
   ];
 
   function mUserView(u) {
@@ -28112,7 +28126,7 @@ a.gala-chip:hover{border-color:#e8bd48}
     return '<article class="mp' + (p.im >= 3 ? ' big' : '') + (compact ? ' compact' : '') + '" data-pid="' + p.id + '">' +
       '<div class="mp-av" style="background:' + u.color + '">' + u.avatar + '</div>' +
       '<div class="mp-main"><div class="mp-head"><b>' + mNameLink(u) + '</b>' + (u.verified ? ' <span class="mp-ver" title="Verified">✔</span>' : '') + mRoleTag(u.kind) +
-      ' <span class="mp-handle">' + mEsc(u.handle) + '</span><span class="mp-time">· ' + mEsc(mTimeLabel(p)) + '</span>' + (p.dr && MD_BADGE[p.dr] ? '<span class="mp-storyline">' + MD_BADGE[p.dr] + '</span>' : '') + (p.c ? '<span class="mp-comp">' + mEsc(p.c) + '</span>' : '') + '<span class="mp-teams">' + teams + '</span></div>' +
+      ' <span class="mp-handle">' + mEsc(u.handle) + '</span><span class="mp-time">· ' + mEsc(mTimeLabel(p)) + '</span>' + (p.dr && MD_BADGE[p.dr] ? '<span class="mp-storyline">' + MD_BADGE[p.dr] + '</span>' : '') + (p.hn && HN_BADGE[p.hn] ? '<span class="mp-storyline">' + HN_BADGE[p.hn] + '</span>' : '') + (p.c ? '<span class="mp-comp">' + mEsc(p.c) + '</span>' : '') + '<span class="mp-teams">' + teams + '</span></div>' +
       '<div class="mp-text">' + (p.k === 'vid' ? '🎥 ' : '') + ((p.k === 'tv' || (p.k === 'art' && p.h)) ? '' : text) + '</div>' + extra +
       '<div class="mp-acts"><span onclick="App.mediaToggleThread(' + p.id + ')" class="mp-act' + (p.r && p.r.length ? ' has' : '') + '">💬 ' + mFmt(p.rp) + '</span><span class="mp-act">🔁 ' + mFmt(p.rt) + '</span><span class="mp-act">❤️ ' + mFmt(p.l) + '</span><span class="mp-act">📊 ' + mFmt(p.vw) + '</span></div>' +
       replies + '</div></article>';
@@ -28137,6 +28151,7 @@ a.gala-chip:hover{border-color:#e8bd48}
     else if (k === 'teamnews') list = list.filter(p => p.nw === 'inj' || p.nw === 'bench' || p.nw === 'sus' || p.nw === 'tn');
     else if (k === 'hype') list = list.filter(p => p.ph === 'aw' || p.aw);
     else if (k === 'storylines') list = list.filter(p => p.dr);
+    else if (k === 'honours') list = list.filter(p => p.hn);
     return list;
   }
 
@@ -28383,6 +28398,775 @@ a.gala-chip:hover{border-color:#e8bd48}
     if (!ps.length) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerHTML = '<div class="card-title" style="font-size:0.95rem">📰 Media reaction <a class="mc-link" onclick="App.switchView(\'media\')">Open Media Centre ▸</a></div>' + ps.map(p => mPostHtml(p, true)).join('');
+  }
+
+
+  // ==========================================================================
+  // APEX HONOURS — Team of the Week, Players of the Week / Month / Season, Team of the Season
+  // --------------------------------------------------------------------------
+  // Everything here is built from real match data (the per-player ratings, goals, assists, clean
+  // sheets and line-ups that endMatch() already produces) — nothing is rolled at random:
+  //
+  //   * Player of the Week   — for EVERY club, after every round it plays (league, Champions
+  //                            League, cups): its best-rated performer in that round.
+  //   * Team of the Week     — after every league matchday (and every Champions League matchday /
+  //                            knockout round): the best XI of the round, picked into a formation.
+  //   * Player of the Month  — for EVERY club (and one per league) when a calendar month closes:
+  //                            best average rating, goals and assists over the month.
+  //   * Player of the Season — for EVERY club at season end.
+  //   * Team of the Season   — at season end: the best manager is chosen first (one per league + an
+  //                            overall pick across every league), then HIS best formation (the one
+  //                            he took most points per game with), then the XI is picked slot by slot
+  //                            for that formation from the players' season numbers.
+  //
+  // Data flow: endMatch() -> hnOnMatchComplete(m) records the match; whenever a round finishes
+  // hnSweep() turns the pending records into awards. Wording for the news layer lives in
+  // media-honours.json (engine/mediaHonours.js); tuning numbers below can be overridden by that
+  // file's CFG block. Nothing here touches seededRandom(), so match determinism is unaffected.
+  // ==========================================================================
+  const HN_KEY = 'apexHonours';
+  let hn = null;
+  let hnDirty = false;
+  let HNJ = null;                 // media-honours.json (wording + optional CFG overrides)
+  let _hnMedia = [];              // honour events waiting for the next media flush
+
+  const HN_CFG = {
+    totwFormation: '4-3-3',
+    totwMinMatches: 2,            // a round needs at least this many matches before it gets a Team of the Round
+    clubWeekKeep: 6,              // latest weekly winners kept per club
+    monthMinApps: 2,              // appearances needed in a month to be Player of the Month
+    minStartsAbs: 5,              // season awards: minimum starts ...
+    minStartsFrac: 0.35,          // ... or this share of the busiest player's starts, whichever is higher
+    minFormGames: 3,              // a formation needs this many games to be a manager's "best formation" ...
+    minFormFrac: 0.15,            // ... or this share of his games
+    monthW: { g: 0.16, a: 0.10, m: 0.06 },
+    seasonW: { g: { GK: 0, D: 0.02, M: 0.014, F: 0.010 }, a: 0.010, m: 0.012, c: { GK: 0.015, D: 0.012, M: 0, F: 0 } },
+    lineW: { g: 0.06, a: 0.03, m: 0.05 }
+  };
+  function hnCfg(path, d) {
+    const walk = (root) => { let o = root; const parts = String(path).split('.'); for (let i = 0; i < parts.length && o != null; i++) o = o[parts[i]]; return o; };
+    let v = HNJ && HNJ.CFG ? walk(HNJ.CFG) : null;
+    if (v == null) v = walk(HN_CFG);
+    return v == null ? d : v;
+  }
+
+  // ---- state ----------------------------------------------------------------------------------------------------
+  function hnBlank() {
+    return { v: 1, sid: null, y: 0, ended: false, nm: {}, pend: [], led: {}, mon: { label: '', ent: {} }, cw: {}, cwn: {}, tw: {}, cm: {}, pm: [], fm: {},
+      ts: null, pos: null, hist: {}, tot: {} };
+  }
+  function hnLoad() {
+    hn = null;
+    try { const raw = localStorage.getItem(HN_KEY); if (raw) { const j = JSON.parse(raw); if (j && j.v === 1) hn = Object.assign(hnBlank(), j); } } catch (e) { hn = null; }
+    if (!hn) hn = hnBlank();
+    return hn;
+  }
+  function hnSave() {
+    if (!hn || !hnDirty) return true;
+    const ok = safeSetItem(HN_KEY, JSON.stringify(hn));
+    if (ok) hnDirty = false;
+    return ok;
+  }
+  function hnRollover(sid) {
+    const keep = { hist: hn.hist, tot: hn.tot };
+    hn = Object.assign(hnBlank(), keep, { sid: sid, y: season ? season.year : 0 });
+    hnDirty = true;
+  }
+  function hnState() {
+    if (!hn) hnLoad();
+    if (season) {
+      if (!season.hnId) season.hnId = 's' + Date.now().toString(36);
+      if (hn.sid !== season.hnId) hnRollover(season.hnId);
+    }
+    return hn;
+  }
+  function hnTn(t) { return t ? String(t.name || '').replace(/\s+\d{4}.*$/, '') : ''; }
+  function hnTeamName(id) { const t = getTeam(id); return t ? hnTn(t) : ''; }
+  function hnTot(pid) { const S = hn; return S.tot[pid] || (S.tot[pid] = { w: 0, tw: 0, m: 0, lm: 0, ps: 0, ts: 0, tl: 0 }); }
+
+  // ---- competition helpers ----------------------------------------------------------------------------------------
+  function hnCompKey(comp) {
+    if (!season || !comp) return null;
+    const e = seasonCompEntries().find(x => x.comp === comp);
+    if (e) return e.key;
+    if (season.cups) { const k = Object.keys(season.cups).find(x => season.cups[x] === comp); if (k) return 'cup_' + k; }
+    return null;
+  }
+  function hnRoundKey(ck, comp) {
+    if (isCupKey(ck)) return 'c' + comp.currentRound;
+    if (ck === 'ucl' && comp.stage !== 'league') return 'k' + comp.stage;
+    return 'r' + comp.currentRound;
+  }
+  function hnLeagueOf(tid) {
+    if (!season || !season.leagues) return null;
+    const k = Object.keys(season.leagues).find(key => (season.leagues[key].teams || []).some(t => t.id === tid));
+    return k || null;
+  }
+  function hnRoundLabel(rk, comp) {
+    const kind = rk[0], v = rk.slice(1);
+    if (kind === 'k') return v === 'qf' ? 'Quarter-finals' : v === 'sf' ? 'Semi-finals' : v === 'final' ? 'Final' : 'Knockouts';
+    if (kind === 'c') { const r = comp && comp.rounds && comp.rounds[parseInt(v, 10)]; const n = r ? r.length * 2 : 0; return n >= 32 ? 'Round of 32' : n >= 16 ? 'Round of 16' : n >= 8 ? 'Quarter-finals' : n >= 4 ? 'Semi-finals' : n >= 2 ? 'Final' : 'Round ' + (parseInt(v, 10) + 1); }
+    return 'Matchday ' + (parseInt(v, 10) + 1);
+  }
+
+  // ---- position helpers -------------------------------------------------------------------------------------------
+  const HN_FAM = { GK: ['GK'], CB: ['CB', 'SW'], RB: ['RB', 'RWB'], LB: ['LB', 'LWB'], RWB: ['RWB', 'RB'], LWB: ['LWB', 'LB'], CDM: ['CDM'], CM: ['CM'], CAM: ['CAM'],
+    RM: ['RM', 'RW'], LM: ['LM', 'LW'], RW: ['RW', 'RM'], LW: ['LW', 'LM'], ST: ['ST', 'CF'] };
+  function hnGroupOf(pos) {
+    pos = String(pos || '').toUpperCase();
+    if (pos === 'GK') return 'GK';
+    if (['CB', 'RB', 'LB', 'RWB', 'LWB', 'SW'].indexOf(pos) !== -1) return 'D';
+    if (['CM', 'CDM', 'CAM', 'RM', 'LM', 'DM', 'AM'].indexOf(pos) !== -1) return 'M';
+    return 'F';
+  }
+  function hnSlotPri(slot) { const g = hnGroupOf(slot); return slot === 'GK' ? 0 : slot === 'CB' ? 1 : g === 'D' ? 2 : g === 'M' ? 3 : 4; }
+  // Picks one player per formation slot: exact-position fit first, then same line, then anyone left.
+  // `cands` need { p, s (position played), sc (score) }; returns an array aligned to the formation's slots.
+  function hnPickXI(cands, formKey) {
+    const F = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
+    const slots = F.slots, out = new Array(slots.length).fill(null), used = {};
+    const order = slots.map((s, i) => i).sort((a, b) => hnSlotPri(slots[a]) - hnSlotPri(slots[b]) || a - b);
+    const posOf = c => String(c.pos != null ? c.pos : c.s).toUpperCase();
+    order.forEach(i => {
+      const slot = slots[i], fam = HN_FAM[slot] || [slot], grp = hnGroupOf(slot);
+      const free = cands.filter(c => !used[c.p]);
+      let pool = free.filter(c => fam.indexOf(posOf(c)) !== -1);
+      if (!pool.length) pool = free.filter(c => hnGroupOf(posOf(c)) === grp && grp !== 'GK');
+      if (!pool.length && grp !== 'GK') pool = free.filter(c => hnGroupOf(posOf(c)) !== 'GK');
+      if (!pool.length) return;
+      pool.sort((a, b) => b.sc - a.sc);
+      out[i] = Object.assign({}, pool[0], { slot, si: i });
+      used[pool[0].p] = 1;
+    });
+    return out;
+  }
+  function hnLineScore(l) {
+    const W = hnCfg('lineW', HN_CFG.lineW);
+    return l.r + W.g * l.g + W.a * l.a + W.m * (l.mm || 0);
+  }
+  function hnSlim(c) { return { p: c.p, n: c.n, t: c.t, si: c.si, s: c.slot || c.s, r: c.r != null ? c.r : c.avg, g: c.g || 0, a: c.a != null ? c.a : (c.as || 0) }; }
+
+  // ---- 1. capture every season match (called from endMatch) -----------------------------------------------------------
+  function hnOnMatchComplete(m) {
+    if (!m || m._hnDone || !season || !currentSeasonComp) return;
+    const comp = currentSeasonComp, ck = hnCompKey(comp);
+    if (!ck) return;
+    m._hnDone = true;
+    const S = hnState();
+    const rk = hnRoundKey(ck, comp);
+    let mo = ''; try { mo = computeSeasonMonth(season); } catch (e) {}
+    if (S.mon.label && mo && S.mon.label !== mo) hnCloseMonth();
+    if (!S.mon.label) S.mon.label = mo;
+    const starts = new Set([].concat(m.home.squad.starting || [], m.away.squad.starting || []).map(p => p.id));
+    const onIds = new Set([].concat(m.homeOnPitch || [], m.awayOnPitch || []));
+    const isLeague = !isCupKey(ck) && ck !== 'ucl';
+    const lines = [];
+    [m.home, m.away].forEach(side => {
+      const tid = side.team.id;
+      (side.squad.all || []).forEach(p => {
+        const ps = m.playerMatchStats && m.playerMatchStats[p.id];
+        if (!ps || typeof ps.rating !== 'number') return;
+        const st = starts.has(p.id) ? 1 : 0;
+        if (!st && !onIds.has(p.id) && !(ps.goals || ps.assists)) return;
+        lines.push({ p: p.id, t: tid, n: p.name, s: String(ps.slot || p.slot || ps.pos || '').toUpperCase(), pp: String((ps.posArr || p.pos || [])[0] || '').toUpperCase(),
+          r: Math.round(ps.rating * 10) / 10, g: ps.goals || 0, a: ps.assists || 0, c: ps.cleanSheet ? 1 : 0, st, mm: m.motmId === p.id ? 1 : 0 });
+      });
+    });
+    lines.forEach(l => {
+      const key = l.p + '|' + l.t;
+      S.nm[l.p] = l.n;
+      const e = S.led[key] || (S.led[key] = { p: l.p, t: l.t, pp: l.pp, a: 0, st: 0, r: 0, g: 0, as: 0, m: 0, c: 0, s: {}, la: 0, lst: 0, lr: 0, lg: 0, las: 0 });
+      e.a++; e.st += l.st; e.r += l.r; e.g += l.g; e.as += l.a; e.m += l.mm; e.c += l.c;
+      if (l.st && l.s) e.s[l.s] = (e.s[l.s] || 0) + 1;
+      if (isLeague) { e.la++; e.lst += l.st; e.lr += l.r; e.lg += l.g; e.las += l.a; }
+      const me = S.mon.ent[key] || (S.mon.ent[key] = { p: l.p, t: l.t, a: 0, r: 0, g: 0, as: 0, m: 0 });
+      me.a++; me.r += l.r; me.g += l.g; me.as += l.a; me.m += l.mm;
+    });
+    const hs = m.home.score, as = m.away.score;
+    [[m.home, hs > as ? 3 : hs === as ? 1 : 0], [m.away, as > hs ? 3 : hs === as ? 1 : 0]].forEach(x => {
+      const f = x[0].squad && x[0].squad.formation; if (!f) return;
+      const tid = x[0].team.id, rec = S.fm[tid] || (S.fm[tid] = {});
+      const e = rec[f] || (rec[f] = [0, 0]); e[0]++; e[1] += x[1];
+    });
+    S.pend.push({ ck, rk, h: m.home.team.id, a: m.away.team.id, hs, as, L: lines });
+    hnDirty = true;
+  }
+
+  // ---- 2. a round finished -> awards ------------------------------------------------------------------------------------
+  function hnRoundDone(ck, rk, comp) {
+    const kind = rk[0], v = rk.slice(1);
+    if (!comp) return false;
+    if (kind === 'k') return !!comp.finished || comp.stage !== v;
+    return !!comp.finished || comp.currentRound > parseInt(v, 10);
+  }
+  function hnSweep() {
+    if (!season) return;
+    const S = hnState();
+    if (!S.pend.length) return;
+    const groups = {}, order = [];
+    S.pend.forEach(r => { const k = r.ck + '#' + r.rk; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(r); });
+    const keep = [];
+    order.forEach(k => {
+      const g = groups[k], first = g[0], comp = resolveSeasonComp(first.ck);
+      if (comp && hnRoundDone(first.ck, first.rk, comp)) { try { hnProcessGroup(S, first.ck, first.rk, g, comp); } catch (e) { console.warn('Honours round', e); } }
+      else keep.push.apply(keep, g);
+    });
+    S.pend = keep;
+    hnDirty = true;
+  }
+  function hnProcessGroup(S, ck, rk, recs, comp) {
+    const lines = []; recs.forEach(r => r.L.forEach(l => lines.push(l)));
+    const label = hnRoundLabel(rk, comp);
+    const year = season ? season.year : 0;
+    // Player of the Week for every club that played in this round
+    const byT = {};
+    lines.forEach(l => { (byT[l.t] = byT[l.t] || []).push(l); });
+    const keepN = hnCfg('clubWeekKeep', 6), clubWins = [];
+    Object.keys(byT).forEach(tid => {
+      const best = byT[tid].slice().sort((a, b) => hnLineScore(b) - hnLineScore(a))[0];
+      if (!best) return;
+      const rec = { ck, rk, lb: label, p: best.p, n: best.n, r: best.r, g: best.g, a: best.a, mm: best.mm };
+      const list = S.cw[tid] || (S.cw[tid] = []);
+      list.unshift(rec); if (list.length > keepN) list.length = keepN;
+      S.cwn[best.p] = (S.cwn[best.p] || 0) + 1;
+      hnTot(best.p).w++;
+      clubWins.push({ tid, rec, line: best });
+    });
+    // Team of the Week / Round
+    let totw = null;
+    if (!isCupKey(ck) && recs.length >= hnCfg('totwMinMatches', 2) && lines.length >= 11) {
+      const formKey = hnCfg('totwFormation', '4-3-3');
+      const cands = lines.filter(l => l.st || l.g || l.a).map(l => ({ p: l.p, n: l.n, t: l.t, pos: l.s || l.pp, r: l.r, g: l.g, a: l.a, mm: l.mm, sc: hnLineScore(l), c: l.c }));
+      const xi = hnPickXI(cands, formKey).filter(Boolean);
+      if (xi.length >= 9) {
+        const star = xi.slice().sort((a, b) => b.sc - a.sc)[0];
+        totw = { ck, rk, lb: label, comp: comp.name, f: formKey, y: year, xi: xi.map(hnSlim), star: hnSlim(star) };
+        (S.tw[ck] = S.tw[ck] || []).push(totw);
+        xi.forEach(x => { hnTot(x.p).tw++; });
+      }
+    }
+    // honour the leftovers of this round for the news layer (snubs = a multi-goal / big-rating player who missed the XI)
+    let snub = null;
+    if (totw) {
+      const inXI = {}; totw.xi.forEach(x => { inXI[x.p] = 1; });
+      snub = lines.filter(l => !inXI[l.p] && (l.g >= 2 || l.r >= 8.6)).sort((a, b) => hnLineScore(b) - hnLineScore(a))[0] || null;
+    }
+    hnQ({ k: 'week', ck, rk, lb: label, comp: comp.name, totw, clubs: clubWins, snub, y: year });
+  }
+
+  // ---- 3. month close -> Players of the Month ------------------------------------------------------------------------------
+  function hnMonthScore(e) {
+    const W = hnCfg('monthW', HN_CFG.monthW);
+    return e.r / e.a + W.g * e.g + W.a * e.as + W.m * e.m;
+  }
+  function hnCloseMonth() {
+    const S = hn; if (!S || !S.mon || !S.mon.label) return;
+    const label = S.mon.label, ent = Object.keys(S.mon.ent).map(k => S.mon.ent[k]);
+    S.mon = { label: '', ent: {} };
+    hnDirty = true;
+    if (!ent.length) return;
+    const minA = hnCfg('monthMinApps', 2);
+    const byT = {};
+    ent.forEach(e => { if (e.a >= minA) (byT[e.t] = byT[e.t] || []).push(e); });
+    const clubs = [], year = season ? season.year : 0;
+    Object.keys(byT).forEach(tid => {
+      const best = byT[tid].slice().sort((a, b) => hnMonthScore(b) - hnMonthScore(a))[0];
+      const rec = { mo: label, p: best.p, n: S.nm[best.p] || '', r: Math.round(best.r / best.a * 100) / 100, g: best.g, a: best.as, ap: best.a, sc: Math.round(hnMonthScore(best) * 100) / 100 };
+      (S.cm[tid] = S.cm[tid] || []).push(rec);
+      hnTot(best.p).m++;
+      clubs.push({ tid, rec });
+    });
+    const leagues = [];
+    Object.keys((season && season.leagues) || {}).forEach(lk => {
+      const mine = clubs.filter(c => hnLeagueOf(c.tid) === lk).sort((a, b) => b.rec.sc - a.rec.sc);
+      if (!mine.length) return;
+      const w = mine[0], rec = Object.assign({ lk, t: w.tid }, w.rec);
+      S.pm.push(rec);
+      hnTot(rec.p).lm++;
+      leagues.push(rec);
+    });
+    hnQ({ k: 'month', mo: label, leagues, clubs, y: year });
+  }
+
+  // ---- 4. season end -> Player of the Season (per club) + Team of the Season ----------------------------------------------
+  function hnDominantSlot(e) {
+    let best = '', n = 0;
+    Object.keys(e.s || {}).forEach(k => { if (e.s[k] > n) { n = e.s[k]; best = k; } });
+    return best || e.pp || '';
+  }
+  function hnSeasonScoreOf(avg, g, a, m, c, grp) {
+    const W = hnCfg('seasonW', HN_CFG.seasonW);
+    return avg + (W.g[grp] || 0) * g + W.a * a + W.m * m + (W.c[grp] || 0) * c;
+  }
+  // Merge ledger rows (a player who changed club mid-season appears once) restricted to `teamIds` (null = everyone).
+  function hnCandidates(S, scope, teamIds) {
+    const agg = {};
+    Object.keys(S.led).forEach(k => {
+      const e = S.led[k];
+      if (teamIds && !teamIds[e.t]) return;
+      const a = scope === 'lg' ? e.la : e.a, st = scope === 'lg' ? e.lst : e.st, r = scope === 'lg' ? e.lr : e.r;
+      if (!a) return;
+      const x = agg[e.p] || (agg[e.p] = { p: e.p, n: S.nm[e.p] || '', t: e.t, ta: 0, a: 0, st: 0, r: 0, g: 0, as: 0, m: 0, c: 0, s: {}, pp: e.pp });
+      x.a += a; x.st += st; x.r += r; x.g += scope === 'lg' ? e.lg : e.g; x.as += scope === 'lg' ? e.las : e.as; x.m += e.m; x.c += e.c;
+      Object.keys(e.s || {}).forEach(sl => { x.s[sl] = (x.s[sl] || 0) + e.s[sl]; });
+      if (a > x.ta) { x.ta = a; x.t = e.t; }
+    });
+    const list = Object.keys(agg).map(k => agg[k]);
+    list.forEach(x => {
+      x.slot = hnDominantSlot(x); x.pos = x.slot; x.grp = hnGroupOf(x.slot);
+      x.avg = Math.round(x.r / x.a * 100) / 100;
+      x.sc = hnSeasonScoreOf(x.r / x.a, x.g, x.as, x.m, x.c, x.grp);
+    });
+    return list;
+  }
+  function hnEligible(list) {
+    const maxSt = Math.max(0, ...list.map(x => x.st));
+    const minSt = Math.max(hnCfg('minStartsAbs', 5), Math.floor(hnCfg('minStartsFrac', 0.35) * maxSt));
+    return { ok: list.filter(x => x.st >= minSt), rest: list.filter(x => x.st < minSt && x.st >= 3), minSt };
+  }
+  // The formation a manager got the most points per game with (falls back to his most used one).
+  function hnBestFormation(teamId) {
+    const S = hn, rec = (S && S.fm[teamId]) || {};
+    const keys = Object.keys(rec).filter(k => FORMATIONS[k]);
+    if (!keys.length) { const t = getTeam(teamId); let f = '4-3-3'; try { f = pickTeamFormation(t) || f; } catch (e) {} return { key: FORMATIONS[f] ? f : '4-3-3', n: 0, ppg: 0 }; }
+    const total = keys.reduce((s, k) => s + rec[k][0], 0);
+    const need = Math.max(hnCfg('minFormGames', 3), Math.round(hnCfg('minFormFrac', 0.15) * total));
+    let pool = keys.filter(k => rec[k][0] >= need);
+    if (!pool.length) pool = keys;
+    pool.sort((a, b) => (rec[b][1] / rec[b][0]) - (rec[a][1] / rec[a][0]) || rec[b][0] - rec[a][0]);
+    const k = pool[0];
+    return { key: k, n: rec[k][0], ppg: Math.round(rec[k][1] / rec[k][0] * 100) / 100 };
+  }
+  function hnLeagueManagerTeam(comp) {
+    try {
+      const nm = comp.name + ' Manager of the Season', y = season.year;
+      const tr = (trophies || []).slice().reverse().find(t => t.name === nm && t.year === y);
+      if (tr) { const t = (comp.teams || []).find(x => x.name === tr.team); if (t) return t; }
+    } catch (e) {}
+    try { return galaLeagueManager(comp) || null; } catch (e) { return null; }
+  }
+  function hnOverallManagerTeam() {
+    try {
+      const pool = galaManagerPool().filter(x => x && x.team && x.team.manager);
+      if (pool.length) { pool.sort((a, b) => b.score - a.score); return { team: pool[0].team, row: pool[0] }; }
+    } catch (e) {}
+    return null;
+  }
+  function hnBuildTots(S, scope, teamIds, mgrTeam, extra) {
+    if (!mgrTeam) return null;
+    const cands = hnCandidates(S, scope, teamIds);
+    if (cands.length < 11) return null;
+    const el = hnEligible(cands);
+    const form = hnBestFormation(mgrTeam.id);
+    let xi = hnPickXI(el.ok, form.key);
+    if (xi.some(x => !x)) {                                   // thin pool: let near-regulars fill the gaps
+      const have = {}; xi.forEach(x => { if (x) have[x.p] = 1; });
+      const extraPool = el.rest.concat(el.ok.filter(x => !have[x.p]));
+      const F = FORMATIONS[form.key], filled = hnPickXI(extraPool.filter(x => !have[x.p]).concat(el.ok.filter(x => have[x.p])), form.key);
+      xi = xi.map((x, i) => x || filled[i]);
+    }
+    xi = xi.filter(Boolean);
+    if (xi.length < 9) return null;
+    const star = el.ok.concat(el.rest).sort((a, b) => b.sc - a.sc)[0] || xi[0];
+    const mgr = mgrTeam.manager || {};
+    return Object.assign({
+      mgr: { n: mgr.name || '', t: mgrTeam.id, tn: hnTn(mgrTeam), f: form.key, fn: (FORMATIONS[form.key] || {}).name || form.key, gp: form.n, ppg: form.ppg },
+      f: form.key,
+      xi: xi.map(c => ({ p: c.p, n: c.n, t: c.t, si: c.si, s: c.slot, r: c.avg, g: c.g, a: c.as, ap: c.a, sc: Math.round(c.sc * 100) / 100 })),
+      star: { p: star.p, n: star.n, t: star.t, r: star.avg, g: star.g, a: star.as, sc: Math.round(star.sc * 100) / 100 }
+    }, extra || {});
+  }
+  function hnOnSeasonEnd() {
+    if (!season) return;
+    const S = hnState();
+    if (S.ended) return;
+    hnSweep();
+    hnCloseMonth();
+    S.ended = true;
+    const year = season.year;
+    // Player of the Season for every club
+    const pos = {}, posList = [];
+    const byClub = {};
+    Object.keys(S.led).forEach(k => { const e = S.led[k]; (byClub[e.t] = byClub[e.t] || []).push(e); });
+    const all = hnCandidates(S, 'all', null);
+    const elAll = hnEligible(all);
+    const okSet = {}; elAll.ok.concat(elAll.rest).forEach(x => { okSet[x.p] = 1; });
+    Object.keys(byClub).forEach(tid => {
+      const list = byClub[tid].filter(e => e.a >= 3).map(e => {
+        const slot = hnDominantSlot(e), grp = hnGroupOf(slot);
+        return { p: e.p, n: S.nm[e.p] || '', a: e.a, st: e.st, avg: Math.round(e.r / e.a * 100) / 100, g: e.g, as: e.as, m: e.m, sc: hnSeasonScoreOf(e.r / e.a, e.g, e.as, e.m, e.c, grp) };
+      });
+      if (!list.length) return;
+      const clubMaxSt = Math.max(...list.map(x => x.st));
+      const minSt = Math.max(3, Math.floor(0.4 * clubMaxSt));
+      const pool = list.filter(x => x.st >= minSt);
+      const best = (pool.length ? pool : list).sort((a, b) => b.sc - a.sc)[0];
+      pos[tid] = { p: best.p, n: best.n, r: best.avg, g: best.g, a: best.as, ap: best.a, m: best.m, sc: Math.round(best.sc * 100) / 100 };
+      hnTot(best.p).ps++;
+      posList.push({ tid, rec: pos[tid] });
+    });
+    S.pos = pos;
+    // Team of the Season: best manager first, then his formation, then the players
+    const ts = { y: year, g: null, l: {} };
+    const overall = hnOverallManagerTeam();
+    if (overall) {
+      const allIds = null;
+      const g = hnBuildTots(S, 'all', allIds, overall.team, { why: overall.row && overall.row.tags ? overall.row.tags.slice(0, 3) : [] });
+      if (g) { ts.g = g; g.xi.forEach(x => { hnTot(x.p).ts++; }); }
+    }
+    Object.keys(season.leagues || {}).forEach(lk => {
+      const comp = season.leagues[lk];
+      const mt = hnLeagueManagerTeam(comp);
+      const ids = {}; (comp.teams || []).forEach(t => { ids[t.id] = 1; });
+      const l = hnBuildTots(S, 'lg', ids, mt, { lk, comp: comp.name });
+      if (l) { ts.l[lk] = l; l.xi.forEach(x => { hnTot(x.p).tl++; }); }
+    });
+    S.ts = ts;
+    S.hist[year] = { ts, pos, pm: S.pm.slice() };
+    hnDirty = true;
+    hnQ({ k: 'season', ts, pos: posList, y: year });
+  }
+
+  // ---- news hook ---------------------------------------------------------------------------------------------------------
+  function hnQ(ev) {
+    try { if (typeof mediaReady === 'undefined' || !mediaReady) return; } catch (e) { return; }
+    _hnMedia.push(ev);
+    if (_hnMedia.length > 400) _hnMedia.splice(0, _hnMedia.length - 400);
+    try { mediaOnHonours(); } catch (e) {}
+  }
+
+
+  // ==========================================================================
+  // HONOURS NEWS — how the media world talks about Teams of the Week, Players of the Week / Month /
+  // Season and the Team of the Season. All wording lives in media-honours.json ("B" banks, merged into
+  // MB as hn_<name>), so it can be edited without a rebuild. The engine side is engine/honours.js.
+  // ==========================================================================
+  const HN_BADGE = { totw: '⭐ Team of the Week', potw: '🏅 Player of the Week', potm: '📅 Player of the Month', pots: '🏆 Player of the Season', tots: '🌟 Team of the Season', mgr: '🧥 Manager of the Season' };
+
+  function mediaHonoursApply(j) {
+    if (!j || !j.B) return;
+    HNJ = j;
+    Object.keys(j.B).forEach(k => { MB['hn_' + k] = j.B[k]; });
+  }
+  function hnMediaOn() { return !!(mediaReady && HNJ && HNJ.B); }
+  function mediaOnHonours() {
+    if (!hnMediaOn()) { _hnMedia = []; return; }
+    ensureMedia();
+    if (!_mediaEventQueue.some(e => e.kind === 'honours')) _mediaEventQueue.push({ kind: 'honours' });
+    mediaScheduleFlush();
+  }
+
+  // ---- small helpers -------------------------------------------------------------------------------------------------
+  function hnl(bank, c) {
+    const arr = HNJ && HNJ.B && HNJ.B[bank]; if (!arr || !arr.length) return '';
+    return mx(mFresh(mOk(arr, c), 'hn:' + bank), c);
+  }
+  function hnPost(batch, u, kind, bank, c, o) {
+    const x = hnl(bank, c); if (!x) return null;
+    return mkPost(batch, u, kind, x, o);
+  }
+  function hnPlural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+  function hnLineText(l) {
+    const bits = [];
+    if (l.g) bits.push(hnPlural(l.g, 'goal'));
+    if (l.a) bits.push(hnPlural(l.a, 'assist'));
+    if (!bits.length) bits.push('a rating of ' + Number(l.r).toFixed(1));
+    return bits.join(' and ');
+  }
+  function hnSeasonLineText(l) {
+    const bits = [];
+    if (l.g) bits.push(hnPlural(l.g, 'goal'));
+    if (l.a) bits.push(hnPlural(l.a, 'assist'));
+    bits.push('an average rating of ' + Number(l.r).toFixed(2));
+    return bits.join(', ').replace(/, ([^,]*)$/, ' and $1');
+  }
+  function hnClubAcct(team) { try { return sxOn() ? mClubAcct(team) : mClubDesk(team); } catch (e) { return mClubDesk(team); } }
+  function hnFanOf(team, slot, mood) { return mFan(team, slot + mInt(0, 400), mood); }
+  function hnPlayerObj(pid) { try { const f = findPlayerAndTeam(pid); return f; } catch (e) { return null; } }
+  function hnPlayerPost(batch, pid, bank, c, o) {
+    try {
+      if (!sxOn()) return null;
+      const f = hnPlayerObj(pid); if (!f || !f.player) return null;
+      const x = hnl(bank, c); if (!x) return null;
+      return mkPost(batch, mPlayerAcct(f.player, f.team), 'tw', x, o);
+    } catch (e) { return null; }
+  }
+  function hnNames(xi) { return xi.map(x => mSur(x.n) + ' (' + ((getTeam(x.t) || {}).short || '') + ')').join(', '); }
+  function hnTopClub(xi) {
+    const n = {}; xi.forEach(x => { n[x.t] = (n[x.t] || 0) + 1; });
+    const best = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+    return best ? { id: best, n: n[best] } : null;
+  }
+  function hnCareerFirst(list, key) {
+    return list.slice().sort((a, b) => ((b[key] === careerTeamId) - (a[key] === careerTeamId)));
+  }
+
+  // ---- flush ---------------------------------------------------------------------------------------------------------------------
+  function hnMediaFlush(batch, bulk) {
+    const evs = _hnMedia; _hnMedia = [];
+    if (!hnMediaOn() || !evs.length) return;
+    // a bulk sim (to end of season, etc.) would otherwise flood the feed: keep only the latest weekly story per competition
+    let list = evs;
+    if (bulk) {
+      const lastWeek = {};
+      evs.forEach((e, i) => { if (e.k === 'week') lastWeek[e.ck] = i; });
+      list = evs.filter((e, i) => e.k !== 'week' || lastWeek[e.ck] === i);
+    }
+    list.forEach(ev => {
+      try {
+        if (ev.k === 'week') hnStoryWeek(batch, ev, bulk);
+        else if (ev.k === 'month') hnStoryMonth(batch, ev, bulk);
+        else if (ev.k === 'season') hnStorySeason(batch, ev);
+      } catch (e) { console.warn('Honours story', e); }
+    });
+  }
+
+  // ---- weekly: Team of the Week + club Players of the Week ----------------------------------------------------------------------------
+  function hnStoryWeek(batch, ev, bulk) {
+    const t = ev.totw, maxClub = hnCfg('media.clubWeekPosts', 3);
+    const tg = ['#TOTW', mTag(ev.comp)], isUcl = ev.ck === 'ucl';
+    if (t) {
+      const star = t.star, starTeam = getTeam(star.t), starFound = hnPlayerObj(star.p);
+      const gk = t.xi.find(x => x.s === 'GK');
+      const c = { league: ev.comp, md: ev.lb, names: hnNames(t.xi), star: star.n, starS: mSur(star.n), starT: hnTeamName(star.t), starTS: starTeam ? starTeam.short : '',
+        starLine: hnLineText(star), starR: Number(star.r).toFixed(1), formation: t.f, gk: gk ? gk.n : '', gkS: gk ? mSur(gk.n) : '', tag: mTag(ev.comp) };
+      const base = { ts: t.xi.map(x => x.t).filter((v, i, a) => a.indexOf(v) === i), tg, c: ev.comp, ph: 'wk', hn: 'totw', im: 0 };
+      hnPost(batch, 'bn', 'news', 'totw_bn', c, Object.assign({}, base, { dt: 0, v: isUcl ? 1.6 : 1.2 }));
+      hnPost(batch, 'statbook', 'stat', 'totw_list', c, Object.assign({}, base, { dt: mInt(8, 30) }));
+      if (!bulk) {
+        hnCareerFirst(t.xi, 't').slice(0, maxClub).forEach((x, i) => {
+          const team = getTeam(x.t); if (!team) return;
+          const cc = Object.assign({}, c, { player: x.n, playerS: mSur(x.n), line: hnLineText(x), team: hnTeamName(x.t) });
+          hnPost(batch, hnClubAcct(team), 'tw', 'totw_club', cc, Object.assign({}, base, { dt: mInt(12, 90), ts: [team.id] }));
+        });
+        if (starTeam) {
+          hnPost(batch, hnFanOf(starTeam, 'tw', 'wholesome'), 'tw', 'totw_fan', c, Object.assign({}, base, { dt: mInt(20, 150), ts: [starTeam.id] }));
+          if (mChance(0.5)) hnPlayerPost(batch, star.p, 'totw_player', c, Object.assign({}, base, { dt: mInt(30, 160), ts: [starTeam.id] }));
+        }
+        if (mChance(0.6)) hnPost(batch, mFan(null, 'rv' + mInt(0, 400), 'banter'), 'tw', 'totw_rival', c, Object.assign({}, base, { dt: mInt(30, 200) }));
+        if (ev.snub) {
+          const sTeam = getTeam(ev.snub.t);
+          const sc = Object.assign({}, c, { snub: ev.snub.n, snubS: mSur(ev.snub.n), snubT: hnTeamName(ev.snub.t), snubLine: hnLineText(ev.snub) });
+          hnPost(batch, hnFanOf(sTeam, 'sn', 'angry'), 'tw', 'totw_snub', sc, Object.assign({}, base, { dt: mInt(40, 220), v: 1.5, ts: sTeam ? [sTeam.id] : [] }));
+        }
+        if (isUcl || mChance(0.2)) {
+          const byLens = mPundits();
+          hnPost(batch, 'asc', 'tv', 'totw_tv', c, Object.assign({}, base, { dt: mInt(40, 100), ban: hnl('tv_banner_totw', c), show: 'Team of the Week',
+            an: [hnl('studio_totw', c)], pn: ['analyst', 'attacker'].filter(l => byLens[l]).map(l => ({ p: byLens[l], x: hnl('pan_' + l, c) })), tick: [ev.comp + ' ' + ev.lb + ': ' + mSur(star.n) + ' stars'] }));
+        }
+      }
+    }
+    // clubs' Players of the Week
+    if (bulk) return;
+    const wins = hnCareerFirst(ev.clubs, 'tid').filter(w => w.rec.r >= 7.6 || w.tid === careerTeamId).sort((a, b) => ((b.tid === careerTeamId) - (a.tid === careerTeamId)) || b.rec.r - a.rec.r).slice(0, maxClub);
+    wins.forEach(w => {
+      const team = getTeam(w.tid); if (!team) return;
+      const c = { player: w.rec.n, playerS: mSur(w.rec.n), team: hnTeamName(w.tid), teamS: team.short || '', line: hnLineText(w.rec), r: Number(w.rec.r).toFixed(1), md: ev.lb, league: ev.comp, tag: mTag(ev.comp) };
+      const base = { ts: [team.id], tg: ['#PlayerOfTheWeek', mTag(hnTeamName(w.tid))], c: ev.comp, ph: 'wk', hn: 'potw', im: 0 };
+      hnPost(batch, hnClubAcct(team), 'tw', 'potw_club', c, Object.assign({}, base, { dt: mInt(15, 100) }));
+      if (w.tid === careerTeamId || mChance(0.35)) hnPost(batch, hnFanOf(team, 'pw', 'wholesome'), 'tw', 'potw_fan', c, Object.assign({}, base, { dt: mInt(25, 170) }));
+      if (w.tid === careerTeamId || mChance(0.3)) hnPlayerPost(batch, w.rec.p, 'potw_player', c, Object.assign({}, base, { dt: mInt(30, 180) }));
+    });
+  }
+
+  // ---- monthly ---------------------------------------------------------------------------------------------------------------------
+  function hnStoryMonth(batch, ev, bulk) {
+    const byLens = mPundits();
+    ev.leagues.forEach(w => {
+      const team = getTeam(w.t); if (!team) return;
+      const lg = season && season.leagues && season.leagues[w.lk] ? season.leagues[w.lk].name : w.lk;
+      const c = { player: w.n, playerS: mSur(w.n), team: hnTeamName(w.t), teamS: team.short || '', month: ev.mo, league: lg, line: hnSeasonLineText({ g: w.g, a: w.a, r: w.r }), apps: w.ap, tag: mTag(lg) };
+      const base = { ts: [team.id], tg: ['#PlayerOfTheMonth', mTag(lg)], c: lg, ph: 'ev', hn: 'potm', im: 1 };
+      hnPost(batch, 'bn', 'news', 'potm_bn', c, Object.assign({}, base, { dt: 0, v: 1.4 }));
+      hnPost(batch, hnClubAcct(team), 'tw', 'potm_club', c, Object.assign({}, base, { dt: mInt(10, 80) }));
+      if (bulk) return;
+      hnPlayerPost(batch, w.p, 'potm_player', c, Object.assign({}, base, { dt: mInt(20, 120) }));
+      hnPost(batch, hnFanOf(team, 'pm', 'wholesome'), 'tw', 'potm_fan', c, Object.assign({}, base, { dt: mInt(20, 200) }));
+      if (mChance(0.4)) hnPost(batch, 'asc', 'tv', 'potm_tv', c, Object.assign({}, base, { dt: mInt(30, 90), ban: hnl('tv_banner_potm', c), show: 'Awards Night Live',
+        an: [hnl('studio_potm', c)], pn: ['analyst', 'attacker'].filter(l => byLens[l]).map(l => ({ p: byLens[l], x: hnl('pan_' + l, c) })), tick: [lg + ' Player of the ' + ev.mo.slice(0, 3) + ': ' + mSur(w.n)] }));
+    });
+    // a few club winners besides the league winners (career club always)
+    const leagueTeams = {}; ev.leagues.forEach(w => { leagueTeams[w.t] = 1; });
+    const clubs = ev.clubs.filter(x => !leagueTeams[x.tid]).sort((a, b) => ((b.tid === careerTeamId) - (a.tid === careerTeamId)) || b.rec.sc - a.rec.sc).slice(0, bulk ? 2 : hnCfg('media.clubMonthPosts', 6));
+    clubs.forEach(x => {
+      const team = getTeam(x.tid); if (!team) return;
+      const c = { player: x.rec.n, playerS: mSur(x.rec.n), team: hnTeamName(x.tid), teamS: team.short || '', month: ev.mo, line: hnSeasonLineText({ g: x.rec.g, a: x.rec.a, r: x.rec.r }), apps: x.rec.ap };
+      const base = { ts: [team.id], tg: ['#PlayerOfTheMonth', mTag(hnTeamName(x.tid))], ph: 'ev', hn: 'potm', im: 0 };
+      hnPost(batch, hnClubAcct(team), 'tw', 'potm_club', c, Object.assign({}, base, { dt: mInt(20, 150) }));
+      if (x.tid === careerTeamId) hnPost(batch, hnFanOf(team, 'pm', 'wholesome'), 'tw', 'potm_fan', c, Object.assign({}, base, { dt: mInt(30, 200) }));
+    });
+  }
+
+  // ---- season: club Players of the Season + Team of the Season (+ manager and formation) ------------------------------------------------
+  function hnStorySeason(batch, ev) {
+    const yr = 'Season ' + ev.y;
+    // Players of the Season: the career club + the clubs whose winner scored best
+    ev.pos.slice().sort((a, b) => ((b.tid === careerTeamId) - (a.tid === careerTeamId)) || b.rec.sc - a.rec.sc).slice(0, hnCfg('media.clubSeasonPosts', 14)).forEach(x => {
+      const team = getTeam(x.tid); if (!team) return;
+      const c = { player: x.rec.n, playerS: mSur(x.rec.n), team: hnTeamName(x.tid), teamS: team.short || '', line: hnSeasonLineText(x.rec), season: yr, apps: x.rec.ap };
+      const base = { ts: [team.id], tg: ['#PlayerOfTheSeason', mTag(hnTeamName(x.tid))], ph: 'ev', hn: 'pots', im: 1 };
+      hnPost(batch, hnClubAcct(team), 'tw', 'pots_club', c, Object.assign({}, base, { dt: mInt(20, 200) }));
+      if (x.tid === careerTeamId || mChance(0.3)) hnPost(batch, hnFanOf(team, 'ps', 'wholesome'), 'tw', 'pots_fan', c, Object.assign({}, base, { dt: mInt(30, 260) }));
+      if (x.tid === careerTeamId || mChance(0.25)) hnPlayerPost(batch, x.rec.p, 'pots_player', c, Object.assign({}, base, { dt: mInt(40, 260) }));
+    });
+    const ts = ev.ts; if (!ts) return;
+    Object.keys(ts.l || {}).forEach(lk => hnStoryTots(batch, ts.l[lk], yr, false));
+    if (ts.g) hnStoryTots(batch, ts.g, yr, true);
+  }
+
+  function hnStoryTots(batch, t, yr, overall) {
+    const star = t.star, team = getTeam(star.t), mgrTeam = getTeam(t.mgr.t), top = hnTopClub(t.xi);
+    const topTeam = top ? getTeam(top.id) : null;
+    const lg = overall ? 'Apex' : (t.comp || '');
+    const c = { season: yr, league: lg, scope: overall ? 'Apex' : lg, names: hnNames(t.xi), mgr: t.mgr.n, mgrS: mSur(t.mgr.n), mgrT: t.mgr.tn, formation: t.mgr.fn, formKey: t.mgr.f,
+      gp: t.mgr.gp, ppg: Number(t.mgr.ppg).toFixed(2), star: star.n, starS: mSur(star.n), starT: hnTeamName(star.t), starTS: team ? team.short : '', starLine: hnSeasonLineText(star),
+      topClub: topTeam ? hnTeamName(top.id) : '', topN: top ? top.n : '', tag: mTag(lg + 'TOTS') };
+    const allTs = t.xi.map(x => x.t).filter((v, i, a) => a.indexOf(v) === i);
+    const base = { ts: allTs, tg: ['#TeamOfTheSeason', mTag(lg)], c: (overall ? 'Team of the Season' : lg + ' Team of the Season'), ph: 'ev', hn: 'tots', im: overall ? 3 : 2 };
+    const byLens = mPundits();
+    hnPost(batch, 'bn', 'news', overall ? 'tots_bn' : 'tots_lg_bn', c, Object.assign({}, base, { dt: 0, v: overall ? 2.4 : 1.4 }));
+    hnPost(batch, 'statbook', 'stat', 'tots_list', c, Object.assign({}, base, { dt: mInt(8, 30) }));
+    hnPost(batch, 'tac', 'take', 'tots_tac', c, Object.assign({}, base, { dt: mInt(30, 90), hn: 'mgr' }));
+    if (mgrTeam) {
+      let acct = null; try { if (vxOn()) acct = vxMgrAcct(mgrTeam, true); } catch (e) {}
+      if (acct) hnPost(batch, acct, 'tw', 'tots_mgr', c, Object.assign({}, base, { dt: mInt(30, 160), ts: [mgrTeam.id], hn: 'mgr' }));
+      hnPost(batch, hnClubAcct(mgrTeam), 'tw', 'tots_mgr_club', c, Object.assign({}, base, { dt: mInt(20, 100), ts: [mgrTeam.id], hn: 'mgr' }));
+    }
+    hnCareerFirst(t.xi, 't').slice(0, overall ? 4 : 2).forEach(x => {
+      const tm = getTeam(x.t); if (!tm) return;
+      const cc = Object.assign({}, c, { player: x.n, playerS: mSur(x.n), team: hnTeamName(x.t), line: hnSeasonLineText(x) });
+      hnPost(batch, hnClubAcct(tm), 'tw', 'tots_club', cc, Object.assign({}, base, { dt: mInt(20, 200), ts: [tm.id] }));
+      if (overall || x.t === careerTeamId) hnPlayerPost(batch, x.p, 'tots_player', cc, Object.assign({}, base, { dt: mInt(40, 280), ts: [tm.id] }));
+    });
+    for (let i = 0; i < (overall ? 3 : 1); i++) {
+      const tm = i === 0 ? team : (topTeam || team); if (!tm) continue;
+      hnPost(batch, hnFanOf(tm, 'ts', 'wholesome'), 'tw', 'tots_fan', c, Object.assign({}, base, { dt: mInt(30, 260), ts: [tm.id] }));
+    }
+    hnPost(batch, mFan(null, 'rv' + mInt(0, 400), 'angry'), 'tw', 'tots_snub', c, Object.assign({}, base, { dt: mInt(40, 280), v: 1.6 }));
+    if (!overall) return;
+    const hd = hnl('tots_art_h', c);
+    if (hd) mkPost(batch, 'meridian', 'art', hd, Object.assign({}, base, { dt: 30, h: hd, b: [hnl('tots_art_b1', c), hnl('tots_art_b2', c)], by: mPick(MEDIA_BYLINES.meridian) }));
+    hnPost(batch, 'gaffe', 'news', 'tots_gaffe', c, Object.assign({}, base, { dt: 6, v: 1.4 }));
+    hnPost(batch, 'asc', 'tv', 'tots_tv', c, Object.assign({}, base, { dt: 14, v: 2, ban: hnl('tv_banner_tots', c), show: 'Team of the Season Live',
+      an: [hnl('studio_tots', c), hnl('studio_tots2', c)].filter(Boolean), pn: ['analyst', 'attacker', 'hardman'].filter(l => byLens[l]).map(l => ({ p: byLens[l], x: hnl('pan_tots_' + l, c) })), tick: [yr + ' Team of the Season: ' + t.mgr.n + ' (' + t.mgr.fn + ')', 'Player of the Season: ' + star.n] }));
+    hnPost(batch, 'viral', 'meme', 'tots_meme', c, Object.assign({}, base, { dt: mInt(10, 90), v: 1.6 }));
+    hnPost(batch, 'terrace', 'take', 'tots_radio', c, Object.assign({}, base, { dt: mInt(40, 140) }));
+    const vp = hnl('tots_vid', c);
+    if (vp) mkPost(batch, 'fanvoices', 'vid', vp, Object.assign({}, base, { dt: mInt(60, 240), vid: { vw: mInt(150000, 3000000), dur: mInt(4, 14) + ':' + String(mInt(0, 59)).padStart(2, '0') } }));
+  }
+
+
+  // ==========================================================================
+  // HONOURS UI — Season dashboard "Honours" sub-tab (Team of the Week, Players of the Month, Team of
+  // the Season), the club honours panel on team pages and the honours tally on player pages.
+  // ==========================================================================
+  const hnUi = { sec: 'totw', idx: {}, scope: 'lg', year: null };
+  function hnE(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function hnRerender() { try { renderSeasonDashboard(); } catch (e) {} }
+  function hnSetSection(s) { hnUi.sec = s; hnRerender(); }
+  function hnSetScope(s) { hnUi.scope = s; hnRerender(); }
+  function hnSetYear(y) { hnUi.year = y; hnRerender(); }
+  function hnStepRound(ck, d) {
+    const S = hnState(), list = (S.tw[ck] || []);
+    const cur = hnUi.idx[ck] == null ? list.length - 1 : hnUi.idx[ck];
+    hnUi.idx[ck] = Math.max(0, Math.min(list.length - 1, cur + d));
+    hnRerender();
+  }
+
+  function hnDot(x, F) {
+    const c = (F.coords || [])[x.si != null ? x.si : 0] || [50, 50];
+    const team = getTeam(x.t), found = (function () { try { return findPlayerAndTeam(x.p); } catch (e) { return null; } })();
+    const bg = (team && team.color) || '#334155', bd = (team && team.color2) || '#fff';
+    return `<div class="player-dot" style="left:${c[0]}%;top:${c[1]}%;background:${bg};border:2px solid ${bd}">
+      <span class="dot-pos">${hnE(x.s || '')}</span>
+      <span class="dot-avatar">${found && found.player ? playerAvatarMark(found.player) : ''}</span>
+      <span class="dot-label"><span class="dot-num">${Number(x.r).toFixed(1)}</span><span class="dot-name">${hnE(abbreviateName(x.n))}</span></span>
+    </div>`;
+  }
+  function hnPitchHTML(xi, formKey, label) {
+    const F = FORMATIONS[formKey] || FORMATIONS['4-3-3'];
+    return `<div class="pitch-wrap"><div class="mini-pitch team-pitch"><div class="pitch-label">${hnE(label)} · ${hnE(F.name)}</div>${xi.map(x => hnDot(x, F)).join('')}</div></div>`;
+  }
+  function hnXiTable(xi, per90) {
+    return `<div class="hn-table"><table class="data-table"><thead><tr><th>Pos</th><th>Player</th><th>Club</th><th>${per90 ? 'Avg' : 'Rtg'}</th><th>G</th><th>A</th></tr></thead><tbody>` +
+      xi.map(x => `<tr><td>${hnE(x.s)}</td><td>${hnE(x.n)}</td><td>${hnE(hnTeamName(x.t))}</td><td><b>${Number(x.r).toFixed(per90 ? 2 : 1)}</b></td><td>${x.g}</td><td>${x.a}</td></tr>`).join('') + '</tbody></table></div>';
+  }
+  function hnTabs(items, cur, fn) {
+    return '<div class="leaderboard-tabs hn-sub">' + items.map(i => `<button class="lb-tab ${cur === i[0] ? 'active' : ''}" onclick="App.${fn}('${i[0]}')">${i[1]}</button>`).join('') + '</div>';
+  }
+  function hnTotsBlock(t, title) {
+    if (!t) return '<div class="empty-state"><p>Not available for this competition.</p></div>';
+    return `<div class="hn-mgr">🧥 <b>${hnE(t.mgr.n)}</b> <span>${hnE(t.mgr.tn)}</span> — Manager of the Season · formation <b>${hnE(t.mgr.fn)}</b>${t.mgr.gp ? ` <span>(${t.mgr.gp} games, ${Number(t.mgr.ppg).toFixed(2)} pts/game)</span>` : ''}</div>` +
+      hnPitchHTML(t.xi, t.f, title) +
+      `<div class="hn-star">🏆 Player of the Season: <b>${hnE(t.star.n)}</b> (${hnE(hnTeamName(t.star.t))}) — ${t.star.g} goals, ${t.star.a} assists, ${Number(t.star.r).toFixed(2)} avg</div>` + hnXiTable(t.xi, true);
+  }
+
+  function renderHonoursHTML(ck) {
+    const S = hnState(), isLeague = !isCupKey(ck) && ck !== 'ucl';
+    const comp = resolveSeasonComp(ck);
+    let h = hnTabs([['totw', 'Team of the Week'], ['players', 'Players'], ['tots', 'Team of the Season']], hnUi.sec, 'hnSetSection');
+    if (hnUi.sec === 'totw') {
+      const list = S.tw[ck] || [];
+      if (!list.length) return h + '<div class="empty-state"><div class="icon">⭐</div><p>The first Team of the Week appears once a full round has been played.</p></div>';
+      const i = hnUi.idx[ck] == null || hnUi.idx[ck] >= list.length ? list.length - 1 : hnUi.idx[ck], t = list[i];
+      h += `<div class="hn-round"><button class="btn btn-secondary btn-sm" ${i === 0 ? 'disabled' : ''} onclick="App.hnStepRound('${ck}',-1)">◀</button><b>${hnE(t.comp)} · ${hnE(t.lb)}</b><button class="btn btn-secondary btn-sm" ${i === list.length - 1 ? 'disabled' : ''} onclick="App.hnStepRound('${ck}',1)">▶</button></div>`;
+      h += hnPitchHTML(t.xi, t.f, 'Team of the ' + (t.rk[0] === 'k' ? 'Round' : 'Week'));
+      h += `<div class="hn-star">⭐ Star of the round: <b>${hnE(t.star.n)}</b> (${hnE(hnTeamName(t.star.t))}) — ${Number(t.star.r).toFixed(1)}</div>` + hnXiTable(t.xi, false);
+      const clubs = Object.keys(S.cw).map(tid => ({ tid, w: (S.cw[tid] || []).find(x => x.ck === t.ck && x.rk === t.rk) })).filter(x => x.w);
+      if (clubs.length) h += '<div class="hn-clubs"><h4>Club Players of the Week</h4>' + clubs.map(x => `<div class="hn-row"><span>${hnE(hnTeamName(x.tid))}</span><b>${hnE(x.w.n)}</b><span>${Number(x.w.r).toFixed(1)}</span></div>`).join('') + '</div>';
+      return h;
+    }
+    if (hnUi.sec === 'players') {
+      const pm = S.pm.filter(x => !isLeague || x.lk === ck);
+      h += '<div class="hn-clubs"><h4>' + (isLeague ? 'League Player of the Month' : 'Players of the Month') + '</h4>' +
+        (pm.length ? pm.map(x => `<div class="hn-row"><span>${hnE(x.mo)}</span><b>${hnE(x.n)}</b><span>${hnE(hnTeamName(x.t))} · ${x.g}G ${x.a}A · ${Number(x.r).toFixed(2)}</span></div>`).join('') : '<p class="hn-muted">The first monthly award lands when the first month closes.</p>') + '</div>';
+      const teams = (comp && comp.teams) || [];
+      if (teams.length) {
+        h += '<div class="hn-clubs"><h4>Club honours</h4>' + teams.map(t => {
+          const w = (S.cw[t.id] || [])[0], m = (S.cm[t.id] || []).slice(-1)[0], p = S.pos && S.pos[t.id];
+          return `<div class="hn-row hn-club"><span>${hnE(hnTn(t))}</span><span>${w ? '🏅 ' + hnE(w.n) : '—'}</span><span>${m ? '📅 ' + hnE(m.n) : '—'}</span><span>${p ? '🏆 ' + hnE(p.n) : '—'}</span></div>`;
+        }).join('') + '<p class="hn-muted">🏅 latest Player of the Week · 📅 latest Player of the Month · 🏆 Player of the Season</p></div>';
+      }
+      return h;
+    }
+    // Team of the Season
+    const years = Object.keys(S.hist).map(Number).sort((a, b) => b - a);
+    const curTs = S.ts, y = hnUi.year != null ? hnUi.year : (curTs ? curTs.y : years[0]);
+    const ts = y != null && S.hist[y] ? S.hist[y].ts : curTs;
+    if (!ts) return h + '<div class="empty-state"><div class="icon">🌟</div><p>The Team of the Season is announced when the season ends: best manager first, then his formation, then the XI.</p></div>';
+    if (years.length > 1) h += '<div class="leaderboard-tabs hn-sub">' + years.map(yy => `<button class="lb-tab ${yy === y ? 'active' : ''}" onclick="App.hnSetYear(${yy})">Season ${yy}</button>`).join('') + '</div>';
+    h += hnTabs([['lg', isLeague ? hnE(comp.name) : 'League'], ['all', 'Apex (all leagues)']], hnUi.scope, 'hnSetScope');
+    const t = hnUi.scope === 'all' || !isLeague ? ts.g : ts.l[ck];
+    return h + hnTotsBlock(t, hnUi.scope === 'all' || !isLeague ? 'Apex Team of the Season' : comp.name + ' Team of the Season');
+  }
+
+  function hnClubSection(team) {
+    try {
+      const S = hnState(), tid = team.id;
+      const w = (S.cw[tid] || [])[0], cm = S.cm[tid] || [], m = cm[cm.length - 1], p = S.pos && S.pos[tid];
+      const past = Object.keys(S.hist).map(Number).sort((a, b) => b - a).filter(y => S.hist[y].pos && S.hist[y].pos[tid]).slice(0, 5);
+      let inTw = 0; Object.keys(S.tw).forEach(ck => (S.tw[ck] || []).forEach(t => t.xi.forEach(x => { if (x.t === tid) inTw++; })));
+      const tsPl = []; const cur = S.ts; if (cur) { [cur.g].concat(Object.keys(cur.l || {}).map(k => cur.l[k])).forEach(t => { if (t) t.xi.forEach(x => { if (x.t === tid && !tsPl.some(z => z.p === x.p)) tsPl.push(x); }); }); }
+      if (!w && !m && !p && !past.length && !inTw) return '';
+      const row = (ic, lb, v) => `<div class="hn-row"><span>${ic} ${lb}</span><b>${v}</b></div>`;
+      return `<section class="pp-card"><h2 class="pp-card-title">Player Awards</h2>` +
+        (w ? row('🏅', 'Player of the Week', `${hnE(w.n)} <small>${hnE(w.lb)} · ${Number(w.r).toFixed(1)}</small>`) : '') +
+        (m ? row('📅', 'Player of the Month', `${hnE(m.n)} <small>${hnE(m.mo)}</small>`) : '') +
+        (p ? row('🏆', 'Player of the Season', `${hnE(p.n)} <small>${p.g}G ${p.a}A · ${Number(p.r).toFixed(2)}</small>`) : '') +
+        (inTw ? row('⭐', 'Team of the Week picks', inTw) : '') +
+        (tsPl.length ? row('🌟', 'Team of the Season', tsPl.map(x => hnE(x.n)).join(', ')) : '') +
+        past.map(y => row('🏆', 'Player of the Season ' + y, hnE(S.hist[y].pos[tid].n))).join('') + '</section>';
+    } catch (e) { return ''; }
+  }
+  function hnPlayerSection(player) {
+    try {
+      const S = hnState(), t = S.tot[player.id];
+      if (!t || !(t.w || t.tw || t.m || t.lm || t.ps || t.ts || t.tl)) return '';
+      const chip = (ic, lb, n) => n ? `<span class="hn-chip">${ic} ${lb} ×${n}</span>` : '';
+      return `<section class="pp-card"><h2 class="pp-card-title">Honours</h2><div class="hn-chips">` +
+        chip('⭐', 'Team of the Week', t.tw) + chip('🏅', 'Player of the Week', t.w) + chip('📅', 'Player of the Month', t.m) + chip('📅', 'League Player of the Month', t.lm) +
+        chip('🏆', 'Player of the Season', t.ps) + chip('🌟', 'Team of the Season (Apex)', t.ts) + chip('🌟', 'Team of the Season (League)', t.tl) + '</div></section>';
+    } catch (e) { return ''; }
   }
 
   const TM_BASE_YEAR = 2026;
@@ -30840,6 +31624,7 @@ a.gala-chip:hover{border-color:#e8bd48}
     tmOfferAct, tmFaFilter, tmFaMore, tmDealsFilter, tmDealsMore, tmOpenOffer, tmOpenRenew, tmCloseModal, tmOfferChange,
     tmOfferSubmit, tmAcceptCounter, tmView, tmNewsFilter, tmNewsMore, tmClubsFilter, tmOpenPlayer, tmOpenClub, tmClubBrowse,
     galaOpen, galaNext, galaSkip: galaSkipToEnd, galaClose: galaCloseStage, galaDismissInvite, galaAll, galaGet,
+    hnSetSection, hnStepRound, hnSetScope, hnSetYear,
     tmTick, tmWindowInfo, __tmDebug: () => ({ tm, tmFA })
   };
 })();
