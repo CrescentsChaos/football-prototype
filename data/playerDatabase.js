@@ -837,14 +837,29 @@
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  // Memoized cache for canonical skill names to avoid redundant regex
+  // normalization and alias map lookups on high-frequency simulation calls.
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
-    const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    let res = _canonSkillCache.get(s);
+    if (res === undefined) {
+      const k = normSkillKey(s);
+      res = SKILL_NAME_ALIASES[k] || k;
+      _canonSkillCache.set(s, res);
+    }
+    return res;
   }
+  // WeakMap caching a Set of canonical skills keyed by the player's expandedAttrs object.
+  // Avoids O(N) array scans and repetitive string transformations during match simulation hot loops.
+  const _canonSkillsMap = new WeakMap();
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    let skillSet = _canonSkillsMap.get(p.expandedAttrs);
+    if (skillSet === undefined) {
+      skillSet = new Set((p.expandedAttrs.skills || []).map(canonSkillKey));
+      _canonSkillsMap.set(p.expandedAttrs, skillSet);
+    }
+    return skillSet.has(canonSkillKey(skillName));
   }
 /*@CHUNK:c0031:END*/
 
