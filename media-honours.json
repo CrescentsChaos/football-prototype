@@ -12,124 +12,238 @@
    "⭐ {league} Team of the Week ({md}): {starS} ({starTS}) headlines it after {starLine}.",
    "TEAM OF THE WEEK | {league}, {md}. {star} is the pick of the bunch with {starLine}.",
    "The {league} {md} Team of the Week is out — {starS} leads the way for {starT}.",
-   "{starS} ({starTS}) named in the {league} Team of the Week after {starLine}. Full XI below. ⬇️"
+   "{starS} ({starTS}) named in the {league} Team of the Week after {starLine}. Full XI below. ⬇️",
+   "⭐ {league} Team of the Week ({md}) is out: {starS} ({starTS}) leads the line after {starLine}.",
+   "🔥 {starS} is the headline name in the {league} Team of the Week, {md}. {starLine} did it.",
+   "TEAM OF THE WEEK | {league}, {md}: {starS} stars after {starLine}. Full XI below.",
+   "⭐ {md} in the {league} is in the books and {starS} ({starT}) tops the Team of the Week with a {starR} rating.",
+   "The {league} Team of the Week for {md} is set in a {formation}, with {starS} the pick of the bunch.",
+   "📣 {league} {md} Team of the Week: {gkS} in goal, {starS} the star turn ({starLine}).",
+   "⭐ {starS} ({starTS}) earns the top spot in the {league} Team of the Week after {starLine}.",
+   "{league} Team of the Week, {md}: {starS} dominates a {formation} full of in-form names.",
+   "🌟 Best XI of {md} in the {league}: {starS} is the standout with {starLine}.",
+   "The numbers are in for {md}. {starS} ({starTS}) is the {league} Team of the Week's best performer, rated {starR}.",
+   "⭐ {md} {league} Team of the Week: {starS} the headline, {gkS} between the sticks.",
+   "{league} {md} review: {starS} ({starTS}) takes centre stage in the Team of the Week after {starLine}."
   ],
   "totw_list": [
    "📋 {league} Team of the Week, {md} ({formation}): {names}.",
    "TEAM OF THE WEEK — {league} {md}\n{formation}: {names}",
-   "{league} · {md} · Team of the Week in a {formation}: {names}. Star man: {starS}."
+   "{league} · {md} · Team of the Week in a {formation}: {names}. Star man: {starS}.",
+   "⭐ The XI for {md} in the {league}: {names} ({formation}).",
+   "TEAM OF THE WEEK ({league}, {md}) — {formation}: {names}.",
+   "📋 {md} best XI, {league}: {names}. Shape: {formation}.",
+   "Your {league} Team of the Week for {md}: {names}. Lined up in a {formation}.",
+   "🗒️ {league} {md}, Team of the Week: {names}."
   ],
   "totw_club": [
    "{player} is in the {league} Team of the Week after {line}. 👏",
    "Team of the Week ✅ {playerS} gets the nod after {line}.",
-   "Named in the {league} {md} Team of the Week: {player}. Well deserved! 🔥"
+   "Named in the {league} {md} Team of the Week: {player}. Well deserved! 🔥",
+   "{player} makes the {league} Team of the Week after {line}! 🙌",
+   "Team of the Week for {playerS}! {line} earned the call. ⭐",
+   "Named in the {league} Team of the Week, {md}: {player} ({line}). Well played. 👏",
+   "{playerS} in the XI of the week. {line} speaks for itself. ⭐",
+   "Congratulations {player}, picked for the {league} Team of the Week after {line}! 💪",
+   "📋 {md} Team of the Week: {player} is in. {line}."
   ],
   "totw_fan": [
    "{starS} in the Team of the Week AGAIN? Take a bow. {starTS} fans know what we have. 🙌",
    "Told you {starS} was special. {league} Team of the Week, easy. #{starTS}",
-   "Team of the Week and {starT} has the star man. I'll take that all day."
+   "Team of the Week and {starT} has the star man. I'll take that all day.",
+   "{starS} in the Team of the Week and nobody is surprised. Absolute machine. 🙌",
+   "Team of the Week, and {starS} leading it? {starTS} fans are eating well. 😤",
+   "Put {starS} in the Team of the Week every week, honestly. {starLine}. 🔥",
+   "{starS} in the XI of the week and we all knew it from the first half. 🤝",
+   "Frame this Team of the Week. {starS} is a class above right now. 🖼️",
+   "{starTS} in the Team of the Week with {starS} at the top. Good week to be a fan. 🥳"
   ],
   "totw_rival": [
    "Team of the Week is a joke, it's just whoever played against a bad team. Always the same. 😴",
    "{starS} star man? One good week against a poor side, let's see it again.",
-   "Every week the Team of the Week has someone nobody has heard of. Love the league. 😂"
+   "Every week the Team of the Week has someone nobody has heard of. Love the league. 😂",
+   "Team of the Week is just a list of who got the easy fixtures. Every. Single. Time. 🙄",
+   "Team of the Week again and the same names. Is anyone else playing in this league? 😴",
+   "Their Team of the Week had {starS} in it and I still can't see why. Ratings are weird. 🤔",
+   "Any Team of the Week that picks that midfield is a joke. I said what I said. 😂",
+   "The Team of the Week is a vibe, not a science. Don't @ me. ☕",
+   "One good game and you're in the Team of the Week. Standards have slipped. 😏"
   ],
   "totw_player": [
    "Team of the Week! Thanks for all the messages, now back to work. 💪",
    "Great to be in the Team of the Week, credit to the lads around me. {star} 🙏",
-   "Happy to be named in the XI. On to the next one."
+   "Happy to be named in the XI. On to the next one.",
+   "Team of the Week! Big thanks to the lads, now we go again. 💪",
+   "Great to be named in the Team of the Week. All credit to my teammates. 🙏",
+   "Honoured to make the Team of the Week. Work continues! 👊",
+   "Team of the Week. Not bad for a Tuesday. Back to training. 😄",
+   "Thanks for all the messages, Team of the Week is a nice bonus after the result. ❤️"
   ],
   "totw_snub": [
    "{snubS} with {snubLine} and NOT in the Team of the Week? Who picks this?! 😡",
    "How is {snub} ({snubT}) not in the Team of the Week after {snubLine}?? Robbery.",
-   "Team of the Week snubbing {snubS} is criminal. {snubLine}!"
+   "Team of the Week snubbing {snubS} is criminal. {snubLine}!",
+   "{snubS} with {snubLine} and not in the Team of the Week? Absolute robbery. 😤",
+   "Somebody explain how {snubS} ({snubLine}) misses the Team of the Week. I'll wait. 🙄",
+   "Team of the Week snubbed {snubS} after {snubLine}. Unreal. 😡",
+   "{snubS}: {snubLine}. Team of the Week: no. Make it make sense. 🤯",
+   "If {snubS} isn't in the Team of the Week after {snubLine}, what is the point? 😠"
   ],
   "totw_tv": [
    "{league} {md}: {starS} headlines the Team of the Week",
-   "Team of the Week — {formation}, with {starS} as the star man"
+   "Team of the Week — {formation}, with {starS} as the star man",
+   "{league} {md}: the Team of the Week, with {starS} on top",
+   "Team of the Week in full: {starS} leads {md}",
+   "{league} {md} XI revealed — {starS} headlines it"
   ],
   "tv_banner_totw": [
    "TEAM OF THE WEEK",
    "THE BEST XI OF THE ROUND",
-   "{league} · TEAM OF THE WEEK"
+   "{league} · TEAM OF THE WEEK",
+   "THE BEST XI OF THE WEEK",
+   "{md}: TEAM OF THE WEEK",
+   "WEEKLY XI"
   ],
   "studio_totw": [
    "We have picked our {league} Team of the Week and {starS} is the headline name after {starLine}.",
-   "A {formation} this week, and the Team of the Week is led by {starS} of {starT}."
+   "A {formation} this week, and the Team of the Week is led by {starS} of {starT}.",
+   "Our {league} Team of the Week for {md} is ready, and {starS} is the name at the top after {starLine}.",
+   "We've gone through every performance from {md}. In the {league} XI, {starS} is the standout.",
+   "{md} in the {league}. Our Team of the Week is a {formation}, led by {starS} of {starT}."
   ],
   "pan_analyst": [
    "Look at the numbers, {starS} was sharp in every phase. Easy pick.",
-   "Great shape across the XI, a proper balanced side."
+   "Great shape across the XI, a proper balanced side.",
+   "{starS} was sharp in every phase. Easy pick for me.",
+   "The data backs it up: {starS} was the best player on show this week.",
+   "Look at the underlying numbers, {starS} did the lot. Fully deserved.",
+   "Balanced XI, good shape, and {starS} tying it together."
   ],
   "pan_attacker": [
    "I love the front three here, pure quality.",
-   "{starS} makes it look easy. That is what confidence does."
+   "{starS} makes it look easy. That is what confidence does.",
+   "I love the front three in this XI, pure quality.",
+   "{starS} is a joy to watch. Move like that, finish like that, take the headlines.",
+   "Forwards in form, that's all you need. This team scores goals.",
+   "{starS} makes the difficult look easy. Brilliant."
   ],
   "potw_club": [
    "Our Player of the Week: {player}! {line} against the odds. 🌟",
    "⭐ PLAYER OF THE WEEK ⭐ {playerS} after {line}. Brilliant.",
-   "{player} is our Player of the Week ({md}) — {line}. Take a bow."
+   "{player} is our Player of the Week ({md}) — {line}. Take a bow.",
+   "Our Player of the Week: {player}! {line}. 🌟",
+   "{player} is our Player of the Week after {line}. Take a bow! 👏",
+   "🏅 Player of the Week: {player} ({r}). {line} in {md}.",
+   "{playerS} was brilliant in {md}: {line}. Player of the Week, no question. 🙌",
+   "Voted by the numbers, earned on the pitch. {player}, Player of the Week! 🌟",
+   "Player of the Week goes to {player}: {line}. Keep it up! 💪",
+   "{md} Player of the Week for {team}: {player} with {line}. 🏅"
   ],
   "potw_fan": [
    "{playerS} Player of the Week, fully earned. {teamS} needs more of that. 💪",
    "Player of the Week: {playerS}. That is the standard, lads.",
-   "Can't argue with {playerS} as {teamS}'s Player of the Week. Great shift."
+   "Can't argue with {playerS} as {teamS}'s Player of the Week. Great shift.",
+   "{playerS} is my Player of the Week every week at this rate. 🫶",
+   "Absolute class from {playerS}. Player of the Week and not close. 🔥",
+   "Can we just give {playerS} the armband already? Player of the Week. 🏅",
+   "{teamS} fans, say it with me: {playerS}, Player of the Week! 🎉",
+   "Every club needs a {playerS}. Player of the Week, well deserved. 😍"
   ],
   "potw_player": [
    "Thanks for the support! Proud to be Player of the Week, now we go again.",
-   "Team first, always. Player of the Week is a bonus. 🙌"
+   "Team first, always. Player of the Week is a bonus. 🙌",
+   "Player of the Week. All the credit to the lads around me. 🙏",
+   "Honoured to be named Player of the Week. On to the next one. 👊",
+   "Great team performance, and a nice personal bonus. Thank you all! ❤️"
   ],
   "potm_bn": [
    "📅 {league} Player of the Month for {month}: {player} ({teamS}) after {line}.",
    "{playerS} wins the {league} Player of the Month award for {month} — {line} in {apps} games.",
-   "AWARD | {league} Player of the Month ({month}) goes to {player} of {team}."
+   "AWARD | {league} Player of the Month ({month}) goes to {player} of {team}.",
+   "{player} ({teamS}) is the {league} Player of the Month for {month}: {line}.",
+   "PLAYER OF THE MONTH | {league}, {month}: {player}, with {line} across {apps} games.",
+   "📅 {month} belonged to {playerS}: {line} in {apps} games earns the {league} Player of the Month award.",
+   "The {league} Player of the Month for {month} is {player} of {team}. {line}.",
+   "🏅 {playerS} wins the {league} Player of the Month for {month} after {line}."
   ],
   "potm_club": [
    "Congratulations {player}, our Player of the Month for {month}! {line}. 🏅",
    "{playerS} is Player of the Month for {month} ⭐ {line}.",
-   "Player of the Month ({month}): {player}. {apps} games, {line}."
+   "Player of the Month ({month}): {player}. {apps} games, {line}.",
+   "{player} is our Player of the Month for {month}: {line} in {apps} games. Superb. 🌟",
+   "Player of the Month, {month}: {player}! {line}. Keep going! 💪",
+   "{month} belonged to {playerS}. {line}. Our Player of the Month! 👏",
+   "📅 {team} Player of the Month: {player}. {line}."
   ],
   "potm_fan": [
    "Player of the Month and not even close. {playerS} is unplayable right now. 🔥",
-   "{playerS} for {month}'s Player of the Month, no debate."
+   "{playerS} for {month}'s Player of the Month, no debate.",
+   "{playerS} Player of the Month? Of course. Look at those numbers. 😍",
+   "{teamS} fans, we have the best player in the league right now. {playerS}, Player of the Month. 💙",
+   "Imagine not having {playerS} in your side. Player of the Month, deserved. 🙌",
+   "{playerS}: {line}. Player of the Month, and he's still improving. 📈"
   ],
   "potm_player": [
    "Honoured to win Player of the Month. Thanks to my teammates and staff. 🙏",
-   "Player of the Month for {month}! Keep going. 💪"
+   "Player of the Month for {month}! Keep going. 💪",
+   "Player of the Month! Couldn't do it without my teammates. Onwards. 💪",
+   "Really proud of this one. Thank you to everyone who has helped. ❤️",
+   "A good month, and a nice reward. Back to work! 👊"
   ],
   "potm_tv": [
    "{league} Player of the Month: {playerS}",
-   "{month}: {playerS} takes the monthly award"
+   "{month}: {playerS} takes the monthly award",
+   "{month}'s best: {playerS} wins Player of the Month",
+   "{league} Player of the Month — {playerS} of {teamS}"
   ],
   "tv_banner_potm": [
    "PLAYER OF THE MONTH",
-   "{league} · PLAYER OF THE MONTH"
+   "{league} · PLAYER OF THE MONTH",
+   "{month}: PLAYER OF THE MONTH",
+   "MONTHLY AWARD"
   ],
   "studio_potm": [
-   "Our {league} Player of the Month for {month} is {player} of {team} — {line}."
+   "Our {league} Player of the Month for {month} is {player} of {team} — {line}.",
+   "Our {league} Player of the Month for {month} is {player} of {team}: {line}.",
+   "{month} has a clear winner: {player}. {line} in {apps} games.",
+   "The Player of the Month award goes to {player} of {team}. {line}. Absolutely deserved."
   ],
   "pots_club": [
    "🏆 Our Player of the Season: {player}! {line} in {apps} games. Unbelievable year.",
    "{season} Player of the Season: {playerS}. {line}. What a season.",
-   "PLAYER OF THE SEASON — {player}. {line}. Thank you for everything this year. 💙"
+   "PLAYER OF THE SEASON — {player}. {line}. Thank you for everything this year. 💙",
+   "{player} is our Player of the Season after {line}. What a campaign! 👏",
+   "Player of the Season: {player}. {line}, {apps} games, and a lot of big moments. 🏆",
+   "All season, {playerS} delivered. {line}. Our Player of the Season. 🌟",
+   "🏆 {team} Player of the Season: {player}. {line}."
   ],
   "pots_fan": [
    "{playerS} Player of the Season. Not a single doubt. 🏆",
-   "Best player we had all year, {playerS} deserves it."
+   "Best player we had all year, {playerS} deserves it.",
+   "Player of the Season: {playerS}. No debate, close the thread. 🙌",
+   "{playerS} carried us this season. Player of the Season, take a bow. 🥹",
+   "Best at the club this year by a mile: {playerS}. 🏆"
   ],
   "pots_player": [
    "Player of the Season at {team} — a dream. Thank you to the fans. 🙏",
-   "Proud to win this award. Now to go again next year."
+   "Proud to win this award. Now to go again next year.",
+   "Proud and thankful. Player of the Season! Now let's do it all again. 💪",
+   "Honoured to be Player of the Season. This one's for the supporters. ❤️"
   ],
   "tots_bn": [
    "🌟 {season} TEAM OF THE SEASON: {mgr} ({mgrT}) named best manager, lining up in a {formation}. {starS} leads the XI.",
    "THE {season} TEAM OF THE SEASON is out. Manager: {mgr}. Shape: {formation}. Star man: {star} ({starTS}).",
-   "{mgr} is the Manager of the Season and the Team of the Season is built around his {formation}. {starS} tops the XI."
+   "{mgr} is the Manager of the Season and the Team of the Season is built around his {formation}. {starS} tops the XI.",
+   "🌟 {season} TEAM OF THE SEASON: {mgr} ({mgrT}) named best manager, with his {formation}. {starS} leads the XI.",
+   "The {season} Team of the Season is here: {mgr}'s {formation}, built round {starS}. 🌟",
+   "TEAM OF THE SEASON | {season}: manager {mgr} ({mgrT}), formation {formation}, star {starS}."
   ],
   "tots_lg_bn": [
    "{league} Team of the Season: {mgr} ({mgrT}) is the manager, formation {formation}. {starS} is the star.",
    "🌟 {league} {season} Team of the Season — {formation} under {mgr}. {starS} ({starTS}) heads the XI.",
-   "The {league} Team of the Season is in a {formation}, picked under {mgr}. {star} is the standout."
+   "The {league} Team of the Season is in a {formation}, picked under {mgr}. {star} is the standout.",
+   "{league} Team of the Season: {mgr} ({mgrT}) is the manager in a {formation}, and {starS} leads the way.",
+   "🌟 {league} Team of the Season is out. {mgr}'s {formation} sets the shape, {starS} is the star."
   ],
   "tots_list": [
    "📋 {scope} Team of the Season, {season} ({formation}, manager {mgr}): {names}.",
@@ -141,7 +255,8 @@
   ],
   "tots_mgr": [
    "Manager of the Season. All credit to the players and staff. The {formation} works because of them. 🧥",
-   "Thank you for the award, but this is a team honour. Proud of everyone at {mgrT}."
+   "Thank you for the award, but this is a team honour. Proud of everyone at {mgrT}.",
+   "Manager of the Season! Grateful to the squad and everyone behind the scenes. 🙏"
   ],
   "tots_mgr_club": [
    "{mgr} is the Manager of the Season! 🧥 {gp} games in a {formation}, {ppg} points per game. Congratulations boss.",
@@ -149,7 +264,8 @@
   ],
   "tots_club": [
    "{player} is in the {scope} Team of the Season! {line}. 🌟",
-   "Team of the Season ✅ {playerS}. A special year."
+   "Team of the Season ✅ {playerS}. A special year.",
+   "Team of the Season for {playerS}! {line} all year long. ⭐"
   ],
   "tots_player": [
    "Team of the Season, thank you everyone. Blessed. 🙏",
@@ -157,12 +273,16 @@
   ],
   "tots_fan": [
    "{starS} in the Team of the Season, as it should be. {topClub} fans, we ate this year. 😤",
-   "Team of the Season looks about right. {mgrS} was a genius with the {formation}."
+   "Team of the Season looks about right. {mgrS} was a genius with the {formation}.",
+   "Team of the Season: {starS} obviously. What a year for {topClub}. 🥂"
   ],
   "tots_snub": [
    "Team of the Season? Half these lads got in on name alone. Who is picking this? 🙄",
    "Cannot believe who was left out of the Team of the Season. Absolute joke.",
-   "That {formation} has holes. Everyone has a snub they are fuming about. 😤"
+   "That {formation} has holes. Everyone has a snub they are fuming about. 😤",
+   "Team of the Season? I've seen better lists in a school playground. 🙄",
+   "How is that Team of the Season missing a single {topClub} defender? Joke. 😒",
+   "Team of the Season picks are always the same. Where is the creativity? 😴"
   ],
   "tots_gaffe": [
    "{mgr}'S MEN DOMINATE: {topN} of the Team of the Season come from {topClub}!",
@@ -170,7 +290,8 @@
   ],
   "tots_meme": [
    "Team of the Season dropped and every fanbase is in the comments at once. 🍿",
-   "Me checking the Team of the Season to see if my player is in it. 😬"
+   "Me checking the Team of the Season to see if my player is in it. 😬",
+   "Team of the Season: the annual ritual of being angry at a list. 📜"
   ],
   "tots_radio": [
    "Phone lines are lit up about the Team of the Season. Callers want to talk about the {formation} and who missed out."
@@ -210,6 +331,198 @@
   ],
   "pan_tots_hardman": [
    "Good defenders in there, mind. You win leagues with those lads, not flashy stuff."
+  ],
+  "totm_bn": [
+   "🗓️ {league} Team of the Month for {month}: {starS} ({starTS}) leads the XI after {starLine}.",
+   "TEAM OF THE MONTH | {league}, {month}: {starS} headlines a {formation} after {starLine}.",
+   "The {league} Team of the Month for {month} is out. {starS} ({starT}) is the pick of the bunch.",
+   "🗓️ {month} in the {league}: your Team of the Month, with {starS} at the top ({starLine}).",
+   "{league} {month} Team of the Month: {starS} is the star turn in a {formation}.",
+   "📣 The best XI of {month} in the {league} is here, and {starS} ({starTS}) is the standout.",
+   "🌟 {month}'s {league} Team of the Month: {starS} dominates, {topN} from {topClub} in the XI."
+  ],
+  "totm_list": [
+   "📋 {league} Team of the Month, {month} ({formation}): {names}.",
+   "🗓️ The XI of {month} in the {league}: {names} ({formation}).",
+   "TEAM OF THE MONTH ({league}, {month}) — {formation}: {names}.",
+   "Your {league} Team of the Month for {month}: {names}.",
+   "📋 {month} best XI, {league}: {names}. Shape: {formation}."
+  ],
+  "totm_club": [
+   "{player} is in the {league} Team of the Month for {month}! {line}. 🗓️",
+   "Team of the Month for {playerS}: {line} over {month}. Well done! 👏",
+   "Named in the {league} Team of the Month, {month}: {player} ({line}). 🌟",
+   "{playerS} makes the XI of the month. {line}. 💪",
+   "Congratulations {player}, Team of the Month for {month}! 🙌"
+  ],
+  "totm_fan": [
+   "{starS} leading the Team of the Month. {starTS} fans know what we have. 🔥",
+   "Team of the Month with {starS} at the top. Of course. 😤",
+   "{month}'s Team of the Month is basically {starS} and ten others. 😂",
+   "That Team of the Month is right. {starS} has been the best player around. 👏",
+   "{topClub} with {topN} in the Team of the Month. A proper month. 🥂"
+  ],
+  "totm_rival": [
+   "Team of the Month is just whoever won the most games. Not a real list. 🙄",
+   "Team of the Month with that midfield? Come on. 😂",
+   "The Team of the Month is a vibe, not a science. I stand by that. ☕",
+   "{topClub} have {topN} in the Team of the Month. Shocker. 😏",
+   "Another Team of the Month, another list that ignores half the league. 😴"
+  ],
+  "totm_player": [
+   "Team of the Month! Thanks to the lads and the staff. 🙏",
+   "Really happy to be in the Team of the Month. On to the next one. 💪",
+   "Proud to make the Team of the Month. All about the team. 👊"
+  ],
+  "totm_snub": [
+   "Not a single {topClub} player outside that Team of the Month? Think about it. 🤔",
+   "Team of the Month and I don't see my guy in it. Disgrace. 😡",
+   "Who picks the Team of the Month? Half of them were quiet. 🙄",
+   "Team of the Month snubs again. We go again next month. 😤"
+  ],
+  "totm_tv": [
+   "{league} Team of the Month: {starS} leads {month}",
+   "The Team of the Month for {month} — {starS} on top",
+   "{month}'s best XI, led by {starS}"
+  ],
+  "tv_banner_totm": [
+   "TEAM OF THE MONTH",
+   "{month}: THE XI OF THE MONTH",
+   "BEST XI OF THE MONTH"
+  ],
+  "studio_totm": [
+   "Our {league} Team of the Month for {month} is a {formation}, and {starS} of {starT} is the headline after {starLine}.",
+   "We've picked the XI for {month}. {starS} is the star, and the rest is below.",
+   "A month to remember. Our {league} Team of the Month is led by {starS}."
+  ],
+  "pan_totm_analyst": [
+   "Consistency is the key word. {starS} did it for a whole month.",
+   "The shape fits, the midfield has balance. Good XI for me.",
+   "The numbers don't lie: {starS} has been the best of the month."
+  ],
+  "pan_totm_attacker": [
+   "Top of the bill is {starS}, a joy to watch every week.",
+   "That front line scares everyone. Goals, goals, goals.",
+   "{starS} makes it look so easy right now. Brilliant stuff."
+  ],
+  "t_totw_bn": [
+   "⭐ {league} Team of the Week ({md}): {starS} ({starTS}) leads the XI after {starLine}.",
+   "TEAM OF THE WEEK | {league}, {round}: {starS} stars with {starLine}.",
+   "The best XI from {round} at the {league} is out. {starS} ({starT}) is the top performer.",
+   "🔥 {starS} headlines the {league} Team of the Week for {round}: {starLine}.",
+   "{league} {round}: your Team of the Week is a {formation}, with {starS} the pick.",
+   "⭐ {round} is done and {starS} ({starTS}) leads the {league} Team of the Week. {starLine}.",
+   "📣 {league} Team of the Week for {round}: {gkS} in goal, {starS} the star.",
+   "The {league} stage moves on and {starS} is the name of the round after {starLine}. 🏆"
+  ],
+  "t_totw_list": [
+   "📋 {league} Team of the Week, {round} ({formation}): {names}.",
+   "⭐ XI of {round} at the {league}: {names} ({formation}).",
+   "TEAM OF THE WEEK ({league}, {round}) — {formation}: {names}.",
+   "📋 Best XI of {round}, {league}: {names}."
+  ],
+  "t_totw_club": [
+   "{player} makes the {league} Team of the Week for {round}! {line}. 🙌",
+   "Team of the Week for {playerS} after {line} in {round}! ⭐",
+   "{playerS} is in the XI of {round}. {line}. Proud. 👏",
+   "Named in the {league} Team of the Week: {player} ({line}). 💪"
+  ],
+  "t_totw_fan": [
+   "{starS} in the Team of the Week and the {league} is loving it. 🔥",
+   "Team of the Week, {round}: {starS} on top. What a tournament he's having. 🙌",
+   "{starTS} fans, tournament form is real. {starS} leads the Team of the Week. 😤",
+   "Everyone at the {league} is talking about {starS}. Team of the Week, easily. 🏆"
+  ],
+  "t_totw_snub": [
+   "{snubS} with {snubLine} and NOT in the Team of the Week? In a tournament? Unreal. 😡",
+   "{snubS}: {snubLine} in {round}. Team of the Week: no. Explain. 🙄",
+   "Team of the Week left out {snubS} after {snubLine}. Disgraceful. 😤"
+  ],
+  "t_totw_tv": [
+   "{league} {round}: the Team of the Week, with {starS} on top",
+   "Team of the Week from the {league}: {starS} leads {round}"
+  ],
+  "t_totw_rival": [
+   "Team of the Week is only for whoever drew the easiest group. Always. 🙄",
+   "That Team of the Week would not make my {league} XI. Overrated. 😏",
+   "{round} Team of the Week with that front three? Come on. 😂"
+  ],
+  "t_totw_player": [
+   "Team of the Week at the {league}! Proud to be part of this group. 🙏",
+   "A big thank you to the lads. Team of the Week and the tournament goes on. 💪"
+  ],
+  "t_potw_club": [
+   "Our Player of the Week at the {league}: {player}! {line} in {round}. 🌟",
+   "{player} was outstanding in {round}: {line}. Player of the Week! 🏅",
+   "{round} Player of the Week for {team}: {player}. {line}. 👏",
+   "Tournament heroes: {player} ({line}) is our Player of the Week. 🙌"
+  ],
+  "t_potw_fan": [
+   "{playerS} Player of the Week at the {league} and absolutely deserved. 🏅",
+   "{teamS} fans, we've got {playerS}. Player of the Week! 🔥",
+   "Tournament football needs players like {playerS}. Player of the Week. 💪"
+  ],
+  "t_potw_player": [
+   "Player of the Week at the {league}! Thank you all. On to the next round. 💪",
+   "Proud of the team and happy with this. Tournament goes on! 🙏"
+  ],
+  "t_potm_bn": [
+   "📅 {league} Player of the Month ({month}, {range}): {player} ({teamS}) after {line}.",
+   "PLAYER OF THE MONTH | {league}, {month}: {player} with {line} over {range}.",
+   "{player} ({teamS}) is the {league} Player of the Month for {month}: {line}. 📅",
+   "🏅 {league} {month} ({range}): {playerS} takes the Player of the Month with {line}."
+  ],
+  "t_potm_club": [
+   "{player} is our {league} Player of the Month for {month}! {line}. 🏅",
+   "Player of the Month at the {league}: {player}. {line} over {range}. 🌟",
+   "{playerS} is the face of our run: {line}. Player of the Month! 👏"
+  ],
+  "t_potm_fan": [
+   "{playerS} Player of the Month at the {league}. Nobody comes close. 🔥",
+   "{teamS} fans, say it loud: {playerS}, Player of the Month! 🙌",
+   "Over {range}, {playerS} was the best player at the {league}. Fact. 📈"
+  ],
+  "t_potm_player": [
+   "Player of the Month at the {league}! Thank you to the team and the fans. 🙏",
+   "Proud of this one. Great group, great run. 💪"
+  ],
+  "t_totm_bn": [
+   "🗓️ {league} Team of the Month for {month} ({range}): {starS} ({starTS}) leads after {starLine}.",
+   "TEAM OF THE MONTH | {league}, {month}: {starS} headlines a {formation} ({range}).",
+   "The {league} Team of the Month for {month} is out: {starS} ({starT}) stars.",
+   "🗓️ {range} at the {league}: your Team of the Month, led by {starS} ({starLine}).",
+   "{league} {month} Team of the Month: {starS} leads a {formation}, with {topN} from {topClub}."
+  ],
+  "t_totm_list": [
+   "📋 {league} Team of the Month, {month} ({range}, {formation}): {names}.",
+   "🗓️ XI of {month} at the {league}: {names} ({formation}).",
+   "TEAM OF THE MONTH ({league}, {month}) — {formation}: {names}."
+  ],
+  "t_totm_club": [
+   "{player} is in the {league} Team of the Month for {month}! {line}. 🗓️",
+   "Team of the Month at the {league} for {playerS}: {line}. 👏",
+   "{playerS} makes the XI of {month}. {line}. 💪"
+  ],
+  "t_totm_fan": [
+   "{starS} leading the {league} Team of the Month. What a run. 🔥",
+   "{topClub} with {topN} in the Team of the Month. Proper tournament side. 🥂",
+   "Team of the Month and {starS} on top. Every game, every minute. 😍"
+  ],
+  "t_totm_rival": [
+   "Team of the Month at the {league}? Just the teams that got a kind draw. 🙄",
+   "{topClub} have {topN} in the Team of the Month. Shocker. 😏"
+  ],
+  "t_totm_snub": [
+   "Not enough love for the lads who dragged us through {range}. Team of the Month snub. 😤",
+   "Team of the Month and my guy is missing again. 🙄"
+  ],
+  "t_totm_player": [
+   "Team of the Month at the {league}. Proud of the group. 🙏",
+   "In the Team of the Month! On we go. 💪"
+  ],
+  "t_totm_tv": [
+   "{league} Team of the Month: {starS} leads {month}",
+   "The best XI of {range}: {starS} on top"
   ]
  }
 }

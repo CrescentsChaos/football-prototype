@@ -3548,3 +3548,45 @@ table { border-collapse: collapse; }
 .hn-club span { flex: 1; }
 .hn-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .hn-chip { padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.78rem; font-weight: 700; }
+
+/* ===== Honours: award cards, tallies, strips (Team/Player of the Week & Month) ===== */
+.hn-tally { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 14px; }
+.hn-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 999px; background: var(--bg-3); border: 1px solid var(--border-strong); font-size: 0.76rem; color: var(--text-2); }
+.hn-pill b { font-family: var(--numeral); font-size: 1.05rem; color: var(--amber); }
+.hn-pill-off { opacity: 0.45; }
+.hn-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.hn-card { position: relative; padding: 12px 14px; border-radius: var(--radius); background: linear-gradient(160deg, var(--bg-2), var(--bg-1)); border: 1px solid var(--border-strong); border-left: 3px solid var(--amber); transition: transform .15s var(--ease-smooth), border-color .15s; }
+.hn-card:hover { transform: translateY(-2px); }
+.hn-card-potm, .hn-card-tpotm { border-left-color: var(--blue); }
+.hn-card-pots { border-left-color: #b58cf0; }
+.hn-card-star { border-left-color: var(--accent); }
+.hn-card-badge { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+.hn-card-body { display: flex; align-items: center; gap: 10px; }
+.hn-card-main { flex: 1; min-width: 0; }
+.hn-card-name { font-family: var(--display); font-size: 1.25rem; font-weight: 600; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-card-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; font-size: 0.76rem; color: var(--text-2); margin-top: 2px; }
+.hn-card-sub span { overflow-wrap: anywhere; }
+.hn-rate { font-family: var(--numeral); font-size: 1.7rem; font-weight: 700; color: var(--amber); min-width: 46px; text-align: right; }
+.hn-card-stats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.hn-stat { padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); font-size: 0.72rem; font-weight: 600; }
+.hn-stat-mm { background: rgba(226,176,74,0.18); color: var(--amber); }
+.hn-stat-dim { color: var(--text-3); }
+.hn-sub-h { margin: 14px 0 6px; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-3); }
+.hn-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.hn-chip-r { display: inline-flex; flex-direction: column; gap: 1px; min-width: 84px; padding: 6px 10px; border-radius: 8px; background: var(--bg-3); border: 1px solid var(--border); flex-shrink: 0; position: relative; }
+.hn-chip-r small { font-size: 0.64rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
+.hn-chip-r b { font-size: 0.84rem; }
+.hn-chip-r i { font-style: normal; font-family: var(--numeral); color: var(--amber); font-size: 0.95rem; line-height: 1; }
+.hn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.hn-mini { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 9px; background: var(--bg-2); border: 1px solid var(--border); }
+.hn-mini-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hn-mini-main b { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-mini-main span { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--text-3); }
+.hn-mini i { font-style: normal; font-family: var(--numeral); color: var(--amber); font-size: 1.05rem; }
+.hn-tcell, .hn-cl { display: inline-flex; align-items: center; gap: 6px; }
+.hn-cl-off { color: var(--text-3); }
+.hn-clubtable td { vertical-align: middle; }
+.hn-sq { margin-left: 4px; font-size: 0.8rem; }
+.hn-panel { margin-bottom: 16px; }
+.hn-round small { font-weight: 500; margin-left: 6px; }
+@media (max-width: 560px) { .hn-cards { grid-template-columns: 1fr; } }

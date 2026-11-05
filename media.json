@@ -866,7 +866,9 @@
    "fanN": [
     "{W} {wscore} {L}. {?Sensible result.|Fair enough.|Nothing to see here, move along.|The better side won.} [tail_neutral]",
     "{motmS} was {?quietly brilliant|the best player on the pitch|a class above} for {W}.",
-    "{W} just look like a proper side right now. {L} {?have questions to answer|need a reset}."
+    "{W} just look like a proper side right now. {L} {?have questions to answer|need a reset}.",
+    "{W} {wscore} {L}. Deserved on balance. {motmS} the pick of the bunch.",
+    "Not a classic, but {W} did enough. {?Fair result.|Job done.|No complaints from neutrals.}"
    ],
    "meme": [
     "{L} fans after {ws}-{ls}: 🙂➡️😐➡️🫠",
@@ -877,15 +879,21 @@
    ],
    "radio": [
     "Caller from the {Lf} end says {L} \"turned up in body only\" — and he's not wrong.",
-    "Line two says {W} are favourites for everything now. Line three says calm down. Line four is shouting."
+    "Line two says {W} are favourites for everything now. Line three says calm down. Line four is shouting.",
+    "Caller from the {Lf} end says it's the same story every week. Line two disagrees and hangs up.",
+    "Phone-in is split: {W} were solid, or {L} were awful. Both, says the host."
    ],
    "vid": [
     "{W} FANS REACT: {wscore} vs {L} | Full-time scenes",
-    "Walking out of the ground after {W} {wscore} {L} 🎥 (mixed emotions)"
+    "Walking out of the ground after {W} {wscore} {L} 🎥 (mixed emotions)",
+    "{W} {wscore} {L}: all the goals and the scenes at full time 🎥",
+    "WALKING HOME after {W} beat {L} — the fans' verdict"
    ],
    "tac": [
     "{W} dictated where the game was played ({possW}% of the ball, {shW} shots to {shL}) — {L} never found a way to disrupt it.",
-    "Key pattern: {W} won the second balls and made {L}'s press look a step late."
+    "Key pattern: {W} won the second balls and made {L}'s press look a step late.",
+    "{W} controlled the tempo with {possW}% of the ball and {shW} shots against {shL}, and {L} could never settle.",
+    "The gap was in the transitions: {W} were quicker to every loose ball ({shW}-{shL} on shots)."
    ]
   },
   "draw": {
@@ -917,7 +925,9 @@
    ],
    "fanN": [
     "{score} between {H} and {A}. {?Fair.|Entertaining enough.|Nobody deserved to lose.} [tail_neutral]",
-    "A draw. {?Shock.|Again.|The most football result possible.}"
+    "A draw. {?Shock.|Again.|The most football result possible.}",
+    "{H} {score} {A}. Honest result.",
+    "A point each. {?Fair enough.|Nobody will complain.|Rarely a boring draw.}"
    ],
    "meme": [
     "{H} & {A} fans after {score}: 🤝🥲",
@@ -927,14 +937,20 @@
    ],
    "radio": [
     "Caller says a draw is \"a result for both sides\" — which is what you say when you have nothing to say.",
-    "Phone-in split down the middle on {score}: half say fair, half say robbed."
+    "Phone-in split down the middle on {score}: half say fair, half say robbed.",
+    "Caller thinks {score} is a fair result. Caller two is already furious. Typical.",
+    "Split verdict on the phones after {score}: some say a point each, some say no one deserved it."
    ],
    "vid": [
     "{H} vs {A} {score} | Fans react to the draw",
-    "Split points: reaction from both ends"
+    "Split points: reaction from both ends",
+    "{H} {score} {A}: fans' reaction, mixed feelings all round 🎥",
+    "{score} at {H} v {A}. Point gained or two dropped?"
    ],
    "tac": [
-    "{H} and {A} neutralised each other — {possW}% / {possL}% possession, {shW}-{shL} shots. Few clear overloads either side."
+    "{H} and {A} neutralised each other — {possW}% / {possL}% possession, {shW}-{shL} shots. Few clear overloads either side.",
+    "Neither {H} nor {A} found space between the lines: {shW}-{shL} on shots, {possW}% / {possL}% on the ball.",
+    "A game of small margins: {H} and {A} cancelled each other out, {shW}-{shL} in the shot count."
    ]
   },
   "bore": {
@@ -965,7 +981,8 @@
    ],
    "fanN": [
     "0-0 between {H} and {A}. Heavy sigh. [tail_neutral]",
-    "Went to make a tea in the 30th minute, came back to the same score. Perfect timing."
+    "Went to make a tea in the 30th minute, came back to the same score. Perfect timing.",
+    "{H} v {A}. {?Not one for the highlights.|Forgettable.|Both sides will take the point.}"
    ],
    "meme": [
     "{H} 0-0 {A}: highlights ⬛⬛⬛⬛⬛⬛",
@@ -974,13 +991,17 @@
     "Highlights package for {H} v {A}: ⬛ (no footage available)"
    ],
    "radio": [
-    "Our caller calls it \"90 minutes of tactical chess\". Our host calls it \"a car park.\""
+    "Our caller calls it \"90 minutes of tactical chess\". Our host calls it \"a car park.\"",
+    "Caller says he could have watched paint dry and enjoyed it more. Host tries to defend it. Fails.",
+    "\"Nil-nil is a tactical masterclass,\" says Line One. \"No, it's a sedative,\" says Line Two."
    ],
    "vid": [
-    "0-0 FANS REACT: {H} v {A} (zero goals, plenty of opinions)"
+    "0-0 FANS REACT: {H} v {A} (zero goals, plenty of opinions)",
+    "{H} v {A}: the dullest 90 minutes you'll see this year? 🎥"
    ],
    "tac": [
-    "Blocks held firm: {shW}-{shL} shots, xG {xgW}-{xgL}. Both sides refused to risk the transition."
+    "Blocks held firm: {shW}-{shL} shots, xG {xgW}-{xgL}. Both sides refused to risk the transition.",
+    "{shW}-{shL} on shots, {xgW} to {xgL} on xG: both sides closed the game down and nothing opened up."
    ]
   },
   "draw_goalfest": {
@@ -1061,7 +1082,8 @@
    ],
    "fanN": [
     "{W} {wscore} {L} — the match of the weekend, and it isn't close. [tail_neutral]",
-    "Whoever scripted {W} v {L} deserves an award. {tot} goals, drama, the lot."
+    "Whoever scripted {W} v {L} deserves an award. {tot} goals, drama, the lot.",
+    "{tot} goals, a proper game. {W} edge it {wscore} against {L}. Football is great."
    ],
    "meme": [
     "{W} {wscore} {L}: both defences have left the group chat 🏳️",
@@ -1069,14 +1091,16 @@
     "Both defences, all game: 🏃‍♂️💨 {tot} goals: 🎉🎉🎉"
    ],
    "radio": [
-    "Host: \"{tot} goals!\" Caller: \"Terrible defending!\" Host: \"Brilliant television.\""
+    "Host: \"{tot} goals!\" Caller: \"Terrible defending!\" Host: \"Brilliant television.\"",
+    "{tot} goals! The phone lines are melting, callers can't pick a favourite moment."
    ],
    "vid": [
     "{tot} GOALS! {W} {wscore} {L} — the full reaction",
     "INSANE finish at {W} v {L} (fans lose their minds)"
    ],
    "tac": [
-    "Open game by design: both sides pressed, both got bypassed. xG {xgW}-{xgL}; transitions decided it."
+    "Open game by design: both sides pressed, both got bypassed. xG {xgW}-{xgL}; transitions decided it.",
+    "{xgW} xG to {xgL}, and it still ended like that. Open game, transitions everywhere, nobody in control."
    ]
   },
   "thrashing": {
@@ -1118,7 +1142,8 @@
    ],
    "fanN": [
     "{W} {wscore} {L}. {?Ruthless.|Not even close.|Mercy rule when?} [tail_neutral]",
-    "That was a masterclass from {W}. Genuinely worried for {L} now."
+    "That was a masterclass from {W}. Genuinely worried for {L} now.",
+    "{W} {wscore} {L}. {?Ruthless.|One-sided.|Nothing to say.}"
    ],
    "meme": [
     "{L} defenders at {wscore}: 🏃‍♂️🏃‍♂️🏃‍♂️ \"which way's the exit?\"",
@@ -1127,14 +1152,17 @@
     "{L}'s defence: 🧱➡️🥧"
    ],
    "radio": [
-    "Caller: \"I've seen better defending in a pub five-a-side.\" Host: \"Careful, caller.\" Caller: \"Not wrong, though.\""
+    "Caller: \"I've seen better defending in a pub five-a-side.\" Host: \"Careful, caller.\" Caller: \"Not wrong, though.\"",
+    "Caller wants to know how a team gets beaten like that. Host says: slowly, then all at once."
    ],
    "vid": [
     "{W} {wscore} {L}: FULL FAN REACTION to the humiliation",
     "Scenes after {W}'s {wscore} thrashing of {L}"
    ],
    "tac": [
-    "{W} won {possW}% of possession and {shW} shots — but the damage came from {L}'s line sitting too high against runners."
+    "{W} won {possW}% of possession and {shW} shots — but the damage came from {L}'s line sitting too high against runners.",
+    "{W} won the midfield battle early ({possW}% of the ball, {shW} shots) and {L} never recovered.",
+    "{L} switched off in the transitions and {W} punished every mistake."
    ]
   },
   "comeback": {
@@ -1174,7 +1202,8 @@
    ],
    "fanN": [
     "{W} coming back from {deficit} down to win {wscore} is *peak* football. {?Love it.|Brilliant.|Wow.}",
-    "{L} will be sick: ahead, in control, then gone. {W} never stopped."
+    "{L} will be sick: ahead, in control, then gone. {W} never stopped.",
+    "From {deficit} down to {wscore}. {W} showed resilience. {?Brilliant fightback.|What a turnaround.}"
    ],
    "meme": [
     "{L} up {deficit}-0 at half-time: 😎 \"easy\". Full time: 🫥",
@@ -1182,14 +1211,16 @@
     "{W} at 0-{deficit}: 😰 {W} at {ws}-{ls}: 😎"
    ],
    "radio": [
-    "Caller: \"Don't tell me {L} were comfortable.\" Host: \"They were. For about an hour.\""
+    "Caller: \"Don't tell me {L} were comfortable.\" Host: \"They were. For about an hour.\"",
+    "Callers say they've never seen {L} so deflated. The comeback was the story of the night."
    ],
    "vid": [
     "COMEBACK SCENES! {W} {wscore} {L} full reaction",
     "From {deficit} DOWN to WINNERS — {W} fans lose it"
    ],
    "tac": [
-    "{W} adjusted at the break — wide overloads and a higher press reversed the game. {L} dropped deeper and never recovered."
+    "{W} adjusted at the break — wide overloads and a higher press reversed the game. {L} dropped deeper and never recovered.",
+    "Down {deficit}, {W} adjusted at the break: higher line, quicker wide play, and {L} had no reply."
    ]
   },
   "late_winner": {
@@ -1232,7 +1263,8 @@
    ],
    "fanN": [
     "Last-gasp winner from {scorerS}. {?This is why we watch.|Cruel and glorious.|Remember this one.} [tail_neutral]",
-    "{W} {wscore} {L} — won in the {ord} minute. {?Pure drama.|Great ending.|Heartbreak and euphoria in 20 seconds.}"
+    "{W} {wscore} {L} — won in the {ord} minute. {?Pure drama.|Great ending.|Heartbreak and euphoria in 20 seconds.}",
+    "{scorerS} with the late winner for {W}. {?Pure drama.|You can't script it.|Great finish.}"
    ],
    "meme": [
     "{scorerS} in the {ord}: 🏃‍♂️💨🔥 {L} players: 🧍🧍🧍",
@@ -1240,14 +1272,16 @@
     "Defenders, 89th minute: 🧍 {scorerS}, 90th minute: ⚽"
    ],
    "radio": [
-    "Caller at the {Wf} end: \"I've never screamed so loud.\" Caller at the {Lf} end: \"Don't.\" Host: \"Thanks, both.\""
+    "Caller at the {Wf} end: \"I've never screamed so loud.\" Caller at the {Lf} end: \"Don't.\" Host: \"Thanks, both.\"",
+    "\"{Wf} fans are going mad right now,\" says the first caller, \"and I don't blame them.\""
    ],
    "vid": [
     "{scorerS} {ord}-MINUTE WINNER: fans go absolutely MAD",
     "LAST-MINUTE SCENES: {W} fans after {scorerS}'s winner"
    ],
    "tac": [
-    "{W} pushed a centre-back forward and went direct in the final ten — {scorerS} found space exactly where {L}'s block tired."
+    "{W} pushed a centre-back forward and went direct in the final ten — {scorerS} found space exactly where {L}'s block tired.",
+    "{W} kept pushing and {L} ran out of legs. {scorerS}'s late goal was the reward for the pressure."
    ]
   },
   "late_equaliser": {
@@ -1286,7 +1320,8 @@
    ],
    "fanN": [
     "Late equaliser, big drama, both sides can feel it. {?Perfect.|Football is great.|What a finish.} [tail_neutral]",
-    "{scorerS} rescued {W} at the death. {?Absolutely deserved? Debatable. Entertaining? Totally.}"
+    "{scorerS} rescued {W} at the death. {?Absolutely deserved? Debatable. Entertaining? Totally.}",
+    "{scorerS} snatches a point for {W}. {?Heartbreak for the other side.|Dramatic.}"
    ],
    "meme": [
     "{L} defenders at {min}': 🧍🧍🧍🧍 \"somebody mark him?\"",
@@ -1294,14 +1329,16 @@
     "{L} fans at 89': 😎 At 90+: 😭"
    ],
    "radio": [
-    "Caller from the {Lf} end: \"They've snatched a point — and they were awful.\" Host: \"Rude but accurate.\""
+    "Caller from the {Lf} end: \"They've snatched a point — and they were awful.\" Host: \"Rude but accurate.\"",
+    "{Lf} fans will say they were robbed. They are not wrong."
    ],
    "vid": [
     "{ord}-MINUTE EQUALISER! {W} fans erupt",
     "Late leveller scenes: {W} {score} {L}"
    ],
    "tac": [
-    "{W} went to a back three and sent bodies into the box — {scorerS}'s equaliser came from the second wave."
+    "{W} went to a back three and sent bodies into the box — {scorerS}'s equaliser came from the second wave.",
+    "{scorerS}'s late equaliser rewarded {W}'s refusal to stop pushing."
    ]
   },
   "upset": {
@@ -1341,7 +1378,8 @@
    ],
    "fanN": [
     "{W} just toppled {L}. {?Love it when the script gets torn up.|Footballing joy.|This is why we watch.} [tail_neutral]",
-    "{L} will be ruing this one. {W} deserved every bit of it."
+    "{L} will be ruing this one. {W} deserved every bit of it.",
+    "{W} beating {L}. {?Football, eh?|That's why we watch.|Fair play to them.}"
    ],
    "meme": [
     "{W} {wscore} {L} — \"form is temporary, class is permanent\" the class: 🏳️",
@@ -1349,14 +1387,16 @@
     "Bookmakers: 😎 {W}: {wscore} Bookmakers: 😳"
    ],
    "radio": [
-    "Caller: \"I told you {W} would do it!\" Host: \"You said 4-0 to {L}.\" Caller: \"…I had a feeling.\""
+    "Caller: \"I told you {W} would do it!\" Host: \"You said 4-0 to {L}.\" Caller: \"…I had a feeling.\"",
+    "Callers can't believe it: {W} beat {L}. The word \"shock\" gets used 14 times in five minutes."
    ],
    "vid": [
     "BIGGEST SHOCK OF THE SEASON? {W} {wscore} {L} FAN REACTION",
     "{W} FANS GO WILD after stunning {L}"
    ],
    "tac": [
-    "{W}'s low block frustrated {L}, then hit them on the break — a textbook underdog gameplan executed superbly."
+    "{W}'s low block frustrated {L}, then hit them on the break — a textbook underdog gameplan executed superbly.",
+    "{W} sat deep, hit {L} on the break, and never looked like conceding. A textbook upset."
    ]
   },
   "hattrick": {
@@ -1396,7 +1436,8 @@
    ],
    "fanN": [
     "{scorerS}'s hat-trick for {W}: {?clinical|ruthless|a finishing clinic}. [tail_neutral]",
-    "Neutral hat: {scorerS} is {?having the season of his life|ridiculous|one of the best around}."
+    "Neutral hat: {scorerS} is {?having the season of his life|ridiculous|one of the best around}.",
+    "Hat-trick for {scorerS}! {?Take the ball home.|Unreal.|He is on a different level.}"
    ],
    "meme": [
     "{scorerS} after the hat-trick: 🧍‍♂️⚽⚽⚽🏆 \"Anyone seen my ball?\"",
@@ -1404,14 +1445,16 @@
     "{scorerS}: *scores {ng}* Referee: \"Sure, take the ball.\""
    ],
    "radio": [
-    "Caller: \"Hat-trick? He's scored more than most midfielders all year.\" Host: \"He's a striker, caller.\" Caller: \"Still.\""
+    "Caller: \"Hat-trick? He's scored more than most midfielders all year.\" Host: \"He's a striker, caller.\" Caller: \"Still.\"",
+    "Hat-trick hero! Nothing else is getting airtime on the phones."
    ],
    "vid": [
     "{scorerS} HAT-TRICK REACTION from the {Wf} end",
     "All THREE goals: {scorerS} | {W} {wscore} {L}"
    ],
    "tac": [
-    "{scorerS} attacked the blind side again and again — three different runs, three different finishes. {L}'s line never solved it."
+    "{scorerS} attacked the blind side again and again — three different runs, three different finishes. {L}'s line never solved it.",
+    "{scorerS} found pockets all night and {L} couldn't track him. Three goals, three different finishes."
    ]
   },
   "brace": {
@@ -1437,20 +1480,24 @@
     "{scorerS} {?scored twice|got a brace}. {myScore}. [tail_lose]"
    ],
    "fanN": [
-    "Two for {scorerS}. {?Clinical.|Quality.}"
+    "Two for {scorerS}. {?Clinical.|Quality.}",
+    "{scorerS} bags a brace. {?Clinical.|Quality.|He just knows where the goal is.}",
+    "Two goals for {scorerS}. {?Sensational.|Job done.}"
    ],
    "meme": [
     "{scorerS} with his second: 😎 {L}: 🙂",
     "{scorerS} after the second goal: 😌✌️"
    ],
    "radio": [
-    "Line one: \"{scorerS}'s brace was outstanding.\" Line two: \"{L}'s marking was not.\""
+    "Line one: \"{scorerS}'s brace was outstanding.\" Line two: \"{L}'s marking was not.\"",
+    "{scorerS} with a brace and a smile. Phone-ins love it."
    ],
    "vid": [
     "BOTH goals: {scorerS} brace vs {L}"
    ],
    "tac": [
-    "{scorerS} drifted between centre-backs — {L} kept passing him on."
+    "{scorerS} drifted between centre-backs — {L} kept passing him on.",
+    "{scorerS} made the difference with two clean finishes, and {L} never worked out how to stop him."
    ]
   },
   "redcard": {
@@ -1487,7 +1534,8 @@
    ],
    "fanN": [
     "Red card for {redS} swung it. {?Foolish.|Costly.|Brutal.} [tail_neutral]",
-    "Ten men, one minute of madness. {?Football discipline matters.|Pure drama.}"
+    "Ten men, one minute of madness. {?Football discipline matters.|Pure drama.}",
+    "{redS} was sent off. {?Silly.|Rash.|Hard to argue with.}"
    ],
    "meme": [
     "{redS}: *sees red* The team: 🧍 \"cheers, mate\"",
@@ -1495,14 +1543,16 @@
     "{redS}: *sees red* Referee: \"ok bye\" {redTeam}: 😵"
    ],
    "radio": [
-    "Caller: \"That's a clear red.\" Other caller: \"Soft.\" Host: \"Thank you, gentlemen. Moving on…\""
+    "Caller: \"That's a clear red.\" Other caller: \"Soft.\" Host: \"Thank you, gentlemen. Moving on…\"",
+    "The red card dominates the phones. {?Harsh, says one.|Stonewall, says another.}"
    ],
    "vid": [
     "{redS} RED CARD REACTION: was it the right call?",
     "{redTeam} fans react to the sending-off"
    ],
    "tac": [
-    "After {redS}'s dismissal ({redMin}'), {redTeam} dropped to a 4-4-1 and conceded the ball: the game's tempo shifted completely."
+    "After {redS}'s dismissal ({redMin}'), {redTeam} dropped to a 4-4-1 and conceded the ball: the game's tempo shifted completely.",
+    "After {redS}'s red ({redMin}'), {redTeam} had to drop deeper and the shape was never the same."
    ]
   },
   "keeper": {
@@ -1537,7 +1587,8 @@
     "{gkS} stopped everything. {?Everything.|Absolutely everything.} {myScore}. [tail_lose]"
    ],
    "fanN": [
-    "{gkS}'s {saves} saves. {?Keepers are heroes.|Hands like buckets.|Great stuff.} [tail_neutral]"
+    "{gkS}'s {saves} saves. {?Keepers are heroes.|Hands like buckets.|Great stuff.} [tail_neutral]",
+    "{gkS} made {saves} saves. {?Heroic.|Frankly unreal.|Wall.}"
    ],
    "meme": [
     "{gkS}: \"{saves} saves, no biggie\" 🧤😎 {L}: 🫠",
@@ -1545,14 +1596,16 @@
     "{gkS} with {saves} saves: 🧤🧤🧤 Strikers: 🥲"
    ],
    "radio": [
-    "Caller wants {gkS} in the team of the week. Host wants him in the Hall of Fame."
+    "Caller wants {gkS} in the team of the week. Host wants him in the Hall of Fame.",
+    "{gkS} stood tall all night. Callers are sending in their Player of the Match votes already."
    ],
    "vid": [
     "{gkS}: ALL {saves} SAVES vs {L}",
     "{gk} goalkeeper masterclass — the best saves"
    ],
    "tac": [
-    "{gkS} faced {shL} shots — {saves} saves, many from close range. A goalkeeper-led defensive display."
+    "{gkS} faced {shL} shots — {saves} saves, many from close range. A goalkeeper-led defensive display.",
+    "{gkS} dealt with {saves} efforts from {shL} shots. {?A goalkeeper-led performance.|Defensive resilience at its best.}"
    ]
   },
   "xg_robbery": {
@@ -1587,21 +1640,24 @@
     "xG says we won. Scoreboard says no. {myScore}. {?Make it make sense.|Football is broken.} [tail_lose]"
    ],
    "fanN": [
-    "{L} was better and lost. {?Cruel.|Football is unfair.|Classic.} [tail_neutral]"
+    "{L} was better and lost. {?Cruel.|Football is unfair.|Classic.} [tail_neutral]",
+    "{L} deserved more. {?Football can be cruel.|The xG says it all.}"
    ],
    "meme": [
     "xG: {L} {xgL} – {xgW} {W}. Scoreboard: {wscore} {W}. xG: 🤡 Football: 💅",
     "xG: {L} {xgL}–{xgW} {W} Score: {W} {wscore} Football: 🤡"
    ],
    "radio": [
-    "Caller: \"Expected goals? It's the actual goals that count.\" Host: \"Not wrong, but also… {xgL} to {xgW}.\""
+    "Caller: \"Expected goals? It's the actual goals that count.\" Host: \"Not wrong, but also… {xgL} to {xgW}.\"",
+    "{xgW} xG vs {xgL}, and still the result went the other way. Callers want a recount."
    ],
    "vid": [
     "ROBBED? {L} fans react after {wscore} loss with {xgL} xG",
     "{W} STEAL IT: fan reaction"
    ],
    "tac": [
-    "{L} dominated shot quality ({xgL} xG) but {W}'s block and keeper turned nearly everything away."
+    "{L} dominated shot quality ({xgL} xG) but {W}'s block and keeper turned nearly everything away.",
+    "{L} created the better chances ({xgL} xG) but lacked a clinical finish; {W} took theirs."
    ]
   },
   "shootout": {
@@ -1643,13 +1699,16 @@
     "Penalty takers: 😎 → 😰 → 💀"
    ],
    "radio": [
-    "Caller: \"Pens are a lottery.\" Host: \"Yes, and you've been buying the same ticket for years.\""
+    "Caller: \"Pens are a lottery.\" Host: \"Yes, and you've been buying the same ticket for years.\"",
+    "A shootout! Callers cannot cope. Neither can the host."
    ],
    "vid": [
-    "PENALTY SHOOTOUT REACTION: {W} v {L} (the tension is real)"
+    "PENALTY SHOOTOUT REACTION: {W} v {L} (the tension is real)",
+    "PENALTY SHOOTOUT: {W} edge {L} in the nerve-shredder 🎥"
    ],
    "tac": [
-    "Both sides cancelled out over 120 minutes — {score}. The shootout decided it: composure over data."
+    "Both sides cancelled out over 120 minutes — {score}. The shootout decided it: composure over data.",
+    "Level at {score} after the full contest. The shootout came down to nerves and a few centimetres."
    ]
   },
   "og": {
@@ -1681,14 +1740,16 @@
     "{ogS} OG. {myScore}. {?Don't blame him.|Brutal luck.} [tail_lose]"
    ],
    "fanN": [
-    "Own goals: the cruelest part of football. Feel for {ogS}. [tail_neutral]"
+    "Own goals: the cruelest part of football. Feel for {ogS}. [tail_neutral]",
+    "{ogS} own goal. {?Cruel.|Rotten luck.|Happens to the best.}"
    ],
    "meme": [
     "{ogS} when the ball hit him: 🥺 \"I swear I didn't mean it\"",
     "{ogS}: *scores* {ogS}: *regrets*"
    ],
    "radio": [
-    "Caller: \"Not his fault!\" Host: \"Who else's name is on the scoresheet for them, caller?\""
+    "Caller: \"Not his fault!\" Host: \"Who else's name is on the scoresheet for them, caller?\"",
+    "Own goal drama on the phones. Callers feel sorry for {ogS}."
    ],
    "vid": [
     "{ogS} OWN GOAL: unlucky or unforgivable?"
@@ -1725,20 +1786,23 @@
     "Their sub {scorerS} killed us. {myScore}. [tail_lose]"
    ],
    "fanN": [
-    "{scorerS} off the bench to score — {?impact sub of the weekend|great stuff}. [tail_neutral]"
+    "{scorerS} off the bench to score — {?impact sub of the weekend|great stuff}. [tail_neutral]",
+    "{scorerS} off the bench to score. {?Manager's masterstroke.|Perfect timing.}"
    ],
    "meme": [
     "Coach: \"Go get us a goal.\" {scorerS}: ✅ in 6 minutes",
     "Bench warmers: 😪 {scorerS}: ⚽"
    ],
    "radio": [
-    "Caller: \"He's too good for the bench.\" Host: \"Evidently the manager disagrees. Until tonight.\""
+    "Caller: \"He's too good for the bench.\" Host: \"Evidently the manager disagrees. Until tonight.\"",
+    "Substitute scores! {scorerS} off the bench is the talk of the lines."
    ],
    "vid": [
     "SUPER-SUB {scorerS} wins it — fans react"
    ],
    "tac": [
-    "{scorerS}'s introduction changed the geometry — a fresh runner against tiring centre-backs."
+    "{scorerS}'s introduction changed the geometry — a fresh runner against tiring centre-backs.",
+    "The change worked: {scorerS} added energy and found space within minutes of coming on."
    ]
   }
  },
@@ -2219,136 +2283,176 @@
    "win": [
     "Told you we'd win it. {?Title race? Why not.|Believe!|The sky's the limit.}",
     "This is the start of something special.",
-    "Another one. {?Believe!|This season is going places.|I'm so excited.}"
+    "Another one. {?Believe!|This season is going places.|I'm so excited.}",
+    "Unbeaten in our hearts. Onwards! {?Believe.|Next week, same again.}",
+    "Great win. Great vibes. Great season ahead."
    ],
    "lose": [
     "Just a blip. {?We bounce back.|Onwards and upwards.|I still believe.}",
     "One bad day. Next week we go again, and win.",
-    "We'll {?bounce back|come back stronger|learn from this}. {?Trust.|Stay positive.}"
+    "We'll {?bounce back|come back stronger|learn from this}. {?Trust.|Stay positive.}",
+    "One bad day. We bounce back. {?Always do.|Trust the process.}",
+    "Learning moment. Next one's ours."
    ],
    "draw": [
     "A point is progress. {?Onwards.|Positive signs.}",
     "We'll look back on this as a point that mattered.",
-    "Positive step. {?We keep going.|Onwards.}"
+    "Positive step. {?We keep going.|Onwards.}",
+    "A point on the road, no shame in that. Positive signs."
    ]
   },
   "doomer": {
    "win": [
     "Don't get carried away. {?We're a mess.|It won't last.|We'll lose next week.}",
     "Won but I'm still worried about the defence.",
-    "Don't celebrate yet. {?It won't last.|We'll slip up soon.}"
+    "Don't celebrate yet. {?It won't last.|We'll slip up soon.}",
+    "Enjoy it while it lasts. {?Won't last.|Back to normal soon.}",
+    "Fine, we won. The next game will ruin it."
    ],
    "lose": [
     "Same old story. {?This club.|I knew it.|Of course.}",
     "I'm prepared for the worst. And the worst usually comes.",
-    "Told you. {?It's coming.|It always happens.}"
+    "Told you. {?It's coming.|It always happens.}",
+    "As expected. This club never changes.",
+    "Of course. Of course we lost."
    ],
    "draw": [
     "We'll regret those dropped points. Mark my words.",
     "A draw feels like a loss when you've been hurt this many times.",
-    "Sure, a point. We'll regret not winning."
+    "Sure, a point. We'll regret not winning.",
+    "A draw. That's basically a loss. See you in the relegation zone."
    ]
   },
   "delusional": {
    "win": [
     "{?Invincibles 2.0.|Quadruple on.|Easy league win.|We are cruising to the title.} Count the trophies.",
     "Best team in the world. Fight me.",
-    "We're winning EVERYTHING. {?Triple crown.|Double and the invincibles.}"
+    "We're winning EVERYTHING. {?Triple crown.|Double and the invincibles.}",
+    "Title. Said it before, saying it again. 🏆",
+    "We're unbeatable, quote me."
    ],
    "lose": [
     "We were robbed. {?Ref's a disgrace.|That's not a loss, that's a conspiracy.|Still the better team.}",
     "xG says we won. Nobody can tell me otherwise.",
-    "That's a scam. {?We won on vibes.|Robbery.}"
+    "That's a scam. {?We won on vibes.|Robbery.}",
+    "The ref ruined it, otherwise we win by three. Facts.",
+    "That wasn't a loss, that was a plot."
    ],
    "draw": [
     "Two points dropped, but we still played better. Heads high.",
     "We won that in every way except the scoreline.",
-    "We were better. {?Everyone knows.|Ask anyone.}"
+    "We were better. {?Everyone knows.|Ask anyone.}",
+    "We were better. The scoreboard is wrong."
    ]
   },
   "banter": {
    "win": [
     "Cheers for the three points, {oppS}. {?See you at the next one.|Enjoy the trip home.}",
     "{oppS} fans, how's the weather out there? 🌧️",
-    "{oppS} fans: {?hope you enjoyed it.|how's the mood?|sleep well.} 😘"
+    "{oppS} fans: {?hope you enjoyed it.|how's the mood?|sleep well.} 😘",
+    "Good win. Now delete the group chat, rivals. 😂",
+    "Three points and a big grin. Bye. 👋"
    ],
    "lose": [
     "Enjoy it while it lasts, {oppS} fans. We'll be back.",
     "Fair play {oppS}. See you next time, plenty of banter to come.",
-    "Enjoy it, {oppS}. {?We'll talk next week.|Don't get used to it.}"
+    "Enjoy it, {oppS}. {?We'll talk next week.|Don't get used to it.}",
+    "Sit down, nobody asked about that result. 😂",
+    "Fine. Tomorrow we're all fine. 🫠"
    ],
    "draw": [
     "Both sides rubbish, the draw was fair. 🤝",
     "I'll take the point and the banter.",
-    "You can have the point, {oppS} — we'll keep the pride."
+    "You can have the point, {oppS} — we'll keep the pride.",
+    "A point? I'll take it. See you in the pub. 🍻"
    ]
   },
   "tactician": {
    "win": [
     "Key moment: the shape change on 60'. {?Midfield overloaded and it flipped.|Pressing triggers worked beautifully.}",
     "The way we moved the ball through the half-spaces was a joy.",
-    "The pressing triggers worked. {?Great shape.|Smart positioning.}"
+    "The pressing triggers worked. {?Great shape.|Smart positioning.}",
+    "The press was perfect. Notice the spacing between the lines.",
+    "The shape clicked in the second half. Good adjustments."
    ],
    "lose": [
     "Tactically we were second best. {?Too wide.|No width.|No midfield control.} Questions for the manager.",
     "We lost the second balls. And the game with it.",
-    "Tactically outwitted. {?We were too predictable.|Rigid.}"
+    "Tactically outwitted. {?We were too predictable.|Rigid.}",
+    "Too open, no control in midfield. Needs fixing.",
+    "Shape never right. Fix the midfield pivot."
    ],
    "draw": [
     "Fine margins: both sides cancelled each other out. {?Wide overloads weren't enough.|Midfield stalemate.}",
     "A tactical draw, honestly.",
-    "Both shapes cancelled out. {?A chess match.|Clean sheets.}"
+    "Both shapes cancelled out. {?A chess match.|Clean sheets.}",
+    "Even game, nobody found overloads. Tactically fascinating."
    ]
   },
   "stat": {
    "win": [
     "{shW} shots, {possW}% of the ball, {xgW} xG. {?Numbers back it up.|Result matches process.}",
     "{xgW} xG to {xgL}. Process, not luck.",
-    "{xgW} xG, {shW} shots. {?The numbers are what they are.|Take the numbers however you like.}"
+    "{xgW} xG, {shW} shots. {?The numbers are what they are.|Take the numbers however you like.}",
+    "Win probability swung our way late. The numbers back it up.",
+    "xG says deserved. The data doesn't lie."
    ],
    "lose": [
     "{xgL} xG for them, {xgW} for us. {?Data doesn't lie.|Hard to argue.}",
     "{shL} shots against us. That's how you lose.",
-    "{xgL} xG against. {?Deserved.|Sigh.}"
+    "{xgL} xG against. {?Deserved.|Sigh.}",
+    "xG says we were unlucky. The data is angry too.",
+    "Possession doesn't win games. The data agrees. Sadly."
    ],
    "draw": [
     "{xgW}-{xgL} xG. A draw is fair on the data.",
     "Possession {possW}-{possL}. Nobody dominated.",
-    "{xgW} v {xgL} xG: draw was fair."
+    "{xgW} v {xgL} xG: draw was fair.",
+    "Even on shots and xG. A draw is the mean outcome."
    ]
   },
   "wholesome": {
    "win": [
     "Beautiful to watch. Thank you, lads. 💛",
     "Love this team, love this club, love this game.",
-    "Beautiful. {?So proud.|Thank you, lads.}"
+    "Beautiful. {?So proud.|Thank you, lads.}",
+    "Proud of the lads. Whole stadium singing. ❤️",
+    "What a day to be a fan. Thank you, team. 🫶"
    ],
    "lose": [
     "Proud of the effort regardless. We stick together. 💙",
     "Lost, but I'd still choose this club every time.",
-    "Heads high. {?We love you.|Stay strong.}"
+    "Heads high. {?We love you.|Stay strong.}",
+    "Heads up, lads. We're with you always. 💙",
+    "Tough one, but we'll stand by this team. 🙏"
    ],
    "draw": [
     "A point shared and a good game of football. 🤝",
     "Good match, good fans, good day. Onwards.",
-    "Good effort. {?Nice atmosphere.|Fun day.}"
+    "Good effort. {?Nice atmosphere.|Fun day.}",
+    "Good point, good effort. See you next week! 🤗"
    ]
   },
   "angry": {
    "win": [
     "Won, but I'm still livid about that first half. {?Defend!|Sort it out!}",
     "Three points but the performance was shocking.",
-    "Won, but that first half was ROUGH."
+    "Won, but that first half was ROUGH.",
+    "WIN doesn't fix the problems. Don't forget them.",
+    "Three points, fine. Still not good enough."
    ],
    "lose": [
     "That is NOT acceptable. {?Heads should roll.|Board take note.|Wake up!}",
     "I'm done with excuses. Fix it.",
-    "Unacceptable! {?Sort it out.|Wake up.}"
+    "Unacceptable! {?Sort it out.|Wake up.}",
+    "That's it. I'm done. Do better.",
+    "Unacceptable. Again."
    ],
    "draw": [
     "Dropped points AGAIN. {?Infuriating.|Pathetic.|Sick of it.}",
     "A draw is not good enough and everyone knows it.",
-    "Not good enough, AGAIN."
+    "Not good enough, AGAIN.",
+    "A draw is not acceptable. Improve."
    ]
   }
  },
@@ -2715,79 +2819,103 @@
   "keeper": {
    "win": [
     "The back line and keeper were organised. Communication wins games.",
-    "Clean positioning in the box; {W}'s keeper dealt with everything."
+    "Clean positioning in the box; {W}'s keeper dealt with everything.",
+    "Positioning was spot on, the back line well organised."
    ],
    "draw": [
-    "A draw: nobody made a keeper's mistake. Good concentration all round."
+    "A draw: nobody made a keeper's mistake. Good concentration all round.",
+    "Concentration at the back for both sides, and nobody made a goalkeeping error."
    ],
    "bore": [
-    "Sat through 90 minutes without being tested. A keeper's dream — and nightmare."
+    "Sat through 90 minutes without being tested. A keeper's dream — and nightmare.",
+    "Two organised back lines. Hard to find a mistake anywhere."
    ],
    "thrash": [
-    "{L}'s keeper had no chance behind that defence. Poor protection."
+    "{L}'s keeper had no chance behind that defence. Poor protection.",
+    "Nothing a keeper could do. The defending in front of him was the problem."
    ],
    "comeback": [
-    "When a team's behind, the keeper's distribution sets the tone. {W} got it right at the break."
+    "When a team's behind, the keeper's distribution sets the tone. {W} got it right at the break.",
+    "Keepers hate that kind of pressure. Full credit to the attackers for finding the way through."
    ],
    "late": [
-    "Keepers hate stoppage-time goals. {scorerS} wins it and the keeper gets no help."
+    "Keepers hate stoppage-time goals. {scorerS} wins it and the keeper gets no help.",
+    "Late goal, and a keeper who probably didn't see it coming. Concentration matters."
    ],
    "upset": [
-    "The giants' keeper was exposed — the defence hung him out to dry."
+    "The giants' keeper was exposed — the defence hung him out to dry.",
+    "Keeping the ball out when it matters: that's how you shock a big side."
    ],
    "hat": [
-    "{scorerS}'s hat-trick? The keeper was left alone three times. That's a defensive failure, not just a save issue."
+    "{scorerS}'s hat-trick? The keeper was left alone three times. That's a defensive failure, not just a save issue.",
+    "Three goals past one keeper. Tough night, but he'll learn."
    ],
    "red": [
-    "The red card left {redTeam} exposed at the back. A keeper's nightmare — more crosses, more pressure."
+    "The red card left {redTeam} exposed at the back. A keeper's nightmare — more crosses, more pressure.",
+    "Down to ten, the keeper becomes everything. That's a different game."
    ],
    "keeper": [
-    "{gkS}: {saves} saves. That's not luck — that's positioning, reflexes and nerve. Textbook."
+    "{gkS}: {saves} saves. That's not luck — that's positioning, reflexes and nerve. Textbook.",
+    "{gkS} with {saves} saves — that's the difference."
    ],
    "xgrob": [
-    "{L} had the shots; {W}'s keeper didn't blink. That's goalkeeping."
+    "{L} had the shots; {W}'s keeper didn't blink. That's goalkeeping.",
+    "Sometimes the keeper's good day beats all the expected goals."
    ],
    "pre": [
-    "Goalkeeping duel: {gkH} vs {gkA}. Whoever blinks first loses this one."
+    "Goalkeeping duel: {gkH} vs {gkA}. Whoever blinks first loses this one.",
+    "Both keepers in good form. {gkH} v {gkA} could decide it."
    ]
   },
   "host": {
    "win": [
     "Well, that was something. {W} get the win — we'll dissect it after the break.",
-    "{W} victorious, {L} licking their wounds. Let's hear from the panel."
+    "{W} victorious, {L} licking their wounds. Let's hear from the panel.",
+    "What a result. Over to the panel to pick apart what happened."
    ],
    "draw": [
-    "Honours even. Let's see how our panel sees it."
+    "Honours even. Let's see how our panel sees it.",
+    "A draw, and that's all we've got. Let's get into it."
    ],
    "bore": [
-    "Not one for the highlights reel. Let's find something to talk about."
+    "Not one for the highlights reel. Let's find something to talk about.",
+    "Not the most thrilling one, we'll admit. Right, let's talk about it."
    ],
    "thrash": [
-    "A statement from {W}. {L} will want to forget that one."
+    "A statement from {W}. {L} will want to forget that one.",
+    "That was one-sided. Let's see how the panel reacts."
    ],
    "comeback": [
-    "Drama! {W} turn it around — what do we make of that?"
+    "Drama! {W} turn it around — what do we make of that?",
+    "A comeback! Let's break it down with the panel."
    ],
    "late": [
-    "Unbelievable finish! {scorerS} the hero. Let's hear it from the panel."
+    "Unbelievable finish! {scorerS} the hero. Let's hear it from the panel.",
+    "Late drama. The panel has opinions. Let's go."
    ],
    "upset": [
-    "A seismic result. Who saw that coming?"
+    "A seismic result. Who saw that coming?",
+    "A shock result. Let's get the panel's take."
    ],
    "hat": [
-    "{scorerS} with the match ball. What a performance!"
+    "{scorerS} with the match ball. What a performance!",
+    "A hat-trick! Time to hear from the panel."
    ],
    "red": [
-    "A red card changed everything. Was it the right decision?"
+    "A red card changed everything. Was it the right decision?",
+    "The red card changed everything. Panel, thoughts?"
    ],
    "keeper": [
-    "{gkS} on form. Let's look at those saves."
+    "{gkS} on form. Let's look at those saves.",
+    "A keeper-led night. Let's hear it from the panel."
    ],
    "xgrob": [
-    "The stats say one thing; the scoreboard another. Let's discuss."
+    "The stats say one thing; the scoreboard another. Let's discuss.",
+    "The numbers and the result don't match. Panel?"
    ],
    "pre": [
-    "Big game on the horizon. Let's get the panel's predictions."
+    "Big game on the horizon. Let's get the panel's predictions.",
+    "A big one coming up. Predictions, panel?"
    ]
   }
  },
@@ -3347,7 +3475,9 @@
    "{playerS}: {n} and the season isn't done. {?Sensational.|Ridiculous.}"
   ],
   "apps": [
-   "{player} makes his {n}th appearance — {?loyalty and consistency|a model professional}."
+   "{player} makes his {n}th appearance — {?loyalty and consistency|a model professional}.",
+   "{player} reaches {n} appearances — {?a real servant of the club|durability and class}.",
+   "{n} games for {player}. {?Class is permanent.|An ever-present.}"
   ],
   "fan": [
    "{playerS}: {n} goals. {?What a servant.|He's a legend.|Just incredible.} 🙌",
@@ -3398,7 +3528,9 @@
   ],
   "wish": [
    "Wishing {inj} a full and quick recovery. Football can be cruel.",
-   "From all of us at {outlet}: get well soon, {injS}."
+   "From all of us at {outlet}: get well soon, {injS}.",
+   "We wish {inj} a speedy return. Football misses you when you're out.",
+   "Get well soon, {injS}. Everyone at {outlet} is thinking of you."
   ]
  },
  "MB_TROPHY": {
@@ -3466,7 +3598,9 @@
    "BEHIND THE SCENES: {team} win the {trophy}"
   ],
   "tac": [
-   "How {team} won the {trophy}: pressing, structure, patience. A blueprint."
+   "How {team} won the {trophy}: pressing, structure, patience. A blueprint.",
+   "The {team} blueprint: the shape, the pressing, the patience. {trophy} secured.",
+   "How {team} won the {trophy}: control, patience and the right XI."
   ],
   "stat": [
    "{team}: {trophy} champions. {?Another one for the cabinet.|A season of dominance.|Another golden chapter.}",
@@ -3669,22 +3803,31 @@
  "MB_STUDIO": {
   "title_race": [
    "The title race: {leadS} lead by {gap}. How many mistakes can {secondS} afford?",
-   "Our panel is split: {leadS} for the title, or {secondS} to catch them?"
+   "Our panel is split: {leadS} for the title, or {secondS} to catch them?",
+   "The race is tight: {leadS} lead by {gap}. Does {secondS} have the nerve?",
+   "Panel question: can {secondS} close a gap of {gap} on {leadS}?"
   ],
   "sack": [
    "{mgrS} is under pressure. Our panel weighs in on whether he should stay.",
-   "{team} are in a crisis. What can they do?"
+   "{team} are in a crisis. What can they do?",
+   "The pressure is building on {mgrS} at {team}. How long before the board acts?",
+   "Is it the end for {mgrS}? Our panel weighs in on {team}."
   ],
   "transfer": [
-   "Transfer buzz around {player}: {?is he worth {fee}?|will he move?|how would he fit at {to}?}"
+   "Transfer buzz around {player}: {?is he worth {fee}?|will he move?|how would he fit at {to}?}",
+   "Is {player} worth {fee}? Our panel says {?yes|no|depends}.",
+   "{player} to {to}: sensible move or a big gamble?"
   ],
   "champs": [
    "{team} are the champions. Let's take a look at how they did it.",
-   "A season of triumph — {team} have won it all."
+   "A season of triumph — {team} have won it all.",
+   "{team} are champions. Our panel looks back at how they did it.",
+   "What made {team} so good this season? The panel digs in."
   ],
   "awards": [
    "Tonight: the awards. Who deserved it, who was snubbed?",
-   "A night of glory for {winnerS}. But was it the right choice?"
+   "A night of glory for {winnerS}. But was it the right choice?",
+   "{winnerS} takes the big award. Deserved? We debate."
   ]
  },
  "GEN": {
