@@ -4661,14 +4661,31 @@ const PLAYSTYLE_BEHAVIOR = {
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  // Cache canonical skill keys to avoid repeated regex & map overhead on identical strings
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
+    if (typeof s !== 'string') s = String(s || '');
+    let cached = _canonSkillCache.get(s);
+    if (cached !== undefined) return cached;
     const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    const res = SKILL_NAME_ALIASES[k] || k;
+    _canonSkillCache.set(s, res);
+    return res;
   }
+  // Fast skill lookup using a WeakMap-cached Set on p.expandedAttrs (O(1) lookups in match simulation)
+  const _canonSkillsMap = new WeakMap();
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    let set = _canonSkillsMap.get(p.expandedAttrs);
+    if (!set) {
+      set = new Set();
+      const skills = p.expandedAttrs.skills || [];
+      for (let i = 0; i < skills.length; i++) {
+        set.add(canonSkillKey(skills[i]));
+      }
+      _canonSkillsMap.set(p.expandedAttrs, set);
+    }
+    return set.has(canonSkillKey(skillName));
   }
   function xattr(p, key, fallback) {
     const v = p && p.expandedAttrs && p.expandedAttrs[key];
