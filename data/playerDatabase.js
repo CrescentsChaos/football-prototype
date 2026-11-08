@@ -837,14 +837,37 @@
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  // Cache for canonicalized skill strings to avoid repeating regex and alias lookups.
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
+    let hit = _canonSkillCache.get(s);
+    if (hit !== undefined) return hit;
     const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    hit = SKILL_NAME_ALIASES[k] || k;
+    _canonSkillCache.set(s, hit);
+    return hit;
+  }
+  // WeakMap caching a Set of canonical skills per player's expandedAttrs.
+  // Converts O(N) array scans with repetitive string normalization during
+  // simulation hot loops into O(1) Set lookups without mutating attribute objects.
+  const _canonSkillsMap = new WeakMap();
+  function getPlayerSkillSet(expandedAttrs) {
+    let set = _canonSkillsMap.get(expandedAttrs);
+    if (set !== undefined) return set;
+    set = new Set();
+    const list = expandedAttrs.skills;
+    if (Array.isArray(list)) {
+      for (let i = 0; i < list.length; i++) {
+        set.add(canonSkillKey(list[i]));
+      }
+    }
+    _canonSkillsMap.set(expandedAttrs, set);
+    return set;
   }
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    const set = getPlayerSkillSet(p.expandedAttrs);
+    return set.has(canonSkillKey(skillName));
   }
 /*@CHUNK:c0031:END*/
 
