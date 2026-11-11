@@ -3122,14 +3122,30 @@ var App = (() => {
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
+    let c = _canonSkillCache.get(s);
+    if (c !== undefined) return c;
     const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    c = SKILL_NAME_ALIASES[k] || k;
+    _canonSkillCache.set(s, c);
+    return c;
   }
+  const _canonSkillsMap = new WeakMap();
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    let set = _canonSkillsMap.get(p.expandedAttrs);
+    if (!set) {
+      const rawSkills = p.expandedAttrs.skills;
+      set = new Set();
+      if (rawSkills && rawSkills.length) {
+        for (let i = 0; i < rawSkills.length; i++) {
+          set.add(canonSkillKey(rawSkills[i]));
+        }
+      }
+      _canonSkillsMap.set(p.expandedAttrs, set);
+    }
+    return set.has(canonSkillKey(skillName));
   }
   function xattr(p, key, fallback) {
     const v = p && p.expandedAttrs && p.expandedAttrs[key];
