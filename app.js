@@ -3122,14 +3122,31 @@ var App = (() => {
     'risingshots': 'risingshot',
     'longrangeshor': 'longrangeshooting'
   };
+  // Cache canonicalized skill query keys to avoid repeated regex operations
+  const _canonSkillCache = new Map();
   function canonSkillKey(s) {
+    let res = _canonSkillCache.get(s);
+    if (res !== undefined) return res;
     const k = normSkillKey(s);
-    return SKILL_NAME_ALIASES[k] || k;
+    res = SKILL_NAME_ALIASES[k] || k;
+    _canonSkillCache.set(s, res);
+    return res;
   }
+  // WeakMap caching a Set of canonicalized skills per player expandedAttrs object.
+  // Converts O(N) array scans with regex overhead into O(1) Set lookups during simulation hot loops.
+  const _canonSkillsMap = new WeakMap();
   function hasSkill(p, skillName) {
     if (!p || !p.expandedAttrs) return false;
-    const target = canonSkillKey(skillName);
-    return (p.expandedAttrs.skills || []).some((s) => canonSkillKey(s) === target);
+    let set = _canonSkillsMap.get(p.expandedAttrs);
+    if (!set) {
+      const raw = p.expandedAttrs.skills || [];
+      set = new Set();
+      for (let i = 0; i < raw.length; i++) {
+        set.add(canonSkillKey(raw[i]));
+      }
+      _canonSkillsMap.set(p.expandedAttrs, set);
+    }
+    return set.has(canonSkillKey(skillName));
   }
   function xattr(p, key, fallback) {
     const v = p && p.expandedAttrs && p.expandedAttrs[key];
