@@ -20094,7 +20094,7 @@ a.gala-chip:hover{border-color:#e8bd48}
       if (typeof attr.age === 'number') bio.push(['Age', attr.age]);
       if (typeof attr.height_cm === 'number') bio.push(['Height', Math.round(attr.height_cm) + ' cm']);
       if (attr.preferred_foot) bio.push(['Foot', ppEsc(attr.preferred_foot)]);
-      if (typeof attr['weak foot'] === 'number') bio.push(['Weak foot', attr['weak foot'] + ' of 5']);
+      if (typeof attr['weak foot'] === 'number') bio.push(['Weak foot', attr['weak foot'] + ' of 100']);
       if (attr.injury_res) bio.push(['Injury resistance', ppEsc(attr.injury_res)]);
     }
 
