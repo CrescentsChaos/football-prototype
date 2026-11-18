@@ -15528,14 +15528,26 @@ a.gala-chip:hover{border-color:#e8bd48}
   function safeSetItem(key, value) {
     try {
       localStorage.setItem(key, value);
+      // ApexStore refuses to overwrite a key that another tab changed more recently; report that as a failed write
+      // instead of pretending it was saved.
+      if (localStorage.getItem(key) !== value) return false;
       return true;
     } catch (e) {
       if (isQuotaError(e) && !_storageQuotaWarned) {
         _storageQuotaWarned = true;
-        toast('Browser storage is full — use Export Save now to back up your progress to a file');
+        toast('Browser storage is full — open the Saves button (bottom corner) to back up to Google Drive or a file');
       }
       return false;
     }
+  }
+
+  // Keys whose saved copy could not be read at load time. persistAll() must never delete those just because the
+  // in-memory copy is empty - the raw data stays untouched so it can be recovered from a snapshot / Drive.
+  const _loadFailed = {};
+  function markLoadFailed(key, err) {
+    _loadFailed[key] = true;
+    console.error('Could not read saved ' + key, err);
+    try { setTimeout(() => toast('A saved item (' + key + ') could not be read. It was left untouched - open Saves to restore a snapshot.'), 1500); } catch (e) {}
   }
 
   // ========== SAVE-SIZE COMPACTION HELPERS ==========
@@ -15743,13 +15755,13 @@ a.gala-chip:hover{border-color:#e8bd48}
     let ok = true;
     try {
       if (season) ok = safeSetItem('apexSeason', JSON.stringify(season, teamRefReplacer)) && ok;
-      else localStorage.removeItem('apexSeason');
+      else if (!_loadFailed.apexSeason) localStorage.removeItem('apexSeason');
       if (worldCup) ok = safeSetItem('apexWorldCup', JSON.stringify(worldCup, teamRefReplacer)) && ok;
-      else localStorage.removeItem('apexWorldCup');
+      else if (!_loadFailed.apexWorldCup) localStorage.removeItem('apexWorldCup');
       if (qualifiers) ok = safeSetItem('apexQualifiers', JSON.stringify(qualifiers, teamRefReplacer)) && ok;
-      else localStorage.removeItem('apexQualifiers');
+      else if (!_loadFailed.apexQualifiers) localStorage.removeItem('apexQualifiers');
       if (tournament) ok = safeSetItem('apexTournament', JSON.stringify(tournament, teamRefReplacer)) && ok;
-      else localStorage.removeItem('apexTournament');
+      else if (!_loadFailed.apexTournament) localStorage.removeItem('apexTournament');
       ok = safeSetItem('apexTournamentType', tournamentType) && ok;
       ok = safeSetItem('apexTournamentStats', JSON.stringify(compactStatsBook(tournamentStats))) && ok;
       ok = safeSetItem('apexSeasonActiveTab', seasonActiveTab) && ok;
@@ -15770,19 +15782,19 @@ a.gala-chip:hover{border-color:#e8bd48}
     try {
       const s = localStorage.getItem('apexSeason');
       if (s) season = JSON.parse(s, teamRefReviver);
-    } catch (e) { season = null; }
+    } catch (e) { season = null; markLoadFailed('apexSeason', e); }
     try {
       const wc = localStorage.getItem('apexWorldCup');
       if (wc) worldCup = JSON.parse(wc, teamRefReviver);
-    } catch (e) { worldCup = null; }
+    } catch (e) { worldCup = null; markLoadFailed('apexWorldCup', e); }
     try {
       const q = localStorage.getItem('apexQualifiers');
       if (q) qualifiers = JSON.parse(q, teamRefReviver);
-    } catch (e) { qualifiers = null; }
+    } catch (e) { qualifiers = null; markLoadFailed('apexQualifiers', e); }
     try {
       const t = localStorage.getItem('apexTournament');
       if (t) tournament = JSON.parse(t, teamRefReviver);
-    } catch (e) { tournament = null; }
+    } catch (e) { tournament = null; markLoadFailed('apexTournament', e); }
     try {
       const tt = localStorage.getItem('apexTournamentType');
       if (tt) tournamentType = tt;
@@ -15908,6 +15920,15 @@ a.gala-chip:hover{border-color:#e8bd48}
       });
     }
   }
+  // Used by the Save Manager (apex-save-ui.js) right before it snapshots / syncs, so the stored copy is exactly what
+  // is on screen.
+  function persistNow() {
+    let ok = true;
+    try { ok = persistAll() && ok; } catch (e) { ok = false; }
+    try { ok = saveStats() && ok; } catch (e) { ok = false; }
+    return ok;
+  }
+
   function manualSave() {
     const okSeason = persistAll();
     const okStats = saveStats();
@@ -16046,6 +16067,20 @@ a.gala-chip:hover{border-color:#e8bd48}
         if (!confirm('Import this save? This will REPLACE all current progress — leaderboard, trophies, history, active season, tournament, everything — with the contents of this file. This cannot be undone.')) {
           return;
         }
+        if (window.ApexStore && ApexStore.replaceAll) {
+          // New path: snapshot the current save first (so this is undoable), write everything to IndexedDB,
+          // and only reload once it is safely stored.
+          const clean = {};
+          validKeys.forEach(k => { clean[k] = data[k]; });
+          ApexStore.replaceAll(clean, { reason: 'file import' }).then(() => {
+            try { sessionStorage.setItem('apexJustImported', '1'); } catch (e) {}
+            return ApexStore.saveAndReload();
+          }).catch(err => {
+            console.error('Import failed', err);
+            alert('Import failed: ' + (err && err.message ? err.message : err) + '. Your previous save was not changed (a snapshot was taken first).');
+          });
+          return;
+        }
         // Clear every existing "apex*" key first so nothing from the
         // current save (e.g. a key this version writes that an older
         // export doesn't have) bleeds into the restored state.
@@ -16099,16 +16134,24 @@ a.gala-chip:hover{border-color:#e8bd48}
     // then reload so the app boots from a completely clean slate — this
     // guarantees no stale in-memory state (season, tournament, injury
     // book, player forms, etc.) can survive the reset.
-    try {
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
-      }
-      keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
-    } catch (e) {}
-    try { sessionStorage.setItem('apexJustReset', '1'); } catch (e) {}
-    location.reload();
+    // Take a safety snapshot first (a reset can then be undone from the Saves panel), wipe, and reload only once
+    // the wipe has really been written to storage.
+    const wipe = () => {
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
+        }
+        keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+      } catch (e) {}
+      try { sessionStorage.setItem('apexJustReset', '1'); } catch (e) {}
+      if (window.ApexStore && ApexStore.saveAndReload) ApexStore.saveAndReload(); else location.reload();
+    };
+    if (window.ApexStore && ApexStore.snapshot) {
+      try { if (window.App && App.persistNow) App.persistNow(); } catch (e) {}
+      ApexStore.snapshot('Before full reset', 'safety').then(wipe, wipe);
+    } else wipe();
   }
 
   // ========== LEADERBOARD ==========
@@ -32112,7 +32155,7 @@ a.gala-chip:hover{border-color:#e8bd48}
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     playLeagueTournamentFixture, simLeagueTournamentFixture,
     returnToTournament, showPlayerProfile, showTeamProfile, renderPlayerPage, renderTeamPage, playerPageURL, teamPageURL, showTeamLineup, randomMatch, randomizeTeamSide,
-    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
+    resetLeaderboard, manualSave, persistNow, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
     sortTournamentTeams, filterTournamentTeamsLeague, filterTournamentTeamsRating,
     openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,

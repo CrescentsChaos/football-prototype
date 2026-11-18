@@ -213,16 +213,24 @@
     // then reload so the app boots from a completely clean slate — this
     // guarantees no stale in-memory state (season, tournament, injury
     // book, player forms, etc.) can survive the reset.
-    try {
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
-      }
-      keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
-    } catch (e) {}
-    try { sessionStorage.setItem('apexJustReset', '1'); } catch (e) {}
-    location.reload();
+    // Take a safety snapshot first (a reset can then be undone from the Saves panel), wipe, and reload only once
+    // the wipe has really been written to storage.
+    const wipe = () => {
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf('apex') === 0) keysToRemove.push(k);
+        }
+        keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+      } catch (e) {}
+      try { sessionStorage.setItem('apexJustReset', '1'); } catch (e) {}
+      if (window.ApexStore && ApexStore.saveAndReload) ApexStore.saveAndReload(); else location.reload();
+    };
+    if (window.ApexStore && ApexStore.snapshot) {
+      try { if (window.App && App.persistNow) App.persistNow(); } catch (e) {}
+      ApexStore.snapshot('Before full reset', 'safety').then(wipe, wipe);
+    } else wipe();
   }
 /*@CHUNK:c0348:END*/
 

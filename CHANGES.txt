@@ -1,3 +1,21 @@
+SAVE SYSTEM: IndexedDB storage, snapshots, Google Drive sync (see SAVE-SETUP.md)
+
+Changed files (drop into your football-game folder, overwriting existing ones):
+  NEW  apex-store.js  apex-drive.js  apex-save-ui.js  apex-config.js  SAVE-SETUP.md  test/save-harness.js
+  index.html  awards.html  extras.html  history.html  hospital.html  leaderboard.html  match.html  media.html
+  player.html  players.html  season.html  team.html  teams.html  tournament.html   (one script tag each)
+  simulation/seasonEngine.js  ui/statisticsUI.js  ui/matchUI.js  dist/app.js (patched)  CHANGES.txt
+
+WHAT'S NEW
+ - localStorage is replaced (same API, no game code needed) by an IndexedDB-backed store: no 5 MB cap, verified writes.
+ - Rolling snapshots + restore; automatic safety snapshot before import / reset / cloud load.
+ - Another tab changing the save makes this tab stop writing (red Reload bar) instead of overwriting newer data.
+ - Unreadable saved season/tournament is no longer deleted by the next autosave.
+ - Import/Reset now wait until storage is written before reloading.
+ - Google Drive sync (hidden app folder, gzip, 6 rotating backups, named slots, conflict prompts).
+
+--------------------------------------------------------------------------
+
 LEGACY, RECORDS, REPUTATION & MARKET VALUE (social layer)
 
 Changed files (drop into your football-game folder, overwriting existing ones):

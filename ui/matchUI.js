@@ -1675,7 +1675,7 @@
     showAwards, goToSquadBuilder, playTournamentMatch, simSingleFixture,
     playLeagueTournamentFixture, simLeagueTournamentFixture,
     returnToTournament, showPlayerProfile, showTeamProfile, showTeamLineup, randomMatch, randomizeTeamSide,
-    resetLeaderboard, manualSave, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
+    resetLeaderboard, manualSave, persistNow, exportSave, triggerImportSave, importSaveFile, toggleSaveMenu,
     searchTeams, sortTeams, searchTournamentTeams,
     sortTournamentTeams, filterTournamentTeamsLeague, filterTournamentTeamsRating,
     openSquadBuilder, setSquadSlot, openSlotPicker, closeSlotPicker,
