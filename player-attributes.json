@@ -93,34 +93,19 @@
 
 "arg11":{"name":"Nahuel Molina","pos":["RB"],"height_cm":175,"preferred_foot":"Right","age":28,"num":70,"playstyle":["Attacking Full-back"],"off_awr":73,"ball_con":79,"dribb":79,"tight_pos":76,"low_pass":77,"lofted_pass":81,"fin":63,"head":62,"place_kick":60,"curl":71,"def_awr":73,"def_eng":82,"tack":79,"aggr":80,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":95,"accel":87,"kick_pwr":87,"jmp":66,"phy_con":69,"bal":82,"stam":96,"skills":["Pinpoint Crossing","One-touch Pass","Interception","Fighting Spirit"],"weak foot":75,"injury_res":"High","form":"Standard","personality":["Trickster","Long Ball Expert","Early Crosser"]},
 
-"fiorentina2027_new1":{"name":"Franco Mastantuono","pos":["RMF"],"height_cm":178,"preferred_foot":"Left","age":19,"num":70,"playstyle":["Creative Playmaker"],"off_awr":79,"ball_con":86,"dribb":85,"tight_pos":87,"low_pass":78,"lofted_pass":80,"fin":78,"head":54,"place_kick":73,"curl":79,"def_awr":51,"def_eng":64,"tack":53,"aggr":61,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":88,"accel":88,"kick_pwr":87,"jmp":62,"phy_con":66,"bal":87,"stam":84,"skills":["Long-range Curler","Through Passing","Double Touch","Flip Flap","Cut Behind & Turn","Sole Control","First-time Shot","One-touch Pass","Outside Curler","Gamesmanship"],"weak foot":25,"injury_res":"Medium","form":"Standard","personality":["Mazing Run"]}
+"fiorentina2027_new1":{"name":"Franco Mastantuono","pos":["RMF"],"height_cm":178,"preferred_foot":"Left","age":19,"num":70,"playstyle":["Creative Playmaker"],"off_awr":79,"ball_con":86,"dribb":85,"tight_pos":87,"low_pass":78,"lofted_pass":80,"fin":78,"head":54,"place_kick":73,"curl":79,"def_awr":51,"def_eng":64,"tack":53,"aggr":61,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":88,"accel":88,"kick_pwr":87,"jmp":62,"phy_con":66,"bal":87,"stam":84,"skills":["Long-range Curler","Through Passing","Double Touch","Flip Flap","Cut Behind & Turn","Sole Control","First-time Shot","One-touch Pass","Outside Curler","Gamesmanship"],"weak foot":25,"injury_res":"Medium","form":"Standard","personality":["Mazing Run"]},
 
+"por9":{"name":"Diogo Dalot","pos":["RB"],"height_cm":184,"preferred_foot":"Right","age":27,"num":70,"playstyle":["Attacking Full-back"],"off_awr":74,"ball_con":77,"dribb":79,"tight_pos":75,"low_pass":75,"lofted_pass":78,"fin":59,"head":72,"place_kick":57,"curl":76,"def_awr":74,"def_eng":81,"tack":75,"aggr":90,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":96,"accel":84,"kick_pwr":86,"jmp":84,"phy_con":73,"bal":74,"stam":95,"skills":["Pinpoint Crossing","Interception","Sliding Tackle"],"weak foot":75,"injury_res":"Medium","form":"Standard","personality":["Trickster"]},
 
+"por1":{"name":"Diogo Costa","pos":["GK"],"height_cm":186,"preferred_foot":"Right","age":27,"num":70,"playstyle":["Attacking GK"],"off_awr":40,"ball_con":55,"dribb":41,"tight_pos":45,"low_pass":62,"lofted_pass":67,"fin":40,"head":44,"place_kick":55,"curl":46,"def_awr":50,"def_eng":60,"tack":47,"aggr":45,"gk_awr":91,"gk_catch":88,"gk_parry":91,"gk_reflex":92,"gk_reach":90,"spd":56,"accel":60,"kick_pwr":74,"jmp":70,"phy_con":69,"bal":52,"stam":59,"skills":["GK Penalty Saver","GK Low Punt","GK High Punt","GK Long Throw","Captaincy","Fighting Spirit"],"weak foot":50,"injury_res":"Medium","form":"Standard","personality":["Early Crosser"]},
 
+"por8":{"name":"Gonçalo Inácio","pos":["CB"],"height_cm":186,"preferred_foot":"Left","age":25,"num":70,"playstyle":["Build Up"],"off_awr":65,"ball_con":70,"dribb":70,"tight_pos":65,"low_pass":76,"lofted_pass":76,"fin":50,"head":75,"place_kick":59,"curl":70,"def_awr":89,"def_eng":86,"tack":86,"aggr":86,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":79,"accel":77,"kick_pwr":80,"jmp":78,"phy_con":85,"bal":64,"stam":83,"skills":["Weighted Pass","Captaincy"],"weak foot":25,"injury_res":"Medium","form":"Standard","personality":[]},
 
+"por21":{"name":"Pedro Neto","pos":["LMF"],"height_cm":174,"preferred_foot":"Left","age":26,"num":70,"playstyle":["Cross Specialist"],"off_awr":80,"ball_con":88,"dribb":92,"tight_pos":90,"low_pass":84,"lofted_pass":85,"fin":81,"head":55,"place_kick":69,"curl":79,"def_awr":54,"def_eng":56,"tack":55,"aggr":65,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":95,"accel":91,"kick_pwr":90,"jmp":61,"phy_con":75,"bal":88,"stam":90,"skills":["Long-range Curler","Through Passing","Pinpoint Crossing","Scissors Feint","Double Touch","Cut Behind & Turn","Sole Control","Track Back","Edged Crossing","Acceleration Burst"],"weak foot":50,"injury_res":"Low","form":"Unwavering","personality":["Trickster","Incisive Run","Long Ball Expert"]},
 
+"por22":{"name":"Gonçalo Ramos","pos":["CF"],"height_cm":185,"preferred_foot":"Right","age":25,"num":70,"playstyle":["Goal Poacher"],"off_awr":91,"ball_con":81,"dribb":79,"tight_pos":79,"low_pass":68,"lofted_pass":60,"fin":93,"head":86,"place_kick":65,"curl":68,"def_awr":50,"def_eng":70,"tack":52,"aggr":70,"gk_awr":41,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":84,"accel":90,"kick_pwr":86,"jmp":86,"phy_con":84,"bal":82,"stam":80,"skills":["Heading","Long-range Curler","Heel Trick","Super-sub","First-time Shot","One-touch Pass","Track Back","Fighting Spirit","Aerial Superiority","Bullet Header"],"weak foot":50,"injury_res":"High","form":"Inconsistent","personality":["Incisive Run","Early Crosser"]},
 
+"brugge2027_new3":{"name":"Carlos Forbs","pos":["RMF"],"height_cm":169,"preferred_foot":"Left","age":22,"num":70,"playstyle":["Hole Player"],"off_awr":82,"ball_con":85,"dribb":88,"tight_pos":84,"low_pass":80,"lofted_pass":75,"fin":81,"head":55,"place_kick":58,"curl":78,"def_awr":48,"def_eng":56,"tack":46,"aggr":58,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":89,"accel":87,"kick_pwr":84,"jmp":60,"phy_con":68,"bal":87,"stam":82,"skills":["Long-range Curler","Chip Shot Control","Through Passing","Pinpoint Crossing","Scissors Feint","Double Touch","First-time Shot","One-touch Pass","Outside Curler","Fighting Spirit"],"weak foot":75,"injury_res":"Medium","form":"Standard","personality":["Mazing Run","Long Ball Expert","Early Crosser"]},
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+"por20":{"name":"Francisco Conceição","pos":["RWF"],"height_cm":172,"preferred_foot":"Left","age":24,"num":70,"playstyle":["Prolific Winger"],"off_awr":80,"ball_con":94,"dribb":96,"tight_pos":96,"low_pass":81,"lofted_pass":79,"fin":81,"head":52,"place_kick":74,"curl":81,"def_awr":56,"def_eng":64,"tack":60,"aggr":66,"gk_awr":40,"gk_catch":40,"gk_parry":40,"gk_reflex":40,"gk_reach":40,"spd":88,"accel":91,"kick_pwr":82,"jmp":57,"phy_con":61,"bal":91,"stam":83,"skills":["Long-range Curler","Pinpoint Crossing","Double Touch","Flip Flap","Marseille Turn","Cut Behind & Turn","Sole Control","Outside Curler","Track Back","Acceleration Burst"],"weak foot":50,"injury_res":"Low","form":"Standard","personality":["Trickster","Mazing Run","Long Ball Expert"]}
 }
